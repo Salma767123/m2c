@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
+import Dropdown from '@/components/UI/Dropdown'
 import { ArrowLeft, Save, X, Upload } from 'lucide-react'
 import Link from 'next/link'
 import { categories } from '@/components/mockData/products'
@@ -699,43 +700,22 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Category *
-                      </label>
-                      <select
-                        name="category"
+                      <Dropdown
+                        label="Category *"
                         value={formData.category}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                      >
-                        <option value="">Select Category</option>
-                        {categories.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
-                      </select>
+                        options={categories}
+                        placeholder="Select Category"
+                        onChange={(value) => setFormData(prev => ({ ...prev, category: value as string, subCategory: '' }))}
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Sub-Category *
-                      </label>
-                      <select
-                        name="subCategory"
+                      <Dropdown
+                        label="Sub-Category *"
                         value={formData.subCategory}
-                        onChange={handleInputChange}
-                        required
-                        disabled={!formData.category}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent disabled:bg-gray-100"
-                      >
-                        <option value="">Select Sub-Category</option>
-                        {formData.category && categorySubcategories[formData.category]?.map((subCat) => (
-                          <option key={subCat} value={subCat}>
-                            {subCat}
-                          </option>
-                        ))}
-                      </select>
+                        options={formData.category ? categorySubcategories[formData.category] || [] : []}
+                        placeholder="Select Sub-Category"
+                        onChange={(value) => setFormData(prev => ({ ...prev, subCategory: value as string }))}
+                      />
                     </div>
                   </div>
 
@@ -831,23 +811,13 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Fabric Type *
-                    </label>
-                    <select
-                      name="fabricType"
+                    <Dropdown
+                      label="Fabric Type *"
                       value={formData.fabricType}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                    >
-                      <option value="">Select Fabric Type</option>
-                      {fabricTypes.map((fabric) => (
-                        <option key={fabric} value={fabric}>
-                          {fabric}
-                        </option>
-                      ))}
-                    </select>
+                      options={fabricTypes}
+                      placeholder="Select Fabric Type"
+                      onChange={(value) => setFormData(prev => ({ ...prev, fabricType: value as string }))}
+                    />
                   </div>
 
                   <div>
@@ -992,29 +962,21 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                         <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Size *</label>
-                            <select
-                              value={newVariant.size}
-                              onChange={(e) => setNewVariant(prev => ({ ...prev, size: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
-                            >
-                              <option value="">Select Size</option>
-                              {standardSizes.map((size) => (
-                                <option key={size} value={size}>{size}</option>
-                              ))}
-                            </select>
+                            <Dropdown
+                              value={newVariant.size || ''}
+                              options={standardSizes}
+                              placeholder="Select Size"
+                              onChange={(value) => setNewVariant(prev => ({ ...prev, size: value as string }))}
+                            />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Color *</label>
-                            <select
-                              value={newVariant.color}
-                              onChange={(e) => setNewVariant(prev => ({ ...prev, color: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
-                            >
-                              <option value="">Select Color</option>
-                              {standardColors.map((color) => (
-                                <option key={color} value={color}>{color}</option>
-                              ))}
-                            </select>
+                            <Dropdown
+                              value={newVariant.color || ''}
+                              options={standardColors}
+                              placeholder="Select Color"
+                              onChange={(value) => setNewVariant(prev => ({ ...prev, color: value as string }))}
+                            />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">SKU *</label>
@@ -1606,20 +1568,17 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Product Status
-                  </label>
-                  <select
-                    name="status"
+                  <Dropdown
+                    label="Product Status"
                     value={formData.status}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="active">Active</option>
-                    <option value="suspended">Suspended</option>
-                    <option value="out_of_stock">Out of Stock</option>
-                  </select>
+                    options={[
+                      { value: 'pending', label: 'Pending' },
+                      { value: 'active', label: 'Active' },
+                      { value: 'suspended', label: 'Suspended' },
+                      { value: 'out_of_stock', label: 'Out of Stock' }
+                    ]}
+                    onChange={(value) => setFormData(prev => ({ ...prev, status: value as 'active' | 'pending' | 'suspended' | 'out_of_stock' }))}
+                  />
                 </div>
 
                 <div className="flex items-center">
