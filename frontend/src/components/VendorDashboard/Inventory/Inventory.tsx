@@ -1,277 +1,359 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
-import { Button } from '@/components/UI/Button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
-import { Package, Plus, Search, Filter, Edit, Trash2, AlertTriangle, Minus } from 'lucide-react';
+import { useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
+import { Button } from '@/components/UI/Button'
+import { Badge } from '@/components/UI/Badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/UI/Table'
+import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Edit, Trash2 } from 'lucide-react'
+import Link from 'next/link'
+import Dropdown from '@/components/UI/Dropdown'
 
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  stock: number;
-  price: number;
-  status: 'In Stock' | 'Low Stock' | 'Out of Stock';
-  lastUpdated: string;
+interface InventoryItem {
+  id: number
+  name: string
+  sku: string
+  category: string
+  currentStock: number
+  minStock: number
+  maxStock: number
+  status: 'in_stock' | 'low_stock' | 'out_of_stock'
+  lastRestocked: string
+  price: number
+  costPrice: number
+}
+
+const mockInventoryItems: InventoryItem[] = [
+  {
+    id: 1,
+    name: 'Cotton Kitchen Towel',
+    sku: 'CKT-001',
+    category: 'Kitchen Linen',
+    currentStock: 45,
+    minStock: 10,
+    maxStock: 100,
+    status: 'in_stock',
+    lastRestocked: '2024-01-15',
+    price: 12.99,
+    costPrice: 6.50,
+  },
+  {
+    id: 2,
+    name: 'Handwoven Bath Towel',
+    sku: 'HBT-002',
+    category: 'Bath Linen',
+    currentStock: 8,
+    minStock: 15,
+    maxStock: 80,
+    status: 'low_stock',
+    lastRestocked: '2024-01-14',
+    price: 24.99,
+    costPrice: 12.00,
+  },
+  {
+    id: 3,
+    name: 'Artisan Apron',
+    sku: 'AA-003',
+    category: 'Aprons',
+    currentStock: 0,
+    minStock: 5,
+    maxStock: 50,
+    status: 'out_of_stock',
+    lastRestocked: '2024-01-13',
+    price: 18.99,
+    costPrice: 9.50,
+  },
+  {
+    id: 4,
+    name: 'Luxury Bed Sheet Set',
+    sku: 'LBS-004',
+    category: 'Bed Linen',
+    currentStock: 25,
+    minStock: 5,
+    maxStock: 30,
+    status: 'in_stock',
+    lastRestocked: '2024-01-16',
+    price: 89.99,
+    costPrice: 45.00,
+  },
+  {
+    id: 5,
+    name: 'Table Runner',
+    sku: 'TR-005',
+    category: 'Table Linen',
+    currentStock: 12,
+    minStock: 20,
+    maxStock: 60,
+    status: 'low_stock',
+    lastRestocked: '2024-01-12',
+    price: 34.99,
+    costPrice: 17.50,
+  },
+]
+
+const getStatusBadge = (status: string, currentStock: number, minStock: number) => {
+  if (currentStock === 0) {
+    return <Badge className="bg-red-100 text-red-800">Out of Stock</Badge>
+  }
+  if (currentStock <= minStock) {
+    return <Badge className="bg-yellow-100 text-yellow-800">Low Stock</Badge>
+  }
+  return <Badge className="bg-green-100 text-green-800">In Stock</Badge>
 }
 
 export default function Inventory() {
-  const router = useRouter();
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: '1',
-      name: 'Cotton Kitchen Towel',
-      sku: 'CKT-001',
-      category: 'Kitchen Linen',
-      stock: 45,
-      price: 12.99,
-      status: 'In Stock',
-      lastUpdated: '2024-01-15'
-    },
-    {
-      id: '2',
-      name: 'Handwoven Bath Towel',
-      sku: 'HBT-002',
-      category: 'Bath Linen',
-      stock: 8,
-      price: 24.99,
-      status: 'Low Stock',
-      lastUpdated: '2024-01-14'
-    },
-    {
-      id: '3',
-      name: 'Artisan Apron',
-      sku: 'AA-003',
-      category: 'Aprons',
-      stock: 0,
-      price: 18.99,
-      status: 'Out of Stock',
-      lastUpdated: '2024-01-13'
-    }
-  ]);
+  const [inventoryItems] = useState<InventoryItem[]>(mockInventoryItems)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
 
-  const [searchTerm, setSearchTerm] = useState('');
+  // Calculate stats
+  const totalItems = inventoryItems.length
+  const lowStockItems = inventoryItems.filter(item => item.currentStock <= item.minStock && item.currentStock > 0).length
+  const outOfStockItems = inventoryItems.filter(item => item.currentStock === 0).length
+  const totalValue = inventoryItems.reduce((sum, item) => sum + (item.currentStock * item.costPrice), 0)
 
-  const handleAddProduct = () => {
-    router.push('/vendor/dashboard/products/add');
-  };
+  // Get unique categories for filter
+  const categories = ['all', ...Array.from(new Set(inventoryItems.map(item => item.category)))]
 
-  const handleEditProduct = (product: Product) => {
-    router.push(`/vendor/dashboard/products/edit/${product.id}`);
-  };
+  // Filter items
+  const filteredItems = inventoryItems.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'out_of_stock' && item.currentStock === 0) ||
+                         (statusFilter === 'low_stock' && item.currentStock <= item.minStock && item.currentStock > 0) ||
+                         (statusFilter === 'in_stock' && item.currentStock > item.minStock)
+    
+    const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter
 
-  const handleQuantityChange = (productId: string, delta: number) => {
-    setProducts(prev => prev.map(p => {
-      if (p.id === productId) {
-        const newStock = Math.max(0, p.stock + delta);
-        const newStatus = newStock === 0 ? 'Out of Stock' : newStock < 10 ? 'Low Stock' : 'In Stock';
+    return matchesSearch && matchesStatus && matchesCategory
+  })
 
-        return {
-          ...p,
-          stock: newStock,
-          status: newStatus,
-          lastUpdated: new Date().toISOString().split('T')[0]
-        };
-      }
-      return p;
-    }));
-  };
+  const handleRestock = (itemId: number) => {
+    console.log('Restocking item:', itemId)
+    // Implement restock logic here
+  }
 
-  const handleDeleteProduct = (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      setProducts(prev => prev.filter(p => p.id !== id));
-    }
-  };
+  const handleEdit = (itemId: number) => {
+    console.log('Editing item:', itemId)
+    // Navigate to edit page or open modal
+  }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'In Stock': return 'text-green-600 bg-green-100';
-      case 'Low Stock': return 'text-yellow-600 bg-yellow-100';
-      case 'Out of Stock': return 'text-gray-700 bg-gray-50';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
-
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleDelete = (itemId: number) => {
+    console.log('Deleting item:', itemId)
+    // Implement delete logic here
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#222222]">Inventory Management</h1>
           <p className="text-slate-600">Manage your product inventory and stock levels</p>
         </div>
-        <Button 
-          onClick={handleAddProduct}
-          className="bg-[#222222] text-white text-base font-semibold hover:bg-[#313131]"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Product
-        </Button>
+        <Link href="/vendor/dashboard/inventory/add">
+          <Button className="bg-[#222222] text-white hover:bg-[#313131]">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Inventory Item
+          </Button>
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Inventory Stats */}
+      <div className="grid gap-6 lg:grid-cols-4">
         <Card className="border border-gray-200 hover:border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Package className="w-8 h-8 text-gray-700" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Total Products</p>
-                <p className="text-2xl font-bold text-[#222222]">{products.length}</p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Total Items</CardTitle>
+            <Package className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-[#222222]">{totalItems}</div>
+            <p className="text-xs text-slate-600">Unique products</p>
           </CardContent>
         </Card>
 
         <Card className="border border-gray-200 hover:border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <AlertTriangle className="w-8 h-8 text-yellow-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Low Stock</p>
-                <p className="text-2xl font-bold text-[#222222]">
-                  {products.filter(p => p.status === 'Low Stock').length}
-                </p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Low Stock</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{lowStockItems}</div>
+            <p className="text-xs text-slate-600">Need restocking</p>
           </CardContent>
         </Card>
 
         <Card className="border border-gray-200 hover:border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <AlertTriangle className="w-8 h-8 text-gray-700" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Out of Stock</p>
-                <p className="text-2xl font-bold text-[#222222]">
-                  {products.filter(p => p.status === 'Out of Stock').length}
-                </p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Out of Stock</CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{outOfStockItems}</div>
+            <p className="text-xs text-slate-600">Urgent attention</p>
           </CardContent>
         </Card>
 
         <Card className="border border-gray-200 hover:border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Package className="w-8 h-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Total Value</p>
-                <p className="text-2xl font-bold text-[#222222]">
-                  ${products.reduce((sum, p) => sum + (p.stock * p.price), 0).toFixed(2)}
-                </p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-600">Total Value</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-[#222222]">${totalValue.toLocaleString()}</div>
+            <p className="text-xs text-slate-600">Inventory worth</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Filters */}
       <Card className="border border-gray-200">
-        <CardContent className="p-6">
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search products..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Search inventory..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Dropdown
+                  id="statusFilter"
+                  value={statusFilter}
+                  options={[
+                    { value: 'all', label: 'All Status' },
+                    { value: 'in_stock', label: 'In Stock' },
+                    { value: 'low_stock', label: 'Low Stock' },
+                    { value: 'out_of_stock', label: 'Out of Stock' }
+                  ]}
+                  onChange={(value) => setStatusFilter(value as 'all' | 'in_stock' | 'low_stock' | 'out_of_stock')}
+                />
+              </div>
+              <Dropdown
+                id="categoryFilter"
+                value={categoryFilter}
+                options={categories.map(cat => ({ 
+                  value: cat, 
+                  label: cat === 'all' ? 'All Categories' : cat 
+                }))}
+                onChange={(value) => setCategoryFilter(value as string)}
               />
             </div>
-            <Button variant="outline" className="hover:bg-gray-50 hover:border-gray-200">
-              <Filter className="w-4 h-4 mr-2" />
-              Filter
-            </Button>
           </div>
         </CardContent>
       </Card>
 
+      {/* Inventory Table */}
       <Card className="border border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-[#222222]">Products</CardTitle>
+          <CardTitle className="text-[#222222]">Inventory Items</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
-                <TableHead >SKU</TableHead>
-                <TableHead >Category</TableHead>
-                <TableHead >Stock</TableHead>
-                <TableHead >Price</TableHead>
-                <TableHead >Status</TableHead>
-                <TableHead >Actions</TableHead>
+                <TableHead>SKU</TableHead>
+                <TableHead>Linked Product</TableHead>
+                <TableHead>Current Stock</TableHead>
+                <TableHead>Min/Max</TableHead>
+                <TableHead>Cost Price</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Last Restocked</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProducts.map((product) => (
-                <TableRow key={product.id} className="hover:bg-gray-50">
-                  <TableCell>
-                    <div className="font-medium text-[#222222]">{product.name}</div>
-                  </TableCell>
-                  <TableCell className="text-slate-600">{product.sku}</TableCell>
-                  <TableCell className="text-slate-600">{product.category}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-600 min-w-10 font-semibold">{product.stock}</span>
-                      <div className="flex flex-col gap-1">
-                        <button
-                          onClick={() => handleQuantityChange(product.id, 1)}
-                          className="w-6 h-6 flex items-center justify-center border border-gray-200 rounded hover:bg-gray-50 hover:border-gray-200 transition-colors"
-                          title="Increase stock"
-                        >
-                          <Plus className="w-3 h-3 text-gray-700" />
-                        </button>
-                        <button
-                          onClick={() => handleQuantityChange(product.id, -1)}
-                          disabled={product.stock === 0}
-                          className="w-6 h-6 flex items-center justify-center border border-gray-200 rounded hover:bg-gray-50 hover:border-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Decrease stock"
-                        >
-                          <Minus className="w-3 h-3 text-gray-700" />
-                        </button>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-gray-700 font-medium">${product.price.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(product.status)}`}>
-                      {product.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="hover:bg-gray-50 hover:border-gray-200"
-                        onClick={() => handleEditProduct(product)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="hover:bg-gray-50 hover:border-gray-200"
-                        onClick={() => handleDeleteProduct(product.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+              {filteredItems.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-12">
+                    <div className="text-slate-500">
+                      <p className="text-lg font-medium">No inventory items found</p>
+                      <p className="text-sm">Try adjusting your search or filter criteria</p>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredItems.map((item) => (
+                  <TableRow key={item.id} className="hover:bg-gray-50">
+                    <TableCell>
+                      <div>
+                        <div className="font-medium text-[#222222]">{item.name}</div>
+                        <div className="text-sm text-slate-500">{item.category}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-slate-600">{item.sku}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-sm text-slate-600">Product Linked</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className={item.currentStock <= item.minStock ? 'text-red-600 font-bold' : 'text-[#222222] font-semibold'}>
+                        {item.currentStock}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-600">
+                      {item.minStock} / {item.maxStock}
+                    </TableCell>
+                    <TableCell className="font-medium text-[#222222]">
+                      ${item.costPrice.toFixed(2)}
+                    </TableCell>
+                    <TableCell>{getStatusBadge(item.status, item.currentStock, item.minStock)}</TableCell>
+                    <TableCell className="text-sm text-slate-600">
+                      {new Date(item.lastRestocked).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="hover:bg-gray-50 hover:border-gray-200"
+                          onClick={() => handleRestock(item.id)}
+                          disabled={item.currentStock > item.minStock}
+                        >
+                          Restock
+                        </Button>
+                        <Link href={`/vendor/dashboard/inventory/edit/${item.id}`}>
+                          <Button variant="outline" size="sm" className="hover:bg-gray-50 hover:border-gray-200">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="hover:bg-gray-50 hover:border-gray-200 text-red-600 hover:text-red-700"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

@@ -37,14 +37,14 @@ const navigation: NavigationItem[] = [
     href: "/vendor/dashboard",
   },
   {
-    title: "Products",
-    icon: Package,
-    href: "/vendor/dashboard/products",
-  },
-  {
     title: "Inventory",
     icon: Warehouse,
     href: "/vendor/dashboard/inventory",
+  },
+   {
+    title: "Products",
+    icon: Package,
+    href: "/vendor/dashboard/products",
   },
   {
     title: "Orders",

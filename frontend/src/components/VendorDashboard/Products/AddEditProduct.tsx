@@ -5,13 +5,49 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
-import { ArrowLeft, Save, X, Upload } from 'lucide-react'
+import Dropdown from '@/components/UI/Dropdown'
+import { ArrowLeft, Save, X, Upload, Package } from 'lucide-react'
 import Link from 'next/link'
 import { categories } from '@/components/mockData/products'
 import { useToast } from '@/hooks/use-toast'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 
-// Mock data for categories and subcategories
+// Mock data for inventory items (these would come from API)
+const mockInventoryItems = [
+  {
+    id: '1',
+    name: 'Cotton Kitchen Towel',
+    sku: 'KL-CKT-001',
+    category: 'Kitchen Linen',
+    description: 'High-quality cotton kitchen towel with excellent absorbency',
+    costPrice: 6.50,
+    sellingPrice: 12.99,
+    currentStock: 45,
+    hasProductCreated: false
+  },
+  {
+    id: '2',
+    name: 'Handwoven Bath Towel',
+    sku: 'BL-HBT-002',
+    category: 'Bath Linen',
+    description: 'Luxurious handwoven bath towel',
+    costPrice: 12.00,
+    sellingPrice: 24.99,
+    currentStock: 25,
+    hasProductCreated: false
+  },
+  {
+    id: '3',
+    name: 'Premium Bed Sheet Set',
+    sku: 'BL-PBS-003',
+    category: 'Bed Linen',
+    description: 'Premium quality bed sheet set',
+    costPrice: 45.00,
+    sellingPrice: 89.99,
+    currentStock: 15,
+    hasProductCreated: true // Already has a product created
+  }
+]
 const categorySubcategories: Record<string, string[]> = {
   'Bed Sheets': ['Cotton Sheets', 'Linen Sheets', 'Silk Sheets', 'Microfiber Sheets'],
   'Towels': ['Bath Towels', 'Hand Towels', 'Beach Towels', 'Kitchen Towels'],
@@ -27,10 +63,39 @@ const fabricTypes = [
 const standardSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'King', 'Queen', 'Full', 'Twin', 'Custom']
 const standardColors = ['White', 'Black', 'Gray', 'Navy', 'Beige', 'Brown', 'Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple']
 
+// Helper function to get color name from hex value
+const getColorName = (hex: string): string => {
+  const colorMap: { [key: string]: string } = {
+    '#000000': 'Black',
+    '#ffffff': 'White',
+    '#808080': 'Gray',
+    '#c0c0c0': 'Silver',
+    '#ff0000': 'Red',
+    '#00ff00': 'Green',
+    '#0000ff': 'Blue',
+    '#ffff00': 'Yellow',
+    '#ff00ff': 'Magenta',
+    '#00ffff': 'Cyan',
+    '#800000': 'Maroon',
+    '#008000': 'Dark Green',
+    '#000080': 'Navy',
+    '#808000': 'Olive',
+    '#800080': 'Purple',
+    '#008080': 'Teal',
+    '#ffa500': 'Orange',
+    '#ffc0cb': 'Pink',
+    '#a52a2a': 'Brown',
+    '#f5f5dc': 'Beige'
+  }
+  
+  return colorMap[hex.toLowerCase()] || `Custom (${hex})`
+}
+
 interface ProductVariant {
   id: string
   size: string
   color: string
+  colorHex?: string // New field for color picker hex value
   sku: string
   price: number
   stock: number
@@ -42,6 +107,7 @@ interface ProductImage {
   url: string
   alt: string
   isPrimary: boolean
+  imageType: 'cover' | 'gallery' // New field to distinguish image types
 }
 
 interface FabricSpecification {
@@ -61,15 +127,19 @@ interface PricingTier {
 }
 
 interface ProductFormData {
+  // Inventory Connection (NEW FLOW)
+  inventoryItemId?: string // Link to inventory item
+  isFromInventory: boolean // Whether this product is created from inventory
+  
   name: string
   description: string
   category: string
   subCategory: string
   
-  // Pricing Information
+  // Pricing Information (inherited from inventory)
   basePrice: number
   originalPrice?: number
-  discount?: number // Discount percentage (e.g., 25 for 25% off)
+  discount?: number
   
   // Product Rating & Reviews (for display/reference)
   rating?: number
@@ -77,7 +147,7 @@ interface ProductFormData {
   
   // Fabric & Specifications
   fabricType: string
-  material: string // Main material description (e.g., "100% Organic Cotton")
+  material: string
   fabricSpecifications: FabricSpecification
   
   // Variants Management
@@ -93,8 +163,9 @@ interface ProductFormData {
   // Pricing Configuration
   pricingTiers: PricingTier[]
   bulkPricingEnabled: boolean
+  singleUnitPricingEnabled: boolean
   
-  // Stock Management
+  // Stock Management (linked to inventory)
   totalStock: number
   lowStockThreshold: number
   trackInventory: boolean
@@ -121,15 +192,20 @@ interface ProductFormData {
 interface AddEditProductProps {
   productId?: string
   isEdit?: boolean
+  inventoryId?: string // Pre-select an inventory item when coming from inventory page
 }
 
-export default function AddEditProduct({ productId, isEdit = false }: AddEditProductProps) {
+export default function AddEditProduct({ productId, isEdit = false, inventoryId }: AddEditProductProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
   
   const [formData, setFormData] = useState<ProductFormData>({
+    // Inventory Connection (NEW)
+    inventoryItemId: inventoryId || '',
+    isFromInventory: !!inventoryId,
+    
     name: '',
     description: '',
     category: '',
@@ -169,6 +245,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
     // Pricing Configuration
     pricingTiers: [{ minQuantity: 1, price: 0 }],
     bulkPricingEnabled: false,
+    singleUnitPricingEnabled: true,
     
     // Stock Management
     totalStock: 0,
@@ -197,6 +274,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
   const [newTag, setNewTag] = useState('')
   const [newCareInstruction, setNewCareInstruction] = useState('')
   const [activeTab, setActiveTab] = useState('basic')
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<any>(null)
   // Auto-save functionality (optional)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
@@ -220,6 +298,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
   const [newVariant, setNewVariant] = useState<Partial<ProductVariant>>({
     size: '',
     color: '',
+    colorHex: '#000000',
     sku: '',
     price: 0,
     stock: 0
@@ -239,6 +318,9 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
           
           // Mock product data for editing
           setFormData({
+            inventoryItemId: '1',
+            isFromInventory: true,
+            
             name: 'Premium Cotton Bed Sheet Set',
             description: 'Luxurious 100% cotton bed sheet set with superior comfort and durability',
             category: categories[0],
@@ -269,6 +351,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                 id: '1',
                 size: 'Queen',
                 color: 'White',
+                colorHex: '#FFFFFF',
                 sku: 'CS-Q-WHT-001',
                 price: 89.99,
                 stock: 25,
@@ -278,6 +361,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                 id: '2',
                 size: 'King',
                 color: 'White',
+                colorHex: '#FFFFFF',
                 sku: 'CS-K-WHT-001',
                 price: 99.99,
                 stock: 15,
@@ -296,6 +380,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
               { minQuantity: 50, price: 69.99, discount: 22 }
             ],
             bulkPricingEnabled: true,
+            singleUnitPricingEnabled: true,
             
             totalStock: 40,
             lowStockThreshold: 5,
@@ -325,8 +410,25 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
       }
 
       loadProductData()
+    } else if (inventoryId) {
+      // Pre-fill from inventory selection
+      const inventoryItem = mockInventoryItems.find(item => item.id === inventoryId)
+      if (inventoryItem) {
+        setSelectedInventoryItem(inventoryItem)
+        setFormData(prev => ({
+          ...prev,
+          inventoryItemId: inventoryId,
+          isFromInventory: true,
+          name: inventoryItem.name,
+          description: inventoryItem.description,
+          category: inventoryItem.category,
+          baseSku: inventoryItem.sku,
+          basePrice: inventoryItem.sellingPrice,
+          totalStock: inventoryItem.currentStock
+        }))
+      }
     }
-  }, [isEdit, productId])
+  }, [isEdit, productId, inventoryId])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -365,13 +467,43 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
     }
   }
 
-  // Variant Management Functions
+  // Inventory Selection Functions
+  const handleInventorySelect = (inventoryItem: any) => {
+    setSelectedInventoryItem(inventoryItem)
+    setFormData(prev => ({
+      ...prev,
+      inventoryItemId: inventoryItem.id,
+      isFromInventory: true,
+      name: inventoryItem.name,
+      description: inventoryItem.description,
+      category: inventoryItem.category,
+      baseSku: inventoryItem.sku,
+      basePrice: inventoryItem.sellingPrice,
+      totalStock: inventoryItem.currentStock
+    }))
+  }
+
+  const clearInventorySelection = () => {
+    setSelectedInventoryItem(null)
+    setFormData(prev => ({
+      ...prev,
+      inventoryItemId: '',
+      isFromInventory: false,
+      name: '',
+      description: '',
+      category: '',
+      baseSku: '',
+      basePrice: 0,
+      totalStock: 0
+    }))
+  }
   const addVariant = () => {
     if (newVariant.size && newVariant.color && newVariant.sku) {
       const variant: ProductVariant = {
         id: Date.now().toString(),
         size: newVariant.size!,
         color: newVariant.color!,
+        colorHex: newVariant.colorHex || '#000000',
         sku: newVariant.sku!,
         price: newVariant.price || 0,
         stock: newVariant.stock || 0,
@@ -383,7 +515,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
         variants: [...prev.variants, variant]
       }))
       
-      setNewVariant({ size: '', color: '', sku: '', price: 0, stock: 0 })
+      setNewVariant({ size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0 })
     }
   }
 
@@ -397,17 +529,36 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
   const updateVariant = (variantId: string, field: keyof ProductVariant, value: any) => {
     setFormData(prev => ({
       ...prev,
-      variants: prev.variants.map(v => 
-        v.id === variantId ? { ...v, [field]: value } : v
-      )
+      variants: prev.variants.map(v => {
+        if (v.id === variantId) {
+          // If updating colorHex, also update color name
+          if (field === 'colorHex') {
+            return { 
+              ...v, 
+              [field]: value,
+              color: getColorName(value)
+            }
+          }
+          return { ...v, [field]: value }
+        }
+        return v
+      })
     }))
   }
 
   // Pricing Tier Functions
   const addPricingTier = () => {
+    const newTier: PricingTier = {
+      minQuantity: formData.pricingTiers.length > 0 
+        ? (formData.pricingTiers[formData.pricingTiers.length - 1].maxQuantity || 0) + 1 
+        : 1,
+      price: 0,
+      discount: 0
+    }
+    
     setFormData(prev => ({
       ...prev,
-      pricingTiers: [...prev.pricingTiers, { minQuantity: 1, price: 0 }]
+      pricingTiers: [...prev.pricingTiers, newTier]
     }))
   }
 
@@ -462,10 +613,43 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
   }
 
   // Image handling functions
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, imageType: 'cover' | 'gallery' = 'gallery') => {
     const files = e.target.files
     if (!files) return
 
+    // Check limits before processing
+    if (imageType === 'cover') {
+      const existingCoverImages = formData.images.filter(img => img.imageType === 'cover')
+      if (existingCoverImages.length >= 1) {
+        showWarningToast('Cover Image Limit', 'Only one cover image is allowed. Please remove the existing cover image first.')
+        e.target.value = '' // Reset input
+        return
+      }
+      if (files.length > 1) {
+        showWarningToast('Single Image Only', 'Please select only one image for cover image.')
+        e.target.value = '' // Reset input
+        return
+      }
+    }
+
+    if (imageType === 'gallery') {
+      const existingGalleryImages = formData.images.filter(img => img.imageType === 'gallery')
+      const remainingSlots = 3 - existingGalleryImages.length
+      
+      if (remainingSlots <= 0) {
+        showWarningToast('Gallery Limit Reached', 'Maximum 3 gallery images allowed. Please remove some images first.')
+        e.target.value = '' // Reset input
+        return
+      }
+      
+      if (files.length > remainingSlots) {
+        showWarningToast('Too Many Images', `You can only add ${remainingSlots} more gallery image${remainingSlots > 1 ? 's' : ''}.`)
+        e.target.value = '' // Reset input
+        return
+      }
+    }
+
+    // Process files
     Array.from(files).forEach((file) => {
       if (file.size > 10 * 1024 * 1024) { // 10MB limit
         showWarningToast('File Too Large', `${file.name} is larger than 10MB`)
@@ -478,7 +662,8 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
           url: event.target?.result as string,
           alt: file.name,
-          isPrimary: formData.images.length === 0 // First image is primary
+          isPrimary: imageType === 'cover',
+          imageType: imageType
         }
 
         setFormData(prev => ({
@@ -493,22 +678,68 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
     e.target.value = ''
   }
 
-  const setPrimaryImage = (imageId: string) => {
+  const setCoverImage = (imageId: string) => {
     setFormData(prev => ({
       ...prev,
       images: prev.images.map(img => ({
         ...img,
-        isPrimary: img.id === imageId
+        isPrimary: img.id === imageId,
+        imageType: img.id === imageId ? 'cover' : img.imageType
       }))
+    }))
+  }
+
+  const setImageType = (imageId: string, imageType: 'cover' | 'gallery') => {
+    // Check limits before changing type
+    if (imageType === 'cover') {
+      const existingCoverImages = formData.images.filter(img => img.imageType === 'cover' && img.id !== imageId)
+      if (existingCoverImages.length >= 1) {
+        showWarningToast('Cover Image Limit', 'Only one cover image is allowed. Please remove the existing cover image first.')
+        return
+      }
+    }
+
+    if (imageType === 'gallery') {
+      const existingGalleryImages = formData.images.filter(img => img.imageType === 'gallery' && img.id !== imageId)
+      if (existingGalleryImages.length >= 3) {
+        showWarningToast('Gallery Limit Reached', 'Maximum 3 gallery images allowed.')
+        return
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.map(img => {
+        if (img.id === imageId) {
+          return {
+            ...img,
+            imageType: imageType,
+            isPrimary: imageType === 'cover' ? true : false
+          }
+        }
+        // If setting another image as cover, remove cover status from others
+        if (imageType === 'cover' && img.imageType === 'cover') {
+          return {
+            ...img,
+            imageType: 'gallery',
+            isPrimary: false
+          }
+        }
+        return img
+      })
     }))
   }
 
   const removeImage = (imageId: string) => {
     setFormData(prev => {
       const updatedImages = prev.images.filter(img => img.id !== imageId)
-      // If we removed the primary image, make the first remaining image primary
-      if (updatedImages.length > 0 && !updatedImages.some(img => img.isPrimary)) {
-        updatedImages[0].isPrimary = true
+      // If we removed the cover image, make the first gallery image the cover if available
+      if (updatedImages.length > 0 && !updatedImages.some(img => img.imageType === 'cover')) {
+        const firstGalleryImage = updatedImages.find(img => img.imageType === 'gallery')
+        if (firstGalleryImage) {
+          firstGalleryImage.imageType = 'cover'
+          firstGalleryImage.isPrimary = true
+        }
       }
       return {
         ...prev,
@@ -552,7 +783,23 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
       return
     }
     
-    if (!formData.hasVariants && formData.basePrice <= 0) {
+    // Pricing validation
+    if (!formData.singleUnitPricingEnabled && !formData.bulkPricingEnabled) {
+      showErrorToast('Validation Error', 'Please select at least one pricing strategy.')
+      return
+    }
+    
+    if (formData.singleUnitPricingEnabled && formData.basePrice <= 0) {
+      showErrorToast('Validation Error', 'Please enter a valid base price for single unit pricing.')
+      return
+    }
+    
+    if (formData.bulkPricingEnabled && formData.pricingTiers.some(tier => tier.price <= 0)) {
+      showErrorToast('Validation Error', 'Please enter valid prices for all bulk pricing tiers.')
+      return
+    }
+    
+    if (!formData.hasVariants && formData.singleUnitPricingEnabled && formData.basePrice <= 0) {
       showErrorToast('Validation Error', 'Please enter a valid base price.')
       return
     }
@@ -630,9 +877,9 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
       {/* Form */}
       <form onSubmit={handleSubmit}>
         {/* Tab Navigation */}
-        <div className="mb-6">
+        <div className="mb-4">
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+            <nav className="-mb-px flex space-x-6">
               {[
                 { id: 'basic', label: 'Basic Info' },
                 { id: 'fabric', label: 'Fabric & Specs' },
@@ -645,9 +892,9 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  className={`py-2 px-1 border-b-2 font-medium text-base ${
                     activeTab === tab.id
-                      ? 'border-gray-700 text-gray-900'
+                      ? 'border-gray-700 text-white bg-gray-900 rounded-t-md p-2'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
@@ -669,6 +916,73 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                   <CardTitle>Basic Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  
+                  {/* Inventory Selection */}
+                  <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                    <h4 className="font-medium text-blue-900 mb-3">Select Inventory Item</h4>
+                    <p className="text-sm text-blue-800 mb-4">
+                      Choose an inventory item to create a detailed product with variants
+                    </p>
+                    
+                    {!selectedInventoryItem ? (
+                      <div className="space-y-3">
+                        <Dropdown
+                          label="Available Inventory Items"
+                          value=""
+                          options={mockInventoryItems
+                            .filter(item => !item.hasProductCreated)
+                            .map(item => ({
+                              value: item.id,
+                              label: `${item.name} (${item.sku}) - Stock: ${item.currentStock}`
+                            }))}
+                          placeholder="Select an inventory item"
+                          onChange={(value) => {
+                            const item = mockInventoryItems.find(i => i.id === value)
+                            if (item) handleInventorySelect(item)
+                          }}
+                        />
+                        <p className="text-xs text-blue-700">
+                          Only inventory items without existing products are shown
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-white border border-blue-300 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h5 className="font-medium text-gray-900">{selectedInventoryItem.name}</h5>
+                            <p className="text-sm text-gray-600">SKU: {selectedInventoryItem.sku}</p>
+                            <p className="text-sm text-gray-600">Category: {selectedInventoryItem.category}</p>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm"
+                            onClick={clearInventorySelection}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Change
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600">Current Stock:</span>
+                            <span className="font-medium ml-2">{selectedInventoryItem.currentStock}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Base Price:</span>
+                            <span className="font-medium ml-2">${selectedInventoryItem.sellingPrice}</span>
+                          </div>
+                        </div>
+                        <Link href={`/vendor/dashboard/inventory/edit/${selectedInventoryItem.id}`}>
+                          <Button variant="outline" size="sm" className="mt-3">
+                            Edit Inventory Item
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Product Details (Auto-filled or Manual) */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Product Name *
@@ -679,9 +993,15 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                       value={formData.name}
                       onChange={handleInputChange}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                      disabled={formData.isFromInventory}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${
+                        formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
+                      }`}
                       placeholder="Enter product name"
                     />
+                    {formData.isFromInventory && (
+                      <p className="text-xs text-gray-500 mt-1">Auto-filled from inventory item</p>
+                    )}
                   </div>
 
                   <div>
@@ -695,49 +1015,34 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                       required
                       rows={4}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                      placeholder="Product description"
+                      placeholder="Enhance the product description with detailed information"
                     />
+                    {formData.isFromInventory && (
+                      <p className="text-xs text-gray-500 mt-1">You can enhance the basic description from inventory</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Category *
-                      </label>
-                      <select
-                        name="category"
+                      <Dropdown
+                        label="Category *"
                         value={formData.category}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                      >
-                        <option value="">Select Category</option>
-                        {categories.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
-                      </select>
+                        options={categories}
+                        placeholder="Select Category"
+                        onChange={(value) => setFormData(prev => ({ ...prev, category: value as string, subCategory: '' }))}
+                      />
+                      {formData.isFromInventory && (
+                        <p className="text-xs text-gray-500 mt-1">From inventory item</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Sub-Category *
-                      </label>
-                      <select
-                        name="subCategory"
+                      <Dropdown
+                        label="Sub-Category *"
                         value={formData.subCategory}
-                        onChange={handleInputChange}
-                        required
-                        disabled={!formData.category}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent disabled:bg-gray-100"
-                      >
-                        <option value="">Select Sub-Category</option>
-                        {formData.category && categorySubcategories[formData.category]?.map((subCat) => (
-                          <option key={subCat} value={subCat}>
-                            {subCat}
-                          </option>
-                        ))}
-                      </select>
+                        options={formData.category ? categorySubcategories[formData.category] || [] : []}
+                        placeholder="Select Sub-Category"
+                        onChange={(value) => setFormData(prev => ({ ...prev, subCategory: value as string }))}
+                      />
                     </div>
                   </div>
 
@@ -777,9 +1082,15 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                         name="baseSku"
                         value={formData.baseSku}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        disabled={formData.isFromInventory}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${
+                          formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
+                        }`}
                         placeholder="e.g., CS-001"
                       />
+                      {formData.isFromInventory && (
+                        <p className="text-xs text-gray-500 mt-1">From inventory SKU</p>
+                      )}
                     </div>
                   </div>
 
@@ -798,7 +1109,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                           onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                         />
-                        <Button type="button" onClick={addTag}>
+                        <Button type="button" onClick={addTag} className="bg-gray-900 text-white">
                           Add
                         </Button>
                       </div>
@@ -833,23 +1144,13 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Fabric Type *
-                    </label>
-                    <select
-                      name="fabricType"
+                    <Dropdown
+                      label="Fabric Type *"
                       value={formData.fabricType}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                    >
-                      <option value="">Select Fabric Type</option>
-                      {fabricTypes.map((fabric) => (
-                        <option key={fabric} value={fabric}>
-                          {fabric}
-                        </option>
-                      ))}
-                    </select>
+                      options={fabricTypes}
+                      placeholder="Select Fabric Type"
+                      onChange={(value) => setFormData(prev => ({ ...prev, fabricType: value as string }))}
+                    />
                   </div>
 
                   <div>
@@ -939,7 +1240,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                           onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCareInstruction())}
                         />
-                        <Button type="button" onClick={addCareInstruction}>
+                        <Button type="button" onClick={addCareInstruction} className="bg-gray-900 text-white">
                           Add
                         </Button>
                       </div>
@@ -991,32 +1292,43 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                       {/* Add New Variant */}
                       <div className="border-2 border-gray-300 rounded-lg p-6 bg-gray-50">
                         <h4 className="font-semibold text-gray-900 mb-4">Add New Variant</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Size *</label>
-                            <select
-                              value={newVariant.size}
-                              onChange={(e) => setNewVariant(prev => ({ ...prev, size: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
-                            >
-                              <option value="">Select Size</option>
-                              {standardSizes.map((size) => (
-                                <option key={size} value={size}>{size}</option>
-                              ))}
-                            </select>
+                            <Dropdown
+                              value={newVariant.size || ''}
+                              options={standardSizes}
+                              placeholder="Select Size"
+                              onChange={(value) => setNewVariant(prev => ({ ...prev, size: value as string }))}
+                            />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Color *</label>
-                            <select
-                              value={newVariant.color}
-                              onChange={(e) => setNewVariant(prev => ({ ...prev, color: e.target.value }))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
-                            >
-                              <option value="">Select Color</option>
-                              {['Black', 'Gray', 'White'].map((color) => (
-                                <option key={color} value={color}>{color}</option>
-                              ))}
-                            </select>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={newVariant.colorHex || '#000000'}
+                                  onChange={(e) => {
+                                    const hex = e.target.value
+                                    setNewVariant(prev => ({ 
+                                      ...prev, 
+                                      colorHex: hex,
+                                      color: getColorName(hex) // Auto-generate color name
+                                    }))
+                                  }}
+                                  className="w-8 h-8 border border-gray-300 rounded-md cursor-pointer"
+                                  title="Pick a color"
+                                />
+                                <input
+                                  type="text"
+                                  value={newVariant.color || ''}
+                                  onChange={(e) => setNewVariant(prev => ({ ...prev, color: e.target.value }))}
+                                  placeholder="Color name"
+                                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-500 text-sm"
+                                />
+                              </div>
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">SKU *</label>
@@ -1036,9 +1348,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                                 type="number"
                                 value={newVariant.price}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                                placeholder="0.00"
-                                min="0"
-                                step="0.01"
+                                placeholder="0"
                                 className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
                               />
                             </div>
@@ -1050,7 +1360,6 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                               value={newVariant.stock}
                               onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                               placeholder="0"
-                              min="0"
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
                             />
                           </div>
@@ -1095,16 +1404,23 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                                     <TableCell className="text-gray-900 font-medium">{variant.size}</TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
-                                        <div 
-                                          className="w-5 h-5 rounded border border-gray-300"
-                                          style={{
-                                            backgroundColor: 
-                                              variant.color === 'Black' ? '#000000' :
-                                              variant.color === 'Gray' ? '#808080' :
-                                              variant.color === 'White' ? '#FFFFFF' : '#CCCCCC'
-                                          }}
+                                        <input
+                                          type="color"
+                                          value={variant.colorHex || '#CCCCCC'}
+                                          onChange={(e) => updateVariant(variant.id, 'colorHex', e.target.value)}
+                                          className="w-6 h-6 rounded border border-gray-300 cursor-pointer"
+                                          title="Click to change color"
                                         />
-                                        <span className="text-gray-900">{variant.color}</span>
+                                        <div className="flex flex-col">
+                                          <input
+                                            type="text"
+                                            value={variant.color}
+                                            onChange={(e) => updateVariant(variant.id, 'color', e.target.value)}
+                                            className="text-gray-900 text-sm font-medium bg-transparent border-none p-0 focus:outline-none focus:ring-1 focus:ring-gray-300 rounded px-1"
+                                            placeholder="Color name"
+                                          />
+                                          <span className="text-gray-500 text-xs">{variant.colorHex || '#CCCCCC'}</span>
+                                        </div>
                                       </div>
                                     </TableCell>
                                     <TableCell className="text-gray-700 font-mono text-xs">{variant.sku}</TableCell>
@@ -1178,10 +1494,8 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                               value={formData.basePrice}
                               onChange={handleInputChange}
                               required
-                              min="0"
-                              step="0.01"
                               className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                              placeholder="0.00"
+                              placeholder="0"
                             />
                           </div>
                         </div>
@@ -1195,7 +1509,6 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                             value={formData.totalStock}
                             onChange={handleInputChange}
                             required
-                            min="0"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                             placeholder="0"
                           />
@@ -1221,117 +1534,220 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
               <Card>
                 <CardHeader>
                   <CardTitle>Pricing Configuration</CardTitle>
+                  <p className="text-sm text-gray-600">Choose your pricing strategy - you can select one or both options</p>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Single Price Section */}
-                  <div className="border-2 border-gray-300 rounded-lg p-6 bg-blue-50">
-                    <h4 className="font-semibold text-gray-900 mb-4">Single Unit Pricing</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Base Price *
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-gray-500">₹</span>
-                          <input
-                            type="number"
-                            name="basePrice"
-                            value={formData.basePrice}
-                            onChange={handleInputChange}
-                            required
-                            min="0"
-                            step="0.01"
-                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="0.00"
-                          />
+                  
+                  {/* Pricing Strategy Selection */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-900">Select Pricing Strategy</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Single Unit Pricing Option */}
+                      <div 
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                          formData.singleUnitPricingEnabled 
+                            ? 'border-gray-800 bg-gray-100 shadow-sm' 
+                            : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                        }`}
+                        onClick={() => setFormData(prev => ({ ...prev, singleUnitPricingEnabled: !prev.singleUnitPricingEnabled }))}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                            formData.singleUnitPricingEnabled 
+                              ? 'border-gray-800 bg-gray-800' 
+                              : 'border-gray-300'
+                          }`}>
+                            {formData.singleUnitPricingEnabled && (
+                              <div className="w-2 h-2 bg-white rounded-sm"></div>
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-slate-900">Single Unit Pricing</h4>
+                            <p className="text-sm text-slate-600">Fixed price for all quantities</p>
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-600 mt-1">Price for single unit</p>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Original Price (Optional)
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-gray-500">₹</span>
-                          <input
-                            type="number"
-                            name="originalPrice"
-                            value={formData.originalPrice || ''}
-                            onChange={handleInputChange}
-                            min="0"
-                            step="0.01"
-                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="0.00"
-                          />
+
+                      {/* Bulk Pricing Option */}
+                      <div 
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                          formData.bulkPricingEnabled 
+                            ? 'border-gray-800 bg-gray-100 shadow-sm' 
+                            : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                        }`}
+                        onClick={() => setFormData(prev => ({ ...prev, bulkPricingEnabled: !prev.bulkPricingEnabled }))}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                            formData.bulkPricingEnabled 
+                              ? 'border-gray-800 bg-gray-800' 
+                              : 'border-gray-300'
+                          }`}>
+                            {formData.bulkPricingEnabled && (
+                              <div className="w-2 h-2 bg-white rounded-sm"></div>
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-slate-900">Bulk Pricing Tiers</h4>
+                            <p className="text-sm text-slate-600">Discounted prices for larger orders</p>
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-600 mt-1">For showing discount</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Discount %
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            name="discount"
-                            value={formData.discount || ''}
-                            onChange={handleInputChange}
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="0"
-                          />
-                          <span className="absolute right-3 top-2 text-gray-500">%</span>
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1">Auto-calculated if original price set</p>
                       </div>
                     </div>
 
-                    {/* Price Summary */}
-                    {formData.basePrice > 0 && (
-                      <div className="p-4 bg-white border border-gray-300 rounded-lg">
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div>
-                            <p className="text-xs text-gray-600 mb-1">Selling Price</p>
-                            <p className="text-2xl font-bold text-gray-900">₹{formData.basePrice.toFixed(2)}</p>
-                          </div>
-                          {formData.originalPrice && formData.originalPrice > formData.basePrice && (
-                            <>
-                              <div>
-                                <p className="text-xs text-gray-600 mb-1">Original Price</p>
-                                <p className="text-2xl font-bold text-gray-400 line-through">₹{formData.originalPrice.toFixed(2)}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-gray-600 mb-1">You Save</p>
-                                <p className="text-2xl font-bold text-green-600">
-                                  ₹{(formData.originalPrice - formData.basePrice).toFixed(2)}
-                                </p>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                    {/* Validation Message */}
+                    {!formData.singleUnitPricingEnabled && !formData.bulkPricingEnabled && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-700">⚠️ Please select at least one pricing strategy</p>
                       </div>
                     )}
                   </div>
 
-                  {/* Bulk Pricing Section */}
-                  <div className="border-2 border-gray-300 rounded-lg p-6 bg-green-50">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <input
-                        type="checkbox"
-                        id="bulkPricingEnabled"
-                        name="bulkPricingEnabled"
-                        checked={formData.bulkPricingEnabled}
-                        onChange={handleInputChange}
-                        className="rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                      />
-                      <label htmlFor="bulkPricingEnabled" className="text-sm font-medium text-gray-900">
-                        Enable Bulk Pricing Tiers
-                      </label>
-                    </div>
+                  {/* Single Unit Pricing Section */}
+                  {formData.singleUnitPricingEnabled && (
+                    <div className="border-2 border-gray-300 rounded-lg p-6 animate-in slide-in-from-top-2 duration-300">
+                      <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                        <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
+                        Single Unit Pricing
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Base Price *
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-gray-500">₹</span>
+                            <input
+                              type="number"
+                              name="basePrice"
+                              value={formData.basePrice}
+                              onChange={handleInputChange}
+                              required={formData.singleUnitPricingEnabled}
+                              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                              placeholder="0"
+                            />
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">Price for single unit</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Original Price (Optional)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-gray-500">₹</span>
+                            <input
+                              type="number"
+                              name="originalPrice"
+                              value={formData.originalPrice || ''}
+                              onChange={handleInputChange}
+                              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                              placeholder="0"
+                            />
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">For showing discount</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Discount %
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              name="discount"
+                              value={formData.discount || ''}
+                              onChange={handleInputChange}
+                              max="100"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                              placeholder="0"
+                            />
+                            <span className="absolute right-3 top-2 text-gray-500">%</span>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">Auto-calculated if original price set</p>
+                        </div>
+                      </div>
 
-                    {formData.bulkPricingEnabled && (
+                      {/* Price Summary */}
+                      {formData.basePrice > 0 && (
+                        <div className="p-4 bg-white border border-gray-300 rounded-lg">
+                          <div className="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                              <p className="text-xs text-gray-600 mb-1">Selling Price</p>
+                              <p className="text-2xl font-bold text-gray-900">₹{formData.basePrice.toFixed(2)}</p>
+                            </div>
+                            {formData.originalPrice && formData.originalPrice > formData.basePrice && (
+                              <>
+                                <div>
+                                  <p className="text-xs text-gray-600 mb-1">Original Price</p>
+                                  <p className="text-2xl font-bold text-gray-400 line-through">₹{formData.originalPrice.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-600 mb-1">You Save</p>
+                                  <p className="text-2xl font-bold text-green-600">
+                                    ₹{(formData.originalPrice - formData.basePrice).toFixed(2)}
+                                  </p>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Bulk Pricing Section */}
+                  {formData.bulkPricingEnabled && (
+                    <div className="border-2 border-gray-300 rounded-lg p-6 animate-in slide-in-from-top-2 duration-300">
+                      <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                        <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
+                        Bulk Pricing Tiers
+                      </h4>
+
+                      {/* Base Price for Bulk Pricing Only */}
+                      {!formData.singleUnitPricingEnabled && formData.bulkPricingEnabled && (
+                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <h5 className="font-medium text-blue-900 mb-3">Set Base Price for Discount Calculations</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-blue-800 mb-2">
+                                Base Price (Before Discounts) *
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2 text-blue-600">₹</span>
+                                <input
+                                  type="number"
+                                  value={formData.pricingTiers[0]?.price || 0}
+                                  onChange={(e) => {
+                                    const basePrice = parseFloat(e.target.value) || 0
+                                    // Update first tier as base price
+                                    updatePricingTier(0, 'price', basePrice)
+                                    updatePricingTier(0, 'discount', 0)
+                                    
+                                    // Recalculate other tiers based on their discount percentages
+                                    formData.pricingTiers.forEach((tier, idx) => {
+                                      if (idx > 0 && tier.discount && tier.discount > 0) {
+                                        const discountedPrice = basePrice * (1 - tier.discount / 100)
+                                        updatePricingTier(idx, 'price', Math.max(0, discountedPrice))
+                                      }
+                                    })
+                                  }}
+                                  className="w-full pl-7 pr-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                  placeholder="0"
+                                />
+                              </div>
+                              <p className="text-xs text-blue-700 mt-1">This will be your first tier price</p>
+                            </div>
+                            <div className="flex items-end">
+                              <div className="p-3 bg-white border border-blue-300 rounded-lg w-full">
+                                <p className="text-xs text-blue-700 mb-1">Pricing Strategy</p>
+                                <p className="text-sm font-medium text-blue-900">Bulk Pricing Only</p>
+                                <p className="text-xs text-blue-600">Discounts calculated from base price</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-4">
                         {/* Pricing Tiers Table */}
                         <div className="overflow-x-auto border border-gray-300 rounded-lg">
@@ -1340,16 +1756,24 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                               <TableRow>
                                 <TableHead>Quantity Range</TableHead>
                                 <TableHead>Price per Unit</TableHead>
-                                <TableHead>Discount %</TableHead>
+                                <TableHead>
+                                  Discount %
+                                  {formData.bulkPricingEnabled && (
+                                    <span className="block text-xs font-normal text-gray-500">
+                                      {!formData.singleUnitPricingEnabled ? 'Enter discount' : 'Auto-calculated'}
+                                    </span>
+                                  )}
+                                </TableHead>
                                 <TableHead>Savings per Unit</TableHead>
                                 <TableHead className="text-center">Action</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {formData.pricingTiers.map((tier, index) => {
-                                const savings = formData.basePrice - tier.price
-                                const discountPercent = formData.basePrice > 0 
-                                  ? ((savings / formData.basePrice) * 100).toFixed(1)
+                                const basePrice = formData.singleUnitPricingEnabled ? formData.basePrice : (formData.pricingTiers[0]?.price || 0)
+                                const savings = basePrice - tier.price
+                                const discountPercent = basePrice > 0 
+                                  ? ((savings / basePrice) * 100).toFixed(1)
                                   : 0
                                 
                                 return (
@@ -1369,7 +1793,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                                           value={tier.maxQuantity || ''}
                                           onChange={(e) => updatePricingTier(index, 'maxQuantity', e.target.value ? parseInt(e.target.value) : undefined)}
                                           min="1"
-                                          placeholder="∞"
+                                          placeholder="100"
                                           className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                                         />
                                       </div>
@@ -1380,14 +1804,59 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                                         <input
                                           type="number"
                                           value={tier.price}
-                                          onChange={(e) => updatePricingTier(index, 'price', parseFloat(e.target.value) || 0)}
-                                          min="0"
-                                          step="0.01"
+                                          onChange={(e) => {
+                                            const newPrice = parseFloat(e.target.value) || 0
+                                            updatePricingTier(index, 'price', newPrice)
+                                            
+                                            // Auto-calculate discount when price changes
+                                            const basePrice = formData.singleUnitPricingEnabled 
+                                              ? formData.basePrice 
+                                              : (index === 0 ? newPrice : (formData.pricingTiers[0]?.price || 0))
+                                            
+                                            if (basePrice > 0 && newPrice < basePrice) {
+                                              const calculatedDiscount = ((basePrice - newPrice) / basePrice) * 100
+                                              updatePricingTier(index, 'discount', Math.round(calculatedDiscount * 10) / 10)
+                                            } else {
+                                              updatePricingTier(index, 'discount', 0)
+                                            }
+                                          }}
                                           className="w-full pl-6 pr-2 py-1 border border-gray-300 rounded text-sm"
                                         />
                                       </div>
                                     </TableCell>
-                                    <TableCell className="text-gray-900 font-semibold">{discountPercent}%</TableCell>
+                                    <TableCell>
+                                      <div className="relative">
+                                        <input
+                                          type="number"
+                                          value={tier.discount || ''}
+                                          onChange={(e) => {
+                                            const discountValue = parseFloat(e.target.value) || 0
+                                            updatePricingTier(index, 'discount', discountValue)
+                                            
+                                            // Auto-calculate price based on discount when bulk pricing only
+                                            if (!formData.singleUnitPricingEnabled && formData.bulkPricingEnabled) {
+                                              // Use the first tier price as base if no single unit pricing
+                                              const basePrice = index === 0 ? tier.price : (formData.pricingTiers[0]?.price || 0)
+                                              if (basePrice > 0) {
+                                                const newPrice = basePrice * (1 - discountValue / 100)
+                                                updatePricingTier(index, 'price', Math.max(0, newPrice))
+                                              }
+                                            } else if (formData.singleUnitPricingEnabled && formData.basePrice > 0) {
+                                              // Calculate price based on single unit base price
+                                              const newPrice = formData.basePrice * (1 - discountValue / 100)
+                                              updatePricingTier(index, 'price', Math.max(0, newPrice))
+                                            }
+                                          }}
+                                          max="100"
+                                          disabled={!formData.bulkPricingEnabled}
+                                          className={`w-full px-2 py-1 border border-gray-300 rounded text-sm ${
+                                            !formData.bulkPricingEnabled ? 'bg-gray-100 text-gray-500' : ''
+                                          }`}
+                                          placeholder="0"
+                                        />
+                                        <span className="absolute right-2 top-2 text-gray-500 text-sm">%</span>
+                                      </div>
+                                    </TableCell>
                                     <TableCell className="text-gray-900 font-semibold">₹{savings.toFixed(2)}</TableCell>
                                     <TableCell className="text-center">
                                       {formData.pricingTiers.length > 1 && (
@@ -1418,7 +1887,9 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
 
                         {/* Bulk Pricing Example */}
                         <div className="p-4 bg-white border border-gray-300 rounded-lg">
-                          <p className="text-xs font-medium text-gray-700 mb-2">Bulk Pricing Example:</p>
+                          <p className="text-xs font-medium text-gray-700 mb-2">
+                            {!formData.singleUnitPricingEnabled ? 'Bulk Pricing Structure:' : 'Bulk Pricing Example:'}
+                          </p>
                           <div className="space-y-1 text-xs text-gray-600">
                             {formData.pricingTiers.map((tier, idx) => (
                               <div key={idx} className="flex justify-between">
@@ -1427,31 +1898,65 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                                 </span>
                                 <span className="font-medium text-gray-900">
                                   ₹{tier.price.toFixed(2)} each
+                                  {tier.discount && tier.discount > 0 && (
+                                    <span className="text-green-600 ml-1">({tier.discount}% off)</span>
+                                  )}
                                 </span>
                               </div>
                             ))}
                           </div>
+                          
+                          {!formData.singleUnitPricingEnabled && formData.bulkPricingEnabled && (
+                            <div className="mt-3 pt-2 border-t border-gray-200">
+                              <p className="text-xs text-blue-700">
+                                💡 <strong>Bulk Pricing Only:</strong> Enter discount percentages to automatically calculate tier prices
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {!formData.bulkPricingEnabled && (
-                      <div className="p-4 bg-white border border-gray-300 rounded-lg text-center">
-                        <p className="text-sm text-gray-600">
-                          Enable bulk pricing to offer discounts for larger orders
-                        </p>
+                  {/* Combined Pricing Summary */}
+                  {(formData.singleUnitPricingEnabled || formData.bulkPricingEnabled) && (
+                    <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Pricing Summary</h4>
+                      <div className="space-y-2 text-sm">
+                        {formData.singleUnitPricingEnabled && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Single Unit Price:</span>
+                            <span className="font-medium text-gray-900">₹{formData.basePrice.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {formData.bulkPricingEnabled && formData.pricingTiers.length > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Bulk Price Range:</span>
+                            <span className="font-medium text-gray-900">
+                              ₹{Math.min(...formData.pricingTiers.map(t => t.price)).toFixed(2)} - ₹{Math.max(...formData.pricingTiers.map(t => t.price)).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {formData.singleUnitPricingEnabled && formData.bulkPricingEnabled && (
+                          <div className="pt-2 border-t border-gray-300">
+                            <p className="text-xs text-gray-600">
+                              💡 Customers will see both single unit pricing and bulk discounts
+                            </p>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Pricing Strategy Tips */}
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <h4 className="font-medium text-amber-900 mb-2">💡 Pricing Tips</h4>
+                    <h4 className="font-medium text-amber-900 mb-2">💡 Pricing Strategy Tips</h4>
                     <ul className="text-sm text-amber-800 space-y-1">
-                      <li>• Set competitive base prices to attract customers</li>
-                      <li>• Use bulk pricing to encourage larger orders</li>
+                      <li>• <strong>Single Unit Only:</strong> Best for products with consistent pricing</li>
+                      <li>• <strong>Bulk Pricing Only:</strong> Ideal for wholesale or B2B sales</li>
+                      <li>• <strong>Both Options:</strong> Attracts both retail and bulk customers</li>
                       <li>• Typical bulk discounts: 5-10% for 10+ units, 10-15% for 50+ units</li>
-                      <li>• Ensure bulk prices still maintain healthy profit margins</li>
+                      <li>• Ensure all prices maintain healthy profit margins</li>
                     </ul>
                   </div>
                 </CardContent>
@@ -1491,7 +1996,6 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                             value={formData.totalStock}
                             onChange={handleInputChange}
                             required
-                            min="0"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                           />
                         </div>
@@ -1504,7 +2008,6 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                             name="lowStockThreshold"
                             value={formData.lowStockThreshold}
                             onChange={handleInputChange}
-                            min="0"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                           />
                         </div>
@@ -1564,7 +2067,6 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                         value={formData.dispatchTimeline.processingDays}
                         onChange={handleInputChange}
                         required
-                        min="0"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                       />
                       <p className="text-xs text-gray-500 mt-1">Days to prepare order</p>
@@ -1579,7 +2081,6 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                         value={formData.dispatchTimeline.shippingDays}
                         onChange={handleInputChange}
                         required
-                        min="0"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                       />
                       <p className="text-xs text-gray-500 mt-1">Days for delivery</p>
@@ -1612,26 +2113,60 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Inventory Connection Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Inventory Connection</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {formData.isFromInventory && selectedInventoryItem ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center text-green-600">
+                      <Package className="h-4 w-4 mr-2" />
+                      <span className="text-sm font-medium">Connected to Inventory</span>
+                    </div>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <p><strong>Item:</strong> {selectedInventoryItem.name}</p>
+                      <p><strong>SKU:</strong> {selectedInventoryItem.sku}</p>
+                      <p><strong>Stock:</strong> {selectedInventoryItem.currentStock} units</p>
+                    </div>
+                    <Link href={`/vendor/dashboard/inventory/edit/${selectedInventoryItem.id}`}>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Manage Stock
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center text-gray-600">
+                      <Package className="h-4 w-4 mr-2" />
+                      <span className="text-sm font-medium">No Inventory Connection</span>
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      This product is not connected to an inventory item. Stock will be managed separately.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Status & Availability</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Product Status
-                  </label>
-                  <select
-                    name="status"
+                  <Dropdown
+                    label="Product Status"
                     value={formData.status}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="active">Active</option>
-                    <option value="suspended">Suspended</option>
-                    <option value="out_of_stock">Out of Stock</option>
-                  </select>
+                    options={[
+                      { value: 'pending', label: 'Pending' },
+                      { value: 'active', label: 'Active' },
+                      { value: 'suspended', label: 'Suspended' },
+                      { value: 'out_of_stock', label: 'Out of Stock' }
+                    ]}
+                    onChange={(value) => setFormData(prev => ({ ...prev, status: value as 'active' | 'pending' | 'suspended' | 'out_of_stock' }))}
+                  />
                 </div>
 
                 <div className="flex items-center">
@@ -1652,67 +2187,197 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
             <Card>
               <CardHeader>
                 <CardTitle>Product Images</CardTitle>
+                <p className="text-sm text-gray-600">Upload cover image and gallery images for your product</p>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div 
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
-                    onClick={() => document.getElementById('image-upload')?.click()}
-                  >
-                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                    <p className="mt-2 text-sm text-gray-600">
-                      Click to upload or drag and drop
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      PNG, JPG, GIF up to 10MB
-                    </p>
-                    <input
-                      id="image-upload"
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageUpload}
-                    />
-                  </div>
+                <div className="space-y-6">
                   
-                  {/* Image Preview Grid */}
-                  {formData.images.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {formData.images.map((image) => (
-                        <div key={image.id} className="relative group">
-                          <img
-                            src={image.url}
-                            alt={image.alt}
-                            className="w-full h-20 object-cover rounded border"
-                          />
-                          <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-2">
-                            {!image.isPrimary && (
+                  {/* Cover Image Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-gray-900">Cover Image</h4>
+                      <span className="text-xs text-gray-500">1 image only</span>
+                    </div>
+                    
+                    {/* Cover Image Upload */}
+                    {formData.images.filter(img => img.imageType === 'cover').length === 0 ? (
+                      <div 
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors cursor-pointer bg-gray-50"
+                        onClick={() => document.getElementById('cover-image-upload')?.click()}
+                      >
+                        <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                        <p className="mt-1 text-sm text-gray-600">Upload Cover Image</p>
+                        <p className="text-xs text-gray-500">PNG, JPG up to 10MB</p>
+                        <input
+                          id="cover-image-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageUpload(e, 'cover')}
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                        <p className="text-sm text-green-800">✓ Cover image uploaded</p>
+                        <p className="text-xs text-green-600">Upload limit: 1/1</p>
+                      </div>
+                    )}
+                    
+                    {/* Cover Image Preview */}
+                    {formData.images.filter(img => img.imageType === 'cover').map((image) => (
+                      <div key={image.id} className="relative group">
+                        <img
+                          src={image.url}
+                          alt={image.alt}
+                          className="w-full h-32 object-cover rounded border-2 border-gray-800"
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => removeImage(image.id)}
+                            className="text-white hover:text-red-300 bg-red-600 p-2 rounded-full"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="absolute top-2 left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded">
+                          Cover Image
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {formData.images.filter(img => img.imageType === 'cover').length === 0 && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-xs text-yellow-800">⚠️ Cover image is recommended for better product visibility</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Gallery Images Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-gray-900">Gallery Images</h4>
+                      <span className="text-xs text-gray-500">
+                        {formData.images.filter(img => img.imageType === 'gallery').length}/3 images
+                      </span>
+                    </div>
+                    
+                    {/* Gallery Images Upload */}
+                    {formData.images.filter(img => img.imageType === 'gallery').length < 3 ? (
+                      <div 
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors cursor-pointer"
+                        onClick={() => document.getElementById('gallery-images-upload')?.click()}
+                      >
+                        <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                        <p className="mt-1 text-sm text-gray-600">Upload Gallery Images</p>
+                        <p className="text-xs text-gray-500">
+                          {3 - formData.images.filter(img => img.imageType === 'gallery').length} slot{3 - formData.images.filter(img => img.imageType === 'gallery').length > 1 ? 's' : ''} remaining • Multiple selection allowed
+                        </p>
+                        <input
+                          id="gallery-images-upload"
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageUpload(e, 'gallery')}
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                        <p className="text-sm text-green-800">✓ Gallery images full</p>
+                        <p className="text-xs text-green-600">Upload limit: 3/3 reached</p>
+                      </div>
+                    )}
+                    
+                    {/* Gallery Images Preview */}
+                    {formData.images.filter(img => img.imageType === 'gallery').length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {formData.images.filter(img => img.imageType === 'gallery').map((image) => (
+                          <div key={image.id} className="relative group">
+                            <img
+                              src={image.url}
+                              alt={image.alt}
+                              className="w-full h-20 object-cover rounded border"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-1">
+                              {formData.images.filter(img => img.imageType === 'cover').length === 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setImageType(image.id, 'cover')}
+                                  className="text-white text-xs bg-gray-800 px-1 py-1 rounded hover:bg-gray-700"
+                                >
+                                  Cover
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                onClick={() => setPrimaryImage(image.id)}
-                                className="text-white text-xs bg-blue-600 px-2 py-1 rounded hover:bg-blue-700"
+                                onClick={() => removeImage(image.id)}
+                                className="text-white hover:text-red-300 bg-red-600 p-1 rounded"
                               >
-                                Set Primary
+                                <X className="h-3 w-3" />
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeImage(image.id)}
-                              className="text-white hover:text-red-300"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                          {image.isPrimary && (
-                            <div className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-1 rounded">
-                              Primary
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            <div className="absolute top-1 left-1 bg-gray-600 text-white text-xs px-1 rounded">
+                              Gallery
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Empty slots visualization */}
+                        {Array.from({ length: 3 - formData.images.filter(img => img.imageType === 'gallery').length }).map((_, index) => (
+                          <div key={`empty-${index}`} className="w-full h-20 border-2 border-dashed border-gray-200 rounded flex items-center justify-center">
+                            <span className="text-xs text-gray-400">Empty</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {formData.images.filter(img => img.imageType === 'gallery').length === 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {Array.from({ length: 3 }).map((_, index) => (
+                          <div key={`placeholder-${index}`} className="w-full h-20 border-2 border-dashed border-gray-200 rounded flex items-center justify-center">
+                            <span className="text-xs text-gray-400">Empty</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Image Summary */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs text-gray-600">Cover Images</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {formData.images.filter(img => img.imageType === 'cover').length}/1
+                        </p>
+                      </div>
+                      <div className="p-2 bg-gray-50 rounded">
+                        <p className="text-xs text-gray-600">Gallery Images</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {formData.images.filter(img => img.imageType === 'gallery').length}/3
+                        </p>
+                      </div>
                     </div>
-                  )}
+                    <div className="mt-2 text-center">
+                      <p className="text-xs text-gray-500">
+                        Total: {formData.images.length} image{formData.images.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Image Guidelines */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <h5 className="font-medium text-blue-900 mb-2 text-sm">📸 Image Guidelines</h5>
+                    <ul className="text-xs text-blue-800 space-y-1">
+                      <li>• <strong>Cover Image:</strong> 1 image only - main product photo (square format recommended)</li>
+                      <li>• <strong>Gallery Images:</strong> Maximum 3 images - different angles, details, usage examples</li>
+                      <li>• Use high-quality images with good lighting</li>
+                      <li>• Recommended: 1000x1000px or higher resolution</li>
+                      <li>• Maximum file size: 10MB per image</li>
+                      <li>• Multi-select supported for gallery images</li>
+                    </ul>
+                  </div>
                 </div>
               </CardContent>
             </Card>
