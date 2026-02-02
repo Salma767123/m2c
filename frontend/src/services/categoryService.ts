@@ -1,7 +1,7 @@
 // Category Service for Admin Dashboard
 // Handles all API calls related to category management
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+import axiosInstance from '@/lib/axios';
 
 export interface Category {
   id: string;
@@ -26,6 +26,8 @@ export interface Category {
   updatedAt: string;
   createdBy?: string;
   updatedBy?: string;
+  depth?: number; // For tree structure
+  breadcrumb?: Category[]; // For breadcrumb navigation
 }
 
 export interface CategoryFormData {
@@ -52,11 +54,18 @@ export interface SubcategoryFormData {
 }
 
 export interface CategoryStats {
-  total: number;
-  active: number;
-  inactive: number;
-  rootCategories: number;
-  subcategories: number;
+  total: number; // Root categories count
+  active: number; // Active root categories
+  inactive: number; // Inactive root categories
+  subcategories: number; // Total subcategories
+  rootCategories: number; // Same as total (for clarity)
+  activeRootCategories: number;
+  inactiveRootCategories: number;
+  activeSubcategories: number;
+  inactiveSubcategories: number;
+  totalAllCategories: number; // Total including subcategories
+  activeAllCategories: number;
+  inactiveAllCategories: number;
 }
 
 export interface CategoryFilters {
@@ -64,27 +73,34 @@ export interface CategoryFilters {
   status?: 'all' | 'ACTIVE' | 'INACTIVE';
   parentId?: string;
   includeSubcategories?: boolean;
+  showRootOnly?: boolean; // New parameter to control root-only display
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
 
+export interface SearchOptions {
+  status?: string;
+  includeSubcategories?: boolean;
+  limit?: number;
+}
+
+export interface TreeOptions {
+  status?: string;
+  includeInactive?: boolean;
+  maxDepth?: number;
+}
+
+export interface DuplicateOptions {
+  newName?: string;
+  includeSubcategories?: boolean;
+}
+
+export interface SubcategoryOrder {
+  id: string;
+  sortOrder: number;
+}
+
 class CategoryService {
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-    return {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` })
-    };
-  }
-
-  private async handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Network error' }));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
-    }
-    return response.json();
-  }
-
   // Get all categories with optional filtering
   async getCategories(filters: CategoryFilters = {}): Promise<{ data: Category[]; total: number }> {
     const params = new URLSearchParams();
@@ -95,80 +111,50 @@ class CategoryService {
     if (filters.includeSubcategories !== undefined) {
       params.append('includeSubcategories', filters.includeSubcategories.toString());
     }
+    if (filters.showRootOnly !== undefined) {
+      params.append('showRootOnly', filters.showRootOnly.toString());
+    }
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
     if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
 
-    const url = `${API_BASE_URL}/categories${params.toString() ? `?${params.toString()}` : ''}`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: this.getAuthHeaders()
-    });
-
-    return this.handleResponse(response);
+    const response = await axiosInstance.get(`/categories${params.toString() ? `?${params.toString()}` : ''}`);
+    return response.data;
   }
 
   // Get single category by ID
   async getCategoryById(id: string): Promise<{ data: Category }> {
-    const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
-      method: 'GET',
-      headers: this.getAuthHeaders()
-    });
-
-    return this.handleResponse(response);
+    const response = await axiosInstance.get(`/categories/${id}`);
+    return response.data;
   }
 
   // Get category statistics
   async getCategoryStats(): Promise<{ data: CategoryStats }> {
-    const response = await fetch(`${API_BASE_URL}/categories/stats`, {
-      method: 'GET',
-      headers: this.getAuthHeaders()
-    });
-
-    return this.handleResponse(response);
+    const response = await axiosInstance.get('/categories/stats');
+    return response.data;
   }
 
   // Create new category (admin only)
   async createCategory(categoryData: CategoryFormData): Promise<{ data: Category; message: string }> {
-    const response = await fetch(`${API_BASE_URL}/categories`, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify(categoryData)
-    });
-
-    return this.handleResponse(response);
+    const response = await axiosInstance.post('/categories', categoryData);
+    return response.data;
   }
 
   // Update existing category (admin only)
   async updateCategory(id: string, categoryData: Partial<CategoryFormData>): Promise<{ data: Category; message: string }> {
-    const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
-      method: 'PUT',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify(categoryData)
-    });
-
-    return this.handleResponse(response);
+    const response = await axiosInstance.put(`/categories/${id}`, categoryData);
+    return response.data;
   }
 
   // Delete category (admin only)
   async deleteCategory(id: string): Promise<{ message: string }> {
-    const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
-      method: 'DELETE',
-      headers: this.getAuthHeaders()
-    });
-
-    return this.handleResponse(response);
+    const response = await axiosInstance.delete(`/categories/${id}`);
+    return response.data;
   }
 
   // Bulk update category status (admin only)
   async bulkUpdateStatus(categoryIds: string[], status: 'ACTIVE' | 'INACTIVE'): Promise<{ message: string; data: { updatedCount: number } }> {
-    const response = await fetch(`${API_BASE_URL}/categories/bulk-status`, {
-      method: 'PATCH',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify({ categoryIds, status })
-    });
-
-    return this.handleResponse(response);
+    const response = await axiosInstance.patch('/categories/bulk-status', { categoryIds, status });
+    return response.data;
   }
 
   // Helper method to generate slug from name
@@ -230,33 +216,92 @@ class CategoryService {
   async getParentCategories(): Promise<Category[]> {
     const response = await this.getCategories({
       includeSubcategories: false,
+      showRootOnly: true, // Only root categories
       status: 'ACTIVE',
       sortBy: 'name',
       sortOrder: 'asc'
     });
     
-    return response.data.filter(cat => !cat.parentId);
+    return response.data;
   }
 
   // Get subcategories of a specific category
   async getSubcategories(parentId: string): Promise<{ data: Category[]; total: number }> {
-    const response = await fetch(`${API_BASE_URL}/categories/${parentId}/subcategories`, {
-      method: 'GET',
-      headers: this.getAuthHeaders()
-    });
-
-    return this.handleResponse(response);
+    const response = await axiosInstance.get(`/categories/${parentId}/subcategories`);
+    return response.data;
   }
 
-  // Create subcategory
-  async createSubcategory(parentId: string, subcategoryData: Omit<SubcategoryFormData, 'id'>): Promise<{ data: Category; message: string }> {
-    const response = await fetch(`${API_BASE_URL}/categories/${parentId}/subcategories`, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify(subcategoryData)
-    });
+  // Update subcategory
+  async updateSubcategory(parentId: string, subcategoryId: string, subcategoryData: Partial<SubcategoryFormData>): Promise<{ data: Category; message: string }> {
+    const response = await axiosInstance.put(`/categories/${parentId}/subcategories/${subcategoryId}`, subcategoryData);
+    return response.data;
+  }
 
-    return this.handleResponse(response);
+  // Delete subcategory
+  async deleteSubcategory(parentId: string, subcategoryId: string): Promise<{ message: string }> {
+    const response = await axiosInstance.delete(`/categories/${parentId}/subcategories/${subcategoryId}`);
+    return response.data;
+  }
+
+  // Get single subcategory
+  async getSubcategoryById(parentId: string, subcategoryId: string): Promise<{ data: Category }> {
+    const response = await axiosInstance.get(`/categories/${parentId}/subcategories/${subcategoryId}`);
+    return response.data;
+  }
+
+  // Bulk update subcategory status
+  async bulkUpdateSubcategoryStatus(parentId: string, subcategoryIds: string[], status: 'ACTIVE' | 'INACTIVE'): Promise<{ message: string; data: { updatedCount: number } }> {
+    const response = await axiosInstance.patch(`/categories/${parentId}/subcategories/bulk-status`, { subcategoryIds, status });
+    return response.data;
+  }
+
+  // Reorder subcategories
+  async reorderSubcategories(parentId: string, subcategoryOrders: { id: string; sortOrder: number }[]): Promise<{ message: string }> {
+    const response = await axiosInstance.patch(`/categories/${parentId}/subcategories/reorder`, { subcategoryOrders });
+    return response.data;
+  }
+
+  // Move subcategory to different parent
+  async moveSubcategory(parentId: string, subcategoryId: string, newParentId: string): Promise<{ data: Category; message: string }> {
+    const response = await axiosInstance.patch(`/categories/${parentId}/subcategories/${subcategoryId}/move`, { newParentId });
+    return response.data;
+  }
+
+  // Get category breadcrumb path
+  async getCategoryBreadcrumb(categoryId: string): Promise<{ data: Category[] }> {
+    const response = await axiosInstance.get(`/categories/${categoryId}/breadcrumb`);
+    return response.data;
+  }
+
+  // Search categories
+  async searchCategories(query: string, options: { status?: string; includeSubcategories?: boolean; limit?: number } = {}): Promise<{ data: Category[]; total: number; query: string }> {
+    const params = new URLSearchParams();
+    params.append('q', query);
+    
+    if (options.status) params.append('status', options.status);
+    if (options.includeSubcategories !== undefined) params.append('includeSubcategories', options.includeSubcategories.toString());
+    if (options.limit) params.append('limit', options.limit.toString());
+
+    const response = await axiosInstance.get(`/categories/search?${params.toString()}`);
+    return response.data;
+  }
+
+  // Get category tree
+  async getCategoryTree(options: { status?: string; includeInactive?: boolean; maxDepth?: number } = {}): Promise<{ data: Category[]; total: number; maxDepth: number }> {
+    const params = new URLSearchParams();
+    
+    if (options.status) params.append('status', options.status);
+    if (options.includeInactive !== undefined) params.append('includeInactive', options.includeInactive.toString());
+    if (options.maxDepth) params.append('maxDepth', options.maxDepth.toString());
+
+    const response = await axiosInstance.get(`/categories/tree?${params.toString()}`);
+    return response.data;
+  }
+
+  // Duplicate category
+  async duplicateCategory(categoryId: string, options: { newName?: string; includeSubcategories?: boolean } = {}): Promise<{ data: Category; message: string }> {
+    const response = await axiosInstance.post(`/categories/${categoryId}/duplicate`, options);
+    return response.data;
   }
 }
 

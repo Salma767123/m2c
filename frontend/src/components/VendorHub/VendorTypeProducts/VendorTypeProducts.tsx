@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
-import { Package, Globe, ChevronDown, ChevronRight } from 'lucide-react';
+import { Package, Globe, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { categoryService, Category } from '@/services/categoryService';
 
 interface VendorTypeProductsProps {
   onNext: () => void;
@@ -22,51 +23,10 @@ const marketTypes = [
   { id: 'international', label: 'International', description: 'Global markets' }
 ];
 
-const productCategories = [
-  {
-    id: 'bedding',
-    label: 'Bedding',
-    subCategories: ['Bed Sheets', 'Pillowcases', 'Duvet Covers', 'Comforters', 'Mattress Protectors']
-  },
-  {
-    id: 'bath-linens',
-    label: 'Bath Linens',
-    subCategories: ['Bath Towels', 'Hand Towels', 'Washcloths', 'Bath Mats', 'Shower Curtains']
-  },
-  {
-    id: 'kitchen-textiles',
-    label: 'Kitchen Textiles',
-    subCategories: ['Kitchen Towels', 'Oven Mitts', 'Pot Holders', 'Aprons', 'Table Runners']
-  },
-  {
-    id: 'decor',
-    label: 'Décor',
-    subCategories: ['Throw Pillows', 'Cushion Covers', 'Wall Hangings', 'Decorative Throws']
-  },
-  {
-    id: 'window-treatments',
-    label: 'Window Treatments',
-    subCategories: ['Curtains', 'Drapes', 'Blinds', 'Valances', 'Sheers']
-  },
-  {
-    id: 'floor-coverings',
-    label: 'Floor Coverings',
-    subCategories: ['Area Rugs', 'Carpets', 'Runners', 'Door Mats', 'Outdoor Rugs']
-  },
-  {
-    id: 'living-furniture',
-    label: 'Living/Furniture',
-    subCategories: ['Upholstery Fabrics', 'Furniture Covers', 'Ottoman Covers', 'Chair Pads']
-  },
-  // New "Other" category that allows adding custom subcategories
-  {
-    id: 'other',
-    label: 'Other',
-    subCategories: []
-  }
-];
-
 export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data }: VendorTypeProductsProps) {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     // allow multiple selections; accept legacy single-value strings
     vendorType: Array.isArray(data.vendorType) ? data.vendorType : (data.vendorType ? [data.vendorType] : []),
@@ -76,6 +36,57 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
     dynamicSubCategories: data.dynamicSubCategories || {}, // new: holds user-added subcategories per category id
     otherInputs: data.otherInputs || {} // new: temporary input values per category id
   });
+
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch categories with subcategories
+        const response = await categoryService.getCategoryTree({
+          status: 'ACTIVE',
+          includeInactive: false
+        });
+        
+        setCategories(response.data);
+        
+        // If no categories are returned, show a helpful message
+        if (!response.data || response.data.length === 0) {
+          setError('No categories available. Please contact support.');
+        }
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+        setError('Failed to load categories. Please try again.');
+        
+        // Fallback: Set some basic categories if API fails
+        setCategories([
+          {
+            id: 'textiles',
+            name: 'Textiles',
+            description: 'General textile products',
+            slug: 'textiles',
+            status: 'ACTIVE',
+            sortOrder: 0,
+            subcategories: [
+              { id: 'bedding', name: 'Bedding', description: 'Bed linens and accessories', slug: 'bedding', status: 'ACTIVE', sortOrder: 0, subcategories: [] },
+              { id: 'towels', name: 'Towels', description: 'Bath and kitchen towels', slug: 'towels', status: 'ACTIVE', sortOrder: 1, subcategories: [] },
+              { id: 'curtains', name: 'Curtains', description: 'Window treatments', slug: 'curtains', status: 'ACTIVE', sortOrder: 2, subcategories: [] }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            productCount: 0,
+            subcategoryCount: 3
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const toggleVendorType = (typeId: string) => {
     setFormData(prev => {
@@ -163,6 +174,49 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
      onNext();
    };
 
+   // Show loading state
+   if (loading) {
+     return (
+       <div className="max-w-420 p-4 space-y-4 font-sans">
+         <div className="flex p-2 items-center gap-4 mb-4">
+           <Package className="w-12 h-12 text-gray-600" />
+           <div>
+             <h1 className="text-2xl font-bold text-gray-900">Vendor Type & Product Categories</h1>
+             <p className="text-gray-600 mt-1">Define your business model and product offerings</p>
+           </div>
+         </div>
+         <div className="flex items-center justify-center py-12">
+           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+           <span className="ml-2 text-gray-600">Loading categories...</span>
+         </div>
+       </div>
+     );
+   }
+
+   // Show error state
+   if (error) {
+     return (
+       <div className="max-w-420 p-4 space-y-4 font-sans">
+         <div className="flex p-2 items-center gap-4 mb-4">
+           <Package className="w-12 h-12 text-gray-600" />
+           <div>
+             <h1 className="text-2xl font-bold text-gray-900">Vendor Type & Product Categories</h1>
+             <p className="text-gray-600 mt-1">Define your business model and product offerings</p>
+           </div>
+         </div>
+         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+           <p className="text-red-600">{error}</p>
+           <Button 
+             onClick={() => window.location.reload()} 
+             className="mt-2 bg-red-600 hover:bg-red-700 text-white"
+           >
+             Retry
+           </Button>
+         </div>
+       </div>
+     );
+   }
+
    return (
      <div className="max-w-420 p-4 space-y-4 font-sans">
        {/* Header */}
@@ -233,13 +287,20 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
          </div>
          <div className="p-4">
            <div className="space-y-4">
-             {productCategories.map((category) => (
+             {categories.map((category) => (
                <div key={category.id} className="border border-gray-200 rounded-lg">
                  <button
                    onClick={() => toggleCategory(category.id)}
                    className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
                  >
-                   <span className="font-medium text-lg text-gray-900">{category.label}</span>
+                   <div className="flex items-center gap-2">
+                     <span className="font-medium text-lg text-gray-900">{category.name}</span>
+                     {category.subcategories && category.subcategories.length > 0 && (
+                       <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                         {category.subcategories.length} subcategories
+                       </span>
+                     )}
+                   </div>
                    {formData.expandedCategories[category.id] ? (
                      <ChevronDown className="w-5 h-5 text-gray-400" />
                    ) : (
@@ -249,43 +310,53 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
 
                  {formData.expandedCategories[category.id] && (
                    <div className="px-4 pb-4">
-                     {/* If this is the 'other' category, show input to add custom subcategories */}
-                     {category.id === 'other' && (
-                       <div className=" max-w-md flex gap-2 mb-3">
-                         <input
-                           type="text"
-                           value={formData.otherInputs[category.id] || ''}
-                           onChange={(e) => handleOtherInputChange(category.id, e.target.value)}
-                           placeholder="Add a custom subcategory (e.g., Blankets)"
-                           className="flex-1 px-3 py-2 text-base border rounded"
-                         />
-                         <Button onClick={() => addDynamicSubCategory(category.id)} className="px-4 bg-blue-500 text-white rounded-md">
-                           Add
-                         </Button>
-                       </div>
-                     )}
+                     {/* Custom subcategory input for any category */}
+                     <div className="max-w-md flex gap-2 mb-3">
+                       <input
+                         type="text"
+                         value={formData.otherInputs[category.id] || ''}
+                         onChange={(e) => handleOtherInputChange(category.id, e.target.value)}
+                         placeholder={`Add custom subcategory for ${category.name}`}
+                         className="flex-1 px-3 py-2 text-base border rounded"
+                       />
+                       <Button 
+                         onClick={() => addDynamicSubCategory(category.id)} 
+                         className="px-4 bg-blue-500 text-white rounded-md"
+                       >
+                         Add
+                       </Button>
+                     </div>
 
                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                        {(
-                         // combine static subcategories and any dynamic ones user added
+                         // combine API subcategories and any dynamic ones user added
                          [
-                           ...category.subCategories,
+                           ...(category.subcategories?.map(sub => sub.name) || []),
                            ...(formData.dynamicSubCategories[category.id] || [])
                          ]
-                       ).map((subCategory) => (
-                         <label
-                           key={subCategory}
-                           className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
-                         >
-                           <input
-                             type="checkbox"
-                             checked={(formData.selectedCategories[category.id] || []).includes(subCategory)}
-                             onChange={() => toggleSubCategory(category.id, subCategory)}
-                             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                           />
-                           <span className="ml-2 text-base font-medium text-gray-700">{subCategory}</span>
-                         </label>
-                       ))}
+                       ).length > 0 ? (
+                         [
+                           ...(category.subcategories?.map(sub => sub.name) || []),
+                           ...(formData.dynamicSubCategories[category.id] || [])
+                         ].map((subCategory) => (
+                           <label
+                             key={subCategory}
+                             className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
+                           >
+                             <input
+                               type="checkbox"
+                               checked={(formData.selectedCategories[category.id] || []).includes(subCategory)}
+                               onChange={() => toggleSubCategory(category.id, subCategory)}
+                               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                             />
+                             <span className="ml-2 text-base font-medium text-gray-700">{subCategory}</span>
+                           </label>
+                         ))
+                       ) : (
+                         <div className="col-span-full text-gray-500 text-sm italic p-2">
+                           No subcategories available. Add custom ones using the input above.
+                         </div>
+                       )}
                      </div>
                    </div>
                  )}
@@ -305,10 +376,10 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
              <div className="space-y-2">
                {Object.entries(formData.selectedCategories).map(([categoryId, subCategories]) => {
                  if (!subCategories || (subCategories as string[]).length === 0) return null;
-                 const category = productCategories.find(c => c.id === categoryId);
+                 const category = categories.find(c => c.id === categoryId);
                  return (
                    <div key={categoryId} className="flex flex-wrap gap-2">
-                     <span className="font-medium text-gray-900">{category?.label}:</span>
+                     <span className="font-medium text-gray-900">{category?.name}:</span>
                      {(subCategories as string[]).map((sub) => (
                        <span key={sub} className="px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded">
                          {sub}

@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
+import axiosInstance from '@/lib/axios'
 import { 
   Eye, 
   EyeOff, 
@@ -116,23 +117,14 @@ export default function AdminLogin() {
 
     try {
       // Call super admin login endpoint
-      const response = await fetch('http://localhost:5000/api/auth/admin/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies for httpOnly token
-        body: JSON.stringify({
-          email: loginData.email,
-          password: loginData.password,
-        }),
+      const response = await axiosInstance.post('/auth/admin/login', {
+        email: loginData.email,
+        password: loginData.password,
+      }, {
+        withCredentials: true, // Include cookies for httpOnly token
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Super Admin login failed')
-      }
+      const data = response.data
 
       const loginResponse: LoginResponse = data.data
 

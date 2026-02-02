@@ -1,7 +1,7 @@
 import { getStoredAuth, authenticatedFetch } from '@/lib/auth'
+import axiosInstance from '@/lib/axios'
 
 // Vendor Service for API integration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export interface VendorRegistrationData {
   // Company Details
@@ -119,7 +119,7 @@ export interface VendorProfile {
   productCategories: string[];
   productTypes: string[];
   specializations: string[];
-  annualTurnover?: number;
+  annualTurnover?: string;
   exportExperience?: boolean;
   exportCountries?: string[];
   primaryMarkets?: string[];
@@ -316,17 +316,13 @@ class VendorService {
     }
     
     try {
-      const response = await fetch(`${API_BASE_URL}/vendors/register`, {
-        method: 'POST',
-        body: form,
+      const response = await axiosInstance.post('/vendors/register', form, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Registration failed');
-      }
-      
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Vendor registration error:', error);
       throw error;
@@ -336,20 +332,9 @@ class VendorService {
   // Login vendor
   static async loginVendor(email: string, password: string): Promise<VendorLoginResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendors/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const response = await axiosInstance.post('/vendors/login', { email, password });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
-      }
-      
-      const data = await response.json();
+      const data = response.data;
       
       // Store token in localStorage
       if (typeof window !== 'undefined') {
@@ -372,20 +357,13 @@ class VendorService {
     }
     
     try {
-      const response = await fetch(`${API_BASE_URL}/vendors/profile`, {
-        method: 'GET',
+      const response = await axiosInstance.get('/vendors/profile', {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
         },
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch profile');
-      }
-      
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Get vendor profile error:', error);
       throw error;
@@ -400,21 +378,13 @@ class VendorService {
     }
     
     try {
-      const response = await fetch(`${API_BASE_URL}/vendors/profile`, {
-        method: 'PUT',
+      const response = await axiosInstance.put('/vendors/profile', updateData, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updateData),
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update profile');
-      }
-      
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Update vendor profile error:', error);
       throw error;
@@ -436,27 +406,42 @@ class VendorService {
     if (filters.page) queryParams.append('page', filters.page.toString());
     if (filters.limit) queryParams.append('limit', filters.limit.toString());
 
-    const url = `${API_BASE_URL}/vendors/all?${queryParams.toString()}`;
+    const url = `/vendors/all?${queryParams.toString()}`;
     console.log('Making request to:', url);
 
     try {
-      const response = await authenticatedFetch(url, {
-        method: 'GET',
+      const response = await axiosInstance.get(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
       
       console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error:', errorData);
-        throw new Error(errorData.error || 'Failed to fetch vendors');
-      }
-      
-      const data = await response.json();
-      console.log('Vendors data received:', data);
-      return data;
+      console.log('Vendors data received:', response.data);
+      return response.data;
     } catch (error) {
       console.error('Get all vendors error:', error);
+      throw error;
+    }
+  }
+
+  // Admin: Get single vendor by ID
+  static async getVendorById(vendorId: string): Promise<{ vendor: VendorProfile }> {
+    const token = this.getAdminToken();
+    if (!token) {
+      throw new Error('No admin authentication token found');
+    }
+
+    try {
+      const response = await axiosInstance.get(`/vendors/${vendorId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Get vendor by ID error:', error);
       throw error;
     }
   }
@@ -469,16 +454,13 @@ class VendorService {
     }
 
     try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/vendors/${vendorId}/approve`, {
-        method: 'PUT',
+      const response = await axiosInstance.put(`/vendors/${vendorId}/approve`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to approve vendor');
-      }
-      
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Approve vendor error:', error);
       throw error;
@@ -493,17 +475,13 @@ class VendorService {
     }
 
     try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/vendors/${vendorId}/reject`, {
-        method: 'PUT',
-        body: JSON.stringify({ reason }),
+      const response = await axiosInstance.put(`/vendors/${vendorId}/reject`, { reason }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to reject vendor');
-      }
-      
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Reject vendor error:', error);
       throw error;
@@ -518,17 +496,13 @@ class VendorService {
     }
 
     try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/vendors/${vendorId}/suspend`, {
-        method: 'PUT',
-        body: JSON.stringify({ reason }),
+      const response = await axiosInstance.put(`/vendors/${vendorId}/suspend`, { reason }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to suspend vendor');
-      }
-      
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Suspend vendor error:', error);
       throw error;
@@ -563,18 +537,11 @@ class VendorService {
   // Update vendor basic information
   static async updateVendorBasicInfo(basicInfo: VendorBasicInfo) {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/profile/basic`, {
-        method: 'PUT',
+      const response = await axiosInstance.put('/vendor-settings/profile/basic', basicInfo, {
         headers: this.getVendorAuthHeaders(),
-        body: JSON.stringify(basicInfo)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update basic information');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Update vendor basic info error:', error);
       throw error;
@@ -584,18 +551,11 @@ class VendorService {
   // Update vendor owner information
   static async updateVendorOwnerInfo(ownerInfo: VendorOwnerInfo) {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/profile/owner`, {
-        method: 'PUT',
+      const response = await axiosInstance.put('/vendor-settings/profile/owner', ownerInfo, {
         headers: this.getVendorAuthHeaders(),
-        body: JSON.stringify(ownerInfo)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update owner information');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Update vendor owner info error:', error);
       throw error;
@@ -608,18 +568,14 @@ class VendorService {
       const formData = new FormData();
       formData.append('logo', logoFile);
 
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/profile/logo`, {
-        method: 'POST',
-        headers: this.getVendorAuthHeadersFormData(),
-        body: formData
+      const response = await axiosInstance.post('/vendor-settings/profile/logo', formData, {
+        headers: {
+          ...this.getVendorAuthHeadersFormData(),
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload logo');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Upload vendor logo error:', error);
       throw error;
@@ -629,18 +585,11 @@ class VendorService {
   // Update vendor preferences
   static async updateVendorPreferences(preferences: VendorPreferences) {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/preferences`, {
-        method: 'PUT',
+      const response = await axiosInstance.put('/vendor-settings/preferences', preferences, {
         headers: this.getVendorAuthHeaders(),
-        body: JSON.stringify(preferences)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update preferences');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Update vendor preferences error:', error);
       throw error;
@@ -650,23 +599,16 @@ class VendorService {
   // Get vendor bank details
   static async getVendorBankDetails(): Promise<{ bankDetails: VendorBankDetails | null }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/bank-details`, {
-        method: 'GET',
-        headers: this.getVendorAuthHeaders()
+      const response = await axiosInstance.get('/vendor-settings/bank-details', {
+        headers: this.getVendorAuthHeaders(),
       });
 
-      if (response.status === 404) {
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
         // Return null for bank details if not found, don't throw error
         return { bankDetails: null };
       }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch bank details');
-      }
-
-      return await response.json();
-    } catch (error) {
       console.error('Get vendor bank details error:', error);
       throw error;
     }
@@ -675,18 +617,11 @@ class VendorService {
   // Create or update vendor bank details
   static async upsertVendorBankDetails(bankDetails: VendorBankDetails) {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/bank-details`, {
-        method: 'PUT',
+      const response = await axiosInstance.put('/vendor-settings/bank-details', bankDetails, {
         headers: this.getVendorAuthHeaders(),
-        body: JSON.stringify(bankDetails)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save bank details');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Upsert vendor bank details error:', error);
       throw error;
@@ -696,17 +631,11 @@ class VendorService {
   // Get vendor documents
   static async getVendorDocuments(): Promise<{ documents: VendorDocument[] }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/documents`, {
-        method: 'GET',
-        headers: this.getVendorAuthHeaders()
+      const response = await axiosInstance.get('/vendor-settings/documents', {
+        headers: this.getVendorAuthHeaders(),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch documents');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Get vendor documents error:', error);
       throw error;
@@ -721,18 +650,14 @@ class VendorService {
       formData.append('type', type);
       formData.append('name', name);
 
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/documents`, {
-        method: 'POST',
-        headers: this.getVendorAuthHeadersFormData(),
-        body: formData
+      const response = await axiosInstance.post('/vendor-settings/documents', formData, {
+        headers: {
+          ...this.getVendorAuthHeadersFormData(),
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload document');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Upload vendor document error:', error);
       throw error;
@@ -742,17 +667,11 @@ class VendorService {
   // Delete vendor document
   static async deleteVendorDocument(documentId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/documents/${documentId}`, {
-        method: 'DELETE',
-        headers: this.getVendorAuthHeaders()
+      const response = await axiosInstance.delete(`/vendor-settings/documents/${documentId}`, {
+        headers: this.getVendorAuthHeaders(),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete document');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Delete vendor document error:', error);
       throw error;
@@ -762,22 +681,15 @@ class VendorService {
   // Change vendor password
   static async changeVendorPassword(currentPassword: string, newPassword: string, confirmPassword: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/password`, {
-        method: 'PUT',
+      const response = await axiosInstance.put('/vendor-settings/password', {
+        currentPassword,
+        newPassword,
+        confirmPassword
+      }, {
         headers: this.getVendorAuthHeaders(),
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-          confirmPassword
-        })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to change password');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Change vendor password error:', error);
       throw error;
@@ -787,17 +699,11 @@ class VendorService {
   // Get vendor certifications
   static async getVendorCertifications(): Promise<{ certifications: VendorCertification[] }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/certifications`, {
-        method: 'GET',
-        headers: this.getVendorAuthHeaders()
+      const response = await axiosInstance.get('/vendor-settings/certifications', {
+        headers: this.getVendorAuthHeaders(),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch certifications');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Get vendor certifications error:', error);
       throw error;
@@ -829,18 +735,14 @@ class VendorService {
         formData.append('expiryDate', certificationData.expiryDate);
       }
 
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/certifications`, {
-        method: 'POST',
-        headers: this.getVendorAuthHeadersFormData(),
-        body: formData
+      const response = await axiosInstance.post('/vendor-settings/certifications', formData, {
+        headers: {
+          ...this.getVendorAuthHeadersFormData(),
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to add certification');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Add vendor certification error:', error);
       throw error;
@@ -876,18 +778,14 @@ class VendorService {
         formData.append('expiryDate', certificationData.expiryDate);
       }
 
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/certifications/${certificationId}`, {
-        method: 'PUT',
-        headers: this.getVendorAuthHeadersFormData(),
-        body: formData
+      const response = await axiosInstance.put(`/vendor-settings/certifications/${certificationId}`, formData, {
+        headers: {
+          ...this.getVendorAuthHeadersFormData(),
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update certification');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Update vendor certification error:', error);
       throw error;
@@ -897,17 +795,11 @@ class VendorService {
   // Delete vendor certification
   static async deleteVendorCertification(certificationId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-settings/certifications/${certificationId}`, {
-        method: 'DELETE',
-        headers: this.getVendorAuthHeaders()
+      const response = await axiosInstance.delete(`/vendor-settings/certifications/${certificationId}`, {
+        headers: this.getVendorAuthHeaders(),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete certification');
-      }
-
-      return await response.json();
+      return response.data;
     } catch (error) {
       console.error('Delete vendor certification error:', error);
       throw error;

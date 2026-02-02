@@ -174,13 +174,37 @@ export default function ViewCategory({ categoryId }: ViewCategoryProps) {
             </CardHeader>
             <CardContent>
               {category.subcategories.length > 0 ? (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {category.subcategories.map((subcategory) => (
-                    <div key={subcategory.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
+                    <div key={subcategory.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex flex-col space-y-3">
+                        {/* Subcategory Image */}
+                        <div className="w-full h-32 bg-gray-100 rounded-lg overflow-hidden">
+                          {subcategory.image ? (
+                            <img
+                              src={subcategory.image}
+                              alt={subcategory.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Handle broken images
+                                const target = e.target as HTMLImageElement;
+                                target.src = '/assets/images/categories/cs1.jpg'; // Fallback image
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                              <div className="text-center">
+                                <div className="w-8 h-8 mx-auto mb-2 bg-gray-300 rounded"></div>
+                                <p className="text-xs text-gray-500">No image</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Subcategory Info */}
                         <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            <h4 className="font-medium text-gray-900">{subcategory.name}</h4>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-gray-900 truncate">{subcategory.name}</h4>
                             <Badge 
                               variant={subcategory.status === 'ACTIVE' ? 'default' : 'secondary'}
                               className={subcategory.status === 'ACTIVE' ? 'bg-green-100 text-green-800 border-green-200' : ''}
@@ -188,17 +212,46 @@ export default function ViewCategory({ categoryId }: ViewCategoryProps) {
                               {subcategory.status.toLowerCase()}
                             </Badge>
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">{subcategory.description}</p>
-                          <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                            <span>Slug: {subcategory.slug}</span>
-                            <span>Products: {subcategory.productCount}</span>
-                            <span>Updated: {new Date(subcategory.updatedAt).toLocaleDateString()}</span>
+                          
+                          <p className="text-sm text-gray-600 mb-3 overflow-hidden" style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical' as const,
+                            lineHeight: '1.4em',
+                            maxHeight: '2.8em'
+                          }}>{subcategory.description}</p>
+                          
+                          <div className="space-y-1 text-xs text-gray-500">
+                            <div className="flex justify-between">
+                              <span>Slug:</span>
+                              <span className="font-mono">{subcategory.slug}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Products:</span>
+                              <span className="font-medium">{subcategory.productCount}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Sort Order:</span>
+                              <span>{subcategory.sortOrder}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Updated:</span>
+                              <span>{new Date(subcategory.updatedAt).toLocaleDateString()}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        
+                        {/* Actions */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <Link href={`/admin/dashboard/categories/view/${subcategory.id}`}>
+                            <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800">
+                              View Details
+                            </Button>
+                          </Link>
                           <Link href={`/admin/dashboard/categories/edit/${subcategory.id}`}>
                             <Button variant="ghost" size="sm">
-                              <Edit className="h-3 w-3" />
+                              <Edit className="h-3 w-3 mr-1" />
+                              Edit
                             </Button>
                           </Link>
                         </div>
@@ -207,7 +260,18 @@ export default function ViewCategory({ categoryId }: ViewCategoryProps) {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">No subcategories found</p>
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gray-300 rounded"></div>
+                  </div>
+                  <p className="text-gray-500 text-lg font-medium">No subcategories found</p>
+                  <p className="text-gray-400 text-sm mt-1">Add subcategories to organize your products better</p>
+                  <Link href={`/admin/dashboard/categories/edit/${category.id}`} className="mt-4 inline-block">
+                    <Button variant="outline" size="sm">
+                      Add Subcategories
+                    </Button>
+                  </Link>
+                </div>
               )}
             </CardContent>
           </Card>
