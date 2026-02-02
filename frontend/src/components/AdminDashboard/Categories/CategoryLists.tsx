@@ -26,13 +26,27 @@ export default function CategoryLists() {
   const loadCategories = async () => {
     try {
       setLoading(true)
-      const response = await categoryService.getCategories({
-        search: searchTerm || undefined,
-        status: statusFilter,
-        includeSubcategories: true,
-        sortBy: 'sortOrder',
-        sortOrder: 'asc'
-      })
+      
+      let response;
+      
+      if (searchTerm && searchTerm.trim().length >= 2) {
+        // Use dedicated search endpoint for better search results
+        response = await categoryService.searchCategories(searchTerm, {
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          includeSubcategories: true,
+          limit: 50
+        })
+      } else {
+        // Use regular getCategories for normal listing (root categories only)
+        response = await categoryService.getCategories({
+          status: statusFilter,
+          includeSubcategories: true, // Include subcategories in the response
+          showRootOnly: true, // Only show root categories as main items
+          sortBy: 'sortOrder',
+          sortOrder: 'asc'
+        })
+      }
+      
       setCategories(response.data)
     } catch (error) {
       console.error('Failed to load categories:', error)
@@ -101,9 +115,30 @@ export default function CategoryLists() {
               </svg>
             </button>
           )}
-          <div className={isSubcategory ? 'ml-6' : ''}>
-            <div className="text-sm font-medium text-gray-900">{category.name}</div>
-            <div className="text-sm text-gray-500">{category.slug}</div>
+          <div className="flex items-center space-x-3">
+            {/* Category/Subcategory Image */}
+            <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+              {category.image ? (
+                <img
+                  src={category.image}
+                  alt={category.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/assets/images/categories/cs1.jpg';
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                  <div className="w-4 h-4 bg-gray-300 rounded"></div>
+                </div>
+              )}
+            </div>
+            
+            <div className={isSubcategory ? 'ml-6' : ''}>
+              <div className="text-sm font-medium text-gray-900">{category.name}</div>
+              <div className="text-sm text-gray-500">{category.slug}</div>
+            </div>
           </div>
         </div>
       </TableCell>
@@ -255,7 +290,8 @@ export default function CategoryLists() {
           <CardContent className="p-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-900">{stats?.total || 0}</div>
-              <div className="text-sm text-gray-500">Total Categories</div>
+              <div className="text-sm text-gray-500">Main Categories</div>
+              <div className="text-xs text-gray-400 mt-1">Root level categories</div>
             </div>
           </CardContent>
         </Card>
@@ -266,6 +302,7 @@ export default function CategoryLists() {
                 {stats?.active || 0}
               </div>
               <div className="text-sm text-gray-500">Active Categories</div>
+              <div className="text-xs text-gray-400 mt-1">Currently visible</div>
             </div>
           </CardContent>
         </Card>
@@ -276,6 +313,7 @@ export default function CategoryLists() {
                 {stats?.subcategories || 0}
               </div>
               <div className="text-sm text-gray-500">Total Subcategories</div>
+              <div className="text-xs text-gray-400 mt-1">Nested under main categories</div>
             </div>
           </CardContent>
         </Card>
@@ -286,6 +324,7 @@ export default function CategoryLists() {
                 {categories.reduce((sum, c) => sum + c.productCount, 0)}
               </div>
               <div className="text-sm text-gray-500">Total Products</div>
+              <div className="text-xs text-gray-400 mt-1">Across all categories</div>
             </div>
           </CardContent>
         </Card>

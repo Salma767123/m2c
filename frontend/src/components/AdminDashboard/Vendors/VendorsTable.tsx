@@ -48,7 +48,7 @@ const getProductCount = (vendor: VendorProfile): number => {
 
 const getRevenue = (vendor: VendorProfile): string => {
   if (vendor.annualTurnover) {
-    return `$${vendor.annualTurnover.toLocaleString()}`
+    return vendor.annualTurnover
   }
   return 'N/A'
 }

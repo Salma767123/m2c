@@ -48,25 +48,14 @@ export default function VendorView({ vendorId }: VendorViewProps) {
     const fetchVendorData = async () => {
       try {
         setLoading(true)
-        // For now, we'll fetch from the vendors list since there's no single vendor endpoint
-        // In a real implementation, you'd have a dedicated endpoint for single vendor details
-        const response = await VendorService.getAllVendors({ search: vendorId })
-        const foundVendor = response.vendors.find(v => v.id === vendorId)
-        
-        if (foundVendor) {
-          setVendor(foundVendor)
-        } else {
-          toast({
-            title: 'Error',
-            description: 'Vendor not found',
-            variant: 'destructive'
-          })
-        }
+        // Use the new getVendorById method
+        const response = await VendorService.getVendorById(vendorId)
+        setVendor(response.vendor)
       } catch (error) {
         console.error('Error fetching vendor data:', error)
         toast({
           title: 'Error',
-          description: 'Failed to fetch vendor details',
+          description: error instanceof Error ? error.message : 'Failed to fetch vendor details',
           variant: 'destructive'
         })
       } finally {
@@ -838,7 +827,7 @@ function PerformanceTab({ vendor }: { vendor: VendorProfile }) {
             {vendor.annualTurnover && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Annual Turnover</span>
-                <span className="font-semibold">${vendor.annualTurnover.toLocaleString()}</span>
+                <span className="font-semibold">{vendor.annualTurnover}</span>
               </div>
             )}
             

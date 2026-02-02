@@ -527,6 +527,42 @@ const getAllVendors = async (req, res) => {
   }
 };
 
+// Get single vendor by ID (Admin only)
+const getVendorById = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: {
+        certifications: true,
+        documents: true,
+        _count: {
+          select: {
+            certifications: true,
+            documents: true
+          }
+        }
+      }
+    });
+
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    res.json({
+      vendor: {
+        ...vendor,
+        password: undefined
+      }
+    });
+
+  } catch (error) {
+    console.error('Get vendor by ID error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Approve vendor
 const approveVendor = async (req, res) => {
   try {
@@ -838,6 +874,7 @@ module.exports = {
   getVendorProfile,
   updateVendorProfile,
   getAllVendors,
+  getVendorById,
   approveVendor,
   rejectVendor,
   suspendVendor,

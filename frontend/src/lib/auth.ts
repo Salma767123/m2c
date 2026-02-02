@@ -96,7 +96,10 @@ export function clearAuth(): void {
 export function isAuthenticated(): boolean {
   try {
     const auth = getStoredAuth()
-    return auth !== null && auth.user && auth.user.role && auth.user.role.toLowerCase() === 'admin'
+    if (!auth || !auth.user || !auth.user.role) {
+      return false
+    }
+    return auth.user.role.toLowerCase() === 'admin'
   } catch (error) {
     console.error('Error in isAuthenticated:', error)
     return false
@@ -138,26 +141,22 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
   return response
 }
 
+import axiosInstance from './axios'
+
 // Logout function
 export async function logout(): Promise<void> {
   try {
     const auth = getStoredAuth()
     if (auth) {
       // Call backend logout endpoint with credentials for httpOnly cookies
-      await fetch('http://localhost:5000/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeader(),
-        },
-        credentials: 'include', // Include httpOnly cookies
+      await axiosInstance.post('/auth/logout', {}, {
+        withCredentials: true, // Include httpOnly cookies
       }).catch(() => {
         // Ignore errors, just clear local storage
       })
     }
   } finally {
     clearAuth()
-    
     // Import toast function dynamically to avoid SSR issues
     if (typeof window !== 'undefined') {
       const { showSuccessToast } = await import('@/lib/toast-utils')
