@@ -14,6 +14,7 @@ import {
 } from '@/components/UI/Table'
 import { Badge } from '@/components/UI/Badge'
 import { LoadingSpinner } from '@/components/UI/LoadingSpinner'
+import Dropdown from '@/components/UI/Dropdown'
 import { Edit, Eye, CheckCircle, XCircle, Search, Filter, Plus } from 'lucide-react'
 import VendorService, { VendorProfile, VendorFilters } from '@/services/vendorService'
 import { formatDate } from '@/lib/utils'
@@ -275,17 +276,20 @@ export default function VendorsTable() {
           </div>
           
           <div className="flex gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => handleStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">All Status</option>
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="SUSPENDED">Suspended</option>
-            </select>
+            <div className="min-w-[150px]">
+              <Dropdown
+                value={statusFilter}
+                options={[
+                  { value: '', label: 'All Status' },
+                  { value: 'PENDING', label: 'Pending' },
+                  { value: 'APPROVED', label: 'Approved' },
+                  { value: 'REJECTED', label: 'Rejected' },
+                  { value: 'SUSPENDED', label: 'Suspended' }
+                ]}
+                placeholder="All Status"
+                onChange={(value) => handleStatusFilter(value as string)}
+              />
+            </div>
             
             <Button onClick={handleSearch} variant="outline">
               <Filter className="h-4 w-4 mr-2" />

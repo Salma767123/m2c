@@ -4,27 +4,40 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
-import { ArrowLeft, Save, Package, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Save, Package, AlertTriangle, Plus } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 
 interface InventoryFormData {
+  // Basic Product Info (Primary Data)
   name: string
   sku: string
   category: string
-  vendor: string
   description: string
+  manufacturingDate?: string // New field for manufacturing date
+  
+  // Vendor Information (NEW)
+  vendorId?: string // Link to vendor
+  vendorName?: string // Vendor name for display
+  
+  // Inventory Management
   currentStock: number
   minStock: number
-  maxStock: number
-  price: number
-  costPrice: number
   location: string
-  barcode?: string
+  
+  // Product Status
   status: 'active' | 'inactive'
   trackInventory: boolean
-  allowBackorders: boolean
+  
+  // Additional Info - Source Type
+  sourceType: 'supplier' | 'manufacture' | null // New field to track source type
+  supplier?: string
+  lastRestocked?: string
   notes?: string
+  
+  // Product Creation Status
+  hasProductCreated: boolean // Whether this inventory item has been used to create a product
+  productId?: string // Link to created product
 }
 
 interface AddEditInventoryProps {
@@ -32,17 +45,26 @@ interface AddEditInventoryProps {
   isEdit?: boolean
 }
 
-// Mock categories and vendors
 const categories = [
-  'Bed Sheets', 'Towels', 'Curtains', 'Pillows', 'Blankets', 'Table Linens', 'Bath Mats'
+  'Kitchen Linen', 'Bath Linen', 'Bed Linen', 'Table Linen', 'Towels', 'Aprons', 'Curtains', 'Blankets', 'Pillows'
 ]
 
-const vendors = [
-  'Cotton Mills Ltd', 'Textile Pro', 'Home Decor Inc', 'Sleep Comfort Co', 'Warm Textiles', 'Luxury Linens Co'
+// Mock vendors data
+const mockVendors = [
+  { id: '1', name: 'Cotton Mills Ltd', email: 'contact@cottonmills.com', status: 'active' },
+  { id: '2', name: 'Textile Pro Industries', email: 'info@textilepro.com', status: 'active' },
+  { id: '3', name: 'Home Decor Inc', email: 'sales@homedecor.com', status: 'active' },
+  { id: '4', name: 'Sleep Comfort Co', email: 'orders@sleepcomfort.com', status: 'active' },
+  { id: '5', name: 'Warm Textiles', email: 'support@warmtextiles.com', status: 'active' },
+  { id: '6', name: 'Luxury Linens Co', email: 'hello@luxurylinens.com', status: 'active' }
 ]
 
 const locations = [
-  'Warehouse A - Section 1', 'Warehouse A - Section 2', 'Warehouse B - Section 1', 'Warehouse B - Section 2', 'Store Front'
+  'Main Warehouse - Section A', 
+  'Main Warehouse - Section B', 
+  'Storage Room 1', 
+  'Storage Room 2', 
+  'Display Area'
 ]
 
 export default function AddEditInventory({ inventoryId, isEdit = false }: AddEditInventoryProps) {
@@ -54,19 +76,27 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     name: '',
     sku: '',
     category: '',
-    vendor: '',
     description: '',
+    manufacturingDate: '',
+    
+    // Vendor Information (NEW)
+    vendorId: '',
+    vendorName: '',
+    
     currentStock: 0,
     minStock: 5,
-    maxStock: 100,
-    price: 0,
-    costPrice: 0,
     location: '',
-    barcode: '',
+    
     status: 'active',
     trackInventory: true,
-    allowBackorders: false,
-    notes: ''
+    
+    sourceType: null,
+    supplier: '',
+    lastRestocked: '',
+    notes: '',
+    
+    hasProductCreated: false,
+    productId: ''
   })
 
   // Load inventory data for editing
@@ -79,24 +109,32 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         try {
           await new Promise(resolve => setTimeout(resolve, 1000))
           
-          // Mock inventory data for editing
+          // Mock inventory data
           setFormData({
-            name: 'Premium Cotton Bed Sheet Set',
-            sku: 'CS-Q-WHT-001',
-            category: 'Bed Sheets',
-            vendor: 'Cotton Mills Ltd',
-            description: 'Luxurious 100% cotton bed sheet set with superior comfort and durability',
+            name: 'Cotton Kitchen Towel',
+            sku: 'KL-CKT-001',
+            category: 'Kitchen Linen',
+            description: 'High-quality cotton kitchen towel with excellent absorbency',
+            manufacturingDate: '2024-01-10',
+            
+            // Vendor Information
+            vendorId: '1',
+            vendorName: 'Cotton Mills Ltd',
+            
             currentStock: 45,
             minStock: 10,
-            maxStock: 100,
-            price: 89.99,
-            costPrice: 45.00,
-            location: 'Warehouse A - Section 1',
-            barcode: '1234567890123',
+            location: 'Main Warehouse - Section A',
+            
             status: 'active',
             trackInventory: true,
-            allowBackorders: false,
-            notes: 'Popular item, restock regularly'
+            
+            sourceType: 'supplier',
+            supplier: 'Cotton Mills Ltd',
+            lastRestocked: '2024-01-15',
+            notes: 'Popular item, restock regularly',
+            
+            hasProductCreated: false,
+            productId: ''
           })
         } catch (error) {
           console.error('Error loading inventory data:', error)
@@ -128,6 +166,32 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     }))
   }
 
+  const handleSourceTypeChange = (sourceType: 'supplier' | 'manufacture') => {
+    setFormData(prev => {
+      // If clicking the same type that's already selected, deselect it
+      if (prev.sourceType === sourceType) {
+        return {
+          ...prev,
+          sourceType: null,
+          supplier: '',
+          lastRestocked: '',
+          // Clear any source-specific data
+          notes: prev.notes // Keep general notes
+        }
+      }
+      
+      // If selecting a different type, automatically close previous and open new
+      return {
+        ...prev,
+        sourceType: sourceType,
+        // Always clear supplier field when switching (fresh start)
+        supplier: '',
+        // Clear lastRestocked for fresh start
+        lastRestocked: ''
+      }
+    })
+  }
+
   const handleDropdownChange = (name: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -136,23 +200,54 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     }))
   }
 
+  // Vendor Selection Functions
+  const handleVendorSelect = (vendorId: string) => {
+    const vendor = mockVendors.find(v => v.id === vendorId)
+    if (vendor) {
+      setFormData(prev => ({
+        ...prev,
+        vendorId: vendor.id,
+        vendorName: vendor.name
+      }))
+    }
+  }
+
+  const handleCreateProduct = () => {
+    // Navigate to product creation with this inventory item pre-selected
+    router.push(`/admin/dashboard/products/add?inventoryId=${inventoryId}`)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Basic validation
+    if (!formData.name.trim()) {
+      console.error('Product name is required')
+      return
+    }
+    
+    if (!formData.category) {
+      console.error('Category is required')
+      return
+    }
+    
+    if (!formData.vendorId) {
+      console.error('Vendor selection is required')
+      return
+    }
+    
     setIsLoading(true)
 
     try {
       if (isEdit) {
         console.log('Updating inventory item:', inventoryId, formData)
-        // API call: PUT /api/inventory/${inventoryId}
+        // API call: PUT /api/admin/inventory/${inventoryId}
       } else {
         console.log('Creating inventory item:', formData)
-        // API call: POST /api/inventory
+        // API call: POST /api/admin/inventory
       }
       
-      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Redirect back to inventory list
       router.push('/admin/dashboard/inventory')
     } catch (error) {
       console.error('Error saving inventory item:', error)
@@ -173,46 +268,64 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 Back to Inventory
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">Loading...</h1>
+            <h1 className="text-2xl font-bold text-[#222222]">Loading...</h1>
           </div>
         </div>
         <Card>
           <CardContent className="p-8">
             <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700"></div>
-              <span className="ml-3 text-gray-600">Loading inventory data...</span>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#222222]"></div>
+              <span className="ml-3 text-slate-600">Loading inventory data...</span>
             </div>
           </CardContent>
         </Card>
       </div>
     )
   }
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-[#222222]">
             {isEdit ? 'Edit Inventory Item' : 'Add New Inventory Item'}
           </h1>
         </div>
       </div>
-
-      {/* Form */}
+ 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
+            {/* Basic Product Information */}
+            <Card className="border border-gray-200">
+              <CardHeader className="bg-gray-50 border-b border-gray-200">
+                <CardTitle className="text-[#222222]">Basic Product Information</CardTitle>
+                <p className="text-sm text-slate-600">This will be the master product data</p>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-6">
+                
+                {/* Vendor Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Dropdown
+                    id="vendor"
+                    label="Vendor *"
+                    value={formData.vendorId || ''}
+                    options={mockVendors.map(vendor => ({
+                      value: vendor.id,
+                      label: `${vendor.name} (${vendor.email})`
+                    }))}
+                    placeholder="Select Vendor"
+                    onChange={(value) => handleVendorSelect(value as string)}
+                  />
+                  {formData.vendorName && (
+                    <p className="text-xs text-slate-500 mt-1">Selected: {formData.vendorName}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     Product Name *
                   </label>
                   <input
@@ -221,7 +334,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     value={formData.name}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
                     placeholder="Enter product name"
                   />
                 </div>
@@ -238,21 +351,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     />
                   </div>
                   <div>
-                    <Dropdown
-                      id="vendor"
-                      label="Vendor *"
-                      value={formData.vendor}
-                      options={vendors}
-                      placeholder="Select Vendor"
-                      onChange={(value) => handleDropdownChange('vendor', value as string)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      SKU *
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      SKU * <span className="text-xs text-slate-500">(Auto-generated)</span>
                     </label>
                     <input
                       type="text"
@@ -260,50 +360,38 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       value={formData.sku}
                       onChange={handleInputChange}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
                       placeholder="Auto-generated or custom SKU"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Barcode
-                    </label>
-                    <input
-                      type="text"
-                      name="barcode"
-                      value={formData.barcode}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                      placeholder="Product barcode"
                     />
                   </div>
                 </div>
 
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Product Description
                   </label>
                   <textarea
                     name="description"
                     value={formData.description}
                     onChange={handleInputChange}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                    placeholder="Product description"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
+                    placeholder="Basic product description"
                   />
                 </div>
               </CardContent>
             </Card>
 
             {/* Stock Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Stock Management</CardTitle>
+            <Card className="border border-gray-200">
+              <CardHeader className="bg-gray-50 border-b border-gray-200">
+                <CardTitle className="text-[#222222]">Stock Management</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <CardContent className="space-y-4 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Current Stock *
                     </label>
                     <input
@@ -312,12 +400,11 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       value={formData.currentStock}
                       onChange={handleInputChange}
                       required
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Minimum Stock *
                     </label>
                     <input
@@ -326,35 +413,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       value={formData.minStock}
                       onChange={handleInputChange}
                       required
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Maximum Stock *
-                    </label>
-                    <input
-                      type="number"
-                      name="maxStock"
-                      value={formData.maxStock}
-                      onChange={handleInputChange}
-                      required
-                      min="1"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Dropdown
-                    id="location"
-                    label="Storage Location"
-                    value={formData.location}
-                    options={locations}
-                    placeholder="Select Location"
-                    onChange={(value) => handleDropdownChange('location', value as string)}
-                  />
                 </div>
 
                 <div className="space-y-3">
@@ -364,99 +425,199 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       name="trackInventory"
                       checked={formData.trackInventory}
                       onChange={handleInputChange}
-                      className="rounded border-gray-300 text-gray-700 focus:ring-gray-700"
+                      className="rounded border-gray-300 text-[#222222] focus:ring-[#222222]"
                     />
-                    <label className="ml-2 text-sm text-gray-700">
+                    <label className="ml-2 text-sm text-slate-700">
                       Track inventory for this item
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      name="allowBackorders"
-                      checked={formData.allowBackorders}
-                      onChange={handleInputChange}
-                      className="rounded border-gray-300 text-gray-700 focus:ring-gray-700"
-                    />
-                    <label className="ml-2 text-sm text-gray-700">
-                      Allow backorders when out of stock
                     </label>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Pricing */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Pricing Information</CardTitle>
+            {/* Additional Information */}
+            <Card className="border border-gray-200">
+              <CardHeader className="bg-gray-50 border-b border-gray-200">
+                <CardTitle className="text-[#222222]">Additional Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Cost Price *
-                    </label>
-                    <input
-                      type="number"
-                      name="costPrice"
-                      value={formData.costPrice}
-                      onChange={handleInputChange}
-                      required
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Selling Price *
-                    </label>
-                    <input
-                      type="number"
-                      name="price"
-                      value={formData.price}
-                      onChange={handleInputChange}
-                      required
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                      placeholder="0.00"
-                    />
+              <CardContent className="space-y-4 p-6">
+                
+                {/* Source Type Selection */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-slate-700 mb-3">
+                    Product Source Type
+                    <span className="text-xs text-slate-500 ml-2">(Select one option)</span>
+                  </label>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div 
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                        formData.sourceType === 'supplier' 
+                          ? 'border-gray-800 bg-gray-100 shadow-sm' 
+                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleSourceTypeChange('supplier')}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          formData.sourceType === 'supplier' 
+                            ? 'border-gray-800 bg-gray-800' 
+                            : 'border-gray-300'
+                        }`}>
+                          {formData.sourceType === 'supplier' && (
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-slate-900">Supplier</h4>
+                          <p className="text-sm text-slate-600">Product sourced from external supplier</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div 
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                        formData.sourceType === 'manufacture' 
+                          ? 'border-gray-800 bg-gray-100 shadow-sm' 
+                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleSourceTypeChange('manufacture')}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          formData.sourceType === 'manufacture' 
+                            ? 'border-gray-800 bg-gray-800' 
+                            : 'border-gray-300'
+                        }`}>
+                          {formData.sourceType === 'manufacture' && (
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-slate-900">Manufacture</h4>
+                          <p className="text-sm text-slate-600">Product manufactured in-house</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {formData.price > 0 && formData.costPrice > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">Profit Analysis</h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                {/* Conditional Fields Based on Source Type */}
+                {formData.sourceType === 'supplier' && (
+                  <div className="space-y-4 p-4 bg-gray-50 border border-gray-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
+                    <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                      <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
+                      Supplier Information
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <span className="text-blue-800">Profit Margin:</span>
-                        <span className="font-medium ml-2">
-                          ${(formData.price - formData.costPrice).toFixed(2)}
-                        </span>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Supplier Name *
+                        </label>
+                        <input
+                          type="text"
+                          name="supplier"
+                          value={formData.supplier}
+                          onChange={handleInputChange}
+                          required={formData.sourceType === 'supplier'}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors ${
+                            formData.sourceType === 'supplier' && !formData.supplier 
+                              ? 'border-red-300 bg-red-50' 
+                              : 'border-gray-200'
+                          }`}
+                          placeholder="Enter supplier name"
+                        />
+                        {formData.sourceType === 'supplier' && !formData.supplier && (
+                          <p className="text-xs text-red-600 mt-1">Supplier name is required</p>
+                        )}
                       </div>
                       <div>
-                        <span className="text-blue-800">Profit %:</span>
-                        <span className="font-medium ml-2">
-                          {(((formData.price - formData.costPrice) / formData.price) * 100).toFixed(1)}%
-                        </span>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Last Restocked
+                        </label>
+                        <input
+                          type="date"
+                          name="lastRestocked"
+                          value={formData.lastRestocked}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                        />
                       </div>
                     </div>
                   </div>
                 )}
+
+                {formData.sourceType === 'manufacture' && (
+                  <div className="space-y-4 p-4 bg-gray-50 border border-gray-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
+                    <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                      <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
+                      Manufacturing Information
+                    </h4>
+                    <div className="text-sm text-gray-700 mb-4 space-y-2">
+                      <div className="flex items-center">
+                        <span className="w-1.5 h-1.5 bg-gray-600 rounded-full mr-2"></span>
+                        <span>This product is manufactured in-house</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="w-1.5 h-1.5 bg-gray-600 rounded-full mr-2"></span>
+                        <span>Full control over quality and production timeline</span>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Manufacturing Date
+                        </label>
+                        <input
+                          type="date"
+                          name="manufacturingDate"
+                          value={formData.manufacturingDate}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Last Restocked
+                        </label>
+                        <input
+                          type="date"
+                          name="lastRestocked"
+                          value={formData.lastRestocked}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes - Always visible */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Notes
+                  </label>
+                  <textarea
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
+                    placeholder="Any additional notes about this inventory item..."
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Status & Settings</CardTitle>
+            <Card className="border border-gray-200">
+              <CardHeader className="bg-gray-50 border-b border-gray-200">
+                <CardTitle className="text-[#222222]">Status & Settings</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-6">
                 <div>
                   <Dropdown
                     id="status"
@@ -472,16 +633,63 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
               </CardContent>
             </Card>
 
+            {/* Product Creation Status */}
+            <Card className="border border-gray-200">
+              <CardHeader className="bg-gray-50 border-b border-gray-200">
+                <CardTitle className="text-[#222222]">Product Status</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                {formData.hasProductCreated ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center text-gray-700">
+                      <Package className="h-4 w-4 mr-2" />
+                      <span className="text-sm font-medium">Product Created</span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      This inventory item has been used to create a product with variants.
+                    </p>
+                    <Link href={`/admin/dashboard/products/edit/${formData.productId}`}>
+                      <Button variant="outline" size="sm" className="w-full">
+                        View Product
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center text-slate-600">
+                      <Package className="h-4 w-4 mr-2" />
+                      <span className="text-sm font-medium">No Product Created</span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      After saving this inventory item, you can create a detailed product with variants.
+                    </p>
+                    {isEdit && (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={handleCreateProduct}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Product
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Stock Alert */}
             {formData.currentStock <= formData.minStock && (
-              <Card>
-                <CardHeader>
+              <Card className="border border-yellow-200">
+                <CardHeader className="bg-yellow-50 border-b border-yellow-200">
                   <CardTitle className="flex items-center text-yellow-700">
                     <AlertTriangle className="h-4 w-4 mr-2" />
                     Stock Alert
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                   <p className="text-sm text-yellow-700">
                     Current stock ({formData.currentStock}) is at or below minimum threshold ({formData.minStock}).
                     Consider restocking soon.
@@ -491,65 +699,56 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
             )}
 
             {/* Quick Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Stats</CardTitle>
+            <Card className="border border-gray-200">
+              <CardHeader className="bg-gray-50 border-b border-gray-200">
+                <CardTitle className="text-[#222222]">Quick Stats</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 p-6">
+                {formData.vendorName && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Vendor:</span>
+                    <span className="font-medium text-[#222222]">{formData.vendorName}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Stock Value:</span>
-                  <span className="font-medium">
-                    ${(formData.currentStock * formData.costPrice).toFixed(2)}
+                  <span className="text-slate-600">Current Stock:</span>
+                  <span className="font-medium text-[#222222]">
+                    {formData.currentStock} units
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Potential Revenue:</span>
-                  <span className="font-medium">
-                    ${(formData.currentStock * formData.price).toFixed(2)}
+                  <span className="text-slate-600">Min Stock Level:</span>
+                  <span className="font-medium text-[#222222]">
+                    {formData.minStock} units
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Stock Range:</span>
-                  <span className="font-medium">
-                    {formData.minStock} - {formData.maxStock}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Notes */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Additional Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleInputChange}
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                  placeholder="Any additional notes about this inventory item..."
-                />
+                {formData.sourceType && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Source Type:</span>
+                    <span className="font-medium text-gray-800">
+                      {formData.sourceType === 'supplier' ? 'Supplier' : 'Manufacture'}
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             {/* Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Actions</CardTitle>
+            <Card className="border border-gray-200">
+              <CardHeader className="bg-gray-50 border-b border-gray-200">
+                <CardTitle className="text-[#222222]">Actions</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 p-6">
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-[#313131] text-white hover:bg-[#222222]"
+                  className="w-full bg-[#222222] text-white hover:bg-[#313131]"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {isLoading ? 'Saving...' : (isEdit ? 'Update Item' : 'Create Item')}
                 </Button>
                 <Link href="/admin/dashboard/inventory" className="block">
-                  <Button type="button" variant="outline" className="w-full">
+                  <Button type="button" variant="outline" className="w-full hover:bg-gray-50 hover:border-gray-200">
                     Cancel
                   </Button>
                 </Link>

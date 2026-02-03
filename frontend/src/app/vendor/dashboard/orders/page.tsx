@@ -6,5 +6,5 @@ export default function OrdersPage() {
 
 export const metadata = {
   title: 'Orders - Vendor Dashboard',
-  description: 'Manage your orders',
+  description: 'Manage and track your customer orders',
 };
