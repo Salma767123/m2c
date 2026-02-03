@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { categories } from '@/components/mockData/products'
 import { useToast } from '@/hooks/use-toast'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
+import { productService, type ProductFormData as ServiceProductFormData } from '@/services/productService'
 
 // Mock data for inventory items (these would come from API)
 const mockInventoryItems = [
@@ -200,6 +201,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
+  const [availableInventoryItems, setAvailableInventoryItems] = useState<any[]>([])
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false)
   
   const [formData, setFormData] = useState<ProductFormData>({
     // Inventory Connection (NEW)
@@ -304,103 +307,110 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     stock: 0
   })
 
+  // Load available inventory items
+  useEffect(() => {
+    const loadAvailableInventory = async () => {
+      if (!isEdit) {
+        setIsLoadingInventory(true)
+        try {
+          const response = await productService.getAvailableInventoryItems()
+          if (response.success && response.data) {
+            setAvailableInventoryItems(response.data)
+          }
+        } catch (error) {
+          console.error('Error loading inventory items:', error)
+          showErrorToast('Load Failed', 'Unable to load inventory items')
+        } finally {
+          setIsLoadingInventory(false)
+        }
+      }
+    }
+
+    loadAvailableInventory()
+  }, [isEdit])
+
   // Load product data for editing
   useEffect(() => {
     if (isEdit && productId) {
       setIsLoadingData(true)
       
-      // Simulate API call to fetch product data
+      // Load product data from API
       const loadProductData = async () => {
         try {
-          // In a real app, you'd fetch from your API
-          // For now, we'll simulate loading
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          
-          // Mock product data for editing
-          setFormData({
-            inventoryItemId: '1',
-            isFromInventory: true,
-            
-            name: 'Premium Cotton Bed Sheet Set',
-            description: 'Luxurious 100% cotton bed sheet set with superior comfort and durability',
-            category: categories[0],
-            subCategory: 'Cotton Sheets',
-            
-            // Pricing Information
-            basePrice: 89.99,
-            originalPrice: 99.99,
-            discount: 10,
-            
-            // Product Rating & Reviews
-            rating: 4.5,
-            reviews: 128,
-            
-            fabricType: 'Cotton',
-            material: '100% Organic Cotton',
-            fabricSpecifications: {
-              type: 'Cotton',
-              composition: '100% Cotton',
-              weight: '200 GSM',
-              weave: 'Percale',
-              finish: 'Pre-shrunk',
-              careInstructions: ['Machine wash cold', 'Tumble dry low', 'Iron if needed']
-            },
-            
-            variants: [
-              {
-                id: '1',
-                size: 'Queen',
-                color: 'White',
-                colorHex: '#FFFFFF',
-                sku: 'CS-Q-WHT-001',
-                price: 89.99,
-                stock: 25,
-                images: []
+          const response = await productService.getProduct(productId)
+          if (response.success && response.data) {
+            const product = response.data
+            setFormData({
+              inventoryItemId: product.inventoryItemId || '',
+              isFromInventory: product.isFromInventory || false,
+              
+              name: product.name,
+              description: product.description,
+              category: product.category,
+              subCategory: product.subCategory || '',
+              
+              // Pricing Information
+              basePrice: product.basePrice,
+              originalPrice: product.originalPrice,
+              discount: product.discount,
+              
+              // Product Rating & Reviews
+              rating: product.rating,
+              reviews: product.reviews,
+              
+              fabricType: product.fabricType || '',
+              material: product.material || '',
+              fabricSpecifications: product.fabricSpecifications || {
+                type: '',
+                composition: '',
+                weight: '',
+                weave: '',
+                finish: '',
+                careInstructions: []
               },
-              {
-                id: '2',
-                size: 'King',
-                color: 'White',
-                colorHex: '#FFFFFF',
-                sku: 'CS-K-WHT-001',
-                price: 99.99,
-                stock: 15,
-                images: []
-              }
-            ],
-            hasVariants: true,
-            
-            baseSku: 'CS-001',
-            
-            images: [],
-            
-            pricingTiers: [
-              { minQuantity: 1, maxQuantity: 9, price: 89.99 },
-              { minQuantity: 10, maxQuantity: 49, price: 79.99, discount: 11 },
-              { minQuantity: 50, price: 69.99, discount: 22 }
-            ],
-            bulkPricingEnabled: true,
-            singleUnitPricingEnabled: true,
-            
-            totalStock: 40,
-            lowStockThreshold: 5,
-            trackInventory: true,
-            
-            minimumOrderQuantity: 2,
-            maximumOrderQuantity: 100,
-            
-            dispatchTimeline: {
-              processingDays: 2,
-              shippingDays: 5,
-              totalDays: 7
-            },
-            
-            tags: ['premium', 'cotton', 'bedding'],
-            dimensions: '230x250 cm',
-            weight: '1.2 kg',
-            inStock: true,
-            status: 'active'
-          })
+              
+              variants: product.variants || [],
+              hasVariants: product.hasVariants,
+              
+              baseSku: product.baseSku,
+              
+              images: product.images || [],
+              
+              pricingTiers: product.pricingTiers || [{ minQuantity: 1, price: product.basePrice }],
+              bulkPricingEnabled: product.bulkPricingEnabled,
+              singleUnitPricingEnabled: product.singleUnitPricingEnabled,
+              
+              totalStock: product.totalStock,
+              lowStockThreshold: product.lowStockThreshold,
+              trackInventory: product.trackInventory,
+              
+              minimumOrderQuantity: product.minimumOrderQuantity,
+              maximumOrderQuantity: product.maximumOrderQuantity,
+              
+              dispatchTimeline: product.dispatchTimeline || {
+                processingDays: 1,
+                shippingDays: 3,
+                totalDays: 4
+              },
+              
+              tags: product.tags || [],
+              dimensions: product.dimensions || '',
+              weight: product.weight || '',
+              inStock: product.inStock,
+              status: product.status
+            })
+
+            // Set selected inventory item if connected
+            if (product.inventory) {
+              setSelectedInventoryItem({
+                id: product.inventory.id,
+                name: product.inventory.name,
+                sku: product.inventory.sku,
+                currentStock: product.inventory.currentStock,
+                category: product.inventory.category || product.category
+              })
+            }
+          }
         } catch (error) {
           console.error('Error loading product data:', error)
           showErrorToast('Failed to Load Product', 'Unable to load product data. Please try again.')
@@ -412,7 +422,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       loadProductData()
     } else if (inventoryId) {
       // Pre-fill from inventory selection
-      const inventoryItem = mockInventoryItems.find(item => item.id === inventoryId)
+      const inventoryItem = availableInventoryItems.find(item => item.id === inventoryId)
       if (inventoryItem) {
         setSelectedInventoryItem(inventoryItem)
         setFormData(prev => ({
@@ -420,15 +430,15 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
           inventoryItemId: inventoryId,
           isFromInventory: true,
           name: inventoryItem.name,
-          description: inventoryItem.description,
+          description: inventoryItem.description || '',
           category: inventoryItem.category,
           baseSku: inventoryItem.sku,
-          basePrice: inventoryItem.sellingPrice,
+          basePrice: 0, // Will need to be set by user
           totalStock: inventoryItem.currentStock
         }))
       }
     }
-  }, [isEdit, productId, inventoryId])
+  }, [isEdit, productId, inventoryId, availableInventoryItems])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -755,20 +765,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     }))
   }
 
-  const handleSaveDraft = async () => {
-    setIsLoading(true)
-    try {
-      // Save as draft
-      console.log('Saving draft:', formData)
-      showSuccessToast('Draft Saved', 'Your product draft has been saved.')
-      setHasUnsavedChanges(false)
-    } catch (error) {
-      showErrorToast('Save Failed', 'Unable to save draft.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -812,25 +808,25 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     setIsLoading(true)
 
     try {
-      if (isEdit) {
-        console.log('Updating product:', productId, formData)
-        // API call: PUT /api/products/${productId}
-        showSuccessToast('Product Updated', 'Your product has been updated successfully.')
+      let response
+      if (isEdit && productId) {
+        response = await productService.updateProduct(productId, formData)
+        if (response.success) {
+          showSuccessToast('Product Updated', 'Your product has been updated successfully.')
+        }
       } else {
-        console.log('Creating product:', formData)
-        // API call: POST /api/products
-        showSuccessToast('Product Created', 'Your product has been created successfully.')
+        response = await productService.createProduct(formData)
+        if (response.success) {
+          showSuccessToast('Product Created', 'Your product has been created successfully.')
+        }
       }
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
       
       // Redirect back to products list
       router.push('/vendor/dashboard/products')
       setHasUnsavedChanges(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error)
-      showErrorToast('Save Failed', 'Unable to save product. Please try again.')
+      showErrorToast('Save Failed', error.message || 'Unable to save product. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -929,17 +925,16 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         <Dropdown
                           label="Available Inventory Items"
                           value=""
-                          options={mockInventoryItems
-                            .filter(item => !item.hasProductCreated)
-                            .map(item => ({
-                              value: item.id,
-                              label: `${item.name} (${item.sku}) - Stock: ${item.currentStock}`
-                            }))}
-                          placeholder="Select an inventory item"
+                          options={availableInventoryItems.map(item => ({
+                            value: item.id,
+                            label: `${item.name} (${item.sku}) - Stock: ${item.currentStock}`
+                          }))}
+                          placeholder={isLoadingInventory ? "Loading inventory..." : "Select an inventory item"}
                           onChange={(value) => {
-                            const item = mockInventoryItems.find(i => i.id === value)
+                            const item = availableInventoryItems.find(i => i.id === value)
                             if (item) handleInventorySelect(item)
                           }}
+                          disabled={isLoadingInventory}
                         />
                         <p className="text-xs text-blue-700">
                           Only inventory items without existing products are shown
@@ -2435,18 +2430,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <Save className="h-4 w-4 mr-2" />
                   {isLoading ? 'Saving...' : (isEdit ? 'Update Product' : 'Create Product')}
                 </Button>
-                
-                {!isEdit && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleSaveDraft}
-                    disabled={isLoading}
-                    className="w-full"
-                  >
-                    Save as Draft
-                  </Button>
-                )}
                 
                 <Link href="/vendor/dashboard/products" className="block">
                   <Button type="button" variant="outline" className="w-full">

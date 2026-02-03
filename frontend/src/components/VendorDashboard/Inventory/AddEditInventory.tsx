@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { ArrowLeft, Save, Package, AlertTriangle, Plus } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
+import inventoryService, { CreateInventoryData, VendorCategories } from '@/services/inventoryService'
 
 interface InventoryFormData {
   // Basic Product Info (Primary Data)
   name: string
   sku: string
   category: string
+  subcategory: string
   description: string
   manufacturingDate?: string // New field for manufacturing date
   
@@ -23,7 +25,6 @@ interface InventoryFormData {
   
   // Product Status
   status: 'active' | 'inactive'
-  trackInventory: boolean
   
   // Additional Info - Source Type
   sourceType: 'supplier' | 'manufacture' | null // New field to track source type
@@ -41,10 +42,7 @@ interface AddEditInventoryProps {
   isEdit?: boolean
 }
 
-const categories = [
-  'Kitchen Linen', 'Bath Linen', 'Bed Linen', 'Table Linen', 'Towels', 'Aprons', 'Curtains', 'Blankets', 'Pillows'
-]
-
+// Default locations - these can be made dynamic later if needed
 const locations = [
   'Main Warehouse - Section A', 
   'Main Warehouse - Section B', 
@@ -56,12 +54,17 @@ const locations = [
 export default function AddEditInventory({ inventoryId, isEdit = false }: AddEditInventoryProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
-  const [isLoadingData, setIsLoadingData] = useState(isEdit)
+  const [isLoadingData, setIsLoadingData] = useState(isEdit && !!inventoryId)
+  const [vendorCategories, setVendorCategories] = useState<Array<{id?: string; name: string; slug?: string}>>([])
+  const [vendorSubcategories, setVendorSubcategories] = useState<Array<{id: string; name: string; slug: string}>>([])
+  const [filteredSubcategories, setFilteredSubcategories] = useState<Array<{id: string; name: string; slug: string}>>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
 
   const [formData, setFormData] = useState<InventoryFormData>({
     name: '',
     sku: '',
     category: '',
+    subcategory: '',
     description: '',
     manufacturingDate: '',
     
@@ -70,7 +73,6 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     location: '',
     
     status: 'active',
-    trackInventory: true,
     
     sourceType: null,
     supplier: '',
@@ -81,13 +83,57 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     productId: ''
   })
 
-  // Auto-generate SKU from name and category
-  const generateSKU = (name: string, category: string) => {
-    const namePrefix = name.split(' ').map(word => word.charAt(0)).join('').toUpperCase()
-    const categoryPrefix = category.split(' ').map(word => word.charAt(0)).join('').toUpperCase()
-    const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-    return `${categoryPrefix}-${namePrefix}-${randomNum}`
-  }
+  // Load vendor's selected categories
+  useEffect(() => {
+    const loadVendorCategories = async () => {
+      try {
+        setIsLoadingCategories(true)
+        
+        // Check if vendor is logged in
+        const vendorToken = localStorage.getItem('vendorToken')
+        if (!vendorToken) {
+          console.log('No vendor token found, redirecting to login')
+          router.push('/vendor/login')
+          return
+        }
+        
+        const categoriesData = await inventoryService.getVendorCategories()
+        setVendorCategories(categoriesData.categories)
+        setVendorSubcategories(categoriesData.subcategories)
+      } catch (error: any) {
+        console.error('Error loading vendor categories:', error)
+        if (error.response?.status === 401) {
+          alert('Authentication required. Please login again.')
+          router.push('/vendor/login')
+        } else {
+          alert('Failed to load categories. Using default categories.')
+          // Fallback to some default categories if API fails
+          setVendorCategories([
+            { name: 'Kitchen Linen' },
+            { name: 'Bath Linen' },
+            { name: 'Bed Linen' },
+            { name: 'Table Linen' },
+            { name: 'Towels' }
+          ])
+        }
+      } finally {
+        setIsLoadingCategories(false)
+      }
+    }
+
+    loadVendorCategories()
+  }, [router])
+
+  // Update filtered subcategories when vendor subcategories change
+  useEffect(() => {
+    if (formData.category) {
+      // For now, show all subcategories since we don't have parent-child relationship data
+      // In a real implementation, you'd filter based on the selected category
+      setFilteredSubcategories(vendorSubcategories)
+    } else {
+      setFilteredSubcategories([])
+    }
+  }, [vendorSubcategories, formData.category])
 
   // Load inventory data for editing
   useEffect(() => {
@@ -96,41 +142,33 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
       
       const loadInventoryData = async () => {
         try {
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          
-          // Mock inventory data
-          setFormData({
-            name: 'Cotton Kitchen Towel',
-            sku: 'KL-CKT-001',
-            category: 'Kitchen Linen',
-            description: 'High-quality cotton kitchen towel with excellent absorbency',
-            manufacturingDate: '2024-01-10',
-            
-            currentStock: 45,
-            minStock: 10,
-            location: 'Main Warehouse - Section A',
-            
-            status: 'active',
-            trackInventory: true,
-            
-            sourceType: 'supplier',
-            supplier: 'Cotton Mills Ltd',
-            lastRestocked: '2024-01-15',
-            notes: 'Popular item, restock regularly',
-            
-            hasProductCreated: false,
-            productId: ''
-          })
-        } catch (error) {
+          const inventoryItem = await inventoryService.getItem(inventoryId)
+          const formattedData = inventoryService.formatForForm(inventoryItem)
+          setFormData(formattedData)
+        } catch (error: any) {
           console.error('Error loading inventory data:', error)
+          if (error.response?.status === 404) {
+            alert('Inventory item not found')
+            router.push('/vendor/dashboard/inventory')
+          } else if (error.response?.status === 401) {
+            alert('Authentication required. Please login again.')
+            router.push('/vendor/login')
+          } else {
+            alert('Failed to load inventory data: ' + error.message)
+          }
         } finally {
           setIsLoadingData(false)
         }
       }
 
       loadInventoryData()
+    } else {
+      // If we're in edit mode but no inventoryId, set loading to false
+      if (isEdit && !inventoryId) {
+        setIsLoadingData(false)
+      }
     }
-  }, [isEdit, inventoryId])
+  }, [isEdit, inventoryId, router])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
@@ -138,19 +176,31 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     setFormData(prev => ({
       ...prev,
       [name]: type === 'number' ? parseFloat(value) || 0 : 
-               type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
-      // Auto-generate SKU when name or category changes
-      ...(name === 'name' && prev.category && { sku: generateSKU(value, prev.category) })
+               type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }))
   }
 
   const handleDropdownChange = (name: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-      // Auto-generate SKU when category changes
-      ...(name === 'category' && prev.name && { sku: generateSKU(prev.name, value) })
-    }))
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [name]: value
+      }
+      
+      // Reset subcategory when category changes
+      if (name === 'category') {
+        newData.subcategory = ''
+      }
+      
+      return newData
+    })
+    
+    // Filter subcategories when category changes
+    if (name === 'category') {
+      // For now, show all subcategories since we don't have parent-child relationship data
+      // In a real implementation, you'd filter based on the selected category
+      setFilteredSubcategories(vendorSubcategories)
+    }
   }
 
   const handleSourceTypeChange = (sourceType: 'supplier' | 'manufacture') => {
@@ -184,18 +234,31 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     setIsLoading(true)
 
     try {
-      if (isEdit) {
-        console.log('Updating inventory item:', inventoryId, formData)
-        // API call: PUT /api/vendor/inventory/${inventoryId}
+      const apiData = inventoryService.formatForAPI(formData)
+      
+      if (isEdit && inventoryId) {
+        console.log('Updating inventory item:', inventoryId, apiData)
+        await inventoryService.updateItem(inventoryId, apiData)
+        console.log('✅ Inventory item updated successfully')
       } else {
-        console.log('Creating inventory item:', formData)
-        // API call: POST /api/vendor/inventory
+        console.log('Creating inventory item:', apiData)
+        const createdItem = await inventoryService.createItem(apiData as CreateInventoryData)
+        console.log('✅ Inventory item created successfully:', createdItem.id)
       }
       
-      await new Promise(resolve => setTimeout(resolve, 1000))
       router.push('/vendor/dashboard/inventory')
-    } catch (error) {
-      console.error('Error saving inventory item:', error)
+    } catch (error: any) {
+      console.error('❌ Error saving inventory item:', error)
+      
+      // Handle specific error cases
+      if (error.response?.status === 400) {
+        alert(error.response.data.message || 'Invalid data provided')
+      } else if (error.response?.status === 401) {
+        alert('Authentication required. Please login again.')
+        router.push('/vendor/login')
+      } else {
+        alert('Failed to save inventory item. Please try again.')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -206,7 +269,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     router.push(`/vendor/dashboard/products/add?inventoryId=${inventoryId}`)
   }
 
-  if (isLoadingData) {
+  if (isLoadingData || isLoadingCategories) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -224,7 +287,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           <CardContent className="p-8">
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#222222]"></div>
-              <span className="ml-3 text-slate-600">Loading inventory data...</span>
+              <span className="ml-3 text-slate-600">
+                {isLoadingData ? 'Loading inventory data...' : 'Loading categories...'}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -276,14 +341,39 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       id="category"
                       label="Category *"
                       value={formData.category}
-                      options={categories}
-                      placeholder="Select Category"
+                      options={vendorCategories.map(cat => cat.name)}
+                      placeholder={isLoadingCategories ? "Loading categories..." : "Select Category"}
                       onChange={(value) => handleDropdownChange('category', value as string)}
                     />
+                    {isLoadingCategories && (
+                      <p className="text-xs text-slate-500 mt-1">Loading your selected categories...</p>
+                    )}
+                    {!isLoadingCategories && vendorCategories.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        No categories found. Please update your vendor profile to add product categories.
+                      </p>
+                    )}
                   </div>
                   <div>
+                    <Dropdown
+                      id="subcategory"
+                      label="Subcategory"
+                      value={formData.subcategory}
+                      options={filteredSubcategories.map(sub => sub.name)}
+                      placeholder={formData.category ? "Select Subcategory" : "Select category first"}
+                      onChange={(value) => handleDropdownChange('subcategory', value as string)}
+                    />
+                    {formData.category && filteredSubcategories.length === 0 && (
+                      <p className="text-xs text-slate-500 mt-1">No subcategories available for this category</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div></div>
+                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      SKU * <span className="text-xs text-slate-500">(Auto-generated)</span>
+                      SKU *
                     </label>
                     <input
                       type="text"
@@ -292,7 +382,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       onChange={handleInputChange}
                       required
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
-                      placeholder="Auto-generated or custom SKU"
+                      placeholder="Enter SKU"
                     />
                   </div>
                 </div>
@@ -345,21 +435,6 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       required
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
                     />
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      name="trackInventory"
-                      checked={formData.trackInventory}
-                      onChange={handleInputChange}
-                      className="rounded border-gray-300 text-[#222222] focus:ring-[#222222]"
-                    />
-                    <label className="ml-2 text-sm text-slate-700">
-                      Track inventory for this item
-                    </label>
                   </div>
                 </div>
               </CardContent>

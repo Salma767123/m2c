@@ -1,0 +1,562 @@
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+// Create new inventory item
+const createInventoryItem = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+    const {
+      name,
+      sku,
+      category,
+      subcategory,
+      description,
+      manufacturingDate,
+      currentStock,
+      minStock,
+      location,
+      status,
+      sourceType,
+      supplier,
+      lastRestocked,
+      notes
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !sku || !category || currentStock === undefined || minStock === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, SKU, category, current stock, and minimum stock are required'
+      });
+    }
+
+    // Check if SKU already exists
+    const existingSku = await prisma.inventory.findUnique({
+      where: { sku }
+    });
+
+    if (existingSku) {
+      return res.status(400).json({
+        success: false,
+        message: 'SKU already exists. Please use a unique SKU.'
+      });
+    }
+
+    // Validate source type specific fields
+    if (sourceType === 'SUPPLIER' && !supplier) {
+      return res.status(400).json({
+        success: false,
+        message: 'Supplier name is required when source type is supplier'
+      });
+    }
+
+    // Create inventory item
+    const inventoryItem = await prisma.inventory.create({
+      data: {
+        vendorId,
+        name,
+        sku,
+        category,
+        subcategory,
+        description,
+        manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null,
+        currentStock: parseInt(currentStock),
+        minStock: parseInt(minStock),
+        location,
+        status: status || 'ACTIVE',
+        sourceType: sourceType || null,
+        supplier,
+        lastRestocked: lastRestocked ? new Date(lastRestocked) : null,
+        notes
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Inventory item created successfully',
+      data: inventoryItem
+    });
+
+  } catch (error) {
+    console.error('Error creating inventory item:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Get all inventory items for a vendor
+const getVendorInventory = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+    const { page = 1, limit = 10, search, category, status, sourceType } = req.query;
+
+    // Build filter conditions
+    const where = {
+      vendorId,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { sku: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } }
+        ]
+      }),
+      ...(category && { category }),
+      ...(status && { status }),
+      ...(sourceType && { sourceType })
+    };
+
+    // Get total count for pagination
+    const totalItems = await prisma.inventory.count({ where });
+
+    // Get inventory items with pagination
+    const inventoryItems = await prisma.inventory.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (parseInt(page) - 1) * parseInt(limit),
+      take: parseInt(limit)
+    });
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalItems / parseInt(limit));
+    const hasNextPage = parseInt(page) < totalPages;
+    const hasPrevPage = parseInt(page) > 1;
+
+    res.json({
+      success: true,
+      data: {
+        items: inventoryItems,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalItems,
+          hasNextPage,
+          hasPrevPage,
+          limit: parseInt(limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching inventory:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Get single inventory item
+const getInventoryItem = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+    const { id } = req.params;
+
+    const inventoryItem = await prisma.inventory.findFirst({
+      where: {
+        id,
+        vendorId
+      }
+    });
+
+    if (!inventoryItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inventory item not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: inventoryItem
+    });
+
+  } catch (error) {
+    console.error('Error fetching inventory item:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Update inventory item
+const updateInventoryItem = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+    const { id } = req.params;
+    const {
+      name,
+      sku,
+      category,
+      subcategory,
+      description,
+      manufacturingDate,
+      currentStock,
+      minStock,
+      location,
+      status,
+      sourceType,
+      supplier,
+      lastRestocked,
+      notes
+    } = req.body;
+
+    // Check if inventory item exists and belongs to vendor
+    const existingItem = await prisma.inventory.findFirst({
+      where: {
+        id,
+        vendorId
+      }
+    });
+
+    if (!existingItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inventory item not found'
+      });
+    }
+
+    // Check if SKU is being changed and if new SKU already exists
+    if (sku && sku !== existingItem.sku) {
+      const existingSku = await prisma.inventory.findUnique({
+        where: { sku }
+      });
+
+      if (existingSku) {
+        return res.status(400).json({
+          success: false,
+          message: 'SKU already exists. Please use a unique SKU.'
+        });
+      }
+    }
+
+    // Validate source type specific fields
+    if (sourceType === 'SUPPLIER' && !supplier) {
+      return res.status(400).json({
+        success: false,
+        message: 'Supplier name is required when source type is supplier'
+      });
+    }
+
+    // Update inventory item
+    const updatedItem = await prisma.inventory.update({
+      where: { id },
+      data: {
+        ...(name && { name }),
+        ...(sku && { sku }),
+        ...(category && { category }),
+        ...(subcategory !== undefined && { subcategory }),
+        ...(description !== undefined && { description }),
+        ...(manufacturingDate !== undefined && { 
+          manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null 
+        }),
+        ...(currentStock !== undefined && { currentStock: parseInt(currentStock) }),
+        ...(minStock !== undefined && { minStock: parseInt(minStock) }),
+        ...(location !== undefined && { location }),
+        ...(status && { status }),
+        ...(sourceType !== undefined && { sourceType }),
+        ...(supplier !== undefined && { supplier }),
+        ...(lastRestocked !== undefined && { 
+          lastRestocked: lastRestocked ? new Date(lastRestocked) : null 
+        }),
+        ...(notes !== undefined && { notes })
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Inventory item updated successfully',
+      data: updatedItem
+    });
+
+  } catch (error) {
+    console.error('Error updating inventory item:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Delete inventory item
+const deleteInventoryItem = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+    const { id } = req.params;
+
+    // Check if inventory item exists and belongs to vendor
+    const existingItem = await prisma.inventory.findFirst({
+      where: {
+        id,
+        vendorId
+      }
+    });
+
+    if (!existingItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inventory item not found'
+      });
+    }
+
+    // Check if item has been used to create a product
+    if (existingItem.hasProductCreated) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete inventory item that has been used to create a product'
+      });
+    }
+
+    // Delete inventory item
+    await prisma.inventory.delete({
+      where: { id }
+    });
+
+    res.json({
+      success: true,
+      message: 'Inventory item deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting inventory item:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Update stock levels
+const updateStock = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+    const { id } = req.params;
+    const { currentStock, notes } = req.body;
+
+    if (currentStock === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current stock is required'
+      });
+    }
+
+    // Check if inventory item exists and belongs to vendor
+    const existingItem = await prisma.inventory.findFirst({
+      where: {
+        id,
+        vendorId
+      }
+    });
+
+    if (!existingItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inventory item not found'
+      });
+    }
+
+    // Update stock
+    const updatedItem = await prisma.inventory.update({
+      where: { id },
+      data: {
+        currentStock: parseInt(currentStock),
+        ...(notes && { notes }),
+        lastRestocked: new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Stock updated successfully',
+      data: updatedItem
+    });
+
+  } catch (error) {
+    console.error('Error updating stock:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Get inventory statistics
+const getInventoryStats = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+
+    // Get total items
+    const totalItems = await prisma.inventory.count({
+      where: { vendorId }
+    });
+
+    // Get active items
+    const activeItems = await prisma.inventory.count({
+      where: { vendorId, status: 'ACTIVE' }
+    });
+
+    // Get low stock items (where current stock <= min stock)
+    const lowStockItems = await prisma.inventory.findMany({
+      where: {
+        vendorId,
+        status: 'ACTIVE'
+      },
+      select: {
+        id: true,
+        currentStock: true,
+        minStock: true
+      }
+    });
+
+    const lowStockCount = lowStockItems.filter(item => item.currentStock <= item.minStock).length;
+
+    // Get out of stock items
+    const outOfStockItems = await prisma.inventory.count({
+      where: {
+        vendorId,
+        status: 'ACTIVE',
+        currentStock: 0
+      }
+    });
+
+    // Get total stock value (sum of all current stock)
+    const totalStockValue = await prisma.inventory.aggregate({
+      where: { vendorId, status: 'ACTIVE' },
+      _sum: {
+        currentStock: true
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalItems,
+        activeItems,
+        lowStockItems: lowStockCount,
+        outOfStockItems,
+        totalStockUnits: totalStockValue._sum.currentStock || 0
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching inventory stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Get vendor's selected categories
+const getVendorCategories = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+
+    // Get vendor with their selected categories
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: {
+        productCategories: true,
+        productTypes: true
+      }
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    // If productCategories contains IDs, fetch the actual category data
+    let categories = [];
+    let subcategories = [];
+
+    if (vendor.productCategories && vendor.productCategories.length > 0) {
+      // Check if the first item looks like an ObjectId (24 characters, hex)
+      const firstCategory = vendor.productCategories[0];
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(firstCategory);
+
+      if (isObjectId) {
+        // Fetch category details from database
+        const categoryData = await prisma.category.findMany({
+          where: {
+            id: { in: vendor.productCategories },
+            status: 'ACTIVE'
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            parentId: true,
+            subcategories: {
+              where: { status: 'ACTIVE' },
+              select: {
+                id: true,
+                name: true,
+                slug: true
+              }
+            }
+          }
+        });
+
+        // Separate main categories and collect all subcategories
+        const mainCategories = categoryData.filter(cat => !cat.parentId);
+        const allSubcategories = categoryData.reduce((acc, cat) => {
+          if (cat.subcategories && cat.subcategories.length > 0) {
+            acc.push(...cat.subcategories);
+          }
+          return acc;
+        }, []);
+
+        categories = mainCategories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug
+        }));
+
+        subcategories = allSubcategories;
+      } else {
+        // Assume they are category names (legacy format)
+        categories = vendor.productCategories.map(name => ({ name }));
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        categories,
+        subcategories,
+        productTypes: vendor.productTypes
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching vendor categories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+module.exports = {
+  createInventoryItem,
+  getVendorInventory,
+  getInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
+  updateStock,
+  getInventoryStats,
+  getVendorCategories
+};

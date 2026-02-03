@@ -33,6 +33,8 @@ const authRoutes = require('./routes/auth/authRoutes');
 const vendorRoutes = require('./routes/vendorRoutes');
 const vendorSettingsRoutes = require('./routes/vendorSettingsRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
+const productRoutes = require('./routes/productRoutes');
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -48,6 +50,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/vendor-settings', vendorSettingsRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/products', productRoutes);
 
 // 404 handler
 app.use((req, res) => {

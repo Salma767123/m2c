@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
@@ -15,88 +15,7 @@ import {
 import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Edit, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
-
-interface InventoryItem {
-  id: number
-  name: string
-  sku: string
-  category: string
-  currentStock: number
-  minStock: number
-  maxStock: number
-  status: 'in_stock' | 'low_stock' | 'out_of_stock'
-  lastRestocked: string
-  price: number
-  costPrice: number
-}
-
-const mockInventoryItems: InventoryItem[] = [
-  {
-    id: 1,
-    name: 'Cotton Kitchen Towel',
-    sku: 'CKT-001',
-    category: 'Kitchen Linen',
-    currentStock: 45,
-    minStock: 10,
-    maxStock: 100,
-    status: 'in_stock',
-    lastRestocked: '2024-01-15',
-    price: 12.99,
-    costPrice: 6.50,
-  },
-  {
-    id: 2,
-    name: 'Handwoven Bath Towel',
-    sku: 'HBT-002',
-    category: 'Bath Linen',
-    currentStock: 8,
-    minStock: 15,
-    maxStock: 80,
-    status: 'low_stock',
-    lastRestocked: '2024-01-14',
-    price: 24.99,
-    costPrice: 12.00,
-  },
-  {
-    id: 3,
-    name: 'Artisan Apron',
-    sku: 'AA-003',
-    category: 'Aprons',
-    currentStock: 0,
-    minStock: 5,
-    maxStock: 50,
-    status: 'out_of_stock',
-    lastRestocked: '2024-01-13',
-    price: 18.99,
-    costPrice: 9.50,
-  },
-  {
-    id: 4,
-    name: 'Luxury Bed Sheet Set',
-    sku: 'LBS-004',
-    category: 'Bed Linen',
-    currentStock: 25,
-    minStock: 5,
-    maxStock: 30,
-    status: 'in_stock',
-    lastRestocked: '2024-01-16',
-    price: 89.99,
-    costPrice: 45.00,
-  },
-  {
-    id: 5,
-    name: 'Table Runner',
-    sku: 'TR-005',
-    category: 'Table Linen',
-    currentStock: 12,
-    minStock: 20,
-    maxStock: 60,
-    status: 'low_stock',
-    lastRestocked: '2024-01-12',
-    price: 34.99,
-    costPrice: 17.50,
-  },
-]
+import inventoryService, { InventoryItem as APIInventoryItem, InventoryStats } from '@/services/inventoryService'
 
 const getStatusBadge = (status: string, currentStock: number, minStock: number) => {
   if (currentStock === 0) {
@@ -109,48 +28,140 @@ const getStatusBadge = (status: string, currentStock: number, minStock: number) 
 }
 
 export default function Inventory() {
-  const [inventoryItems] = useState<InventoryItem[]>(mockInventoryItems)
+  const [inventoryItems, setInventoryItems] = useState<APIInventoryItem[]>([])
+  const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null)
+  const [vendorCategories, setVendorCategories] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE'>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   // Calculate stats
-  const totalItems = inventoryItems.length
-  const lowStockItems = inventoryItems.filter(item => item.currentStock <= item.minStock && item.currentStock > 0).length
-  const outOfStockItems = inventoryItems.filter(item => item.currentStock === 0).length
-  const totalValue = inventoryItems.reduce((sum, item) => sum + (item.currentStock * item.costPrice), 0)
+  const totalItems = inventoryStats?.totalItems || 0
+  const lowStockItems = inventoryStats?.lowStockItems || 0
+  const outOfStockItems = inventoryStats?.outOfStockItems || 0
+  const totalValue = inventoryStats?.totalStockUnits || 0
 
-  // Get unique categories for filter
-  const categories = ['all', ...Array.from(new Set(inventoryItems.map(item => item.category)))]
+  // Get categories for filter (vendor categories + 'all')
+  const categories = ['all', ...vendorCategories]
 
-  // Filter items
-  const filteredItems = inventoryItems.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'out_of_stock' && item.currentStock === 0) ||
-                         (statusFilter === 'low_stock' && item.currentStock <= item.minStock && item.currentStock > 0) ||
-                         (statusFilter === 'in_stock' && item.currentStock > item.minStock)
-    
-    const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter
+  // Load data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true)
+        
+        // Check if vendor is logged in
+        const vendorToken = localStorage.getItem('vendorToken')
+        if (!vendorToken) {
+          console.log('No vendor token found, redirecting to login')
+          window.location.href = '/vendor/login'
+          return
+        }
+        
+        // Load vendor categories and stats in parallel
+        const [categoriesData, statsData] = await Promise.all([
+          inventoryService.getVendorCategories(),
+          inventoryService.getStats()
+        ])
+        
+        setVendorCategories(categoriesData.categories.map(cat => cat.name))
+        setInventoryStats(statsData)
+        
+        // Load inventory items
+        await loadInventoryItems()
+        
+      } catch (error: any) {
+        console.error('Error loading data:', error)
+        if (error.response?.status === 401) {
+          alert('Authentication required. Please login again.')
+          window.location.href = '/vendor/login'
+        } else {
+          alert('Failed to load inventory data')
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-    return matchesSearch && matchesStatus && matchesCategory
-  })
+    loadData()
+  }, [])
 
-  const handleRestock = (itemId: number) => {
+  // Load inventory items with current filters
+  const loadInventoryItems = async () => {
+    try {
+      const filters = {
+        page: currentPage,
+        limit: 10,
+        ...(searchTerm && { search: searchTerm }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(categoryFilter !== 'all' && { category: categoryFilter })
+      }
+      
+      const data = await inventoryService.getItems(filters)
+      setInventoryItems(data.items)
+      setTotalPages(data.pagination.totalPages)
+    } catch (error) {
+      console.error('Error loading inventory items:', error)
+    }
+  }
+
+  // Reload items when filters change
+  useEffect(() => {
+    if (!isLoading) {
+      loadInventoryItems()
+    }
+  }, [searchTerm, statusFilter, categoryFilter, currentPage])
+
+  const handleRestock = (itemId: string) => {
     console.log('Restocking item:', itemId)
-    // Implement restock logic here
+    // Navigate to edit page with focus on stock
+    // You could also implement a quick restock modal here
   }
 
-  const handleEdit = (itemId: number) => {
+  const handleEdit = (itemId: string) => {
     console.log('Editing item:', itemId)
-    // Navigate to edit page or open modal
+    // Navigation is handled by the Link component
   }
 
-  const handleDelete = (itemId: number) => {
-    console.log('Deleting item:', itemId)
-    // Implement delete logic here
+  const handleDelete = async (itemId: string) => {
+    if (confirm('Are you sure you want to delete this inventory item?')) {
+      try {
+        await inventoryService.deleteItem(itemId)
+        alert('Item deleted successfully')
+        loadInventoryItems() // Reload the list
+      } catch (error: any) {
+        console.error('Error deleting item:', error)
+        if (error.response?.status === 400) {
+          alert(error.response.data.message || 'Cannot delete this item')
+        } else {
+          alert('Failed to delete item')
+        }
+      }
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-[#222222]">Inventory Management</h1>
+            <p className="text-slate-600">Loading your inventory...</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-8">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#222222]"></div>
+              <span className="ml-3 text-slate-600">Loading inventory data...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -239,11 +250,10 @@ export default function Inventory() {
                   value={statusFilter}
                   options={[
                     { value: 'all', label: 'All Status' },
-                    { value: 'in_stock', label: 'In Stock' },
-                    { value: 'low_stock', label: 'Low Stock' },
-                    { value: 'out_of_stock', label: 'Out of Stock' }
+                    { value: 'ACTIVE', label: 'Active' },
+                    { value: 'INACTIVE', label: 'Inactive' }
                   ]}
-                  onChange={(value) => setStatusFilter(value as 'all' | 'in_stock' | 'low_stock' | 'out_of_stock')}
+                  onChange={(value) => setStatusFilter(value as 'all' | 'ACTIVE' | 'INACTIVE')}
                 />
               </div>
               <Dropdown
@@ -281,7 +291,7 @@ export default function Inventory() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredItems.length === 0 ? (
+              {inventoryItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-12">
                     <div className="text-slate-500">
@@ -291,19 +301,30 @@ export default function Inventory() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredItems.map((item) => (
+                inventoryItems.map((item) => (
                   <TableRow key={item.id} className="hover:bg-gray-50">
                     <TableCell>
                       <div>
                         <div className="font-medium text-[#222222]">{item.name}</div>
-                        <div className="text-sm text-slate-500">{item.category}</div>
+                        <div className="text-sm text-slate-500">
+                          {item.category}{item.subcategory ? ` > ${item.subcategory}` : ''}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-sm text-slate-600">{item.sku}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-sm text-slate-600">Product Linked</span>
+                        {item.hasProductCreated ? (
+                          <>
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-sm text-slate-600">Product Linked</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                            <span className="text-sm text-slate-500">No Product</span>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -312,14 +333,14 @@ export default function Inventory() {
                       </span>
                     </TableCell>
                     <TableCell className="text-sm text-slate-600">
-                      {item.minStock} / {item.maxStock}
+                      {item.minStock} / -
                     </TableCell>
                     <TableCell className="font-medium text-[#222222]">
-                      ${item.costPrice.toFixed(2)}
+                      -
                     </TableCell>
                     <TableCell>{getStatusBadge(item.status, item.currentStock, item.minStock)}</TableCell>
                     <TableCell className="text-sm text-slate-600">
-                      {new Date(item.lastRestocked).toLocaleDateString()}
+                      {item.lastRestocked ? new Date(item.lastRestocked).toLocaleDateString() : 'Never'}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
