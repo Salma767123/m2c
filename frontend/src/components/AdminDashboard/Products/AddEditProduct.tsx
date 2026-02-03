@@ -11,7 +11,80 @@ import Link from 'next/link'
 import { categories } from '@/components/mockData/products'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 
-// Mock data for categories and subcategories
+// Mock data for inventory items (these would come from API)
+const mockInventoryItems = [
+  {
+    id: '1',
+    name: 'Cotton Kitchen Towel',
+    sku: 'KL-CKT-001',
+    category: 'Kitchen Linen',
+    description: 'High-quality cotton kitchen towel with excellent absorbency',
+    costPrice: 6.50,
+    sellingPrice: 12.99,
+    currentStock: 45,
+    hasProductCreated: false
+  },
+  {
+    id: '2',
+    name: 'Handwoven Bath Towel',
+    sku: 'BL-HBT-002',
+    category: 'Bath Linen',
+    description: 'Luxurious handwoven bath towel',
+    costPrice: 12.00,
+    sellingPrice: 24.99,
+    currentStock: 25,
+    hasProductCreated: false
+  },
+  {
+    id: '3',
+    name: 'Premium Bed Sheet Set',
+    sku: 'BL-PBS-003',
+    category: 'Bed Linen',
+    description: 'Premium quality bed sheet set',
+    costPrice: 45.00,
+    sellingPrice: 89.99,
+    currentStock: 15,
+    hasProductCreated: true // Already has a product created
+  }
+]
+
+// Mock vendors data
+const mockVendors = [
+  { id: '1', name: 'Cotton Mills Ltd', email: 'contact@cottonmills.com', status: 'active' },
+  { id: '2', name: 'Textile Pro Industries', email: 'info@textilepro.com', status: 'active' },
+  { id: '3', name: 'Home Decor Inc', email: 'sales@homedecor.com', status: 'active' },
+  { id: '4', name: 'Sleep Comfort Co', email: 'orders@sleepcomfort.com', status: 'active' },
+  { id: '5', name: 'Warm Textiles', email: 'support@warmtextiles.com', status: 'active' },
+  { id: '6', name: 'Luxury Linens Co', email: 'hello@luxurylinens.com', status: 'active' }
+]
+
+// Helper function to get color name from hex value
+const getColorName = (hex: string): string => {
+  const colorMap: { [key: string]: string } = {
+    '#000000': 'Black',
+    '#ffffff': 'White',
+    '#808080': 'Gray',
+    '#c0c0c0': 'Silver',
+    '#ff0000': 'Red',
+    '#00ff00': 'Green',
+    '#0000ff': 'Blue',
+    '#ffff00': 'Yellow',
+    '#ff00ff': 'Magenta',
+    '#00ffff': 'Cyan',
+    '#800000': 'Maroon',
+    '#008000': 'Dark Green',
+    '#000080': 'Navy',
+    '#808000': 'Olive',
+    '#800080': 'Purple',
+    '#008080': 'Teal',
+    '#ffa500': 'Orange',
+    '#ffc0cb': 'Pink',
+    '#a52a2a': 'Brown',
+    '#f5f5dc': 'Beige'
+  }
+  
+  return colorMap[hex.toLowerCase()] || `Custom (${hex})`
+}
 const categorySubcategories: Record<string, string[]> = {
   'Bed Sheets': ['Cotton Sheets', 'Linen Sheets', 'Silk Sheets', 'Microfiber Sheets'],
   'Towels': ['Bath Towels', 'Hand Towels', 'Beach Towels', 'Kitchen Towels'],
@@ -31,6 +104,7 @@ interface ProductVariant {
   id: string
   size: string
   color: string
+  colorHex?: string // New field for color picker hex value
   sku: string
   price: number
   stock: number
@@ -42,6 +116,7 @@ interface ProductImage {
   url: string
   alt: string
   isPrimary: boolean
+  imageType: 'cover' | 'gallery' // New field to distinguish image types
 }
 
 interface FabricSpecification {
@@ -61,6 +136,14 @@ interface PricingTier {
 }
 
 interface ProductFormData {
+  // Inventory Connection (NEW FLOW)
+  inventoryItemId?: string // Link to inventory item
+  isFromInventory: boolean // Whether this product is created from inventory
+  
+  // Vendor Information (NEW)
+  vendorId?: string // Link to vendor
+  vendorName?: string // Vendor name for display
+  
   name: string
   description: string
   category: string
@@ -93,6 +176,7 @@ interface ProductFormData {
   // Pricing Configuration
   pricingTiers: PricingTier[]
   bulkPricingEnabled: boolean
+  singleUnitPricingEnabled: boolean // New field for flexible pricing
   
   // Stock Management
   totalStock: number
@@ -121,14 +205,23 @@ interface ProductFormData {
 interface AddEditProductProps {
   productId?: string
   isEdit?: boolean
+  inventoryId?: string // Pre-select an inventory item when coming from inventory page
 }
 
-export default function AddEditProduct({ productId, isEdit = false }: AddEditProductProps) {
+export default function AddEditProduct({ productId, isEdit = false, inventoryId }: AddEditProductProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
   
   const [formData, setFormData] = useState<ProductFormData>({
+    // Inventory Connection (NEW)
+    inventoryItemId: inventoryId || '',
+    isFromInventory: !!inventoryId,
+    
+    // Vendor Information (NEW)
+    vendorId: '',
+    vendorName: '',
+    
     name: '',
     description: '',
     category: '',
@@ -168,6 +261,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
     // Pricing Configuration
     pricingTiers: [{ minQuantity: 1, price: 0 }],
     bulkPricingEnabled: false,
+    singleUnitPricingEnabled: true,
     
     // Stock Management
     totalStock: 0,
@@ -196,6 +290,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
   const [newTag, setNewTag] = useState('')
   const [newCareInstruction, setNewCareInstruction] = useState('')
   const [activeTab, setActiveTab] = useState('basic')
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<any>(null)
   // Auto-save functionality (optional)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
@@ -219,6 +314,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
   const [newVariant, setNewVariant] = useState<Partial<ProductVariant>>({
     size: '',
     color: '',
+    colorHex: '#000000',
     sku: '',
     price: 0,
     stock: 0
@@ -238,6 +334,13 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
           
           // Mock product data for editing
           setFormData({
+            inventoryItemId: '1',
+            isFromInventory: true,
+            
+            // Vendor Information
+            vendorId: '1',
+            vendorName: 'Cotton Mills Ltd',
+            
             name: 'Premium Cotton Bed Sheet Set',
             description: 'Luxurious 100% cotton bed sheet set with superior comfort and durability',
             category: categories[0],
@@ -268,6 +371,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                 id: '1',
                 size: 'Queen',
                 color: 'White',
+                colorHex: '#FFFFFF',
                 sku: 'CS-Q-WHT-001',
                 price: 89.99,
                 stock: 25,
@@ -277,6 +381,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                 id: '2',
                 size: 'King',
                 color: 'White',
+                colorHex: '#FFFFFF',
                 sku: 'CS-K-WHT-001',
                 price: 99.99,
                 stock: 15,
@@ -295,6 +400,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
               { minQuantity: 50, price: 69.99, discount: 22 }
             ],
             bulkPricingEnabled: true,
+            singleUnitPricingEnabled: true,
             
             totalStock: 40,
             lowStockThreshold: 5,
@@ -324,8 +430,68 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
       }
 
       loadProductData()
+    } else if (inventoryId) {
+      // Pre-fill from inventory selection
+      const inventoryItem = mockInventoryItems.find(item => item.id === inventoryId)
+      if (inventoryItem) {
+        setSelectedInventoryItem(inventoryItem)
+        setFormData(prev => ({
+          ...prev,
+          inventoryItemId: inventoryId,
+          isFromInventory: true,
+          name: inventoryItem.name,
+          description: inventoryItem.description,
+          category: inventoryItem.category,
+          baseSku: inventoryItem.sku,
+          basePrice: inventoryItem.sellingPrice,
+          totalStock: inventoryItem.currentStock
+        }))
+      }
     }
-  }, [isEdit, productId])
+  }, [isEdit, productId, inventoryId])
+
+  // Inventory Selection Functions
+  const handleInventorySelect = (inventoryItem: any) => {
+    setSelectedInventoryItem(inventoryItem)
+    setFormData(prev => ({
+      ...prev,
+      inventoryItemId: inventoryItem.id,
+      isFromInventory: true,
+      name: inventoryItem.name,
+      description: inventoryItem.description,
+      category: inventoryItem.category,
+      baseSku: inventoryItem.sku,
+      basePrice: inventoryItem.sellingPrice,
+      totalStock: inventoryItem.currentStock
+    }))
+  }
+
+  const clearInventorySelection = () => {
+    setSelectedInventoryItem(null)
+    setFormData(prev => ({
+      ...prev,
+      inventoryItemId: '',
+      isFromInventory: false,
+      name: '',
+      description: '',
+      category: '',
+      baseSku: '',
+      basePrice: 0,
+      totalStock: 0
+    }))
+  }
+
+  // Vendor Selection Functions
+  const handleVendorSelect = (vendorId: string) => {
+    const vendor = mockVendors.find(v => v.id === vendorId)
+    if (vendor) {
+      setFormData(prev => ({
+        ...prev,
+        vendorId: vendor.id,
+        vendorName: vendor.name
+      }))
+    }
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -364,13 +530,13 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
     }
   }
 
-  // Variant Management Functions
   const addVariant = () => {
     if (newVariant.size && newVariant.color && newVariant.sku) {
       const variant: ProductVariant = {
         id: Date.now().toString(),
         size: newVariant.size!,
         color: newVariant.color!,
+        colorHex: newVariant.colorHex || '#000000',
         sku: newVariant.sku!,
         price: newVariant.price || 0,
         stock: newVariant.stock || 0,
@@ -382,7 +548,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
         variants: [...prev.variants, variant]
       }))
       
-      setNewVariant({ size: '', color: '', sku: '', price: 0, stock: 0 })
+      setNewVariant({ size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0 })
     }
   }
 
@@ -396,9 +562,20 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
   const updateVariant = (variantId: string, field: keyof ProductVariant, value: any) => {
     setFormData(prev => ({
       ...prev,
-      variants: prev.variants.map(v => 
-        v.id === variantId ? { ...v, [field]: value } : v
-      )
+      variants: prev.variants.map(v => {
+        if (v.id === variantId) {
+          // If updating colorHex, also update color name
+          if (field === 'colorHex') {
+            return { 
+              ...v, 
+              [field]: value,
+              color: getColorName(value)
+            }
+          }
+          return { ...v, [field]: value }
+        }
+        return v
+      })
     }))
   }
 
@@ -461,10 +638,43 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
   }
 
   // Image handling functions
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, imageType: 'cover' | 'gallery' = 'gallery') => {
     const files = e.target.files
     if (!files) return
 
+    // Check limits before processing
+    if (imageType === 'cover') {
+      const existingCoverImages = formData.images.filter(img => img.imageType === 'cover')
+      if (existingCoverImages.length >= 1) {
+        showWarningToast('Cover Image Limit', 'Only one cover image is allowed. Please remove the existing cover image first.')
+        e.target.value = '' // Reset input
+        return
+      }
+      if (files.length > 1) {
+        showWarningToast('Single Image Only', 'Please select only one image for cover image.')
+        e.target.value = '' // Reset input
+        return
+      }
+    }
+
+    if (imageType === 'gallery') {
+      const existingGalleryImages = formData.images.filter(img => img.imageType === 'gallery')
+      const remainingSlots = 3 - existingGalleryImages.length
+      
+      if (remainingSlots <= 0) {
+        showWarningToast('Gallery Limit Reached', 'Maximum 3 gallery images allowed. Please remove some images first.')
+        e.target.value = '' // Reset input
+        return
+      }
+      
+      if (files.length > remainingSlots) {
+        showWarningToast('Too Many Images', `You can only add ${remainingSlots} more gallery image${remainingSlots > 1 ? 's' : ''}.`)
+        e.target.value = '' // Reset input
+        return
+      }
+    }
+
+    // Process files
     Array.from(files).forEach((file) => {
       if (file.size > 10 * 1024 * 1024) { // 10MB limit
         showWarningToast('File Too Large', `${file.name} is larger than 10MB`)
@@ -477,7 +687,8 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
           url: event.target?.result as string,
           alt: file.name,
-          isPrimary: formData.images.length === 0 // First image is primary
+          isPrimary: imageType === 'cover',
+          imageType: imageType
         }
 
         setFormData(prev => ({
@@ -492,22 +703,68 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
     e.target.value = ''
   }
 
-  const setPrimaryImage = (imageId: string) => {
+  const setCoverImage = (imageId: string) => {
     setFormData(prev => ({
       ...prev,
       images: prev.images.map(img => ({
         ...img,
-        isPrimary: img.id === imageId
+        isPrimary: img.id === imageId,
+        imageType: img.id === imageId ? 'cover' : img.imageType
       }))
+    }))
+  }
+
+  const setImageType = (imageId: string, imageType: 'cover' | 'gallery') => {
+    // Check limits before changing type
+    if (imageType === 'cover') {
+      const existingCoverImages = formData.images.filter(img => img.imageType === 'cover' && img.id !== imageId)
+      if (existingCoverImages.length >= 1) {
+        showWarningToast('Cover Image Limit', 'Only one cover image is allowed. Please remove the existing cover image first.')
+        return
+      }
+    }
+
+    if (imageType === 'gallery') {
+      const existingGalleryImages = formData.images.filter(img => img.imageType === 'gallery' && img.id !== imageId)
+      if (existingGalleryImages.length >= 3) {
+        showWarningToast('Gallery Limit Reached', 'Maximum 3 gallery images allowed.')
+        return
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.map(img => {
+        if (img.id === imageId) {
+          return {
+            ...img,
+            imageType: imageType,
+            isPrimary: imageType === 'cover' ? true : false
+          }
+        }
+        // If setting another image as cover, remove cover status from others
+        if (imageType === 'cover' && img.imageType === 'cover') {
+          return {
+            ...img,
+            imageType: 'gallery',
+            isPrimary: false
+          }
+        }
+        return img
+      })
     }))
   }
 
   const removeImage = (imageId: string) => {
     setFormData(prev => {
       const updatedImages = prev.images.filter(img => img.id !== imageId)
-      // If we removed the primary image, make the first remaining image primary
-      if (updatedImages.length > 0 && !updatedImages.some(img => img.isPrimary)) {
-        updatedImages[0].isPrimary = true
+      // If we removed the cover image, make the first gallery image the cover if available
+      if (updatedImages.length > 0 && !updatedImages.some(img => img.imageType === 'cover')) {
+        const firstGalleryImage = updatedImages.find(img => img.imageType === 'gallery')
+        if (firstGalleryImage) {
+          firstGalleryImage.imageType = 'cover'
+          firstGalleryImage.isPrimary = true
+        }
       }
       return {
         ...prev,
@@ -550,9 +807,25 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
       showErrorToast('Validation Error', 'Please select a category.')
       return
     }
+
+    if (!formData.vendorId) {
+      showErrorToast('Validation Error', 'Please select a vendor.')
+      return
+    }
     
-    if (!formData.hasVariants && formData.basePrice <= 0) {
-      showErrorToast('Validation Error', 'Please enter a valid base price.')
+    // Pricing validation
+    if (!formData.singleUnitPricingEnabled && !formData.bulkPricingEnabled) {
+      showErrorToast('Validation Error', 'Please select at least one pricing strategy.')
+      return
+    }
+    
+    if (formData.singleUnitPricingEnabled && formData.basePrice <= 0) {
+      showErrorToast('Validation Error', 'Please enter a valid base price for single unit pricing.')
+      return
+    }
+    
+    if (formData.bulkPricingEnabled && formData.pricingTiers.some(tier => tier.price <= 0)) {
+      showErrorToast('Validation Error', 'Please enter valid prices for all bulk pricing tiers.')
       return
     }
     
@@ -668,6 +941,90 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                   <CardTitle>Basic Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+
+                  {/* Vendor Selection */}
+                  <div>
+                    <Dropdown
+                      label="Vendor *"
+                      value={formData.vendorId || ''}
+                      options={mockVendors.map(vendor => ({
+                        value: vendor.id,
+                        label: `${vendor.name} (${vendor.email})`
+                      }))}
+                      placeholder="Select Vendor"
+                      onChange={(value) => handleVendorSelect(value as string)}
+                    />
+                    {formData.vendorName && (
+                      <p className="text-xs text-gray-500 mt-1">Selected: {formData.vendorName}</p>
+                    )}
+                  </div>
+                  
+                  {/* Inventory Selection */}
+                  <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                    <h4 className="font-medium text-blue-900 mb-3">Select Inventory Item</h4>
+                    <p className="text-sm text-blue-800 mb-4">
+                      Choose an inventory item to create a detailed product with variants
+                    </p>
+                    
+                    {!selectedInventoryItem ? (
+                      <div className="space-y-3">
+                        <Dropdown
+                          label="Available Inventory Items"
+                          value=""
+                          options={mockInventoryItems
+                            .filter(item => !item.hasProductCreated)
+                            .map(item => ({
+                              value: item.id,
+                              label: `${item.name} (${item.sku}) - Stock: ${item.currentStock}`
+                            }))}
+                          placeholder="Select an inventory item"
+                          onChange={(value) => {
+                            const item = mockInventoryItems.find(i => i.id === value)
+                            if (item) handleInventorySelect(item)
+                          }}
+                        />
+                        <p className="text-xs text-blue-700">
+                          Only inventory items without existing products are shown
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-white border border-blue-300 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h5 className="font-medium text-gray-900">{selectedInventoryItem.name}</h5>
+                            <p className="text-sm text-gray-600">SKU: {selectedInventoryItem.sku}</p>
+                            <p className="text-sm text-gray-600">Category: {selectedInventoryItem.category}</p>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm"
+                            onClick={clearInventorySelection}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Change
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600">Current Stock:</span>
+                            <span className="font-medium ml-2">{selectedInventoryItem.currentStock}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Base Price:</span>
+                            <span className="font-medium ml-2">${selectedInventoryItem.sellingPrice}</span>
+                          </div>
+                        </div>
+                        <Link href={`/admin/dashboard/inventory/edit/${selectedInventoryItem.id}`}>
+                          <Button variant="outline" size="sm" className="mt-3">
+                            Edit Inventory Item
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Product Details (Auto-filled or Manual) */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Product Name *
@@ -678,9 +1035,15 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                       value={formData.name}
                       onChange={handleInputChange}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                      disabled={formData.isFromInventory}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${
+                        formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
+                      }`}
                       placeholder="Enter product name"
                     />
+                    {formData.isFromInventory && (
+                      <p className="text-xs text-gray-500 mt-1">Auto-filled from inventory item</p>
+                    )}
                   </div>
 
                   <div>
@@ -694,8 +1057,11 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                       required
                       rows={4}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                      placeholder="Product description"
+                      placeholder="Enhance the product description with detailed information"
                     />
+                    {formData.isFromInventory && (
+                      <p className="text-xs text-gray-500 mt-1">You can enhance the basic description from inventory</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -707,6 +1073,9 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                         placeholder="Select Category"
                         onChange={(value) => setFormData(prev => ({ ...prev, category: value as string, subCategory: '' }))}
                       />
+                      {formData.isFromInventory && (
+                        <p className="text-xs text-gray-500 mt-1">From inventory item</p>
+                      )}
                     </div>
                     <div>
                       <Dropdown
@@ -718,6 +1087,8 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                       />
                     </div>
                   </div>
+
+                  
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -755,9 +1126,15 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                         name="baseSku"
                         value={formData.baseSku}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        disabled={formData.isFromInventory}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${
+                          formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
+                        }`}
                         placeholder="e.g., CS-001"
                       />
+                      {formData.isFromInventory && (
+                        <p className="text-xs text-gray-500 mt-1">From inventory SKU</p>
+                      )}
                     </div>
                   </div>
 
@@ -776,7 +1153,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                           onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                         />
-                        <Button type="button" onClick={addTag}>
+                        <Button type="button" onClick={addTag} className="bg-gray-900 text-white">
                           Add
                         </Button>
                       </div>
@@ -907,7 +1284,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                           onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCareInstruction())}
                         />
-                        <Button type="button" onClick={addCareInstruction}>
+                        <Button type="button" onClick={addCareInstruction} className="bg-gray-900 text-white">
                           Add
                         </Button>
                       </div>
@@ -959,7 +1336,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                       {/* Add New Variant */}
                       <div className="border-2 border-gray-300 rounded-lg p-6 bg-gray-50">
                         <h4 className="font-semibold text-gray-900 mb-4">Add New Variant</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Size *</label>
                             <Dropdown
@@ -971,12 +1348,31 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Color *</label>
-                            <Dropdown
-                              value={newVariant.color || ''}
-                              options={standardColors}
-                              placeholder="Select Color"
-                              onChange={(value) => setNewVariant(prev => ({ ...prev, color: value as string }))}
-                            />
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={newVariant.colorHex || '#000000'}
+                                  onChange={(e) => {
+                                    const hex = e.target.value
+                                    setNewVariant(prev => ({ 
+                                      ...prev, 
+                                      colorHex: hex,
+                                      color: getColorName(hex) // Auto-generate color name
+                                    }))
+                                  }}
+                                  className="w-8 h-8 border border-gray-300 rounded-md cursor-pointer"
+                                  title="Pick a color"
+                                />
+                                <input
+                                  type="text"
+                                  value={newVariant.color || ''}
+                                  onChange={(e) => setNewVariant(prev => ({ ...prev, color: e.target.value }))}
+                                  placeholder="Color name"
+                                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-500 text-sm"
+                                />
+                              </div>
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">SKU *</label>
@@ -996,9 +1392,7 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                                 type="number"
                                 value={newVariant.price}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                                placeholder="0.00"
-                                min="0"
-                                step="0.01"
+                                placeholder="0"
                                 className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
                               />
                             </div>
@@ -1010,7 +1404,6 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                               value={newVariant.stock}
                               onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                               placeholder="0"
-                              min="0"
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
                             />
                           </div>
@@ -1055,16 +1448,23 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                                     <TableCell className="text-gray-900 font-medium">{variant.size}</TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
-                                        <div 
-                                          className="w-5 h-5 rounded border border-gray-300"
-                                          style={{
-                                            backgroundColor: 
-                                              variant.color === 'Black' ? '#000000' :
-                                              variant.color === 'Gray' ? '#808080' :
-                                              variant.color === 'White' ? '#FFFFFF' : '#CCCCCC'
-                                          }}
+                                        <input
+                                          type="color"
+                                          value={variant.colorHex || '#CCCCCC'}
+                                          onChange={(e) => updateVariant(variant.id, 'colorHex', e.target.value)}
+                                          className="w-6 h-6 rounded border border-gray-300 cursor-pointer"
+                                          title="Click to change color"
                                         />
-                                        <span className="text-gray-900">{variant.color}</span>
+                                        <div className="flex flex-col">
+                                          <input
+                                            type="text"
+                                            value={variant.color}
+                                            onChange={(e) => updateVariant(variant.id, 'color', e.target.value)}
+                                            className="text-gray-900 text-sm font-medium bg-transparent border-none p-0 focus:outline-none focus:ring-1 focus:ring-gray-300 rounded px-1"
+                                            placeholder="Color name"
+                                          />
+                                          <span className="text-gray-500 text-xs">{variant.colorHex || '#CCCCCC'}</span>
+                                        </div>
                                       </div>
                                     </TableCell>
                                     <TableCell className="text-gray-700 font-mono text-xs">{variant.sku}</TableCell>
@@ -1602,62 +2002,85 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div 
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
-                    onClick={() => document.getElementById('image-upload')?.click()}
-                  >
-                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                    <p className="mt-2 text-sm text-gray-600">
-                      Click to upload or drag and drop
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      PNG, JPG, GIF up to 10MB
-                    </p>
-                    <input
-                      id="image-upload"
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageUpload}
-                    />
+                  {/* Cover Image Upload */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Cover Image (1 image only)</h4>
+                    <div 
+                      className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer bg-blue-50"
+                      onClick={() => document.getElementById('cover-image-upload')?.click()}
+                    >
+                      <Upload className="mx-auto h-8 w-8 text-blue-400" />
+                      <p className="mt-1 text-sm text-blue-600">Upload Cover Image</p>
+                      <p className="text-xs text-blue-500">PNG, JPG, GIF up to 10MB</p>
+                      <input
+                        id="cover-image-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleImageUpload(e, 'cover')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Gallery Images Upload */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Gallery Images (Max 3 images)</h4>
+                    <div 
+                      className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-400 transition-colors cursor-pointer bg-green-50"
+                      onClick={() => document.getElementById('gallery-image-upload')?.click()}
+                    >
+                      <Upload className="mx-auto h-8 w-8 text-green-400" />
+                      <p className="mt-1 text-sm text-green-600">Upload Gallery Images</p>
+                      <p className="text-xs text-green-500">PNG, JPG, GIF up to 10MB each</p>
+                      <input
+                        id="gallery-image-upload"
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleImageUpload(e, 'gallery')}
+                      />
+                    </div>
                   </div>
                   
                   {/* Image Preview Grid */}
                   {formData.images.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {formData.images.map((image) => (
-                        <div key={image.id} className="relative group">
-                          <img
-                            src={image.url}
-                            alt={image.alt}
-                            className="w-full h-20 object-cover rounded border"
-                          />
-                          <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-2">
-                            {!image.isPrimary && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Images</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {formData.images.map((image) => (
+                          <div key={image.id} className="relative group">
+                            <img
+                              src={image.url}
+                              alt={image.alt}
+                              className="w-full h-20 object-cover rounded border"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => setPrimaryImage(image.id)}
+                                onClick={() => setImageType(image.id, image.imageType === 'cover' ? 'gallery' : 'cover')}
                                 className="text-white text-xs bg-blue-600 px-2 py-1 rounded hover:bg-blue-700"
                               >
-                                Set Primary
+                                {image.imageType === 'cover' ? 'Set Gallery' : 'Set Cover'}
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeImage(image.id)}
-                              className="text-white hover:text-red-300"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                          {image.isPrimary && (
-                            <div className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-1 rounded">
-                              Primary
+                              <button
+                                type="button"
+                                onClick={() => removeImage(image.id)}
+                                className="text-white hover:text-red-300"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            <div className="absolute top-1 left-1">
+                              {image.imageType === 'cover' ? (
+                                <div className="bg-blue-600 text-white text-xs px-1 rounded">Cover</div>
+                              ) : (
+                                <div className="bg-green-600 text-white text-xs px-1 rounded">Gallery</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1670,6 +2093,12 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                 <CardTitle>Quick Stats</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {formData.vendorName && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Vendor:</span>
+                    <span className="font-medium">{formData.vendorName}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Total Variants:</span>
                   <span className="font-medium">{formData.variants.length}</span>
@@ -1687,8 +2116,8 @@ export default function AddEditProduct({ productId, isEdit = false }: AddEditPro
                   <span className="text-gray-600">Price Range:</span>
                   <span className="font-medium">
                     {formData.hasVariants && formData.variants.length > 0
-                      ? `$${Math.min(...formData.variants.map(v => v.price))} - $${Math.max(...formData.variants.map(v => v.price))}`
-                      : `$${formData.basePrice}`
+                      ? `₹${Math.min(...formData.variants.map(v => v.price))} - ₹${Math.max(...formData.variants.map(v => v.price))}`
+                      : `₹${formData.basePrice}`
                     }
                   </span>
                 </div>

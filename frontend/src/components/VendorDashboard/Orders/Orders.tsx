@@ -1,9 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
-import { ShoppingCart, Search, Filter, Eye, Package, Truck, CheckCircle, X } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
+import Dropdown from '@/components/UI/Dropdown';
+import { ShoppingCart, Search, Eye, Package, Truck, CheckCircle, Clock, PackageCheck, RotateCcw, X } from 'lucide-react';
+
+interface OrderProduct {
+  id: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  price: number;
+  variant?: string;
+}
 
 interface Order {
   id: string;
@@ -11,9 +23,18 @@ interface Order {
   customer: string;
   email: string;
   total: number;
-  status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
+  status: 'New Order' | 'Processing' | 'Packed' | 'Shipped' | 'Delivered' | 'Returned' | 'Cancelled';
   items: number;
   date: string;
+  products: OrderProduct[];
+  trackingNumber?: string;
+  estimatedDelivery?: string;
+  returnReason?: string;
+  statusHistory?: Array<{
+    status: string;
+    date: string;
+    note?: string;
+  }>;
 }
 
 const mockOrders: Order[] = [
@@ -23,9 +44,30 @@ const mockOrders: Order[] = [
     customer: 'John Doe',
     email: 'john@example.com',
     total: 89.97,
-    status: 'Processing',
+    status: 'New Order',
     items: 3,
-    date: '2024-01-15'
+    date: '2024-01-15',
+    statusHistory: [
+      { status: 'New Order', date: '2024-01-15', note: 'Order received from customer' }
+    ],
+    products: [
+      {
+        id: 'p1',
+        name: 'Cotton Kitchen Towel',
+        sku: 'KL-CKT-001',
+        quantity: 2,
+        price: 12.99,
+        variant: 'White - Medium'
+      },
+      {
+        id: 'p2',
+        name: 'Handwoven Bath Towel',
+        sku: 'BL-HBT-002',
+        quantity: 1,
+        price: 24.99,
+        variant: 'Blue - Large'
+      }
+    ]
   },
   {
     id: '2',
@@ -35,7 +77,25 @@ const mockOrders: Order[] = [
     total: 45.99,
     status: 'Shipped',
     items: 2,
-    date: '2024-01-14'
+    date: '2024-01-14',
+    trackingNumber: 'TRK987654321',
+    estimatedDelivery: '2024-01-18',
+    statusHistory: [
+      { status: 'New Order', date: '2024-01-14', note: 'Order received from customer' },
+      { status: 'Processing', date: '2024-01-14', note: 'Order confirmed and processing started' },
+      { status: 'Packed', date: '2024-01-15', note: 'Items packed and ready for shipment' },
+      { status: 'Shipped', date: '2024-01-16', note: 'Package shipped via FedEx' }
+    ],
+    products: [
+      {
+        id: 'p3',
+        name: 'Premium Bed Sheet Set',
+        sku: 'BL-PBS-003',
+        quantity: 1,
+        price: 45.99,
+        variant: 'Queen - White'
+      }
+    ]
   },
   {
     id: '3',
@@ -45,22 +105,104 @@ const mockOrders: Order[] = [
     total: 124.50,
     status: 'Delivered',
     items: 5,
-    date: '2024-01-13'
+    date: '2024-01-13',
+    trackingNumber: 'TRK123456789',
+    statusHistory: [
+      { status: 'New Order', date: '2024-01-13', note: 'Order received from customer' },
+      { status: 'Processing', date: '2024-01-13', note: 'Order confirmed and processing started' },
+      { status: 'Packed', date: '2024-01-14', note: 'Items packed and ready for shipment' },
+      { status: 'Shipped', date: '2024-01-15', note: 'Package shipped via UPS' },
+      { status: 'Delivered', date: '2024-01-17', note: 'Package delivered successfully' }
+    ],
+    products: [
+      {
+        id: 'p4',
+        name: 'Artisan Apron',
+        sku: 'AP-ART-004',
+        quantity: 3,
+        price: 18.99,
+        variant: 'Navy - One Size'
+      },
+      {
+        id: 'p5',
+        name: 'Linen Table Runner',
+        sku: 'TL-LTR-005',
+        quantity: 2,
+        price: 32.76,
+        variant: 'Natural - 180cm'
+      }
+    ]
+  },
+  {
+    id: '4',
+    orderNumber: 'ORD-004',
+    customer: 'Sarah Wilson',
+    email: 'sarah@example.com',
+    total: 67.98,
+    status: 'Returned',
+    items: 2,
+    date: '2024-01-10',
+    returnReason: 'Damaged item received - fabric torn',
+    statusHistory: [
+      { status: 'New Order', date: '2024-01-10', note: 'Order received from customer' },
+      { status: 'Processing', date: '2024-01-10', note: 'Order confirmed and processing started' },
+      { status: 'Packed', date: '2024-01-11', note: 'Items packed and ready for shipment' },
+      { status: 'Shipped', date: '2024-01-12', note: 'Package shipped via FedEx' },
+      { status: 'Delivered', date: '2024-01-14', note: 'Package delivered' },
+      { status: 'Returned', date: '2024-01-16', note: 'Customer reported damaged item, return approved' }
+    ],
+    products: [
+      {
+        id: 'p6',
+        name: 'Organic Cotton Towel Set',
+        sku: 'OC-TS-001',
+        quantity: 2,
+        price: 33.99,
+        variant: 'Natural - Set of 4'
+      }
+    ]
+  },
+  {
+    id: '5',
+    orderNumber: 'ORD-005',
+    customer: 'David Brown',
+    email: 'david@example.com',
+    total: 156.75,
+    status: 'Packed',
+    items: 4,
+    date: '2024-01-16',
+    statusHistory: [
+      { status: 'New Order', date: '2024-01-16', note: 'Order received from customer' },
+      { status: 'Processing', date: '2024-01-16', note: 'Order confirmed and processing started' },
+      { status: 'Packed', date: '2024-01-17', note: 'Items packed and ready for shipment' }
+    ],
+    products: [
+      {
+        id: 'p7',
+        name: 'Luxury Bath Towel Collection',
+        sku: 'LB-TC-001',
+        quantity: 4,
+        price: 39.19,
+        variant: 'Charcoal - Large'
+      }
+    ]
   }
 ];
 
 export default function Orders() {
-  const [orders] = useState<Order[]>(mockOrders);
+  const router = useRouter();
+  const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Pending': return 'text-yellow-600 bg-yellow-100';
-      case 'Processing': return 'text-blue-600 bg-blue-100';
-      case 'Shipped': return 'text-purple-600 bg-purple-100';
+      case 'New Order': return 'text-blue-600 bg-blue-100';
+      case 'Processing': return 'text-orange-600 bg-orange-100';
+      case 'Packed': return 'text-purple-600 bg-purple-100';
+      case 'Shipped': return 'text-indigo-600 bg-indigo-100';
       case 'Delivered': return 'text-green-600 bg-green-100';
+      case 'Returned': return 'text-red-600 bg-red-100';
       case 'Cancelled': return 'text-gray-700 bg-gray-50';
       default: return 'text-gray-600 bg-gray-100';
     }
@@ -68,12 +210,54 @@ export default function Orders() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Pending': return <Package className="w-4 h-4" />;
-      case 'Processing': return <Package className="w-4 h-4" />;
+      case 'New Order': return <ShoppingCart className="w-4 h-4" />;
+      case 'Processing': return <Clock className="w-4 h-4" />;
+      case 'Packed': return <PackageCheck className="w-4 h-4" />;
       case 'Shipped': return <Truck className="w-4 h-4" />;
       case 'Delivered': return <CheckCircle className="w-4 h-4" />;
+      case 'Returned': return <RotateCcw className="w-4 h-4" />;
+      case 'Cancelled': return <X className="w-4 h-4" />;
       default: return <Package className="w-4 h-4" />;
     }
+  };
+
+  const updateOrderStatus = (orderId: string, newStatus: Order['status'], note?: string) => {
+    setOrders(prevOrders => 
+      prevOrders.map(order => {
+        if (order.id === orderId) {
+          const updatedHistory = [...(order.statusHistory || [])];
+          updatedHistory.push({
+            status: newStatus,
+            date: new Date().toISOString().split('T')[0],
+            note: note || `Status updated to ${newStatus}`
+          });
+          
+          return {
+            ...order,
+            status: newStatus,
+            statusHistory: updatedHistory
+          };
+        }
+        return order;
+      })
+    );
+  };
+
+  const getNextStatus = (currentStatus: Order['status']): Order['status'] | null => {
+    const statusFlow: Record<Order['status'], Order['status'] | null> = {
+      'New Order': 'Processing',
+      'Processing': 'Packed',
+      'Packed': 'Shipped',
+      'Shipped': 'Delivered',
+      'Delivered': null,
+      'Returned': null,
+      'Cancelled': null
+    };
+    return statusFlow[currentStatus];
+  };
+
+  const canAdvanceStatus = (status: Order['status']) => {
+    return getNextStatus(status) !== null;
   };
 
   const filteredOrders = orders.filter(order => {
@@ -92,7 +276,7 @@ export default function Orders() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
         <Card className="border border-gray-200 hover:border-gray-200">
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -108,11 +292,11 @@ export default function Orders() {
         <Card className="border border-gray-200 hover:border-gray-200">
           <CardContent className="p-6">
             <div className="flex items-center">
-              <Package className="w-8 h-8 text-yellow-600" />
+              <Clock className="w-8 h-8 text-orange-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Pending</p>
+                <p className="text-sm font-medium text-slate-600">Processing</p>
                 <p className="text-2xl font-bold text-[#222222]">
-                  {orders.filter(o => o.status === 'Pending').length}
+                  {orders.filter(o => o.status === 'Processing').length}
                 </p>
               </div>
             </div>
@@ -122,7 +306,21 @@ export default function Orders() {
         <Card className="border border-gray-200 hover:border-gray-200">
           <CardContent className="p-6">
             <div className="flex items-center">
-              <Truck className="w-8 h-8 text-purple-600" />
+              <PackageCheck className="w-8 h-8 text-purple-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-slate-600">Packed</p>
+                <p className="text-2xl font-bold text-[#222222]">
+                  {orders.filter(o => o.status === 'Packed').length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-gray-200 hover:border-gray-200">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Truck className="w-8 h-8 text-indigo-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-slate-600">Shipped</p>
                 <p className="text-2xl font-bold text-[#222222]">
@@ -146,6 +344,20 @@ export default function Orders() {
             </div>
           </CardContent>
         </Card>
+
+        <Card className="border border-gray-200 hover:border-gray-200">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <RotateCcw className="w-8 h-8 text-red-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-slate-600">Returns</p>
+                <p className="text-2xl font-bold text-[#222222]">
+                  {orders.filter(o => o.status === 'Returned').length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="border border-gray-200">
@@ -155,24 +367,29 @@ export default function Orders() {
               <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search orders..."
+                placeholder="Search orders or customers..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <select
-              className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="All">All Status</option>
-              <option value="Pending">Pending</option>
-              <option value="Processing">Processing</option>
-              <option value="Shipped">Shipped</option>
-              <option value="Delivered">Delivered</option>
-              <option value="Cancelled">Cancelled</option>
-            </select>
+            <div className="min-w-[200px]">
+              <Dropdown
+                value={statusFilter}
+                options={[
+                  'All',
+                  'New Order',
+                  'Processing',
+                  'Packed',
+                  'Shipped',
+                  'Delivered',
+                  'Returned',
+                  'Cancelled'
+                ]}
+                placeholder="All Status"
+                onChange={(value) => setStatusFilter(value as string)}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -181,135 +398,85 @@ export default function Orders() {
         <CardHeader className="bg-gray-50 border-b border-gray-200">
           <CardTitle className="text-[#222222]">Recent Orders</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-[#222222]">Order</th>
-                  <th className="text-left py-3 px-4 text-[#222222]">Customer</th>
-                  <th className="text-left py-3 px-4 text-[#222222]">Items</th>
-                  <th className="text-left py-3 px-4 text-[#222222]">Total</th>
-                  <th className="text-left py-3 px-4 text-[#222222]">Status</th>
-                  <th className="text-left py-3 px-4 text-[#222222]">Date</th>
-                  <th className="text-left py-3 px-4 text-[#222222]">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map((order) => (
-                  <tr key={order.id} className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <div className="font-medium text-[#222222]">{order.orderNumber}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div>
-                        <div className="font-medium text-[#222222]">{order.customer}</div>
-                        <div className="text-sm text-slate-600">{order.email}</div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">{order.items}</td>
-                    <td className="py-3 px-4 text-gray-700">${order.total}</td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                        {getStatusIcon(order.status)}
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">{order.date}</td>
-                    <td className="py-3 px-4">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Order ID</TableHead>
+                <TableHead>Customer Name</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredOrders.map((order) => (
+                <TableRow key={order.id}>
+                  <TableCell>
+                    <div className="font-medium text-[#222222]">{order.orderNumber}</div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium text-[#222222]">{order.customer}</div>
+                      {/* <div className="text-sm text-slate-600">{order.email}</div> */}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                      {getStatusIcon(order.status)}
+                      {order.status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-slate-600">{order.date}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
                         className="hover:bg-gray-50 hover:border-gray-200"
-                        onClick={() => setSelectedOrder(order)}
+                        onClick={() => router.push(`/vendor/dashboard/orders/view/${order.id}`)}
                       >
                         <Eye className="w-4 h-4 mr-1" />
                         View
                       </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      {canAdvanceStatus(order.status) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700"
+                          onClick={() => updateOrderStatus(order.id, getNextStatus(order.status)!)}
+                        >
+                          {getStatusIcon(getNextStatus(order.status)!)}
+                          <span className="ml-1">{getNextStatus(order.status)}</span>
+                        </Button>
+                      )}
+                      {order.status === 'Delivered' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="hover:bg-red-50 hover:border-red-200 hover:text-red-700"
+                          onClick={() => updateOrderStatus(order.id, 'Returned', 'Customer initiated return')}
+                        >
+                          <RotateCcw className="w-4 h-4 mr-1" />
+                          Return
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          
+          {filteredOrders.length === 0 && (
+            <div className="text-center py-8 text-slate-500">
+              <Package className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+              <p className="text-lg font-medium">No orders found</p>
+              <p className="text-sm">Try adjusting your search or filter criteria</p>
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {/* View Order Modal */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500">Order</p>
-                <h3 className="text-lg font-semibold text-[#222222]">{selectedOrder.orderNumber}</h3>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="hover:bg-gray-50 hover:text-[#222222]"
-                onClick={() => setSelectedOrder(null)}
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-
-            <div className="px-6 py-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-gray-50/50 border border-gray-200 rounded-lg p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Customer</p>
-                  <p className="text-sm font-semibold text-[#222222]">{selectedOrder.customer}</p>
-                  <p className="text-xs text-slate-600">{selectedOrder.email}</p>
-                </div>
-                <div className="bg-gray-50/50 border border-gray-200 rounded-lg p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Status</p>
-                  <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedOrder.status)}`}>
-                    {getStatusIcon(selectedOrder.status)}
-                    {selectedOrder.status}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="border border-slate-200 rounded-lg p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Items</p>
-                  <p className="text-lg font-semibold text-[#222222]">{selectedOrder.items}</p>
-                </div>
-                <div className="border border-slate-200 rounded-lg p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Total</p>
-                  <p className="text-lg font-semibold text-[#222222]">${selectedOrder.total.toFixed(2)}</p>
-                </div>
-                <div className="border border-slate-200 rounded-lg p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Date</p>
-                  <p className="text-lg font-semibold text-[#222222]">{selectedOrder.date}</p>
-                </div>
-              </div>
-
-              <div className="border border-slate-200 rounded-lg p-4">
-                <p className="text-sm font-semibold text-[#222222] mb-2">Order Summary</p>
-                <p className="text-sm text-slate-600">
-                  This order contains <span className="font-semibold text-[#222222]">{selectedOrder.items}</span> items with a total value of{' '}
-                  <span className="font-semibold text-[#222222]">${selectedOrder.total.toFixed(2)}</span>. Current status is{' '}
-                  <span className="font-semibold text-[#222222]">{selectedOrder.status}</span>.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-200 bg-gray-50/50">
-              <Button
-                variant="outline"
-                className="hover:bg-gray-50 hover:border-gray-200"
-                onClick={() => setSelectedOrder(null)}
-              >
-                Close
-              </Button>
-              <Button className="bg-[#222222] text-white hover:bg-[#313131]">
-                Mark as Processed
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

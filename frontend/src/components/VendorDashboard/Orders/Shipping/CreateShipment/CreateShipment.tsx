@@ -4,52 +4,191 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
+import Dropdown from '@/components/UI/Dropdown';
 import { ArrowLeft, Save, Package, Truck, Calendar, Hash } from 'lucide-react';
+
+interface OrderProduct {
+  id: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  price: number;
+  variant?: string;
+}
+
+interface Order {
+  id: string;
+  orderNumber: string;
+  customer: string;
+  email: string;
+  total: number;
+  status: string;
+  date: string;
+  products: OrderProduct[];
+}
 
 interface ShipmentForm {
   orderId: string;
   customer: string;
-  email: string;
   carrier: string;
   trackingNumber: string;
   status: 'Pending' | 'In Transit' | 'Delivered';
   estimatedDelivery: string;
   items: string;
+  selectedProducts: string[]; // Array of selected product IDs
   notes?: string;
 }
+
+// Mock orders data (same as in Orders.tsx)
+const mockOrders: Order[] = [
+  {
+    id: '1',
+    orderNumber: 'ORD-001',
+    customer: 'John Doe',
+    email: 'john@example.com',
+    total: 89.97,
+    status: 'Processing',
+    date: '2024-01-15',
+    products: [
+      {
+        id: 'p1',
+        name: 'Cotton Kitchen Towel',
+        sku: 'KL-CKT-001',
+        quantity: 2,
+        price: 12.99,
+        variant: 'White - Medium'
+      },
+      {
+        id: 'p2',
+        name: 'Handwoven Bath Towel',
+        sku: 'BL-HBT-002',
+        quantity: 1,
+        price: 24.99,
+        variant: 'Blue - Large'
+      }
+    ]
+  },
+  {
+    id: '2',
+    orderNumber: 'ORD-002',
+    customer: 'Jane Smith',
+    email: 'jane@example.com',
+    total: 45.99,
+    status: 'Shipped',
+    date: '2024-01-14',
+    products: [
+      {
+        id: 'p3',
+        name: 'Premium Bed Sheet Set',
+        sku: 'BL-PBS-003',
+        quantity: 1,
+        price: 45.99,
+        variant: 'Queen - White'
+      }
+    ]
+  },
+  {
+    id: '3',
+    orderNumber: 'ORD-003',
+    customer: 'Mike Johnson',
+    email: 'mike@example.com',
+    total: 124.50,
+    status: 'Delivered',
+    date: '2024-01-13',
+    products: [
+      {
+        id: 'p4',
+        name: 'Artisan Apron',
+        sku: 'AP-ART-004',
+        quantity: 3,
+        price: 18.99,
+        variant: 'Navy - One Size'
+      },
+      {
+        id: 'p5',
+        name: 'Linen Table Runner',
+        sku: 'TL-LTR-005',
+        quantity: 2,
+        price: 32.76,
+        variant: 'Natural - 180cm'
+      }
+    ]
+  }
+];
 
 export default function CreateShipment() {
   const router = useRouter();
   const [form, setForm] = useState<ShipmentForm>({
     orderId: '',
     customer: '',
-    email: '',
     carrier: '',
     trackingNumber: '',
     status: 'Pending',
     estimatedDelivery: '',
-    items: '',
+    items: '0',
+    selectedProducts: [],
     notes: '',
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof ShipmentForm, string>>>({});
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const handleChange = (field: keyof ShipmentForm, value: string) => {
+  const handleChange = (field: keyof ShipmentForm, value: string | string[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
+  const handleOrderSelect = (orderNumber: string) => {
+    const order = mockOrders.find(o => o.orderNumber === orderNumber);
+    if (order) {
+      setSelectedOrder(order);
+      setForm(prev => ({
+        ...prev,
+        orderId: orderNumber,
+        customer: order.customer,
+        selectedProducts: [], // Reset selected products
+        items: '0' // Reset items count
+      }));
+    } else {
+      setSelectedOrder(null);
+      setForm(prev => ({
+        ...prev,
+        orderId: orderNumber,
+        customer: '',
+        selectedProducts: [],
+        items: '0'
+      }));
+    }
+  };
+
+  const handleProductToggle = (productId: string) => {
+    const newSelectedProducts = form.selectedProducts.includes(productId)
+      ? form.selectedProducts.filter(id => id !== productId)
+      : [...form.selectedProducts, productId];
+    
+    // Calculate total items based on selected products
+    const totalItems = newSelectedProducts.reduce((total, id) => {
+      const product = selectedOrder?.products.find(p => p.id === id);
+      return total + (product?.quantity || 0);
+    }, 0);
+
+    setForm(prev => ({
+      ...prev,
+      selectedProducts: newSelectedProducts,
+      items: totalItems.toString()
+    }));
+  };
+
   const validate = () => {
     const next: Partial<Record<keyof ShipmentForm, string>> = {};
     if (!form.orderId.trim()) next.orderId = 'Order ID is required';
     if (!form.customer.trim()) next.customer = 'Customer name is required';
-    if (!form.email.trim()) next.email = 'Email is required';
     if (!form.carrier.trim()) next.carrier = 'Carrier is required';
     if (!form.trackingNumber.trim()) next.trackingNumber = 'Tracking number is required';
     if (!form.estimatedDelivery.trim()) next.estimatedDelivery = 'ETA is required';
-    if (!form.items.trim() || Number.isNaN(parseInt(form.items))) next.items = 'Items must be a number';
+    if (form.selectedProducts.length === 0) next.items = 'Please select at least one product to ship';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -89,58 +228,34 @@ export default function CreateShipment() {
           <form onSubmit={handleSubmit} className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-[#222222] mb-2">
-                  Order ID <span className="text-gray-700">*</span>
-                </label>
-                <div className="relative">
-                  <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    value={form.orderId}
-                    onChange={(e) => handleChange('orderId', e.target.value)}
-                    className={`w-full pl-9 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 ${
-                      errors.orderId ? 'border-gray-500' : 'border-gray-200'
-                    }`}
-                    placeholder="ORD-001"
-                  />
-                </div>
+                <Dropdown
+                  label="Order ID *"
+                  value={form.orderId}
+                  options={mockOrders.map(order => ({
+                    value: order.orderNumber,
+                    label: `${order.orderNumber} - ${order.customer}`
+                  }))}
+                  placeholder="Select Order"
+                  onChange={(value) => handleOrderSelect(value as string)}
+                />
                 {errors.orderId && <p className="text-gray-700 text-xs mt-1">{errors.orderId}</p>}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-[#222222] mb-2">
-                  Customer Name <span className="text-gray-700">*</span>
+                  Customer Name
                 </label>
                 <input
                   type="text"
                   value={form.customer}
-                  onChange={(e) => handleChange('customer', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 ${
-                    errors.customer ? 'border-gray-500' : 'border-gray-200'
-                  }`}
-                  placeholder="John Doe"
+                  readOnly
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-600"
+                  placeholder="Auto-filled from order"
                 />
-                {errors.customer && <p className="text-gray-700 text-xs mt-1">{errors.customer}</p>}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-[#222222] mb-2">
-                  Customer Email <span className="text-gray-700">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 ${
-                    errors.email ? 'border-gray-500' : 'border-gray-200'
-                  }`}
-                  placeholder="customer@example.com"
-                />
-                {errors.email && <p className="text-gray-700 text-xs mt-1">{errors.email}</p>}
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-[#222222] mb-2">
                   Carrier <span className="text-gray-700">*</span>
@@ -158,6 +273,20 @@ export default function CreateShipment() {
                   />
                 </div>
                 {errors.carrier && <p className="text-gray-700 text-xs mt-1">{errors.carrier}</p>}
+              </div>
+
+              <div>
+                <Dropdown
+                  label="Status"
+                  value={form.status}
+                  options={[
+                    'Pending',
+                    'In Transit',
+                    'Delivered'
+                  ]}
+                  placeholder="Select Status"
+                  onChange={(value) => handleChange('status', value as ShipmentForm['status'])}
+                />
               </div>
             </div>
 
@@ -183,23 +312,6 @@ export default function CreateShipment() {
 
               <div>
                 <label className="block text-sm font-medium text-[#222222] mb-2">
-                  Status
-                </label>
-                <select
-                  value={form.status}
-                  onChange={(e) => handleChange('status', e.target.value as ShipmentForm['status'])}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="In Transit">In Transit</option>
-                  <option value="Delivered">Delivered</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-[#222222] mb-2">
                   Estimated Delivery <span className="text-gray-700">*</span>
                 </label>
                 <div className="relative">
@@ -215,24 +327,80 @@ export default function CreateShipment() {
                 </div>
                 {errors.estimatedDelivery && <p className="text-gray-700 text-xs mt-1">{errors.estimatedDelivery}</p>}
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#222222] mb-2">
-                  Items <span className="text-gray-700">*</span>
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={form.items}
-                  onChange={(e) => handleChange('items', e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 ${
-                    errors.items ? 'border-gray-500' : 'border-gray-200'
-                  }`}
-                  placeholder="3"
-                />
-                {errors.items && <p className="text-gray-700 text-xs mt-1">{errors.items}</p>}
-              </div>
             </div>
+
+            {/* Products Selection */}
+            {selectedOrder && (
+              <div className="space-y-4">
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-lg font-medium text-[#222222] mb-4">Select Products to Ship</h3>
+                  <div className="space-y-3">
+                    {selectedOrder.products.map((product) => (
+                      <div key={product.id} className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          id={`product-${product.id}`}
+                          checked={form.selectedProducts.includes(product.id)}
+                          onChange={() => handleProductToggle(product.id)}
+                          className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-700"
+                        />
+                        <label htmlFor={`product-${product.id}`} className="ml-3 flex-1 cursor-pointer">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-[#222222]">{product.name}</p>
+                              <div className="flex items-center gap-4 mt-1">
+                                <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                                  SKU: {product.sku}
+                                </span>
+                                {product.variant && (
+                                  <span className="text-xs text-slate-600">
+                                    {product.variant}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-[#222222]">
+                                Qty: {product.quantity}
+                              </p>
+                              <p className="text-xs text-slate-600">
+                                ${product.price.toFixed(2)} each
+                              </p>
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {errors.items && <p className="text-gray-700 text-xs mt-2">{errors.items}</p>}
+                </div>
+
+                {/* Items Summary */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-900">
+                      Selected Items for Shipment:
+                    </span>
+                    <span className="text-lg font-bold text-blue-900">
+                      {form.items} items
+                    </span>
+                  </div>
+                  {form.selectedProducts.length > 0 && (
+                    <div className="mt-2 text-xs text-blue-800">
+                      {form.selectedProducts.length} product{form.selectedProducts.length !== 1 ? 's' : ''} selected
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!selectedOrder && form.orderId && (
+              <div className="text-center py-8 text-slate-500">
+                <Package className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                <p className="text-lg font-medium">Select an order to view products</p>
+                <p className="text-sm">Choose an order from the dropdown above</p>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-[#222222] mb-2">

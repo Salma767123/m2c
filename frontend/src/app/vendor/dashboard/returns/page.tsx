@@ -5,6 +5,6 @@ export default function ReturnsPage() {
 }
 
 export const metadata = {
-  title: 'Returns - Vendor Dashboard',
-  description: 'Manage product returns and refunds',
+  title: 'Returns & Refunds - Vendor Dashboard',
+  description: 'Manage customer return requests and process refunds',
 };
