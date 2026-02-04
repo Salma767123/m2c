@@ -43,14 +43,14 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
   // Redirect if not authenticated
   useEffect(() => {
     if (!loading && !vendor) {
-      router.push('/vendor/login')
+      router.push('/vendor')
     }
   }, [vendor, loading, router])
 
   // Handle logout
   const handleLogout = () => {
     logout()
-    router.push('/vendor/login')
+    router.push('/vendor')
   }
 
   // Close dropdowns when clicking outside

@@ -354,10 +354,6 @@ const getVendorProducts = async (req, res) => {
       skip: (parseInt(page) - 1) * parseInt(limit),
       take: parseInt(limit)
     });
-    Editing
-    
-    
-    
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalItems / parseInt(limit));
