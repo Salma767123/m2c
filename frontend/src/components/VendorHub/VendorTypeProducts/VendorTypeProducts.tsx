@@ -32,9 +32,7 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
     vendorType: Array.isArray(data.vendorType) ? data.vendorType : (data.vendorType ? [data.vendorType] : []),
     marketType: data.marketType || '',
     selectedCategories: data.selectedCategories || {},
-    expandedCategories: data.expandedCategories || {},
-    dynamicSubCategories: data.dynamicSubCategories || {}, // new: holds user-added subcategories per category id
-    otherInputs: data.otherInputs || {} // new: temporary input values per category id
+    expandedCategories: data.expandedCategories || {}
   });
 
   // Fetch categories from API
@@ -70,9 +68,45 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
             status: 'ACTIVE',
             sortOrder: 0,
             subcategories: [
-              { id: 'bedding', name: 'Bedding', description: 'Bed linens and accessories', slug: 'bedding', status: 'ACTIVE', sortOrder: 0, subcategories: [] },
-              { id: 'towels', name: 'Towels', description: 'Bath and kitchen towels', slug: 'towels', status: 'ACTIVE', sortOrder: 1, subcategories: [] },
-              { id: 'curtains', name: 'Curtains', description: 'Window treatments', slug: 'curtains', status: 'ACTIVE', sortOrder: 2, subcategories: [] }
+              { 
+                id: 'bedding', 
+                name: 'Bedding', 
+                description: 'Bed linens and accessories', 
+                slug: 'bedding', 
+                status: 'ACTIVE', 
+                sortOrder: 0, 
+                subcategories: [],
+                productCount: 0,
+                subcategoryCount: 0,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              },
+              { 
+                id: 'towels', 
+                name: 'Towels', 
+                description: 'Bath and kitchen towels', 
+                slug: 'towels', 
+                status: 'ACTIVE', 
+                sortOrder: 1, 
+                subcategories: [],
+                productCount: 0,
+                subcategoryCount: 0,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              },
+              { 
+                id: 'curtains', 
+                name: 'Curtains', 
+                description: 'Window treatments', 
+                slug: 'curtains', 
+                status: 'ACTIVE', 
+                sortOrder: 2, 
+                subcategories: [],
+                productCount: 0,
+                subcategoryCount: 0,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }
             ],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -125,45 +159,6 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
            [categoryId]: isSelected
              ? categorySelections.filter((item: string) => item !== subCategory)
              : [...categorySelections, subCategory]
-         }
-       };
-     });
-   };
-
-   const handleOtherInputChange = (categoryId: string, value: string) => {
-     setFormData(prev => ({
-       ...prev,
-       otherInputs: {
-         ...prev.otherInputs,
-         [categoryId]: value
-       }
-     }));
-   };
-
-   const addDynamicSubCategory = (categoryId: string) => {
-     setFormData(prev => {
-       const input = (prev.otherInputs[categoryId] || '').trim();
-       if (!input) return prev;
-       const existing = prev.dynamicSubCategories[categoryId] || [];
-       if (existing.includes(input)) {
-         // already exists; just clear input
-         return {
-           ...prev,
-           otherInputs: {
-             ...prev.otherInputs,
-             [categoryId]: ''
-           }
-         };
-       }
-       return {
-         ...prev,
-         dynamicSubCategories: {
-           ...prev.dynamicSubCategories,
-           [categoryId]: [...existing, input]
-         },
-         otherInputs: {
-           ...prev.otherInputs,
-           [categoryId]: ''
          }
        };
      });
@@ -310,51 +305,25 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
 
                  {formData.expandedCategories[category.id] && (
                    <div className="px-4 pb-4">
-                     {/* Custom subcategory input for any category */}
-                     <div className="max-w-md flex gap-2 mb-3">
-                       <input
-                         type="text"
-                         value={formData.otherInputs[category.id] || ''}
-                         onChange={(e) => handleOtherInputChange(category.id, e.target.value)}
-                         placeholder={`Add custom subcategory for ${category.name}`}
-                         className="flex-1 px-3 py-2 text-base border rounded"
-                       />
-                       <Button 
-                         onClick={() => addDynamicSubCategory(category.id)} 
-                         className="px-4 bg-blue-500 text-white rounded-md"
-                       >
-                         Add
-                       </Button>
-                     </div>
-
                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                       {(
-                         // combine API subcategories and any dynamic ones user added
-                         [
-                           ...(category.subcategories?.map(sub => sub.name) || []),
-                           ...(formData.dynamicSubCategories[category.id] || [])
-                         ]
-                       ).length > 0 ? (
-                         [
-                           ...(category.subcategories?.map(sub => sub.name) || []),
-                           ...(formData.dynamicSubCategories[category.id] || [])
-                         ].map((subCategory) => (
+                       {category.subcategories && category.subcategories.length > 0 ? (
+                         category.subcategories.map((subCategory) => (
                            <label
-                             key={subCategory}
+                             key={subCategory.id}
                              className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
                            >
                              <input
                                type="checkbox"
-                               checked={(formData.selectedCategories[category.id] || []).includes(subCategory)}
-                               onChange={() => toggleSubCategory(category.id, subCategory)}
+                               checked={(formData.selectedCategories[category.id] || []).includes(subCategory.name)}
+                               onChange={() => toggleSubCategory(category.id, subCategory.name)}
                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                              />
-                             <span className="ml-2 text-base font-medium text-gray-700">{subCategory}</span>
+                             <span className="ml-2 text-base font-medium text-gray-700">{subCategory.name}</span>
                            </label>
                          ))
                        ) : (
                          <div className="col-span-full text-gray-500 text-sm italic p-2">
-                           No subcategories available. Add custom ones using the input above.
+                           No subcategories available for this category.
                          </div>
                        )}
                      </div>
