@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
 import Dropdown from '@/components/UI/Dropdown';
-import { ShoppingCart, Search, Eye, Package, Truck, CheckCircle, Clock, PackageCheck, RotateCcw, X } from 'lucide-react';
+import { ShoppingCart, Search, Eye, Package, Truck, CheckCircle, Clock, PackageCheck, RotateCcw, X, Building2 } from 'lucide-react';
 
 interface OrderProduct {
   id: string;
@@ -21,15 +21,10 @@ interface Order {
   id: string;
   orderNumber: string;
   customer: string;
-  email: string;
-  total: number;
-  status: 'New Order' | 'Processing' | 'Packed' | 'Shipped' | 'Delivered' | 'Returned' | 'Cancelled';
+  status: 'New Order' | 'Processing' | 'Packed' | 'Ready to Ship' | 'Completed';
   items: number;
   date: string;
   products: OrderProduct[];
-  trackingNumber?: string;
-  estimatedDelivery?: string;
-  returnReason?: string;
   statusHistory?: Array<{
     status: string;
     date: string;
@@ -42,8 +37,6 @@ const mockOrders: Order[] = [
     id: '1',
     orderNumber: 'ORD-001',
     customer: 'John Doe',
-    email: 'john@example.com',
-    total: 89.97,
     status: 'New Order',
     items: 3,
     date: '2024-01-15',
@@ -73,18 +66,12 @@ const mockOrders: Order[] = [
     id: '2',
     orderNumber: 'ORD-002',
     customer: 'Jane Smith',
-    email: 'jane@example.com',
-    total: 45.99,
-    status: 'Shipped',
+    status: 'Processing',
     items: 2,
     date: '2024-01-14',
-    trackingNumber: 'TRK987654321',
-    estimatedDelivery: '2024-01-18',
     statusHistory: [
       { status: 'New Order', date: '2024-01-14', note: 'Order received from customer' },
-      { status: 'Processing', date: '2024-01-14', note: 'Order confirmed and processing started' },
-      { status: 'Packed', date: '2024-01-15', note: 'Items packed and ready for shipment' },
-      { status: 'Shipped', date: '2024-01-16', note: 'Package shipped via FedEx' }
+      { status: 'Processing', date: '2024-01-14', note: 'Order confirmed and processing started' }
     ],
     products: [
       {
@@ -101,18 +88,15 @@ const mockOrders: Order[] = [
     id: '3',
     orderNumber: 'ORD-003',
     customer: 'Mike Johnson',
-    email: 'mike@example.com',
-    total: 124.50,
-    status: 'Delivered',
+    status: 'Completed',
     items: 5,
     date: '2024-01-13',
-    trackingNumber: 'TRK123456789',
     statusHistory: [
       { status: 'New Order', date: '2024-01-13', note: 'Order received from customer' },
       { status: 'Processing', date: '2024-01-13', note: 'Order confirmed and processing started' },
       { status: 'Packed', date: '2024-01-14', note: 'Items packed and ready for shipment' },
-      { status: 'Shipped', date: '2024-01-15', note: 'Package shipped via UPS' },
-      { status: 'Delivered', date: '2024-01-17', note: 'Package delivered successfully' }
+      { status: 'Ready to Ship', date: '2024-01-15', note: 'Order ready for shipment to admin hub' },
+      { status: 'Completed', date: '2024-01-17', note: 'Order completed successfully' }
     ],
     products: [
       {
@@ -137,19 +121,13 @@ const mockOrders: Order[] = [
     id: '4',
     orderNumber: 'ORD-004',
     customer: 'Sarah Wilson',
-    email: 'sarah@example.com',
-    total: 67.98,
-    status: 'Returned',
+    status: 'Packed',
     items: 2,
     date: '2024-01-10',
-    returnReason: 'Damaged item received - fabric torn',
     statusHistory: [
       { status: 'New Order', date: '2024-01-10', note: 'Order received from customer' },
       { status: 'Processing', date: '2024-01-10', note: 'Order confirmed and processing started' },
-      { status: 'Packed', date: '2024-01-11', note: 'Items packed and ready for shipment' },
-      { status: 'Shipped', date: '2024-01-12', note: 'Package shipped via FedEx' },
-      { status: 'Delivered', date: '2024-01-14', note: 'Package delivered' },
-      { status: 'Returned', date: '2024-01-16', note: 'Customer reported damaged item, return approved' }
+      { status: 'Packed', date: '2024-01-11', note: 'Items packed and ready for shipment' }
     ],
     products: [
       {
@@ -166,15 +144,14 @@ const mockOrders: Order[] = [
     id: '5',
     orderNumber: 'ORD-005',
     customer: 'David Brown',
-    email: 'david@example.com',
-    total: 156.75,
-    status: 'Packed',
+    status: 'Ready to Ship',
     items: 4,
     date: '2024-01-16',
     statusHistory: [
       { status: 'New Order', date: '2024-01-16', note: 'Order received from customer' },
       { status: 'Processing', date: '2024-01-16', note: 'Order confirmed and processing started' },
-      { status: 'Packed', date: '2024-01-17', note: 'Items packed and ready for shipment' }
+      { status: 'Packed', date: '2024-01-17', note: 'Items packed and ready for shipment' },
+      { status: 'Ready to Ship', date: '2024-01-17', note: 'Order ready for shipment to admin hub' }
     ],
     products: [
       {
@@ -200,10 +177,8 @@ export default function Orders() {
       case 'New Order': return 'text-blue-600 bg-blue-100';
       case 'Processing': return 'text-orange-600 bg-orange-100';
       case 'Packed': return 'text-purple-600 bg-purple-100';
-      case 'Shipped': return 'text-indigo-600 bg-indigo-100';
-      case 'Delivered': return 'text-green-600 bg-green-100';
-      case 'Returned': return 'text-red-600 bg-red-100';
-      case 'Cancelled': return 'text-gray-700 bg-gray-50';
+      case 'Ready to Ship': return 'text-indigo-600 bg-indigo-100';
+      case 'Completed': return 'text-green-600 bg-green-100';
       default: return 'text-gray-600 bg-gray-100';
     }
   };
@@ -213,10 +188,8 @@ export default function Orders() {
       case 'New Order': return <ShoppingCart className="w-4 h-4" />;
       case 'Processing': return <Clock className="w-4 h-4" />;
       case 'Packed': return <PackageCheck className="w-4 h-4" />;
-      case 'Shipped': return <Truck className="w-4 h-4" />;
-      case 'Delivered': return <CheckCircle className="w-4 h-4" />;
-      case 'Returned': return <RotateCcw className="w-4 h-4" />;
-      case 'Cancelled': return <X className="w-4 h-4" />;
+      case 'Ready to Ship': return <Truck className="w-4 h-4" />;
+      case 'Completed': return <CheckCircle className="w-4 h-4" />;
       default: return <Package className="w-4 h-4" />;
     }
   };
@@ -247,11 +220,9 @@ export default function Orders() {
     const statusFlow: Record<Order['status'], Order['status'] | null> = {
       'New Order': 'Processing',
       'Processing': 'Packed',
-      'Packed': 'Shipped',
-      'Shipped': 'Delivered',
-      'Delivered': null,
-      'Returned': null,
-      'Cancelled': null
+      'Packed': 'Ready to Ship',
+      'Ready to Ship': 'Completed',
+      'Completed': null
     };
     return statusFlow[currentStatus];
   };
@@ -271,12 +242,12 @@ export default function Orders() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[#222222]">Orders</h1>
-          <p className="text-slate-600">Manage and track your customer orders</p>
+          <h1 className="text-2xl font-bold text-[#222222]">Customer Orders</h1>
+          <p className="text-slate-600">Manage customer orders and fulfill them</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card className="border border-gray-200 hover:border-gray-200">
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -322,9 +293,9 @@ export default function Orders() {
             <div className="flex items-center">
               <Truck className="w-8 h-8 text-indigo-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Shipped</p>
+                <p className="text-sm font-medium text-slate-600">Ready to Ship</p>
                 <p className="text-2xl font-bold text-[#222222]">
-                  {orders.filter(o => o.status === 'Shipped').length}
+                  {orders.filter(o => o.status === 'Ready to Ship').length}
                 </p>
               </div>
             </div>
@@ -336,23 +307,9 @@ export default function Orders() {
             <div className="flex items-center">
               <CheckCircle className="w-8 h-8 text-green-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Delivered</p>
+                <p className="text-sm font-medium text-slate-600">Completed</p>
                 <p className="text-2xl font-bold text-[#222222]">
-                  {orders.filter(o => o.status === 'Delivered').length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-gray-200 hover:border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <RotateCcw className="w-8 h-8 text-red-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Returns</p>
-                <p className="text-2xl font-bold text-[#222222]">
-                  {orders.filter(o => o.status === 'Returned').length}
+                  {orders.filter(o => o.status === 'Completed').length}
                 </p>
               </div>
             </div>
@@ -381,10 +338,8 @@ export default function Orders() {
                   'New Order',
                   'Processing',
                   'Packed',
-                  'Shipped',
-                  'Delivered',
-                  'Returned',
-                  'Cancelled'
+                  'Ready to Ship',
+                  'Completed'
                 ]}
                 placeholder="All Status"
                 onChange={(value) => setStatusFilter(value as string)}
@@ -396,7 +351,7 @@ export default function Orders() {
 
       <Card className="border border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-[#222222]">Recent Orders</CardTitle>
+          <CardTitle className="text-[#222222]">Customer Orders</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -405,6 +360,7 @@ export default function Orders() {
                 <TableHead>Order ID</TableHead>
                 <TableHead>Customer Name</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Items</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -416,16 +372,18 @@ export default function Orders() {
                     <div className="font-medium text-[#222222]">{order.orderNumber}</div>
                   </TableCell>
                   <TableCell>
-                    <div>
-                      <div className="font-medium text-[#222222]">{order.customer}</div>
-                      {/* <div className="text-sm text-slate-600">{order.email}</div> */}
-                    </div>
+                    <div className="font-medium text-[#222222]">{order.customer}</div>
                   </TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                       {getStatusIcon(order.status)}
                       {order.status}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <div className="font-medium text-[#222222]">{order.items} items</div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-slate-600">{order.date}</TableCell>
                   <TableCell>
@@ -448,17 +406,6 @@ export default function Orders() {
                         >
                           {getStatusIcon(getNextStatus(order.status)!)}
                           <span className="ml-1">{getNextStatus(order.status)}</span>
-                        </Button>
-                      )}
-                      {order.status === 'Delivered' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="hover:bg-red-50 hover:border-red-200 hover:text-red-700"
-                          onClick={() => updateOrderStatus(order.id, 'Returned', 'Customer initiated return')}
-                        >
-                          <RotateCcw className="w-4 h-4 mr-1" />
-                          Return
                         </Button>
                       )}
                     </div>

@@ -69,7 +69,7 @@ export default function Home() {
         
         {/* Vendor Dashboard - Only show if vendor is logged in, otherwise go to login */}
         <Link 
-          href={isVendorLoggedIn ? "/vendor/dashboard" : "/vendor/login"} 
+          href={isVendorLoggedIn ? "/vendor/dashboard" : "/vendor"} 
           className="px-6 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors text-center"
         >
           {isVendorLoggedIn ? "Vendor Dashboard" : "Vendor Login"}

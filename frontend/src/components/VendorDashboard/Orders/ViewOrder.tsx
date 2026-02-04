@@ -20,15 +20,10 @@ interface Order {
   id: string;
   orderNumber: string;
   customer: string;
-  email: string;
-  total: number;
-  status: 'New Order' | 'Processing' | 'Packed' | 'Shipped' | 'Delivered' | 'Returned' | 'Cancelled';
+  status: 'New Order' | 'Processing' | 'Packed' | 'Ready to Ship' | 'Completed';
   items: number;
   date: string;
   products: OrderProduct[];
-  trackingNumber?: string;
-  estimatedDelivery?: string;
-  returnReason?: string;
   statusHistory?: Array<{
     status: string;
     date: string;
@@ -42,8 +37,6 @@ const mockOrders: Order[] = [
     id: '1',
     orderNumber: 'ORD-001',
     customer: 'John Doe',
-    email: 'john@example.com',
-    total: 89.97,
     status: 'New Order',
     items: 3,
     date: '2024-01-15',
@@ -73,18 +66,12 @@ const mockOrders: Order[] = [
     id: '2',
     orderNumber: 'ORD-002',
     customer: 'Jane Smith',
-    email: 'jane@example.com',
-    total: 45.99,
-    status: 'Shipped',
+    status: 'Processing',
     items: 2,
     date: '2024-01-14',
-    trackingNumber: 'TRK987654321',
-    estimatedDelivery: '2024-01-18',
     statusHistory: [
       { status: 'New Order', date: '2024-01-14', note: 'Order received from customer' },
-      { status: 'Processing', date: '2024-01-14', note: 'Order confirmed and processing started' },
-      { status: 'Packed', date: '2024-01-15', note: 'Items packed and ready for shipment' },
-      { status: 'Shipped', date: '2024-01-16', note: 'Package shipped via FedEx' }
+      { status: 'Processing', date: '2024-01-14', note: 'Order confirmed and processing started' }
     ],
     products: [
       {
@@ -101,18 +88,15 @@ const mockOrders: Order[] = [
     id: '3',
     orderNumber: 'ORD-003',
     customer: 'Mike Johnson',
-    email: 'mike@example.com',
-    total: 124.50,
-    status: 'Delivered',
+    status: 'Completed',
     items: 5,
     date: '2024-01-13',
-    trackingNumber: 'TRK123456789',
     statusHistory: [
       { status: 'New Order', date: '2024-01-13', note: 'Order received from customer' },
       { status: 'Processing', date: '2024-01-13', note: 'Order confirmed and processing started' },
       { status: 'Packed', date: '2024-01-14', note: 'Items packed and ready for shipment' },
-      { status: 'Shipped', date: '2024-01-15', note: 'Package shipped via UPS' },
-      { status: 'Delivered', date: '2024-01-17', note: 'Package delivered successfully' }
+      { status: 'Ready to Ship', date: '2024-01-15', note: 'Order ready for shipment to admin hub' },
+      { status: 'Completed', date: '2024-01-17', note: 'Order completed successfully' }
     ],
     products: [
       {
@@ -130,60 +114,6 @@ const mockOrders: Order[] = [
         quantity: 2,
         price: 32.76,
         variant: 'Natural - 180cm'
-      }
-    ]
-  },
-  {
-    id: '4',
-    orderNumber: 'ORD-004',
-    customer: 'Sarah Wilson',
-    email: 'sarah@example.com',
-    total: 67.98,
-    status: 'Returned',
-    items: 2,
-    date: '2024-01-10',
-    returnReason: 'Damaged item received - fabric torn',
-    statusHistory: [
-      { status: 'New Order', date: '2024-01-10', note: 'Order received from customer' },
-      { status: 'Processing', date: '2024-01-10', note: 'Order confirmed and processing started' },
-      { status: 'Packed', date: '2024-01-11', note: 'Items packed and ready for shipment' },
-      { status: 'Shipped', date: '2024-01-12', note: 'Package shipped via FedEx' },
-      { status: 'Delivered', date: '2024-01-14', note: 'Package delivered' },
-      { status: 'Returned', date: '2024-01-16', note: 'Customer reported damaged item, return approved' }
-    ],
-    products: [
-      {
-        id: 'p6',
-        name: 'Organic Cotton Towel Set',
-        sku: 'OC-TS-001',
-        quantity: 2,
-        price: 33.99,
-        variant: 'Natural - Set of 4'
-      }
-    ]
-  },
-  {
-    id: '5',
-    orderNumber: 'ORD-005',
-    customer: 'David Brown',
-    email: 'david@example.com',
-    total: 156.75,
-    status: 'Packed',
-    items: 4,
-    date: '2024-01-16',
-    statusHistory: [
-      { status: 'New Order', date: '2024-01-16', note: 'Order received from customer' },
-      { status: 'Processing', date: '2024-01-16', note: 'Order confirmed and processing started' },
-      { status: 'Packed', date: '2024-01-17', note: 'Items packed and ready for shipment' }
-    ],
-    products: [
-      {
-        id: 'p7',
-        name: 'Luxury Bath Towel Collection',
-        sku: 'LB-TC-001',
-        quantity: 4,
-        price: 39.19,
-        variant: 'Charcoal - Large'
       }
     ]
   }
@@ -227,10 +157,8 @@ export default function ViewOrder({ orderId }: ViewOrderProps) {
       case 'New Order': return 'text-blue-600 bg-blue-100';
       case 'Processing': return 'text-orange-600 bg-orange-100';
       case 'Packed': return 'text-purple-600 bg-purple-100';
-      case 'Shipped': return 'text-indigo-600 bg-indigo-100';
-      case 'Delivered': return 'text-green-600 bg-green-100';
-      case 'Returned': return 'text-red-600 bg-red-100';
-      case 'Cancelled': return 'text-gray-700 bg-gray-50';
+      case 'Ready to Ship': return 'text-indigo-600 bg-indigo-100';
+      case 'Completed': return 'text-green-600 bg-green-100';
       default: return 'text-gray-600 bg-gray-100';
     }
   };
@@ -240,10 +168,8 @@ export default function ViewOrder({ orderId }: ViewOrderProps) {
       case 'New Order': return <ShoppingCart className="w-4 h-4" />;
       case 'Processing': return <Clock className="w-4 h-4" />;
       case 'Packed': return <PackageCheck className="w-4 h-4" />;
-      case 'Shipped': return <Truck className="w-4 h-4" />;
-      case 'Delivered': return <CheckCircle className="w-4 h-4" />;
-      case 'Returned': return <RotateCcw className="w-4 h-4" />;
-      case 'Cancelled': return <X className="w-4 h-4" />;
+      case 'Ready to Ship': return <Truck className="w-4 h-4" />;
+      case 'Completed': return <CheckCircle className="w-4 h-4" />;
       default: return <Package className="w-4 h-4" />;
     }
   };
@@ -252,11 +178,9 @@ export default function ViewOrder({ orderId }: ViewOrderProps) {
     const statusFlow: Record<Order['status'], Order['status'] | null> = {
       'New Order': 'Processing',
       'Processing': 'Packed',
-      'Packed': 'Shipped',
-      'Shipped': 'Delivered',
-      'Delivered': null,
-      'Returned': null,
-      'Cancelled': null
+      'Packed': 'Ready to Ship',
+      'Ready to Ship': 'Completed',
+      'Completed': null
     };
     return statusFlow[currentStatus];
   };
@@ -267,10 +191,6 @@ export default function ViewOrder({ orderId }: ViewOrderProps) {
     
     if (nextStatus) {
       options.push(nextStatus);
-    }
-    
-    if (currentStatus === 'Delivered') {
-      options.push('Returned');
     }
     
     return options;
@@ -338,7 +258,6 @@ export default function ViewOrder({ orderId }: ViewOrderProps) {
                   <div>
                     <label className="text-sm font-medium text-slate-600">Customer</label>
                     <p className="text-lg font-semibold text-[#222222]">{order.customer}</p>
-                    <p className="text-sm text-slate-600">Customer ID: {order.id}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-slate-600">Order Date</label>
@@ -361,44 +280,6 @@ export default function ViewOrder({ orderId }: ViewOrderProps) {
               </div>
             </CardContent>
           </Card>
-
-          {/* Tracking Information */}
-          {order.trackingNumber && (
-            <Card className="border border-gray-200">
-              <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-[#222222] text-lg">Shipping Information</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <label className="text-sm font-medium text-slate-600">Tracking Number</label>
-                    <p className="text-lg font-semibold text-[#222222]">{order.trackingNumber}</p>
-                  </div>
-                  {order.estimatedDelivery && (
-                    <div>
-                      <label className="text-sm font-medium text-slate-600">Estimated Delivery</label>
-                      <p className="text-lg font-semibold text-[#222222]">{order.estimatedDelivery}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Return Information */}
-          {order.status === 'Returned' && order.returnReason && (
-            <Card className="border border-red-200 bg-red-50">
-              <CardHeader className="bg-red-100 border-b border-red-200">
-                <CardTitle className="text-red-900 text-lg flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5" />
-                  Return Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <p className="text-sm text-red-800">{order.returnReason}</p>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Products List */}
           <Card className="border border-gray-200">
@@ -528,19 +409,6 @@ export default function ViewOrder({ orderId }: ViewOrderProps) {
                   <span className="ml-2">Mark as {getNextStatus(order.status)}</span>
                 </Button>
               )}
-              {order.status === 'Delivered' && (
-                <Button
-                  variant="outline"
-                  className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
-                  onClick={() => {
-                    setNewStatus('Returned');
-                    setStatusNote('Customer initiated return');
-                  }}
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Process Return
-                </Button>
-              )}
             </CardContent>
           </Card>
 
@@ -559,11 +427,6 @@ export default function ViewOrder({ orderId }: ViewOrderProps) {
                   <span className="text-slate-600">Status:</span>
                   <span className="font-medium text-[#222222]">{order.status}</span>
                 </div>
-                {order.status === 'Returned' && (
-                  <div className="pt-2 border-t border-gray-200">
-                    <p className="text-xs text-red-600">This order has been returned by the customer.</p>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>

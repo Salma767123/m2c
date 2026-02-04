@@ -11,12 +11,14 @@ import { Truck, Package, Clock, CheckCircle, Search, Edit, Trash2, X } from 'luc
 interface Shipment {
   id: string;
   orderId: string;
-  customer: string;
-  status: 'Pending' | 'In Transit' | 'Delivered';
+  adminHub: string;
+  status: 'Pending' | 'Shipped to Hub' | 'Received at Hub' | 'Quality Check' | 'Approved' | 'Rejected';
   trackingNumber: string;
   carrier: string;
   estimatedDelivery: string;
   items: number;
+  hubNotes?: string;
+  rejectionReason?: string;
 }
 
 export default function Shipping() {
@@ -25,8 +27,8 @@ export default function Shipping() {
     {
       id: 'SH-001',
       orderId: 'ORD-001',
-      customer: 'John Doe',
-      status: 'In Transit',
+      adminHub: 'M2C Admin Hub - Warehouse A',
+      status: 'Shipped to Hub',
       trackingNumber: 'TRK123456789',
       carrier: 'FedEx',
       estimatedDelivery: '2024-01-18',
@@ -35,13 +37,26 @@ export default function Shipping() {
     {
       id: 'SH-002',
       orderId: 'ORD-002',
-      customer: 'Jane Smith',
-      status: 'Delivered',
+      adminHub: 'M2C Admin Hub - Warehouse B',
+      status: 'Approved',
       trackingNumber: 'TRK987654321',
       carrier: 'UPS',
       estimatedDelivery: '2024-01-16',
-      items: 2
+      items: 2,
+      hubNotes: 'Quality check passed - items approved for customer shipment'
     },
+    {
+      id: 'SH-003',
+      orderId: 'ORD-003',
+      adminHub: 'M2C Admin Hub - Warehouse C',
+      status: 'Rejected',
+      trackingNumber: 'TRK555666777',
+      carrier: 'DHL',
+      estimatedDelivery: '2024-01-15',
+      items: 1,
+      hubNotes: 'Quality issue detected - fabric defect found',
+      rejectionReason: 'Product quality does not meet standards'
+    }
   ]);
 
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
@@ -50,8 +65,11 @@ export default function Shipping() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Pending': return 'text-yellow-600 bg-yellow-100';
-      case 'In Transit': return 'text-blue-600 bg-blue-100';
-      case 'Delivered': return 'text-green-600 bg-green-100';
+      case 'Shipped to Hub': return 'text-blue-600 bg-blue-100';
+      case 'Received at Hub': return 'text-indigo-600 bg-indigo-100';
+      case 'Quality Check': return 'text-purple-600 bg-purple-100';
+      case 'Approved': return 'text-green-600 bg-green-100';
+      case 'Rejected': return 'text-red-600 bg-red-100';
       default: return 'text-gray-600 bg-gray-100';
     }
   };
@@ -90,8 +108,8 @@ export default function Shipping() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[#222222]">Shipping Management</h1>
-          <p className="text-slate-600">Track and manage your shipments</p>
+          <h1 className="text-2xl font-bold text-[#222222]">Shipments to Admin Hub</h1>
+          <p className="text-slate-600">Track shipments sent to admin hub for quality control</p>
         </div>
         <Button
           className="bg-[#222222] text-white text-base font-semibold hover:bg-[#313131]"
@@ -121,7 +139,9 @@ export default function Shipping() {
               <Clock className="w-8 h-8 text-yellow-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-slate-600">Pending</p>
-                <p className="text-2xl font-bold text-[#222222]">3</p>
+                <p className="text-2xl font-bold text-[#222222]">
+                  {shipments.filter(s => s.status === 'Pending').length}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -132,8 +152,10 @@ export default function Shipping() {
             <div className="flex items-center">
               <Truck className="w-8 h-8 text-blue-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">In Transit</p>
-                <p className="text-2xl font-bold text-[#222222]">8</p>
+                <p className="text-sm font-medium text-slate-600">Shipped to Hub</p>
+                <p className="text-2xl font-bold text-[#222222]">
+                  {shipments.filter(s => s.status === 'Shipped to Hub').length}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -144,8 +166,10 @@ export default function Shipping() {
             <div className="flex items-center">
               <CheckCircle className="w-8 h-8 text-green-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Delivered</p>
-                <p className="text-2xl font-bold text-[#222222]">13</p>
+                <p className="text-sm font-medium text-slate-600">Approved</p>
+                <p className="text-2xl font-bold text-[#222222]">
+                  {shipments.filter(s => s.status === 'Approved').length}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -167,7 +191,7 @@ export default function Shipping() {
 
       <Card className="border border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-[#222222]">Recent Shipments</CardTitle>
+          <CardTitle className="text-[#222222]">Shipments to Admin Hub</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -175,7 +199,7 @@ export default function Shipping() {
               <TableRow>
                 <TableHead>Shipment ID</TableHead>
                 <TableHead>Order</TableHead>
-                <TableHead>Customer</TableHead>
+                <TableHead>Admin Hub</TableHead>
                 <TableHead>Carrier</TableHead>
                 <TableHead>Tracking</TableHead>
                 <TableHead>Status</TableHead>
@@ -188,7 +212,7 @@ export default function Shipping() {
                 <TableRow key={shipment.id}>
                   <TableCell className="font-medium text-[#222222]">{shipment.id}</TableCell>
                   <TableCell className="text-slate-600">{shipment.orderId}</TableCell>
-                  <TableCell className="text-slate-600">{shipment.customer}</TableCell>
+                  <TableCell className="text-slate-600">{shipment.adminHub}</TableCell>
                   <TableCell className="text-slate-600">{shipment.carrier}</TableCell>
                   <TableCell className="text-slate-600">{shipment.trackingNumber}</TableCell>
                   <TableCell>
@@ -252,8 +276,8 @@ export default function Shipping() {
                       <span className="font-medium ml-2 text-[#222222]">{editingShipment.orderId}</span>
                     </div>
                     <div>
-                      <span className="text-slate-600">Customer:</span>
-                      <span className="font-medium ml-2 text-[#222222]">{editingShipment.customer}</span>
+                      <span className="text-slate-600">Admin Hub:</span>
+                      <span className="font-medium ml-2 text-[#222222]">{editingShipment.adminHub}</span>
                     </div>
                     <div>
                       <span className="text-slate-600">Carrier:</span>
@@ -274,8 +298,11 @@ export default function Shipping() {
                     value={newStatus}
                     options={[
                       'Pending',
-                      'In Transit',
-                      'Delivered'
+                      'Shipped to Hub',
+                      'Received at Hub',
+                      'Quality Check',
+                      'Approved',
+                      'Rejected'
                     ]}
                     placeholder="Select Status"
                     onChange={(value) => setNewStatus(value as string)}

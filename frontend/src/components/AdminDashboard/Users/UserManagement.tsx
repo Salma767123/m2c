@@ -1,0 +1,511 @@
+'use client';
+
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
+import { Button } from '@/components/UI/Button';
+import { Badge } from '@/components/UI/Badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/UI/Table';
+import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb';
+import Dropdown from '@/components/UI/Dropdown';
+import { 
+  Users as UsersIcon, 
+  UserPlus, 
+  Search, 
+  Filter, 
+  Eye,
+  Edit,
+  Trash2,
+  Shield,
+  ShieldCheck,
+  Mail,
+  Phone,
+  Activity,
+  UserCheck,
+  UserX
+} from 'lucide-react';
+
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  role: 'admin' | 'manager' | 'employee';
+  status: 'active' | 'inactive' | 'suspended' | 'pending';
+  joinDate: string;
+  lastLogin: string;
+  totalOrders: number;
+  totalSpent: number;
+  loyaltyTier?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+  avatar?: string;
+  address: {
+    addressLine1: string;
+    addressLine2?: string;
+    landmark?: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
+  isEmailVerified: boolean;
+  isPhoneVerified: boolean;
+}
+// Mock users data
+const mockUsers: User[] = [
+  {
+    id: '1',
+    firstName: 'Sarah',
+    lastName: 'Johnson',
+    email: 'sarah.johnson@email.com',
+    phone: '+1 (555) 123-4567',
+    role: 'employee',
+    status: 'active',
+    joinDate: '2024-01-15T10:30:00Z',
+    lastLogin: '2024-02-01T14:20:00Z',
+    totalOrders: 15,
+    totalSpent: 2450.75,
+    address: {
+      addressLine1: '123 Main Street',
+      addressLine2: 'Apt 4B',
+      landmark: 'Near Central Park',
+      city: 'New York',
+      state: 'NY',
+      zipCode: '10001',
+      country: 'United States'
+    },
+    isEmailVerified: true,
+    isPhoneVerified: true
+  },
+  {
+    id: '2',
+    firstName: 'Michael',
+    lastName: 'Chen',
+    email: 'michael.chen@email.com',
+    phone: '+1 (555) 987-6543',
+    role: 'manager',
+    status: 'active',
+    joinDate: '2024-01-10T09:15:00Z',
+    lastLogin: '2024-02-02T11:45:00Z',
+    totalOrders: 0,
+    totalSpent: 0,
+    address: {
+      addressLine1: '456 Oak Avenue',
+      addressLine2: 'Suite 200',
+      landmark: 'Business District',
+      city: 'Los Angeles',
+      state: 'CA',
+      zipCode: '90210',
+      country: 'United States'
+    },
+    isEmailVerified: true,
+    isPhoneVerified: false
+  },
+  {
+    id: '3',
+    firstName: 'Emily',
+    lastName: 'Rodriguez',
+    email: 'emily.rodriguez@email.com',
+    phone: '+1 (555) 456-7890',
+    role: 'employee',
+    status: 'inactive',
+    joinDate: '2023-12-20T16:45:00Z',
+    lastLogin: '2024-01-25T08:30:00Z',
+    totalOrders: 32,
+    totalSpent: 5680.25,
+    address: {
+      addressLine1: '789 Pine Street',
+      addressLine2: 'Unit 12',
+      landmark: 'Downtown Area',
+      city: 'Chicago',
+      state: 'IL',
+      zipCode: '60601',
+      country: 'United States'
+    },
+    isEmailVerified: true,
+    isPhoneVerified: true
+  },
+  {
+    id: '4',
+    firstName: 'David',
+    lastName: 'Wilson',
+    email: 'david.wilson@email.com',
+    phone: '+1 (555) 321-9876',
+    role: 'admin',
+    status: 'active',
+    joinDate: '2023-11-01T12:00:00Z',
+    lastLogin: '2024-02-03T09:15:00Z',
+    totalOrders: 0,
+    totalSpent: 0,
+    address: {
+      addressLine1: '321 Admin Boulevard',
+      city: 'Seattle',
+      state: 'WA',
+      zipCode: '98101',
+      country: 'United States'
+    },
+    isEmailVerified: true,
+    isPhoneVerified: true
+  },
+  {
+    id: '5',
+    firstName: 'Lisa',
+    lastName: 'Thompson',
+    email: 'lisa.thompson@email.com',
+    phone: '+1 (555) 654-3210',
+    role: 'employee',
+    status: 'suspended',
+    joinDate: '2024-01-20T14:30:00Z',
+    lastLogin: '2024-01-28T16:20:00Z',
+    totalOrders: 3,
+    totalSpent: 125.50,
+    address: {
+      addressLine1: '654 Elm Street',
+      city: 'Miami',
+      state: 'FL',
+      zipCode: '33101',
+      country: 'United States'
+    },
+    isEmailVerified: false,
+    isPhoneVerified: false
+  }
+];
+
+export default function UserManagement() {
+  const [users] = useState<User[]>(mockUsers);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Calculate stats
+  const totalUsers = users.length;
+  const newThisMonth = users.filter(user => {
+    const joinDate = new Date(user.joinDate);
+    const now = new Date();
+    return joinDate.getMonth() === now.getMonth() && joinDate.getFullYear() === now.getFullYear();
+  }).length;
+  const activeToday = users.filter(user => {
+    const lastLogin = new Date(user.lastLogin);
+    const today = new Date();
+    return lastLogin.toDateString() === today.toDateString();
+  }).length;
+  const activeUsers = users.filter(user => user.status === 'active').length;
+  const suspendedUsers = users.filter(user => user.status === 'suspended').length;
+  const pendingUsers = users.filter(user => user.status === 'pending').length;
+
+  // Filter users
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = 
+      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.phone.includes(searchTerm);
+    
+    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-100 text-green-800">Active</Badge>;
+      case 'inactive':
+        return <Badge className="bg-gray-100 text-gray-800">Inactive</Badge>;
+      case 'suspended':
+        return <Badge className="bg-red-100 text-red-800">Suspended</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+      default:
+        return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>;
+    }
+  };
+
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return <Badge className="bg-purple-100 text-purple-800">Admin</Badge>;
+      case 'manager':
+        return <Badge className="bg-blue-100 text-blue-800">Manager</Badge>;
+      case 'employee':
+        return <Badge className="bg-green-100 text-green-800">Employee</Badge>;
+      default:
+        return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb />
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+          <p className="text-gray-600">Manage internal staff and their access levels</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button className="bg-gray-900 hover:bg-gray-800 text-white">
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add Staff Member
+          </Button>
+        </div>
+      </div>
+      {/* Stats Cards */}
+      <div className="grid gap-6 lg:grid-cols-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <UsersIcon className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalUsers}</div>
+            <p className="text-xs text-gray-600">Internal staff members</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">New This Month</CardTitle>
+            <UserPlus className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{newThisMonth}</div>
+            <p className="text-xs text-gray-600">+12% from last month</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Today</CardTitle>
+            <Activity className="h-4 w-4 text-indigo-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-indigo-600">{activeToday}</div>
+            <p className="text-xs text-gray-600">Currently online</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+            <UserCheck className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{activeUsers}</div>
+            <p className="text-xs text-gray-600">Verified accounts</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Suspended</CardTitle>
+            <UserX className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{suspendedUsers}</div>
+            <p className="text-xs text-gray-600">Restricted access</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <Shield className="h-4 w-4 text-yellow-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{pendingUsers}</div>
+            <p className="text-xs text-gray-600">Awaiting approval</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card className="bg-white rounded-xl shadow-sm border border-slate-200">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Filter className="w-5 h-5 text-gray-600" />
+            <h3 className="text-lg font-semibold text-slate-900">Filter Users</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                <Search className="w-4 h-4 inline mr-2" />
+                Search Users
+              </label>
+              <input
+                type="text"
+                placeholder="Search by name, email, or phone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 placeholder:text-slate-400"
+              />
+            </div>
+            
+            <div>
+              <Dropdown
+                label="User Role"
+                id="roleFilter"
+                value={roleFilter}
+                options={[
+                  { value: 'all', label: 'All Roles' },
+                  { value: 'admin', label: 'Admin' },
+                  { value: 'manager', label: 'Manager' },
+                  { value: 'employee', label: 'Employee' }
+                ]}
+                onChange={(value) => setRoleFilter(value as string)}
+                placeholder="Select role"
+              />
+            </div>
+            
+            <div>
+              <Dropdown
+                label="User Status"
+                id="statusFilter"
+                value={statusFilter}
+                options={[
+                  { value: 'all', label: 'All Status' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                  { value: 'suspended', label: 'Suspended' },
+                  { value: 'pending', label: 'Pending' }
+                ]}
+                onChange={(value) => setStatusFilter(value as string)}
+                placeholder="Select status"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      {/* Users Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Internal Staff</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Orders</TableHead>
+                <TableHead>Last Login</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-12">
+                    <div className="text-gray-500">
+                      <p className="text-lg font-medium">No users found</p>
+                      <p className="text-sm">Try adjusting your search or filter criteria</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                          {user.avatar ? (
+                            <img
+                              src={user.avatar}
+                              alt={`${user.firstName} ${user.lastName}`}
+                              className="w-full h-full object-cover rounded-full"
+                            />
+                          ) : (
+                            <span className="text-sm font-medium text-gray-600">
+                              {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium">{user.firstName} {user.lastName}</div>
+                          <div className="text-sm text-gray-500">ID: {user.id}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1 text-sm">
+                          <Mail className="h-3 w-3 text-gray-400" />
+                          <span className={user.isEmailVerified ? 'text-green-600' : 'text-gray-600'}>
+                            {user.email}
+                          </span>
+                          {user.isEmailVerified && <ShieldCheck className="h-3 w-3 text-green-500" />}
+                        </div>
+                        <div className="flex items-center gap-1 text-sm">
+                          <Phone className="h-3 w-3 text-gray-400" />
+                          <span className={user.isPhoneVerified ? 'text-green-600' : 'text-gray-600'}>
+                            {user.phone}
+                          </span>
+                          {user.isPhoneVerified && <ShieldCheck className="h-3 w-3 text-green-500" />}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{getRoleBadge(user.role)}</TableCell>
+                    <TableCell>{getStatusBadge(user.status)}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="font-medium">{user.totalOrders} orders</div>
+                        {user.totalSpent > 0 && (
+                          <div className="text-gray-500">${user.totalSpent.toFixed(2)}</div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-600">
+                        {new Date(user.lastLogin).toLocaleDateString()}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="hover:bg-gray-100"
+                          title="View User Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="hover:bg-gray-100"
+                          title="Edit User"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="hover:bg-red-100 text-red-600"
+                          title="Delete User"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

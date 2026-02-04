@@ -11,16 +11,15 @@ import { RotateCcw, Search, Eye, CheckCircle, XCircle, Clock, Package, AlertTria
 interface ReturnRequest {
   id: string;
   orderNumber: string;
-  customer: string;
-  email: string;
+  adminHub: string;
   product: string;
   reason: string;
-  status: 'Pending Review' | 'Approved' | 'Rejected' | 'Item Received' | 'Refund Processed' | 'Replacement Sent';
+  status: 'Pending Review' | 'Approved' | 'Rejected' | 'Item Returned' | 'Replacement Sent' | 'Issue Resolved';
   requestDate: string;
   quantity: number;
-  returnType: 'Refund' | 'Replacement';
-  customerNotes?: string;
-  vendorNotes?: string;
+  returnType: 'Quality Issue' | 'Defective Item' | 'Wrong Specification';
+  adminNotes?: string;
+  vendorResponse?: string;
   images?: string[];
 }
 
@@ -28,72 +27,67 @@ const mockReturns: ReturnRequest[] = [
   {
     id: 'RET-001',
     orderNumber: 'ORD-001',
-    customer: 'John Doe',
-    email: 'john@example.com',
+    adminHub: 'M2C Admin Hub - Warehouse A',
     product: 'Cotton Kitchen Towel',
-    reason: 'Defective item - torn fabric',
+    reason: 'Quality issue detected during hub inspection',
     status: 'Pending Review',
     requestDate: '2024-01-15',
     quantity: 1,
-    returnType: 'Refund',
-    customerNotes: 'The towel arrived with a large tear in the fabric. Photos attached.',
-    images: ['torn-fabric-1.jpg', 'torn-fabric-2.jpg']
+    returnType: 'Quality Issue',
+    adminNotes: 'Fabric quality does not meet standards. Requesting replacement or improvement.',
+    images: ['quality-issue-1.jpg', 'quality-issue-2.jpg']
   },
   {
     id: 'RET-002',
     orderNumber: 'ORD-002',
-    customer: 'Jane Smith',
-    email: 'jane@example.com',
+    adminHub: 'M2C Admin Hub - Warehouse B',
     product: 'Handwoven Bath Towel',
-    reason: 'Wrong size received',
+    reason: 'Wrong size specification',
     status: 'Approved',
     requestDate: '2024-01-14',
     quantity: 2,
-    returnType: 'Replacement',
-    customerNotes: 'Ordered Large size but received Medium size towels.',
-    vendorNotes: 'Replacement approved - Large size towels will be sent'
+    returnType: 'Wrong Specification',
+    adminNotes: 'Ordered Large size but received Medium size towels.',
+    vendorResponse: 'Replacement approved - Large size towels will be sent'
   },
   {
     id: 'RET-003',
     orderNumber: 'ORD-003',
-    customer: 'Mike Johnson',
-    email: 'mike@example.com',
+    adminHub: 'M2C Admin Hub - Warehouse C',
     product: 'Artisan Apron',
-    reason: 'Quality not as described',
-    status: 'Refund Processed',
+    reason: 'Defective stitching found',
+    status: 'Issue Resolved',
     requestDate: '2024-01-13',
     quantity: 1,
-    returnType: 'Refund',
-    customerNotes: 'Material feels cheap and colors are faded.',
-    vendorNotes: 'Quality issue confirmed. Full refund processed.'
+    returnType: 'Defective Item',
+    adminNotes: 'Stitching defects found during quality check.',
+    vendorResponse: 'Quality issue acknowledged. Replacement sent and process improved.'
   },
   {
     id: 'RET-004',
     orderNumber: 'ORD-004',
-    customer: 'Sarah Wilson',
-    email: 'sarah@example.com',
+    adminHub: 'M2C Admin Hub - Warehouse D',
     product: 'Linen Table Runner',
-    reason: 'Damaged during shipping',
-    status: 'Item Received',
+    reason: 'Color variation from specification',
+    status: 'Item Returned',
     requestDate: '2024-01-12',
     quantity: 1,
-    returnType: 'Refund',
-    customerNotes: 'Package was damaged and the table runner has stains.',
-    vendorNotes: 'Item received back. Inspecting for refund processing.'
+    returnType: 'Quality Issue',
+    adminNotes: 'Color does not match approved sample.',
+    vendorResponse: 'Item received back. Investigating color consistency issue.'
   },
   {
     id: 'RET-005',
     orderNumber: 'ORD-005',
-    customer: 'David Brown',
-    email: 'david@example.com',
+    adminHub: 'M2C Admin Hub - Warehouse E',
     product: 'Organic Cotton Towel Set',
-    reason: 'Changed mind',
+    reason: 'Packaging damage during transit',
     status: 'Rejected',
     requestDate: '2024-01-11',
     quantity: 2,
-    returnType: 'Refund',
-    customerNotes: 'No longer need these towels.',
-    vendorNotes: 'Return window expired. Custom order cannot be returned.'
+    returnType: 'Defective Item',
+    adminNotes: 'Packaging was damaged but product is intact.',
+    vendorResponse: 'Packaging issue noted. Will improve packaging for future shipments.'
   }
 ];
 
@@ -108,8 +102,8 @@ export default function Returns() {
       case 'Pending Review': return 'text-yellow-600 bg-yellow-100';
       case 'Approved': return 'text-blue-600 bg-blue-100';
       case 'Rejected': return 'text-gray-700 bg-gray-50';
-      case 'Item Received': return 'text-purple-600 bg-purple-100';
-      case 'Refund Processed': return 'text-green-600 bg-green-100';
+      case 'Item Returned': return 'text-purple-600 bg-purple-100';
+      case 'Issue Resolved': return 'text-green-600 bg-green-100';
       case 'Replacement Sent': return 'text-indigo-600 bg-indigo-100';
       default: return 'text-gray-600 bg-gray-100';
     }
@@ -120,8 +114,8 @@ export default function Returns() {
       case 'Pending Review': return <Clock className="w-4 h-4" />;
       case 'Approved': return <CheckCircle className="w-4 h-4" />;
       case 'Rejected': return <XCircle className="w-4 h-4" />;
-      case 'Item Received': return <Package className="w-4 h-4" />;
-      case 'Refund Processed': return <CheckCircle className="w-4 h-4" />;
+      case 'Item Returned': return <Package className="w-4 h-4" />;
+      case 'Issue Resolved': return <CheckCircle className="w-4 h-4" />;
       case 'Replacement Sent': return <Package className="w-4 h-4" />;
       default: return <AlertTriangle className="w-4 h-4" />;
     }
@@ -141,8 +135,8 @@ export default function Returns() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[#222222]">Returns & Refunds</h1>
-          <p className="text-slate-600">Manage customer return requests and process refunds</p>
+          <h1 className="text-2xl font-bold text-[#222222]">Returns from Admin Hub</h1>
+          <p className="text-slate-600">Manage return requests from admin hub quality control</p>
         </div>
       </div>
 
@@ -176,9 +170,9 @@ export default function Returns() {
             <div className="flex items-center">
               <CheckCircle className="w-8 h-8 text-green-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Processed</p>
+                <p className="text-sm font-medium text-slate-600">Resolved</p>
                 <p className="text-2xl font-bold text-[#222222]">
-                  {returns.filter(r => r.status === 'Refund Processed' || r.status === 'Replacement Sent').length}
+                  {returns.filter(r => r.status === 'Issue Resolved' || r.status === 'Replacement Sent').length}
                 </p>
               </div>
             </div>
@@ -207,8 +201,8 @@ export default function Returns() {
                   'Pending Review',
                   'Approved',
                   'Rejected',
-                  'Item Received',
-                  'Refund Processed',
+                  'Item Returned',
+                  'Issue Resolved',
                   'Replacement Sent'
                 ]}
                 placeholder="All Status"
@@ -221,7 +215,7 @@ export default function Returns() {
 
       <Card className="border border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-[#222222]">Return Requests</CardTitle>
+          <CardTitle className="text-[#222222]">Return Requests from Admin Hub</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -229,7 +223,7 @@ export default function Returns() {
               <TableRow>
                 <TableHead>Return ID</TableHead>
                 <TableHead>Order</TableHead>
-                <TableHead>Customer</TableHead>
+                <TableHead>Admin Hub</TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead>Reason</TableHead>
                 <TableHead>Type</TableHead>
@@ -249,7 +243,7 @@ export default function Returns() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium text-[#222222]">{returnItem.customer}</div>
+                      <div className="font-medium text-[#222222]">{returnItem.adminHub}</div>
                       <div className="text-sm text-slate-600">Return ID: {returnItem.id}</div>
                     </div>
                   </TableCell>
@@ -266,8 +260,10 @@ export default function Returns() {
                   </TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      returnItem.returnType === 'Refund' 
+                      returnItem.returnType === 'Quality Issue' 
                         ? 'text-red-600 bg-red-100' 
+                        : returnItem.returnType === 'Defective Item'
+                        ? 'text-orange-600 bg-orange-100'
                         : 'text-blue-600 bg-blue-100'
                     }`}>
                       {returnItem.returnType}
@@ -315,22 +311,22 @@ export default function Returns() {
                           variant="outline" 
                           size="sm" 
                           className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                          title="Mark Item Received"
+                          title="Mark Item Returned"
                         >
                           <Package className="w-4 h-4" />
                         </Button>
                       )}
-                      {returnItem.status === 'Item Received' && returnItem.returnType === 'Refund' && (
+                      {returnItem.status === 'Item Returned' && returnItem.returnType === 'Quality Issue' && (
                         <Button 
                           variant="outline" 
                           size="sm" 
                           className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                          title="Process Refund"
+                          title="Mark Issue Resolved"
                         >
                           <CheckCircle className="w-4 h-4" />
                         </Button>
                       )}
-                      {returnItem.status === 'Item Received' && returnItem.returnType === 'Replacement' && (
+                      {returnItem.status === 'Item Returned' && returnItem.returnType === 'Defective Item' && (
                         <Button 
                           variant="outline" 
                           size="sm" 

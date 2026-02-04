@@ -66,7 +66,11 @@ const navigation: NavigationItem[] = [
   {
     title: "Orders",
     icon: ShoppingCart,
-    href: "/admin/dashboard/orders",
+    subItems: [
+      { title: "Overview", href: "/admin/dashboard/orders" },
+      { title: "Vendor Orders", href: "/admin/dashboard/orders/vendor" },
+      { title: "Customer Orders", href: "/admin/dashboard/orders/customer" },
+    ],
   },
   {
     title: "Invoice & Billing",
@@ -76,7 +80,10 @@ const navigation: NavigationItem[] = [
   {
     title: "Users",
     icon: Users,
-    href: "/admin/dashboard/users",
+    subItems: [
+      { title: "User Management", href: "/admin/dashboard/users/user-management" },
+      { title: "Customer Management", href: "/admin/dashboard/users/customer-management" },
+    ],
   },
   {
     title: "Reviews",
@@ -120,6 +127,19 @@ export default function AdminSidebar() {
     
     if (href === "/admin/dashboard/products/vendor-requests") {
       return pathname === "/admin/dashboard/products/vendor-requests" || pathname.startsWith("/admin/dashboard/products/vendor-requests/") || pathname.startsWith("/admin/dashboard/products/vendor-requests?") || pathname.startsWith("/admin/dashboard/products/vendor-requests#");
+    }
+    
+    // For orders routes
+    if (href === "/admin/dashboard/orders") {
+      return pathname === "/admin/dashboard/orders" && !pathname.includes("/vendor") && !pathname.includes("/customer");
+    }
+    
+    if (href === "/admin/dashboard/orders/vendor") {
+      return pathname === "/admin/dashboard/orders/vendor" || pathname.startsWith("/admin/dashboard/orders/vendor/");
+    }
+    
+    if (href === "/admin/dashboard/orders/customer") {
+      return pathname === "/admin/dashboard/orders/customer" || pathname.startsWith("/admin/dashboard/orders/customer/");
     }
     
     // Default exact match for any other routes

@@ -18,18 +18,10 @@ import {
   Package, 
   Truck, 
   CheckCircle, 
-  Clock, 
-  AlertTriangle,
+  Clock,
   Search, 
   Filter, 
   Eye, 
-  Edit, 
-  Download,
-  X,
-  MapPin,
-  Phone,
-  Mail,
-  Calendar,
   DollarSign
 } from 'lucide-react'
 import Link from 'next/link'
@@ -46,18 +38,21 @@ interface OrderItem {
 }
 
 interface ShippingAddress {
-  name: string
-  street: string
-  city: string
-  state: string
-  zipCode: string
-  country: string
-  phone: string
+  name: string;
+  addressLine1: string;
+  addressLine2?: string;
+  landmark?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+  phone: string;
 }
 
 interface Order {
   id: string
   orderNumber: string
+  orderType: 'customer' | 'vendor'
   customer: {
     name: string
     email: string
@@ -72,21 +67,46 @@ interface Order {
   shipping: number
   tax: number
   total: number
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned'
-  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded'
-  shippingAddress: ShippingAddress
-  trackingNumber?: string
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped_to_hub' | 'at_hub' | 'hub_quality_check' | 'hub_approved' | 'shipped_to_customer' | 'delivered' | 'cancelled'
+  paymentStatus: 'pending' | 'paid' | 'failed'
+  vendorShippingAddress: ShippingAddress // Admin Hub address
+  customerShippingAddress: ShippingAddress // Final customer address
+  currentLocation: 'vendor' | 'hub' | 'customer'
+  trackingInfo?: {
+    vendorToHub?: {
+      trackingNumber: string
+      carrier: string
+      shippedDate: string
+      receivedDate?: string
+    }
+    hubToCustomer?: {
+      trackingNumber: string
+      carrier: string
+      shippedDate: string
+      deliveredDate?: string
+    }
+  }
+  hubQualityCheck?: {
+    passed: boolean
+    notes: string
+    checkedBy: string
+    checkDate: string
+    issues?: string[]
+    action: 'approve' | 'return_to_vendor' | 'replace'
+  }
   estimatedDelivery?: string
   createdAt: string
   updatedAt: string
   notes?: string
 }
 
-// Mock orders data for textile business
+// Mock orders data for textile business - both customer and vendor orders
 const mockOrders: Order[] = [
+  // Customer Orders
   {
     id: '1',
-    orderNumber: 'ORD-2024-001',
+    orderNumber: 'CUST-2024-001',
+    orderType: 'customer',
     customer: {
       name: 'Sarah Johnson',
       email: 'sarah.johnson@email.com',
@@ -118,23 +138,38 @@ const mockOrders: Order[] = [
     shipping: 15.00,
     tax: 25.59,
     total: 360.53,
-    status: 'pending',
+    status: 'processing',
     paymentStatus: 'paid',
-    shippingAddress: {
+    vendorShippingAddress: {
+      name: 'M2C Textiles Admin Hub',
+      addressLine1: '500 Industrial Blvd',
+      addressLine2: 'Warehouse A',
+      landmark: 'Near Highway 101',
+      city: 'Manufacturing City',
+      state: 'TX',
+      zipCode: '75001',
+      country: 'United States',
+      phone: '+1 (555) 000-0001'
+    },
+    customerShippingAddress: {
       name: 'Sarah Johnson',
-      street: '123 Main Street, Apt 4B',
+      addressLine1: '123 Main Street',
+      addressLine2: 'Apt 4B',
+      landmark: 'Near Central Park',
       city: 'New York',
       state: 'NY',
       zipCode: '10001',
       country: 'United States',
       phone: '+1 (555) 123-4567'
     },
+    currentLocation: 'vendor',
     createdAt: '2024-01-15T10:30:00Z',
     updatedAt: '2024-01-15T10:30:00Z'
   },
   {
     id: '2',
-    orderNumber: 'ORD-2024-002',
+    orderNumber: 'CUST-2024-002',
+    orderType: 'customer',
     customer: {
       name: 'Michael Chen',
       email: 'michael.chen@email.com',
@@ -158,25 +193,47 @@ const mockOrders: Order[] = [
     shipping: 8.00,
     tax: 2.64,
     total: 35.63,
-    status: 'shipped',
+    status: 'shipped_to_hub',
     paymentStatus: 'paid',
-    shippingAddress: {
+    vendorShippingAddress: {
+      name: 'M2C Textiles Admin Hub',
+      addressLine1: '500 Industrial Blvd',
+      addressLine2: 'Warehouse B',
+      landmark: 'Near Highway 101',
+      city: 'Manufacturing City',
+      state: 'TX',
+      zipCode: '75001',
+      country: 'United States',
+      phone: '+1 (555) 000-0001'
+    },
+    customerShippingAddress: {
       name: 'Michael Chen',
-      street: '456 Oak Avenue',
+      addressLine1: '456 Oak Avenue',
+      addressLine2: 'Suite 200',
+      landmark: 'Business District',
       city: 'Los Angeles',
       state: 'CA',
       zipCode: '90210',
       country: 'United States',
       phone: '+1 (555) 987-6543'
     },
-    trackingNumber: 'TRK123456789',
+    currentLocation: 'hub',
+    trackingInfo: {
+      vendorToHub: {
+        trackingNumber: 'TRK123456789',
+        carrier: 'FedEx',
+        shippedDate: '2024-01-16T09:15:00Z',
+        receivedDate: '2024-01-17T14:30:00Z'
+      }
+    },
     estimatedDelivery: '2024-01-18',
     createdAt: '2024-01-14T14:20:00Z',
     updatedAt: '2024-01-16T09:15:00Z'
   },
   {
     id: '3',
-    orderNumber: 'ORD-2024-003',
+    orderNumber: 'CUST-2024-003',
+    orderType: 'customer',
     customer: {
       name: 'Emily Rodriguez',
       email: 'emily.rodriguez@email.com',
@@ -210,33 +267,231 @@ const mockOrders: Order[] = [
     total: 185.73,
     status: 'delivered',
     paymentStatus: 'paid',
-    shippingAddress: {
+    vendorShippingAddress: {
+      name: 'M2C Textiles Admin Hub',
+      addressLine1: '500 Industrial Blvd',
+      addressLine2: 'Warehouse C',
+      landmark: 'Near Highway 101',
+      city: 'Manufacturing City',
+      state: 'TX',
+      zipCode: '75001',
+      country: 'United States',
+      phone: '+1 (555) 000-0001'
+    },
+    customerShippingAddress: {
       name: 'Emily Rodriguez',
-      street: '789 Pine Street',
+      addressLine1: '789 Pine Street',
+      addressLine2: 'Unit 12',
+      landmark: 'Downtown Area',
       city: 'Chicago',
       state: 'IL',
       zipCode: '60601',
       country: 'United States',
       phone: '+1 (555) 456-7890'
     },
-    trackingNumber: 'TRK987654321',
+    currentLocation: 'customer',
+    trackingInfo: {
+      vendorToHub: {
+        trackingNumber: 'TRK987654321',
+        carrier: 'USPS',
+        shippedDate: '2024-01-13T10:00:00Z',
+        receivedDate: '2024-01-14T15:30:00Z'
+      },
+      hubToCustomer: {
+        trackingNumber: 'HUB456789123',
+        carrier: 'UPS',
+        shippedDate: '2024-01-15T09:00:00Z',
+        deliveredDate: '2024-01-17T11:30:00Z'
+      }
+    },
+    hubQualityCheck: {
+      passed: true,
+      notes: 'All items in perfect condition, quality approved',
+      checkedBy: 'Quality Inspector - John Smith',
+      checkDate: '2024-01-14T16:00:00Z',
+      action: 'approve'
+    },
     createdAt: '2024-01-12T16:45:00Z',
     updatedAt: '2024-01-17T11:30:00Z'
+  },
+  // Vendor Orders (Vendor Orders)
+  {
+    id: '4',
+    orderNumber: 'VEND-2024-001',
+    orderType: 'vendor',
+    customer: {
+      name: 'M2C Textiles (Admin)',
+      email: 'admin@m2ctextiles.com',
+      phone: '+1 (555) 000-0001'
+    },
+    vendor: {
+      name: 'Raw Materials Supplier',
+      id: 'vendor-4'
+    },
+    items: [
+      {
+        id: 'item-6',
+        productName: 'Organic Cotton Fabric - 100 yards',
+        sku: 'OCF-100Y-WHT',
+        quantity: 5,
+        price: 120.00,
+        total: 600.00
+      },
+      {
+        id: 'item-7',
+        productName: 'Polyester Thread - Industrial',
+        sku: 'PT-IND-BLK',
+        quantity: 20,
+        price: 15.50,
+        total: 310.00
+      }
+    ],
+    subtotal: 910.00,
+    shipping: 45.00,
+    tax: 76.40,
+    total: 1031.40,
+    status: 'confirmed',
+    paymentStatus: 'pending',
+    vendorShippingAddress: {
+      name: 'M2C Textiles Admin Hub',
+      addressLine1: '500 Industrial Blvd',
+      addressLine2: 'Warehouse B',
+      landmark: 'Near Highway 101',
+      city: 'Manufacturing City',
+      state: 'TX',
+      zipCode: '75001',
+      country: 'United States',
+      phone: '+1 (555) 000-0001'
+    },
+    customerShippingAddress: {
+      name: 'M2C Textiles Warehouse',
+      addressLine1: '500 Industrial Blvd',
+      addressLine2: 'Warehouse B',
+      landmark: 'Near Highway 101',
+      city: 'Manufacturing City',
+      state: 'TX',
+      zipCode: '75001',
+      country: 'United States',
+      phone: '+1 (555) 000-0001'
+    },
+    currentLocation: 'vendor',
+    estimatedDelivery: '2024-01-25',
+    createdAt: '2024-01-18T09:00:00Z',
+    updatedAt: '2024-01-18T14:30:00Z'
+  },
+  {
+    id: '5',
+    orderNumber: 'VEND-2024-002',
+    orderType: 'vendor',
+    customer: {
+      name: 'M2C Textiles (Admin)',
+      email: 'admin@m2ctextiles.com',
+      phone: '+1 (555) 000-0001'
+    },
+    vendor: {
+      name: 'Packaging Solutions Ltd',
+      id: 'vendor-5'
+    },
+    items: [
+      {
+        id: 'item-8',
+        productName: 'Eco-Friendly Packaging Boxes - Medium',
+        sku: 'EPB-MED-100',
+        quantity: 100,
+        price: 2.50,
+        total: 250.00
+      },
+      {
+        id: 'item-9',
+        productName: 'Branded Tissue Paper',
+        sku: 'BTP-M2C-500',
+        quantity: 10,
+        price: 18.00,
+        total: 180.00
+      }
+    ],
+    subtotal: 430.00,
+    shipping: 25.00,
+    tax: 36.40,
+    total: 491.40,
+    status: 'hub_approved',
+    paymentStatus: 'paid',
+    vendorShippingAddress: {
+      name: 'M2C Textiles Admin Hub',
+      addressLine1: '500 Industrial Blvd',
+      addressLine2: 'Warehouse A',
+      landmark: 'Near Highway 101',
+      city: 'Manufacturing City',
+      state: 'TX',
+      zipCode: '75001',
+      country: 'United States',
+      phone: '+1 (555) 000-0001'
+    },
+    customerShippingAddress: {
+      name: 'M2C Textiles Warehouse',
+      addressLine1: '500 Industrial Blvd',
+      addressLine2: 'Warehouse A',
+      landmark: 'Near Highway 101',
+      city: 'Manufacturing City',
+      state: 'TX',
+      zipCode: '75001',
+      country: 'United States',
+      phone: '+1 (555) 000-0001'
+    },
+    currentLocation: 'hub',
+    trackingInfo: {
+      vendorToHub: {
+        trackingNumber: 'PKG789012345',
+        carrier: 'DHL',
+        shippedDate: '2024-01-17T08:00:00Z',
+        receivedDate: '2024-01-18T10:30:00Z'
+      }
+    },
+    hubQualityCheck: {
+      passed: true,
+      notes: 'Packaging materials approved, ready for customer shipment',
+      checkedBy: 'Quality Inspector - Sarah Wilson',
+      checkDate: '2024-01-18T14:00:00Z',
+      action: 'approve'
+    },
+    estimatedDelivery: '2024-01-22',
+    createdAt: '2024-01-16T11:15:00Z',
+    updatedAt: '2024-01-19T08:45:00Z'
   }
 ]
 
 export default function Orders() {
-  const [orders] = useState<Order[]>(mockOrders)
+  const [orders, setOrders] = useState<Order[]>(mockOrders)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [paymentFilter, setPaymentFilter] = useState<string>('all')
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all')
+
+  // Function to handle "Get Order" action for vendor orders
+  const handleGetOrder = (orderId: string) => {
+    setOrders(prevOrders => 
+      prevOrders.map(order => {
+        if (order.id === orderId && order.orderType === 'vendor') {
+          return {
+            ...order,
+            status: 'delivered' as const,
+            currentLocation: 'hub' as const,
+            updatedAt: new Date().toISOString()
+          }
+        }
+        return order
+      })
+    )
+  }
 
   // Calculate stats
   const totalOrders = orders.length
+  const customerOrders = orders.filter(order => order.orderType === 'customer').length
+  const vendorOrders = orders.filter(order => order.orderType === 'vendor').length
   const pendingOrders = orders.filter(order => order.status === 'pending').length
   const processingOrders = orders.filter(order => order.status === 'processing').length
-  const shippedOrders = orders.filter(order => order.status === 'shipped').length
+  const atHubOrders = orders.filter(order => order.status === 'at_hub' || order.status === 'hub_quality_check' || order.status === 'hub_approved').length
+  const shippedOrders = orders.filter(order => order.status === 'shipped_to_hub' || order.status === 'shipped_to_customer').length
   const deliveredOrders = orders.filter(order => order.status === 'delivered').length
   const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0)
 
@@ -249,9 +504,21 @@ export default function Orders() {
     
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter
     const matchesPayment = paymentFilter === 'all' || order.paymentStatus === paymentFilter
+    const matchesOrderType = orderTypeFilter === 'all' || order.orderType === orderTypeFilter
 
-    return matchesSearch && matchesStatus && matchesPayment
+    return matchesSearch && matchesStatus && matchesPayment && matchesOrderType
   })
+
+  const getOrderTypeBadge = (orderType: string) => {
+    switch (orderType) {
+      case 'customer':
+        return <Badge className="bg-blue-100 text-blue-800">Customer Order</Badge>
+      case 'vendor':
+        return <Badge className="bg-purple-100 text-purple-800">Vendor Order</Badge>
+      default:
+        return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -261,14 +528,20 @@ export default function Orders() {
         return <Badge className="bg-blue-100 text-blue-800">Confirmed</Badge>
       case 'processing':
         return <Badge className="bg-purple-100 text-purple-800">Processing</Badge>
-      case 'shipped':
-        return <Badge className="bg-indigo-100 text-indigo-800">Shipped</Badge>
+      case 'shipped_to_hub':
+        return <Badge className="bg-indigo-100 text-indigo-800">Shipped to Hub</Badge>
+      case 'at_hub':
+        return <Badge className="bg-orange-100 text-orange-800">At Hub</Badge>
+      case 'hub_quality_check':
+        return <Badge className="bg-amber-100 text-amber-800">Quality Check</Badge>
+      case 'hub_approved':
+        return <Badge className="bg-emerald-100 text-emerald-800">Hub Approved</Badge>
+      case 'shipped_to_customer':
+        return <Badge className="bg-cyan-100 text-cyan-800">Shipped to Customer</Badge>
       case 'delivered':
         return <Badge className="bg-green-100 text-green-800">Delivered</Badge>
       case 'cancelled':
         return <Badge className="bg-red-100 text-red-800">Cancelled</Badge>
-      case 'returned':
-        return <Badge className="bg-gray-100 text-gray-800">Returned</Badge>
       default:
         return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>
     }
@@ -282,21 +555,9 @@ export default function Orders() {
         return <Badge className="bg-green-100 text-green-800">Paid</Badge>
       case 'failed':
         return <Badge className="bg-red-100 text-red-800">Failed</Badge>
-      case 'refunded':
-        return <Badge className="bg-gray-100 text-gray-800">Refunded</Badge>
       default:
         return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>
     }
-  }
-
-  const handleStatusUpdate = (orderId: string, newStatus: string) => {
-    console.log(`Updating order ${orderId} to status: ${newStatus}`)
-    // Implement status update logic here
-  }
-
-  const handleExport = () => {
-    console.log('Exporting orders...')
-    // Implement export logic here
   }
 
   return (
@@ -307,19 +568,13 @@ export default function Orders() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Orders Management</h1>
-          <p className="text-gray-600">Track and manage customer orders from placement to delivery</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">Orders Overview</h1>
+          <p className="text-gray-600">Comprehensive order tracking and management dashboard</p>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-6 lg:grid-cols-6">
+      <div className="grid gap-6 lg:grid-cols-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
@@ -327,7 +582,29 @@ export default function Orders() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalOrders}</div>
-            <p className="text-xs text-gray-600">All time</p>
+            <p className="text-xs text-gray-600">All orders</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Customer Orders</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{customerOrders}</div>
+            <p className="text-xs text-gray-600">From customers</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Vendor Orders</CardTitle>
+            <Package className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{vendorOrders}</div>
+            <p className="text-xs text-gray-600">To vendors</p>
           </CardContent>
         </Card>
 
@@ -338,7 +615,7 @@ export default function Orders() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">{pendingOrders}</div>
-            <p className="text-xs text-gray-600">Awaiting confirmation</p>
+            <p className="text-xs text-gray-600">Awaiting action</p>
           </CardContent>
         </Card>
 
@@ -355,23 +632,23 @@ export default function Orders() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">At Hub</CardTitle>
+            <Package className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{atHubOrders}</div>
+            <p className="text-xs text-gray-600">Quality check</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Shipped</CardTitle>
             <Truck className="h-4 w-4 text-indigo-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-indigo-600">{shippedOrders}</div>
             <p className="text-xs text-gray-600">In transit</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Delivered</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{deliveredOrders}</div>
-            <p className="text-xs text-gray-600">Completed</p>
           </CardContent>
         </Card>
 
@@ -407,6 +684,18 @@ export default function Orders() {
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-gray-500" />
                 <Dropdown
+                  id="orderTypeFilter"
+                  value={orderTypeFilter}
+                  options={[
+                    { value: 'all', label: 'All Orders' },
+                    { value: 'customer', label: 'Customer Orders' },
+                    { value: 'vendor', label: 'Vendor Orders' }
+                  ]}
+                  onChange={(value) => setOrderTypeFilter(value as string)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Dropdown
                   id="statusFilter"
                   value={statusFilter}
                   options={[
@@ -416,8 +705,7 @@ export default function Orders() {
                     { value: 'processing', label: 'Processing' },
                     { value: 'shipped', label: 'Shipped' },
                     { value: 'delivered', label: 'Delivered' },
-                    { value: 'cancelled', label: 'Cancelled' },
-                    { value: 'returned', label: 'Returned' }
+                    { value: 'cancelled', label: 'Cancelled' }
                   ]}
                   onChange={(value) => setStatusFilter(value as string)}
                 />
@@ -429,8 +717,7 @@ export default function Orders() {
                   { value: 'all', label: 'All Payments' },
                   { value: 'pending', label: 'Payment Pending' },
                   { value: 'paid', label: 'Paid' },
-                  { value: 'failed', label: 'Payment Failed' },
-                  { value: 'refunded', label: 'Refunded' }
+                  { value: 'failed', label: 'Payment Failed' }
                 ]}
                 onChange={(value) => setPaymentFilter(value as string)}
               />
@@ -449,8 +736,9 @@ export default function Orders() {
             <TableHeader>
               <TableRow>
                 <TableHead>Order</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Vendor</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Customer/Buyer</TableHead>
+                <TableHead>Vendor/Supplier</TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
@@ -462,7 +750,7 @@ export default function Orders() {
             <TableBody>
               {filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
+                  <TableCell colSpan={10} className="text-center py-12">
                     <div className="text-gray-500">
                       <p className="text-lg font-medium">No orders found</p>
                       <p className="text-sm">Try adjusting your search or filter criteria</p>
@@ -475,11 +763,12 @@ export default function Orders() {
                     <TableCell>
                       <div>
                         <div className="font-medium">{order.orderNumber}</div>
-                        {order.trackingNumber && (
-                          <div className="text-sm text-gray-500">Track: {order.trackingNumber}</div>
+                        {order.trackingInfo?.vendorToHub?.trackingNumber && (
+                          <div className="text-sm text-gray-500">Track: {order.trackingInfo.vendorToHub.trackingNumber}</div>
                         )}
                       </div>
                     </TableCell>
+                    <TableCell>{getOrderTypeBadge(order.orderType)}</TableCell>
                     <TableCell>
                       <div>
                         <div className="font-medium">{order.customer.name}</div>
@@ -496,18 +785,23 @@ export default function Orders() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Link href={`/admin/dashboard/orders/edit/${order.id}`}>
+                        <Link href={`/admin/dashboard/orders/view/${order.id}`}>
                           <Button variant="ghost" size="sm">
-                            <Edit className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </Button>
                         </Link>
+                        {/* Get Order button for vendor orders that are not delivered */}
+                        {order.orderType === 'vendor' && order.status !== 'delivered' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleGetOrder(order.id)}
+                            className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:border-green-300"
+                          >
+                            <Package className="h-4 w-4 mr-1" />
+                            Get Order
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -517,202 +811,6 @@ export default function Orders() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Order Detail Modal */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Order Details</h3>
-                <p className="text-sm text-gray-500">{selectedOrder.orderNumber}</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedOrder(null)}
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-
-            <div className="px-6 py-4 max-h-[calc(90vh-120px)] overflow-y-auto">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Order Info */}
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Order Information</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Order Number:</span>
-                        <span className="font-medium">{selectedOrder.orderNumber}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Status:</span>
-                        {getStatusBadge(selectedOrder.status)}
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Payment:</span>
-                        {getPaymentBadge(selectedOrder.paymentStatus)}
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Vendor:</span>
-                        <span className="font-medium">{selectedOrder.vendor.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Order Date:</span>
-                        <span>{new Date(selectedOrder.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      {selectedOrder.estimatedDelivery && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Est. Delivery:</span>
-                          <span>{new Date(selectedOrder.estimatedDelivery).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Customer Info */}
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Customer Information</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center">
-                        <span className="text-gray-600 w-16">Name:</span>
-                        <span className="font-medium">{selectedOrder.customer.name}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Mail className="h-4 w-4 text-gray-400 mr-2" />
-                        <span>{selectedOrder.customer.email}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Phone className="h-4 w-4 text-gray-400 mr-2" />
-                        <span>{selectedOrder.customer.phone}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Shipping Address */}
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Shipping Address</h4>
-                    <div className="text-sm text-gray-600">
-                      <div className="flex items-start">
-                        <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-0.5" />
-                        <div>
-                          <div className="font-medium text-gray-900">{selectedOrder.shippingAddress.name}</div>
-                          <div>{selectedOrder.shippingAddress.street}</div>
-                          <div>
-                            {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state} {selectedOrder.shippingAddress.zipCode}
-                          </div>
-                          <div>{selectedOrder.shippingAddress.country}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Order Items & Summary */}
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Order Items</h4>
-                    <div className="space-y-3">
-                      {selectedOrder.items.map((item) => (
-                        <div key={item.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg">
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">{item.productName}</div>
-                            <div className="text-xs text-gray-500">SKU: {item.sku}</div>
-                            <div className="text-xs text-gray-600">Qty: {item.quantity} × ${item.price.toFixed(2)}</div>
-                          </div>
-                          <div className="font-medium text-sm">${item.total.toFixed(2)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Order Summary */}
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Order Summary</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Subtotal:</span>
-                        <span>${selectedOrder.subtotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Shipping:</span>
-                        <span>${selectedOrder.shipping.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Tax:</span>
-                        <span>${selectedOrder.tax.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between font-medium text-base border-t pt-2">
-                        <span>Total:</span>
-                        <span>${selectedOrder.total.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Status Update Actions */}
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Update Status</h4>
-                    <div className="space-y-2">
-                      {selectedOrder.status === 'pending' && (
-                        <Button 
-                          size="sm" 
-                          className="w-full"
-                          onClick={() => handleStatusUpdate(selectedOrder.id, 'confirmed')}
-                        >
-                          Confirm Order
-                        </Button>
-                      )}
-                      {selectedOrder.status === 'confirmed' && (
-                        <Button 
-                          size="sm" 
-                          className="w-full"
-                          onClick={() => handleStatusUpdate(selectedOrder.id, 'processing')}
-                        >
-                          Start Processing
-                        </Button>
-                      )}
-                      {selectedOrder.status === 'processing' && (
-                        <Button 
-                          size="sm" 
-                          className="w-full"
-                          onClick={() => handleStatusUpdate(selectedOrder.id, 'shipped')}
-                        >
-                          Mark as Shipped
-                        </Button>
-                      )}
-                      {selectedOrder.status === 'shipped' && (
-                        <Button 
-                          size="sm" 
-                          className="w-full"
-                          onClick={() => handleStatusUpdate(selectedOrder.id, 'delivered')}
-                        >
-                          Mark as Delivered
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <Button
-                variant="outline"
-                onClick={() => setSelectedOrder(null)}
-              >
-                Close
-              </Button>
-              <Link href={`/admin/dashboard/orders/edit/${selectedOrder.id}`}>
-                <Button>
-                  Edit Order
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

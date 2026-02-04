@@ -27,7 +27,7 @@ export function Breadcrumb() {
     'billing': 'Billing',
     'cms': 'CMS',
     'reviews': 'Reviews',
-    'add': 'Add New',
+    'add': 'Create New',
     'edit': 'Edit',
     'view': 'View Details',
     'profile': 'Profile',
@@ -37,6 +37,7 @@ export function Breadcrumb() {
     'support': 'Support',
     'analytics': 'Analytics',
     'customers': 'Customers',
+    'customer': 'Customer Orders',
     'vendor-requests': 'Vendor Requests'
   }
 
