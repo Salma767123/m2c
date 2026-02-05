@@ -213,12 +213,12 @@ const paymentStatusOptions = [
 
 interface AddEditCustomerOrderProps {
   orderId?: string;
-  isEdit?: boolean;
 }
 
-export default function AddEditCustomerOrder({ orderId, isEdit = false }: AddEditCustomerOrderProps) {
+export default function AddEditCustomerOrder({ orderId }: AddEditCustomerOrderProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const isEdit = !!orderId;
   const [formData, setFormData] = useState<CustomerOrderForm>({
     orderNumber: '',
     customer: {

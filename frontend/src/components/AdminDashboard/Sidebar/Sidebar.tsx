@@ -86,6 +86,14 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
+    title: "Roles & Permissions",
+    icon: Shield,
+    subItems: [
+      { title: "All Roles", href: "/admin/dashboard/roles-permissions" },
+      { title: "Create Role", href: "/admin/dashboard/roles-permissions/add" },
+    ],
+  },
+  {
     title: "Reviews",
     icon: MessageSquare,
     href: "/admin/dashboard/reviews",

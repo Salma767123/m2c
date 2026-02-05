@@ -191,9 +191,9 @@ export default function LoginForm({ onGoogleAuth }: LoginFormProps) {
           />
           <span className="ml-1.5 sm:ml-2 text-xs sm:text-sm text-gray-700">Remember me</span>
         </label>
-        <button type="button" className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
+        <a href="/forgot-password" className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
           Forgot password?
-        </button>
+        </a>
       </div>
 
       {/* Sign In Button */}

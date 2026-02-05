@@ -442,7 +442,7 @@ export default function CustomerOrder() {
           <p className="text-gray-600">Monitor customer orders and delivery experience</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/admin/dashboard/orders/customer/add">
+          <Link href="/admin/dashboard/orders/add">
             <Button className="bg-gray-900 hover:bg-gray-800 text-white">
               <Package className="h-4 w-4 mr-2" />
               Create Order
@@ -651,7 +651,7 @@ export default function CustomerOrder() {
                             <Eye className="h-4 w-4" />
                           </Button>
                         </Link>
-                        <Link href={`/admin/dashboard/orders/customer/edit/${order.id}`}>
+                        <Link href={`/admin/dashboard/orders/edit/${order.id}`}>
                           <Button 
                             variant="ghost" 
                             size="sm"

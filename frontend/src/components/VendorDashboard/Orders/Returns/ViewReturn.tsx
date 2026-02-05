@@ -299,7 +299,7 @@ export default function ViewReturn({ returnId }: ViewReturnProps) {
                 <div className="space-y-4">
                   {returnRequest.statusHistory.map((history, index) => (
                     <div key={index} className="flex items-start gap-3">
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getStatusColor(history.status)}`}>
+                      <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${getStatusColor(history.status)}`}>
                         {getStatusIcon(history.status)}
                       </div>
                       <div className="flex-1 min-w-0">
