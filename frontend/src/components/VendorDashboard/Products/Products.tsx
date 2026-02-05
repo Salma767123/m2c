@@ -178,17 +178,24 @@ export default function Products() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs capitalize ${
-                        product.approvalStatus === 'APPROVED' 
-                          ? 'bg-green-100 text-green-800' 
-                          : product.approvalStatus === 'PENDING'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : product.approvalStatus === 'REJECTED'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {product.approvalStatus?.toLowerCase()}
-                      </span>
+                      <div className="space-y-1">
+                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${
+                          product.approvalStatus === 'APPROVED' 
+                            ? 'bg-green-100 text-green-800' 
+                            : product.approvalStatus === 'PENDING'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : product.approvalStatus === 'REJECTED'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {product.approvalStatus?.toLowerCase()}
+                        </span>
+                        {product.approvalStatus === 'REJECTED' && product.rejectionReason && (
+                          <div className="text-xs text-red-600 max-w-32 truncate" title={product.rejectionReason}>
+                            {product.rejectionReason}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-slate-600">
                       {product.hasVariants ? `${product.variants?.length || 0} variants` : 'No variants'}

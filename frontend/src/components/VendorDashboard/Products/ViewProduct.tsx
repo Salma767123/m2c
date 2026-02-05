@@ -356,6 +356,47 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                   <p className="text-sm text-gray-600 font-mono">{product.baseSku}</p>
                 </div>
               </div>
+              
+              {/* Approval Status Information */}
+              {product.approvalStatus === 'APPROVED' && product.approvedAt && (
+                <div className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg">
+                  <div className="w-4 h-4 bg-green-500 rounded-full mt-0.5"></div>
+                  <div>
+                    <p className="text-sm font-medium text-green-900">Product Approved</p>
+                    <p className="text-sm text-green-700">
+                      Approved on {new Date(product.approvedAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {product.approvalStatus === 'REJECTED' && product.rejectionReason && (
+                <div className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                  <div className="w-4 h-4 bg-red-500 rounded-full mt-0.5"></div>
+                  <div>
+                    <p className="text-sm font-medium text-red-900">Product Rejected</p>
+                    <p className="text-sm text-red-700 mt-1">
+                      <span className="font-medium">Reason:</span> {product.rejectionReason}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {product.approvalStatus === 'PENDING' && (
+                <div className="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg">
+                  <div className="w-4 h-4 bg-yellow-500 rounded-full mt-0.5"></div>
+                  <div>
+                    <p className="text-sm font-medium text-yellow-900">Pending Review</p>
+                    <p className="text-sm text-yellow-700">
+                      Your product is under review by our admin team.
+                    </p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
           {/* Stock Information */}
