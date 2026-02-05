@@ -143,7 +143,7 @@ interface ProductFormData {
   originalPrice?: number
   discount?: number
   
-  // Single Unit Pricing Configuration (NEW)
+  // Basic Product Info - Size & Color
   singleUnitSize?: string
   singleUnitColor?: string
   singleUnitColorHex?: string
@@ -229,7 +229,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     originalPrice: undefined,
     discount: undefined,
     
-    // Single Unit Pricing Configuration (NEW)
+    // Basic Product Info - Size & Color
     singleUnitSize: '',
     singleUnitColor: '',
     singleUnitColorHex: '#000000',
@@ -369,10 +369,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               originalPrice: product.originalPrice,
               discount: product.discount,
               
-              // Single Unit Pricing Configuration
-              singleUnitSize: product.singleUnitSize || '',
-              singleUnitColor: product.singleUnitColor || '',
-              singleUnitColorHex: product.singleUnitColorHex || '#000000',
+              // Basic Product Info - Size & Color
+              singleUnitSize: (product as any).singleUnitSize || '',
+              singleUnitColor: (product as any).singleUnitColor || '',
+              singleUnitColorHex: (product as any).singleUnitColorHex || '#000000',
               
               // Product Rating & Reviews
               rating: product.rating,
@@ -1161,6 +1161,53 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     </div>
                   </div>
 
+                  {/* Size and Color */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Default Size
+                      </label>
+                      <Dropdown
+                        value={formData.singleUnitSize || ''}
+                        options={standardSizes}
+                        placeholder="Select Size"
+                        onChange={(value) => setFormData(prev => ({ ...prev, singleUnitSize: value as string }))}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Primary size for this product</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Default Color
+                      </label>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={formData.singleUnitColorHex || '#000000'}
+                            onChange={(e) => {
+                              const hex = e.target.value
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                singleUnitColorHex: hex,
+                                singleUnitColor: getColorName(hex)
+                              }))
+                            }}
+                            className="w-10 h-10 border border-gray-300 rounded-md cursor-pointer"
+                            title="Pick a color"
+                          />
+                          <input
+                            type="text"
+                            value={formData.singleUnitColor || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, singleUnitColor: e.target.value }))}
+                            placeholder="Color name"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500">Primary color for this product</p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Tags */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1357,22 +1404,34 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   {formData.hasVariants && (
                     <>
                       {/* Add New Variant */}
-                      <div className="border-2 border-gray-300 rounded-lg p-6 bg-gray-50">
-                        <h4 className="font-semibold text-gray-900 mb-4">Add New Variant</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Size *</label>
-                            <Dropdown
-                              value={newVariant.size || ''}
-                              options={standardSizes}
-                              placeholder="Select Size"
-                              onChange={(value) => setNewVariant(prev => ({ ...prev, size: value as string }))}
-                            />
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 bg-gradient-to-br from-gray-50 to-white hover:border-gray-400 transition-colors">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="p-2 bg-gray-900 rounded-lg">
+                            <Package className="h-5 w-5 text-white" />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Color *</label>
+                            <h4 className="font-semibold text-gray-900">Add New Variant</h4>
+                            <p className="text-sm text-gray-600">Create a new product variant with specific attributes</p>
+                          </div>
+                        </div>
+
+                        {/* Variant Details - Two Row Layout */}
+                        <div className="space-y-6">
+                          {/* First Row: Basic Attributes */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div className="space-y-2">
-                              <div className="flex items-center gap-2">
+                              <label className="block text-sm font-medium text-gray-700">Size *</label>
+                              <Dropdown
+                                value={newVariant.size || ''}
+                                options={standardSizes}
+                                placeholder="Select Size"
+                                onChange={(value) => setNewVariant(prev => ({ ...prev, size: value as string }))}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Color *</label>
+                              <div className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg bg-white">
                                 <input
                                   type="color"
                                   value={newVariant.colorHex || '#000000'}
@@ -1381,10 +1440,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                     setNewVariant(prev => ({ 
                                       ...prev, 
                                       colorHex: hex,
-                                      color: getColorName(hex) // Auto-generate color name
+                                      color: getColorName(hex)
                                     }))
                                   }}
-                                  className="w-8 h-8 border border-gray-300 rounded-md cursor-pointer"
+                                  className="w-10 h-10 border border-gray-300 rounded-md cursor-pointer"
                                   title="Pick a color"
                                 />
                                 <input
@@ -1392,50 +1451,62 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                   value={newVariant.color || ''}
                                   onChange={(e) => setNewVariant(prev => ({ ...prev, color: e.target.value }))}
                                   placeholder="Color name"
-                                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-500 text-sm"
+                                  className="flex-1 px-0 py-0 border-0 focus:outline-none focus:ring-0 text-sm bg-transparent"
                                 />
                               </div>
                             </div>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">SKU *</label>
-                            <input
-                              type="text"
-                              value={newVariant.sku}
-                              onChange={(e) => setNewVariant(prev => ({ ...prev, sku: e.target.value }))}
-                              placeholder="e.g., CS-Q-BLK"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Price *</label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-2 text-gray-500 text-sm">₹</span>
+
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">SKU *</label>
                               <input
-                                type="number"
-                                value={newVariant.price}
-                                onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                                placeholder="0"
-                                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
+                                type="text"
+                                value={newVariant.sku}
+                                onChange={(e) => setNewVariant(prev => ({ ...prev, sku: e.target.value }))}
+                                placeholder="e.g., CS-Q-BLK"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
                               />
                             </div>
                           </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Stock *</label>
-                            <input
-                              type="number"
-                              value={newVariant.stock}
-                              onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
-                              placeholder="0"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
-                            />
+
+                          {/* Second Row: Pricing & Inventory */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Price *</label>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm font-medium">₹</span>
+                                <input
+                                  type="number"
+                                  value={newVariant.price}
+                                  onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                                  placeholder="0.00"
+                                  step="0.01"
+                                  className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Stock Quantity *</label>
+                              <input
+                                type="number"
+                                value={newVariant.stock}
+                                onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
+                                placeholder="0"
+                                min="0"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
+                              />
+                            </div>
                           </div>
-                          <div className="flex items-end">
+
+                          {/* Action Button */}
+                          <div className="flex justify-end pt-4 border-t border-gray-200">
                             <Button 
                               type="button" 
                               onClick={addVariant}
-                              className="w-full bg-gray-900 text-white hover:bg-black"
+                              disabled={!newVariant.size || !newVariant.color || !newVariant.sku || !newVariant.price}
+                              className="bg-gray-900 text-white hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed px-6 py-2.5 font-medium"
                             >
+                              <Package className="h-4 w-4 mr-2" />
                               Add Variant
                             </Button>
                           </div>
@@ -1679,53 +1750,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         Single Unit Pricing
                       </h4>
                       
-                      {/* Size and Color Configuration */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Size
-                          </label>
-                          <Dropdown
-                            value={formData.singleUnitSize || ''}
-                            options={standardSizes}
-                            placeholder="Select Size"
-                            onChange={(value) => setFormData(prev => ({ ...prev, singleUnitSize: value as string }))}
-                          />
-                          <p className="text-xs text-gray-600 mt-1">Default size for single unit</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Color
-                          </label>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="color"
-                                value={formData.singleUnitColorHex || '#000000'}
-                                onChange={(e) => {
-                                  const hex = e.target.value
-                                  setFormData(prev => ({ 
-                                    ...prev, 
-                                    singleUnitColorHex: hex,
-                                    singleUnitColor: getColorName(hex)
-                                  }))
-                                }}
-                                className="w-10 h-10 border border-gray-300 rounded-md cursor-pointer"
-                                title="Pick a color"
-                              />
-                              <input
-                                type="text"
-                                value={formData.singleUnitColor || ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, singleUnitColor: e.target.value }))}
-                                placeholder="Color name"
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                              />
-                            </div>
-                            <p className="text-xs text-gray-600">Default color for single unit</p>
-                          </div>
-                        </div>
-                      </div>
-
                       {/* Pricing Configuration */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
@@ -1784,34 +1808,14 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       </div>
 
                       {/* Single Unit Summary */}
-                      {(formData.singleUnitSize || formData.singleUnitColor || formData.basePrice > 0) && (
+                      {formData.basePrice > 0 && (
                         <div className="p-4 bg-white border border-gray-300 rounded-lg mb-4">
                           <h5 className="font-medium text-gray-900 mb-3">Single Unit Configuration</h5>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            {formData.singleUnitSize && (
-                              <div>
-                                <span className="text-gray-600">Size:</span>
-                                <span className="font-medium ml-2">{formData.singleUnitSize}</span>
-                              </div>
-                            )}
-                            {formData.singleUnitColor && (
-                              <div className="flex items-center">
-                                <span className="text-gray-600">Color:</span>
-                                <div className="flex items-center ml-2">
-                                  <div 
-                                    className="w-4 h-4 rounded border border-gray-300 mr-1"
-                                    style={{ backgroundColor: formData.singleUnitColorHex }}
-                                  ></div>
-                                  <span className="font-medium">{formData.singleUnitColor}</span>
-                                </div>
-                              </div>
-                            )}
-                            {formData.basePrice > 0 && (
-                              <div>
-                                <span className="text-gray-600">Price:</span>
-                                <span className="font-medium ml-2">₹{formData.basePrice.toFixed(2)}</span>
-                              </div>
-                            )}
+                            <div>
+                              <span className="text-gray-600">Base Price:</span>
+                              <span className="font-medium ml-2">₹{formData.basePrice.toFixed(2)}</span>
+                            </div>
                             {formData.originalPrice && formData.originalPrice > formData.basePrice && (
                               <div>
                                 <span className="text-gray-600">Discount:</span>

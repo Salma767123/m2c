@@ -9,6 +9,7 @@ export interface AdminProduct {
   basePrice: number;
   originalPrice?: number;
   discount?: number;
+  adminFixedPrice?: number; // Admin's fixed price (separate from basePrice)
   fabricType?: string;
   material?: string;
   fabricSpecifications?: any;

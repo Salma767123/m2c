@@ -231,6 +231,13 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Client-side validation
+    if (formData.sourceType === 'supplier' && !formData.supplier?.trim()) {
+      alert('Supplier name is required when supplier is selected as source type.')
+      return
+    }
+    
     setIsLoading(true)
 
     try {
@@ -451,7 +458,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 <div className="space-y-3">
                   <label className="block text-sm font-medium text-slate-700 mb-3">
                     Product Source Type
-                    <span className="text-xs text-slate-500 ml-2">(Select one option)</span>
+                    <span className="text-xs text-slate-500 ml-2">(Optional - Select one if applicable)</span>
                   </label>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -505,6 +512,15 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       </div>
                     </div>
                   </div>
+                  
+                  {!formData.sourceType && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700">
+                        💡 You can skip this section if you don't want to specify a source type. 
+                        Select "Supplier" if you purchase from external vendors, or "Manufacture" if you make the products yourself.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Conditional Fields Based on Source Type */}
@@ -524,16 +540,15 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="supplier"
                           value={formData.supplier}
                           onChange={handleInputChange}
-                          required={formData.sourceType === 'supplier'}
                           className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors ${
-                            formData.sourceType === 'supplier' && !formData.supplier 
+                            formData.sourceType === 'supplier' && !formData.supplier?.trim()
                               ? 'border-red-300 bg-red-50' 
                               : 'border-gray-200'
                           }`}
                           placeholder="Enter supplier name"
                         />
-                        {formData.sourceType === 'supplier' && !formData.supplier && (
-                          <p className="text-xs text-red-600 mt-1">Supplier name is required</p>
+                        {formData.sourceType === 'supplier' && !formData.supplier?.trim() && (
+                          <p className="text-xs text-red-600 mt-1">Supplier name is required when supplier is selected</p>
                         )}
                       </div>
                       <div>

@@ -6,7 +6,7 @@ import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { ArrowLeft, Save, X, Upload } from 'lucide-react'
+import { ArrowLeft, Save, X, Upload, Package } from 'lucide-react'
 import Link from 'next/link'
 import { categories } from '@/components/mockData/products'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
@@ -154,7 +154,7 @@ interface ProductFormData {
   originalPrice?: number
   discount?: number // Discount percentage (e.g., 25 for 25% off)
   
-  // Single Unit Pricing Configuration (NEW)
+  // Basic Product Info - Size & Color
   singleUnitSize?: string
   singleUnitColor?: string
   singleUnitColorHex?: string
@@ -237,7 +237,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     originalPrice: undefined,
     discount: undefined,
     
-    // Single Unit Pricing Configuration (NEW)
+    // Basic Product Info - Size & Color
     singleUnitSize: '',
     singleUnitColor: '',
     singleUnitColorHex: '#000000',
@@ -1348,22 +1348,34 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   {formData.hasVariants && (
                     <>
                       {/* Add New Variant */}
-                      <div className="border-2 border-gray-300 rounded-lg p-6 bg-gray-50">
-                        <h4 className="font-semibold text-gray-900 mb-4">Add New Variant</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Size *</label>
-                            <Dropdown
-                              value={newVariant.size || ''}
-                              options={standardSizes}
-                              placeholder="Select Size"
-                              onChange={(value) => setNewVariant(prev => ({ ...prev, size: value as string }))}
-                            />
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 bg-gradient-to-br from-gray-50 to-white hover:border-gray-400 transition-colors">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="p-2 bg-gray-900 rounded-lg">
+                            <Package className="h-5 w-5 text-white" />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Color *</label>
+                            <h4 className="font-semibold text-gray-900">Add New Variant</h4>
+                            <p className="text-sm text-gray-600">Create a new product variant with specific attributes</p>
+                          </div>
+                        </div>
+
+                        {/* Variant Details - Two Row Layout */}
+                        <div className="space-y-6">
+                          {/* First Row: Basic Attributes */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div className="space-y-2">
-                              <div className="flex items-center gap-2">
+                              <label className="block text-sm font-medium text-gray-700">Size *</label>
+                              <Dropdown
+                                value={newVariant.size || ''}
+                                options={standardSizes}
+                                placeholder="Select Size"
+                                onChange={(value) => setNewVariant(prev => ({ ...prev, size: value as string }))}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Color *</label>
+                              <div className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg bg-white">
                                 <input
                                   type="color"
                                   value={newVariant.colorHex || '#000000'}
@@ -1372,10 +1384,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                     setNewVariant(prev => ({ 
                                       ...prev, 
                                       colorHex: hex,
-                                      color: getColorName(hex) // Auto-generate color name
+                                      color: getColorName(hex)
                                     }))
                                   }}
-                                  className="w-8 h-8 border border-gray-300 rounded-md cursor-pointer"
+                                  className="w-10 h-10 border border-gray-300 rounded-md cursor-pointer"
                                   title="Pick a color"
                                 />
                                 <input
@@ -1383,50 +1395,62 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                   value={newVariant.color || ''}
                                   onChange={(e) => setNewVariant(prev => ({ ...prev, color: e.target.value }))}
                                   placeholder="Color name"
-                                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-500 text-sm"
+                                  className="flex-1 px-0 py-0 border-0 focus:outline-none focus:ring-0 text-sm bg-transparent"
                                 />
                               </div>
                             </div>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">SKU *</label>
-                            <input
-                              type="text"
-                              value={newVariant.sku}
-                              onChange={(e) => setNewVariant(prev => ({ ...prev, sku: e.target.value }))}
-                              placeholder="e.g., CS-Q-BLK"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Price *</label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-2 text-gray-500 text-sm">₹</span>
+
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">SKU *</label>
                               <input
-                                type="number"
-                                value={newVariant.price}
-                                onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                                placeholder="0"
-                                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
+                                type="text"
+                                value={newVariant.sku}
+                                onChange={(e) => setNewVariant(prev => ({ ...prev, sku: e.target.value }))}
+                                placeholder="e.g., CS-Q-BLK"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
                               />
                             </div>
                           </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Stock *</label>
-                            <input
-                              type="number"
-                              value={newVariant.stock}
-                              onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
-                              placeholder="0"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm"
-                            />
+
+                          {/* Second Row: Pricing & Inventory */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Price *</label>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm font-medium">₹</span>
+                                <input
+                                  type="number"
+                                  value={newVariant.price}
+                                  onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                                  placeholder="0.00"
+                                  step="0.01"
+                                  className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Stock Quantity *</label>
+                              <input
+                                type="number"
+                                value={newVariant.stock}
+                                onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
+                                placeholder="0"
+                                min="0"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
+                              />
+                            </div>
                           </div>
-                          <div className="flex items-end">
+
+                          {/* Action Button */}
+                          <div className="flex justify-end pt-4 border-t border-gray-200">
                             <Button 
                               type="button" 
                               onClick={addVariant}
-                              className="w-full bg-gray-900 text-white hover:bg-black"
+                              disabled={!newVariant.size || !newVariant.color || !newVariant.sku || !newVariant.price}
+                              className="bg-gray-900 text-white hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed px-6 py-2.5 font-medium"
                             >
+                              <Package className="h-4 w-4 mr-2" />
                               Add Variant
                             </Button>
                           </div>

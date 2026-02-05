@@ -47,6 +47,10 @@ export default function Products() {
     router.push('/vendor/dashboard/products/add');
   };
 
+  const handleViewProduct = (product: Product) => {
+    router.push(`/vendor/dashboard/products/${product.id}`);
+  };
+
   const handleEditProduct = (product: Product) => {
     router.push(`/vendor/dashboard/products/edit/${product.id}`);
   };
@@ -191,7 +195,12 @@ export default function Products() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="sm" className="hover:bg-gray-50 hover:text-[#222222]">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="hover:bg-gray-50 hover:text-[#222222]"
+                          onClick={() => handleViewProduct(product)}
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button 

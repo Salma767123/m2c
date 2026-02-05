@@ -46,8 +46,8 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         const response = await adminProductService.getProduct(requestId)
         if (response.success && response.data) {
           setProduct(response.data)
-          // Set initial admin price to the product's base price
-          setAdminPrice(response.data.basePrice.toString())
+          // Set initial admin price to the product's admin fixed price or base price
+          setAdminPrice((response.data.adminFixedPrice || response.data.basePrice).toString())
         } else {
           showErrorToast('Error', 'Product not found')
         }
@@ -82,7 +82,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           ...prev, 
           approvalStatus: 'APPROVED', 
           approvedAt: new Date().toISOString(),
-          basePrice: parseFloat(adminPrice) // Update with admin fixed price
+          adminFixedPrice: parseFloat(adminPrice) // Store in adminFixedPrice field
         } : null)
         // Optionally redirect back to requests list
         setTimeout(() => {
@@ -385,10 +385,10 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               <div className="flex items-center space-x-3">
                 <DollarSign className="h-4 w-4 text-gray-500" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Price</p>
-                  <p className="text-sm text-gray-600">₹{product.basePrice}</p>
-                  {product.originalPrice && product.originalPrice !== product.basePrice && (
-                    <p className="text-xs text-gray-500">Vendor Price: ₹{product.originalPrice}</p>
+                  <p className="text-sm font-medium text-gray-900">Pricing</p>
+                  <p className="text-sm text-gray-600">Vendor Price: ₹{product.basePrice}</p>
+                  {product.adminFixedPrice && (
+                    <p className="text-sm text-green-600 font-medium">Admin Price: ₹{product.adminFixedPrice}</p>
                   )}
                 </div>
               </div>
@@ -542,6 +542,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             <div className="mb-4 p-3 bg-gray-50 rounded-lg">
               <p className="text-sm font-medium text-gray-700">Product: {product.name}</p>
               <p className="text-sm text-gray-600">Vendor Price: ₹{product.basePrice}</p>
+              {product.adminFixedPrice && (
+                <p className="text-sm text-green-600">Current Admin Price: ₹{product.adminFixedPrice}</p>
+              )}
               <p className="text-sm text-gray-600">Vendor: {product.vendor.companyName}</p>
             </div>
             <div className="mb-4">
@@ -559,7 +562,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 disabled={actionLoading}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Leave as is to keep vendor's price, or set a new price
+                This will be the final price customers see. Vendor's original price: ₹{product.basePrice}
               </p>
             </div>
             <div className="flex justify-end space-x-3">

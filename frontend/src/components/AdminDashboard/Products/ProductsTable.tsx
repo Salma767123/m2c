@@ -24,6 +24,7 @@ interface Product {
   name: string
   category: string
   basePrice: number
+  adminFixedPrice?: number // Admin's fixed price
   totalStock: number
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
   approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -252,7 +253,18 @@ export default function ProductsTable() {
                   </div>
                 </TableCell>
                 <TableCell>{product.category}</TableCell>
-                <TableCell className="font-medium">{formatPrice(product.basePrice)}</TableCell>
+                <TableCell>
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      Vendor: {formatPrice(product.basePrice)}
+                    </div>
+                    {product.adminFixedPrice && (
+                      <div className="text-sm text-green-600 font-medium">
+                        Admin: {formatPrice(product.adminFixedPrice)}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>
                   <span className={product.totalStock === 0 ? "text-red-600" : "text-gray-900"}>
                     {product.totalStock}

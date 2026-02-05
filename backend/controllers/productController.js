@@ -879,7 +879,7 @@ const approveProduct = async (req, res) => {
       rejectionReason: null // Clear any previous rejection reason
     };
 
-    // If admin price is provided, update the base price
+    // If admin price is provided, store it in adminFixedPrice field
     if (adminPrice !== undefined && adminPrice !== null) {
       if (adminPrice <= 0) {
         return res.status(400).json({
@@ -887,7 +887,7 @@ const approveProduct = async (req, res) => {
           message: 'Admin price must be greater than 0'
         });
       }
-      updateData.basePrice = parseFloat(adminPrice);
+      updateData.adminFixedPrice = parseFloat(adminPrice);
     }
 
     // Update product approval status
