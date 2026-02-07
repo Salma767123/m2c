@@ -27,6 +27,7 @@ export interface PublicProduct {
     size: string;
     color: string;
     colorHex?: string;
+    sku: string;
     price: number;
     stock: number;
     images: string[];
@@ -46,6 +47,12 @@ export interface PublicProduct {
   trackInventory: boolean;
   minimumOrderQuantity: number;
   maximumOrderQuantity?: number;
+  dispatchTimeline: {
+    processingDays: number;
+    shippingDays: number;
+    totalDays: number;
+  };
+  status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
 }
 
 export interface ProductsResponse {
