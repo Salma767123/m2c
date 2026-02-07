@@ -1,5 +1,10 @@
-import Orders from '@/components/AdminDashboard/Orders/Orders'
+'use client';
 
-export default function OrdersPage() {
-  return <Orders />
-}
+import React from 'react';
+import OrderManagement from '../../../../components/AdminDashboard/Orders/OrderManagement';
+
+const OrdersPage: React.FC = () => {
+  return <OrderManagement />;
+};
+
+export default OrdersPage;

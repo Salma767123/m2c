@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   Users,
   Package,
-  ShoppingCart,
   Settings,
   Store,
   Tags,
@@ -20,6 +19,7 @@ import {
   ChevronDown,
   ChevronRight,
   Shield,
+  ShoppingCart,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -39,6 +39,11 @@ const navigation: NavigationItem[] = [
     title: "Dashboard",
     icon: LayoutDashboard,
     href: "/admin/dashboard",
+  },
+  {
+    title: "Orders",
+    icon: ShoppingCart,
+    href: "/admin/dashboard/orders",
   },
   {
     title: "Vendors",
@@ -61,15 +66,6 @@ const navigation: NavigationItem[] = [
     subItems: [
       { title: "All Products", href: "/admin/dashboard/products" },
       { title: "Vendor Requests", href: "/admin/dashboard/products/vendor-requests" },
-    ],
-  },
-  {
-    title: "Orders",
-    icon: ShoppingCart,
-    subItems: [
-      { title: "Overview", href: "/admin/dashboard/orders" },
-      { title: "Vendor Orders", href: "/admin/dashboard/orders/vendor" },
-      { title: "Customer Orders", href: "/admin/dashboard/orders/customer" },
     ],
   },
   {
@@ -135,19 +131,6 @@ export default function AdminSidebar() {
     
     if (href === "/admin/dashboard/products/vendor-requests") {
       return pathname === "/admin/dashboard/products/vendor-requests" || pathname.startsWith("/admin/dashboard/products/vendor-requests/") || pathname.startsWith("/admin/dashboard/products/vendor-requests?") || pathname.startsWith("/admin/dashboard/products/vendor-requests#");
-    }
-    
-    // For orders routes
-    if (href === "/admin/dashboard/orders") {
-      return pathname === "/admin/dashboard/orders" && !pathname.includes("/vendor") && !pathname.includes("/customer");
-    }
-    
-    if (href === "/admin/dashboard/orders/vendor") {
-      return pathname === "/admin/dashboard/orders/vendor" || pathname.startsWith("/admin/dashboard/orders/vendor/");
-    }
-    
-    if (href === "/admin/dashboard/orders/customer") {
-      return pathname === "/admin/dashboard/orders/customer" || pathname.startsWith("/admin/dashboard/orders/customer/");
     }
     
     // Default exact match for any other routes
@@ -319,7 +302,7 @@ export default function AdminSidebar() {
       {/* Footer */}
       <div className="border-t border-gray-200 p-4">
         <div className="flex items-center">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#222222] to-[#444444] flex items-center justify-center shadow-md">
+          <div className="h-10 w-10 rounded-full bg-linear-to-br from-[#222222] to-[#444444] flex items-center justify-center shadow-md">
             <span className="text-sm font-semibold text-white">SA</span>
           </div>
           <div className="ml-3 flex-1">

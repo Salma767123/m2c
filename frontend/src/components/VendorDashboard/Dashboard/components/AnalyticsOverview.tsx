@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent } from '@/components/UI/Card';
-import { DollarSign, ShoppingCart, Users, Eye, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { DollarSign, Users, Eye, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface Metric {
   label: string;
@@ -12,7 +12,6 @@ interface Metric {
 
 interface AnalyticsData {
   revenue: { current: number; change: number };
-  orders: { current: number; change: number };
   customers: { current: number; change: number };
   views?: { current: number; change: number };
 }
@@ -32,12 +31,6 @@ export default function AnalyticsOverview({ analytics }: AnalyticsOverviewProps)
       value: analytics.revenue.current,
       change: analytics.revenue.change,
       icon: DollarSign,
-    },
-    {
-      label: 'Orders',
-      value: analytics.orders.current,
-      change: analytics.orders.change,
-      icon: ShoppingCart,
     },
     {
       label: 'Customers',

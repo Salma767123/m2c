@@ -1,10 +1,10 @@
-import Orders from '@/components/VendorDashboard/Orders/Orders';
+'use client';
 
-export default function OrdersPage() {
-  return <Orders />;
-}
+import React from 'react';
+import VendorOrderManagement from '../../../../components/VendorDashboard/Orders/VendorOrderManagement';
 
-export const metadata = {
-  title: 'Orders - Vendor Dashboard',
-  description: 'Manage and track your customer orders',
+const VendorOrdersPage: React.FC = () => {
+  return <VendorOrderManagement />;
 };
+
+export default VendorOrdersPage;

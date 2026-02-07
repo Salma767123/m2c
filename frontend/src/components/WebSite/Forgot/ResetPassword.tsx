@@ -180,7 +180,7 @@ export default function ResetPassword() {
 
   if (passwordReset) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-linear-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="text-center pb-4">
             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">

@@ -1,9 +1,8 @@
 'use client';
 
-import { Package, ShoppingCart, DollarSign, TrendingUp, Users } from 'lucide-react';
+import { Package, DollarSign, TrendingUp, Users } from 'lucide-react';
 import StatsGrid from './components/StatsGrid';
 import AnalyticsOverview from './components/AnalyticsOverview';
-import RecentOrders from './components/RecentOrders';
 import TopProducts from './components/TopProducts';
 import PerformanceOverview from './components/PerformanceOverview';
 
@@ -14,12 +13,6 @@ export default function Dashboard() {
       value: '45',
       change: '+12%',
       icon: Package,
-    },
-    {
-      title: 'Orders This Month',
-      value: '127',
-      change: '+23%',
-      icon: ShoppingCart,
     },
     {
       title: 'Revenue',
@@ -37,15 +30,8 @@ export default function Dashboard() {
 
   const analytics = {
     revenue: { current: 12450, change: 22.1 },
-    orders: { current: 156, change: 9.9 },
     customers: { current: 89, change: 17.1 },
   };
-
-  const recentOrders = [
-    { id: '#1234', customer: 'John Doe', amount: '$89.99', status: 'Processing' as const },
-    { id: '#1235', customer: 'Jane Smith', amount: '$156.50', status: 'Shipped' as const },
-    { id: '#1236', customer: 'Mike Johnson', amount: '$45.00', status: 'Delivered' as const },
-  ];
 
   const topProducts = [
     { name: 'Handwoven Cotton Towel Set', sales: 45, rating: 4.8, revenue: 584.55 },
@@ -73,9 +59,8 @@ export default function Dashboard() {
       {/* Analytics Section */}
       <AnalyticsOverview analytics={analytics} />
 
-      {/* Recent Activity & Top Products */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        <RecentOrders orders={recentOrders} />
+      {/* Top Products */}
+      <div className="grid grid-cols-1 gap-4 sm:gap-6">
         <TopProducts products={topProducts} />
       </div>
 

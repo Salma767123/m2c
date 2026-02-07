@@ -594,3 +594,163 @@ enum ProductApprovalStatus {
   APPROVED
   REJECTED
 }
+
+// ============================================
+// ORDER MANAGEMENT SYSTEM
+// ============================================
+
+model Order {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  orderId               String    @unique // Human readable order ID (e.g., ORD-2024-001)
+  
+  // Customer Information
+  customerId            String?   @db.ObjectId
+  customerName          String
+  customerEmail         String
+  customerPhone         String
+  
+  // Shipping Address
+  shippingAddress       Json      // Complete address object
+  
+  // Order Items
+  items                 OrderItem[]
+  
+  // Pricing
+  subtotal              Float
+  shippingCost          Float     @default(0)
+  tax                   Float     @default(0)
+  discount              Float     @default(0)
+  totalAmount           Float
+  
+  // Payment Information
+  paymentStatus         PaymentStatus @default(PENDING)
+  paymentMethod         String?
+  paymentId             String?
+  
+  // Order Status & Tracking
+  status                OrderStatus @default(ORDER_CREATED)
+  trackingReference     String?   // Internal tracking reference
+  
+  // Vendor Information (for single vendor orders)
+  vendorId              String?   @db.ObjectId
+  vendor                Vendor?   @relation(fields: [vendorId], references: [id])
+  
+  // Admin Hub Processing
+  adminReview           AdminReview?
+  
+  // Status History
+  statusHistory         OrderStatusHistory[]
+  
+  // Timestamps
+  orderDate             DateTime  @default(now())
+  estimatedDelivery     DateTime?
+  actualDelivery        DateTime?
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  orderId               String    @db.ObjectId
+  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Product Information
+  productId             String    @db.ObjectId
+  product               Product   @relation(fields: [productId], references: [id])
+  productName           String
+  productImage          String?
+  
+  // Variant Information (if applicable)
+  variantId             String?   @db.ObjectId
+  size                  String?
+  color                 String?
+  sku                   String
+  
+  // Pricing & Quantity
+  quantity              Int
+  unitPrice             Float
+  totalPrice            Float
+  
+  // Vendor Information
+  vendorId              String    @db.ObjectId
+  vendorName            String
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  orderId               String    @db.ObjectId
+  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  status                OrderStatus
+  comment               String?
+  updatedBy             String?   // Admin/Vendor ID who updated
+  updatedByType         String?   // "admin", "vendor", "system"
+  
+  timestamp             DateTime  @default(now())
+
+  @@map("order_status_history")
+}
+
+model AdminReview {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  orderId               String    @unique @db.ObjectId
+  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Review Details
+  reviewComments        String?
+  qualityCheckNotes     String?
+  rating                Int?      // 1-5 rating
+  approved              Boolean   @default(false)
+  
+  // Admin Information
+  reviewedBy            String?   @db.ObjectId // Admin ID
+  reviewedAt            DateTime?
+  
+  // Rejection Details (if applicable)
+  rejectionReason       String?
+  returnToVendor        Boolean   @default(false)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("admin_reviews")
+}
+
+// Add relation to existing models
+model VendorExtended {
+  orders                Order[]
+}
+
+model ProductExtended {
+  orderItems            OrderItem[]
+}
+
+// Enums for Order Management
+enum OrderStatus {
+  ORDER_CREATED
+  VENDOR_PROCESSING
+  PACKED_BY_VENDOR
+  IN_TRANSIT_TO_ADMIN_HUB
+  RECEIVED_AT_ADMIN_HUB
+  APPROVED_BY_ADMIN_HUB
+  REJECTED_BY_ADMIN_HUB
+  SHIPPED_TO_CUSTOMER
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}

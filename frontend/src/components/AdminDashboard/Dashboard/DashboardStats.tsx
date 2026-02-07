@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
-import { Users, Store, Package, ShoppingCart, TrendingUp, DollarSign } from 'lucide-react'
+import { Users, Store, Package, TrendingUp, DollarSign } from 'lucide-react'
 
 const stats = [
   {
@@ -28,15 +28,6 @@ const stats = [
     color: 'text-purple-600',
     borderColor: 'border-purple-600',
     bgColor: 'bg-purple-50',
-  },
-  {
-    title: 'Total Orders',
-    value: '3,456',
-    change: '+201 since last hour',
-    icon: ShoppingCart,
-    color: 'text-orange-600',
-    borderColor: 'border-orange-600',
-    bgColor: 'bg-orange-50',
   },
   {
     title: 'Active Users',

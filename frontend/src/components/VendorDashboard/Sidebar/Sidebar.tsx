@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Package,
-  ShoppingCart,
   DollarSign,
   Warehouse,
   User,
@@ -16,6 +15,7 @@ import {
   BarChart3,
   MessageSquare,
   Settings,
+  ShoppingCart,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -37,6 +37,11 @@ const navigation: NavigationItem[] = [
     href: "/vendor/dashboard",
   },
   {
+    title: "Orders",
+    icon: ShoppingCart,
+    href: "/vendor/dashboard/orders",
+  },
+  {
     title: "Inventory",
     icon: Warehouse,
     href: "/vendor/dashboard/inventory",
@@ -45,15 +50,6 @@ const navigation: NavigationItem[] = [
     title: "Products",
     icon: Package,
     href: "/vendor/dashboard/products",
-  },
-  {
-    title: "Orders",
-    icon: ShoppingCart,
-    subItems: [
-      { title: "All Orders", href: "/vendor/dashboard/orders" },
-      { title: "Shipping", href: "/vendor/dashboard/shipping" },
-      { title: "Returns", href: "/vendor/dashboard/returns" },
-    ],
   },
   {
     title: "Earnings",
@@ -108,19 +104,6 @@ export default function VendorSidebar() {
     
     if (href === "/vendor/dashboard/earnings/payouts") {
       return pathname === "/vendor/dashboard/earnings/payouts" || pathname.startsWith("/vendor/dashboard/earnings/payouts/") || pathname.startsWith("/vendor/dashboard/earnings/payouts?") || pathname.startsWith("/vendor/dashboard/earnings/payouts#");
-    }
-    
-    // For orders routes
-    if (href === "/vendor/dashboard/orders") {
-      return pathname === "/vendor/dashboard/orders" || pathname.startsWith("/vendor/dashboard/orders?") || pathname.startsWith("/vendor/dashboard/orders#");
-    }
-    
-    if (href === "/vendor/dashboard/shipping") {
-      return pathname === "/vendor/dashboard/shipping" || pathname.startsWith("/vendor/dashboard/shipping/") || pathname.startsWith("/vendor/dashboard/shipping?") || pathname.startsWith("/vendor/dashboard/shipping#");
-    }
-    
-    if (href === "/vendor/dashboard/returns") {
-      return pathname === "/vendor/dashboard/returns" || pathname.startsWith("/vendor/dashboard/returns/") || pathname.startsWith("/vendor/dashboard/returns?") || pathname.startsWith("/vendor/dashboard/returns#");
     }
     
     // For settings routes

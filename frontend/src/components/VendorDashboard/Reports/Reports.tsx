@@ -3,21 +3,20 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
-import { BarChart3, Download, Calendar, TrendingUp, DollarSign, ShoppingCart, Users, FileText } from 'lucide-react';
+import { BarChart3, Download, Calendar, TrendingUp, DollarSign, Users, FileText } from 'lucide-react';
 
 interface ReportData {
   period: string;
   revenue: number;
-  orders: number;
   customers: number;
   avgOrderValue: number;
 }
 
 const mockReportData: ReportData[] = [
-  { period: 'Jan 2024', revenue: 12450, orders: 156, customers: 89, avgOrderValue: 79.81 },
-  { period: 'Dec 2023', revenue: 10200, orders: 142, customers: 76, avgOrderValue: 71.83 },
-  { period: 'Nov 2023', revenue: 9800, orders: 134, customers: 72, avgOrderValue: 73.13 },
-  { period: 'Oct 2023', revenue: 11200, orders: 148, customers: 81, avgOrderValue: 75.68 }
+  { period: 'Jan 2024', revenue: 12450, customers: 89, avgOrderValue: 79.81 },
+  { period: 'Dec 2023', revenue: 10200, customers: 76, avgOrderValue: 71.83 },
+  { period: 'Nov 2023', revenue: 9800, customers: 72, avgOrderValue: 73.13 },
+  { period: 'Oct 2023', revenue: 11200, customers: 81, avgOrderValue: 75.68 }
 ];
 
 export default function Reports() {
@@ -87,21 +86,6 @@ export default function Reports() {
                 </p>
               </div>
               <DollarSign className="w-8 h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                <p className="text-2xl font-bold text-gray-900">{currentData.orders}</p>
-                <p className="text-sm text-green-600 mt-1">
-                  +{calculateChange(currentData.orders, previousData.orders)}% vs last period
-                </p>
-              </div>
-              <ShoppingCart className="w-8 h-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
