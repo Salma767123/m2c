@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: process.env.CORS_ORIGIN || ['http://localhost:3000', 'https://m2-c.vercel.app'],
   credentials: true
 }));
 app.use(morgan('combined'));
@@ -73,12 +73,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-const server = app.listen(PORT, async () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+// Initialize database and admin (for serverless, this runs on each cold start)
+let isInitialized = false;
+
+const initializeApp = async () => {
+  if (isInitialized) return;
   
-  // Initialize database connection
   try {
     await connectDB();
     
@@ -90,10 +90,25 @@ const server = app.listen(PORT, async () => {
       console.log('⚠️ Admin initialization skipped:', adminResult.message);
     }
     
-    // Clean expired sessions on startup
+    // Clean expired sessions
     await sessionManager.cleanExpiredSessions();
     
-    // Set up periodic session cleanup (every 6 hours)
+    isInitialized = true;
+  } catch (error) {
+    console.error('❌ Initialization error:', error);
+  }
+};
+
+// Initialize on import
+initializeApp();
+
+// Start server only if not in serverless environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  const server = app.listen(PORT, async () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/health`);
+    
+    // Set up periodic session cleanup (every 6 hours) - only for local dev
     setInterval(async () => {
       try {
         console.log('🧹 Running periodic session cleanup...');
@@ -101,28 +116,25 @@ const server = app.listen(PORT, async () => {
       } catch (error) {
         console.error('❌ Periodic session cleanup error:', error);
       }
-    }, 6 * 60 * 60 * 1000); // 6 hours
-    
-  } catch (error) {
-    console.error('❌ Startup error:', error);
-  }
-});
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
+    }, 6 * 60 * 60 * 1000);
   });
-  await prisma.$disconnect();
-});
 
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('Process terminated');
+    });
+    await prisma.$disconnect();
   });
-  await prisma.$disconnect();
-});
+
+  process.on('SIGINT', async () => {
+    console.log('SIGINT received, shutting down gracefully');
+    server.close(() => {
+      console.log('Process terminated');
+    });
+    await prisma.$disconnect();
+  });
+}
 
 module.exports = app;
