@@ -57,7 +57,7 @@ export default function Inventory() {
         const vendorToken = localStorage.getItem('vendorToken')
         if (!vendorToken) {
           console.log('No vendor token found, redirecting to login')
-          window.location.href = '/vendor/login'
+          window.location.href = '/vendor'
           return
         }
         
@@ -77,7 +77,7 @@ export default function Inventory() {
         console.error('Error loading data:', error)
         if (error.response?.status === 401) {
           alert('Authentication required. Please login again.')
-          window.location.href = '/vendor/login'
+          window.location.href = '/vendor'
         } else {
           alert('Failed to load inventory data')
         }
@@ -154,7 +154,7 @@ export default function Inventory() {
         </div>
         <Card>
           <CardContent className="p-8">
-            <div className="flex items-center justify-center">
+            <div className="flex items-center jusbnmtify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#222222]"></div>
               <span className="ml-3 text-slate-600">Loading inventory data...</span>
             </div>

@@ -24,7 +24,7 @@ export default function SubCategoriesPage({ params }: SubCategoriesPageProps) {
     <>
       <Header />
       <Breadcrumb items={breadcrumbItems} />
-      <SubCategories categoryId={id} />
+      <SubCategories categorySlug={id} />
       <Footer />
     </>
   );

@@ -257,7 +257,7 @@ function getVendorSuspensionEmailTemplate({ companyName, ownerName, email, reaso
  * Send approval email with credentials to vendor
  */
 async function sendVendorApprovalEmail({ companyName, ownerName, email, password }) {
-  const loginUrl = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/vendor/login` : 'http://localhost:3000/vendor/login';
+  const loginUrl = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/vendor` : 'http://localhost:3000/vendor';
   
   const emailTemplate = getVendorApprovalEmailTemplate({ 
     companyName, 

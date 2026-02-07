@@ -8,6 +8,7 @@ import Dropdown from '@/components/UI/Dropdown'
 import { ArrowLeft, Save, X, Plus, Trash2, Upload } from 'lucide-react'
 import Link from 'next/link'
 import { categoryService, Category, CategoryFormData, SubcategoryFormData } from '@/services/categoryService'
+import { useToast } from '@/hooks/use-toast'
  
 interface AddEditCategoryProps {
   categoryId?: string
@@ -16,6 +17,7 @@ interface AddEditCategoryProps {
 
 export default function AddEditCategory({ categoryId, isEdit = false }: AddEditCategoryProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
   const [activeTab, setActiveTab] = useState<'category' | 'subcategories'>('category')
@@ -166,31 +168,139 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
     ))
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // For now, we'll create a URL for preview
-      // In a real app, you'd upload to a server/cloud storage
-      const imageUrl = URL.createObjectURL(file)
-      setCategoryData(prev => ({ ...prev, image: imageUrl }))
-    }
-  }
-
-  const handleSubcategoryImageUpload = (e: React.ChangeEvent<HTMLInputElement>, isNew: boolean = false) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const imageUrl = URL.createObjectURL(file)
-      if (isNew) {
-        setNewSubcategory(prev => ({ ...prev, image: imageUrl }))
+      try {
+        // Show loading state
+        setCategoryData(prev => ({ ...prev, image: 'uploading...' }))
+        
+        // Create FormData for file upload
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'm2c_categories')
+        formData.append('folder', 'categories')
+        
+        // Upload to Cloudinary
+        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`
+        
+        console.log('Uploading to Cloudinary:', cloudinaryUrl)
+        console.log('Upload preset:', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'm2c_categories')
+        
+        const response = await fetch(cloudinaryUrl, {
+          method: 'POST',
+          body: formData
+        })
+        
+        const data = await response.json()
+        console.log('Cloudinary response:', data)
+        
+        if (data.secure_url) {
+          setCategoryData(prev => ({ ...prev, image: data.secure_url }))
+          toast({
+            title: 'Success',
+            description: 'Image uploaded successfully',
+          })
+        } else {
+          // Log the full error response
+          console.error('Cloudinary upload failed:', data)
+          throw new Error(data.error?.message || 'Upload failed')
+        }
+      } catch (error) {
+        console.error('Image upload error:', error)
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to upload image. Please try again.',
+          variant: 'destructive',
+        })
+        setCategoryData(prev => ({ ...prev, image: '' }))
       }
     }
   }
 
-  const handleExistingSubcategoryImageUpload = (e: React.ChangeEvent<HTMLInputElement>, subcategoryId: string) => {
+  const handleSubcategoryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isNew: boolean = false) => {
     const file = e.target.files?.[0]
     if (file) {
-      const imageUrl = URL.createObjectURL(file)
-      updateSubcategory(subcategoryId, 'image', imageUrl)
+      try {
+        // Create FormData for file upload
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'm2c_categories')
+        formData.append('folder', 'categories/subcategories')
+        
+        // Upload to Cloudinary
+        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`
+        
+        const response = await fetch(cloudinaryUrl, {
+          method: 'POST',
+          body: formData
+        })
+        
+        const data = await response.json()
+        console.log('Cloudinary response:', data)
+        
+        if (data.secure_url) {
+          if (isNew) {
+            setNewSubcategory(prev => ({ ...prev, image: data.secure_url }))
+          }
+          toast({
+            title: 'Success',
+            description: 'Image uploaded successfully',
+          })
+        } else {
+          console.error('Cloudinary upload failed:', data)
+          throw new Error(data.error?.message || 'Upload failed')
+        }
+      } catch (error) {
+        console.error('Image upload error:', error)
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to upload image. Please try again.',
+          variant: 'destructive',
+        })
+      }
+    }
+  }
+
+  const handleExistingSubcategoryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, subcategoryId: string) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      try {
+        // Create FormData for file upload
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'm2c_categories')
+        formData.append('folder', 'categories/subcategories')
+        
+        // Upload to Cloudinary
+        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`
+        
+        const response = await fetch(cloudinaryUrl, {
+          method: 'POST',
+          body: formData
+        })
+        
+        const data = await response.json()
+        console.log('Cloudinary response:', data)
+        
+        if (data.secure_url) {
+          updateSubcategory(subcategoryId, 'image', data.secure_url)
+          toast({
+            title: 'Success',
+            description: 'Image uploaded successfully',
+          })
+        } else {
+          console.error('Cloudinary upload failed:', data)
+          throw new Error(data.error?.message || 'Upload failed')
+        }
+      } catch (error) {
+        console.error('Image upload error:', error)
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to upload image. Please try again.',
+          variant: 'destructive',
+        })
+      }
     }
   }
 

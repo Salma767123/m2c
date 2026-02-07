@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Link from 'next/link'
+import axios from '@/lib/axios'
 
 interface ForgotPasswordData {
   email: string
@@ -66,25 +67,20 @@ export default function Forgot() {
     setEmailError("")
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: formData.email }),
+      const response = await axios.post('/auth/forgot-password', { 
+        email: formData.email 
       })
 
-      if (response.ok) {
+      if (response.data.success) {
         setEmailSent(true)
         showSuccessToast('Password reset email sent successfully!')
       } else {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Failed to send reset email')
+        throw new Error(response.data.error || 'Failed to send reset email')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Forgot password error:', error)
-      showErrorToast(error instanceof Error ? error.message : 'Failed to send reset email')
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to send reset email'
+      showErrorToast(errorMessage)
     } finally {
       setIsLoading(false)
     }

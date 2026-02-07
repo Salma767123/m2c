@@ -9,11 +9,18 @@ const { sendEmail: sendSMTPEmail, sendEmailWithEnv } = require("../../config/con
 const sendEmail = async (emailData) => {
   try {
     console.log("📧 Attempting to send email to:", emailData.to);
+    console.log("📧 Email subject:", emailData.subject);
     
     // Get active email configuration from database
-    const emailConfig = await prisma.emailConfiguration.findFirst({
-      where: { isActive: true }
-    });
+    let emailConfig;
+    try {
+      emailConfig = await prisma.emailConfiguration.findFirst({
+        where: { isActive: true }
+      });
+    } catch (dbError) {
+      console.log("📧 Email configuration table not found, using environment variables");
+      emailConfig = null;
+    }
 
     let result;
     
@@ -29,6 +36,11 @@ const sendEmail = async (emailData) => {
     } else {
       // Fallback to environment variables
       console.log("📧 Using environment SMTP configuration");
+      console.log("📧 SMTP Host:", process.env.SMTP_HOST);
+      console.log("📧 SMTP Port:", process.env.SMTP_PORT);
+      console.log("📧 SMTP User:", process.env.SMTP_USER);
+      console.log("📧 SMTP From:", process.env.SMTP_FROM_EMAIL);
+      
       result = await sendEmailWithEnv({
         to: emailData.to,
         subject: emailData.subject,
@@ -39,6 +51,7 @@ const sendEmail = async (emailData) => {
 
     if (result.success) {
       console.log("✅ Email sent successfully to:", emailData.to);
+      console.log("📧 Message ID:", result.messageId);
     } else {
       console.error("❌ Failed to send email:", result.message);
     }
@@ -697,7 +710,7 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // Find user in both collections
+    // Find user in all collections (User, Admin, Vendor)
     let user = await prisma.user.findUnique({
       where: { email },
     });
@@ -708,6 +721,13 @@ const forgotPassword = async (req, res) => {
         where: { email },
       });
       userType = "admin";
+    }
+
+    if (!user) {
+      user = await prisma.vendor.findUnique({
+        where: { email },
+      });
+      userType = "vendor";
     }
 
     if (!user) {
@@ -730,6 +750,14 @@ const forgotPassword = async (req, res) => {
           resetTokenExpiry,
         },
       });
+    } else if (userType === "vendor") {
+      await prisma.vendor.update({
+        where: { id: user.id },
+        data: {
+          resetToken,
+          resetTokenExpiry,
+        },
+      });
     } else {
       await prisma.user.update({
         where: { id: user.id },
@@ -740,15 +768,32 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // Send reset email
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    // Send reset email with appropriate reset URL based on user type
+    let resetUrl;
+    let userName;
+    let emailSubject;
+    
+    if (userType === "vendor") {
+      resetUrl = `${process.env.FRONTEND_URL}/vendor/reset-password?token=${resetToken}`;
+      userName = user.ownerName || user.companyName;
+      emailSubject = "Reset Your Vendor Account Password";
+    } else if (userType === "admin") {
+      resetUrl = `${process.env.FRONTEND_URL}/admin/reset-password?token=${resetToken}`;
+      userName = user.name;
+      emailSubject = "Reset Your Admin Account Password";
+    } else {
+      resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+      userName = user.name;
+      emailSubject = "Reset Your Account Password";
+    }
+
     const emailData = {
       to: email,
-      subject: "Reset Your Password - Employee Management System",
+      subject: emailSubject,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2>Password Reset Request</h2>
-          <p>Hi ${user.name},</p>
+          <p>Hi ${userName},</p>
           <p>You requested to reset your password. Click the button below to reset it:</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${resetUrl}" 
@@ -765,9 +810,25 @@ const forgotPassword = async (req, res) => {
     };
 
     // Send password reset email
-    await sendEmail(emailData).catch((err) => {
-      console.error("Failed to send password reset email:", err);
-    });
+    try {
+      const emailResult = await sendEmail(emailData);
+      if (!emailResult.success) {
+        console.error("❌ Email sending failed:", emailResult.message);
+        // Still return success to user for security reasons (don't reveal if email exists)
+        return res.json({
+          success: true,
+          message: "If an account with that email exists, a password reset link has been sent.",
+        });
+      }
+      console.log("✅ Password reset email sent successfully to:", email);
+    } catch (emailError) {
+      console.error("❌ Email sending error:", emailError);
+      // Still return success to user for security reasons (don't reveal if email exists)
+      return res.json({
+        success: true,
+        message: "If an account with that email exists, a password reset link has been sent.",
+      });
+    }
 
     res.json({
       success: true,
@@ -794,7 +855,7 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Find user with valid reset token in both collections
+    // Find user with valid reset token in all collections
     let user = await prisma.user.findFirst({
       where: {
         resetToken: token,
@@ -818,6 +879,18 @@ const resetPassword = async (req, res) => {
     }
 
     if (!user) {
+      user = await prisma.vendor.findFirst({
+        where: {
+          resetToken: token,
+          resetTokenExpiry: {
+            gt: new Date(),
+          },
+        },
+      });
+      userType = "vendor";
+    }
+
+    if (!user) {
       return res.status(400).json({
         success: false,
         error: "Invalid or expired reset token",
@@ -831,6 +904,15 @@ const resetPassword = async (req, res) => {
     // Update user password in appropriate collection
     if (userType === "admin") {
       await prisma.admin.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          resetToken: null,
+          resetTokenExpiry: null,
+        },
+      });
+    } else if (userType === "vendor") {
+      await prisma.vendor.update({
         where: { id: user.id },
         data: {
           password: hashedPassword,

@@ -151,6 +151,10 @@ model Vendor {
   email                 String    @unique
   password              String?
   
+  // Password Reset Fields
+  resetToken            String?
+  resetTokenExpiry      DateTime?
+  
   // Application Status
   status                VendorStatus @default(PENDING)
   rejectionReason       String?

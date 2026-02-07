@@ -121,6 +121,26 @@ class CategoryService {
     return response.data;
   }
 
+  // Simplified method for public website - get all active categories
+  async getAllCategories(options: {
+    status?: string;
+    showRootOnly?: string;
+    includeSubcategories?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  } = {}): Promise<{ success: boolean; data: Category[]; total: number }> {
+    const params = new URLSearchParams();
+    
+    if (options.status) params.append('status', options.status);
+    if (options.showRootOnly) params.append('showRootOnly', options.showRootOnly);
+    if (options.includeSubcategories) params.append('includeSubcategories', options.includeSubcategories);
+    if (options.sortBy) params.append('sortBy', options.sortBy);
+    if (options.sortOrder) params.append('sortOrder', options.sortOrder);
+
+    const response = await axiosInstance.get(`/categories${params.toString() ? `?${params.toString()}` : ''}`);
+    return { success: true, ...response.data };
+  }
+
   // Get single category by ID
   async getCategoryById(id: string): Promise<{ data: Category }> {
     const response = await axiosInstance.get(`/categories/${id}`);
@@ -226,9 +246,9 @@ class CategoryService {
   }
 
   // Get subcategories of a specific category
-  async getSubcategories(parentId: string): Promise<{ data: Category[]; total: number }> {
+  async getSubcategories(parentId: string): Promise<{ success: boolean; data: Category[]; total: number }> {
     const response = await axiosInstance.get(`/categories/${parentId}/subcategories`);
-    return response.data;
+    return { success: true, ...response.data };
   }
 
   // Update subcategory

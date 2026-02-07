@@ -46,7 +46,7 @@ axiosInstance.interceptors.response.use(
           // Check if this is a login attempt - don't redirect for login failures
           const isLoginAttempt = error.config?.url?.includes('/auth/login') || 
                                 error.config?.url?.includes('/auth/admin/login') ||
-                                error.config?.url?.includes('/auth/vendor/login') ||
+                                error.config?.url?.includes('/auth/vendor') ||
                                 error.config?.url?.includes('/vendors/login');
           
           if (!isLoginAttempt) {
@@ -61,7 +61,7 @@ axiosInstance.interceptors.response.use(
               if (currentPath.includes('/admin')) {
                 window.location.href = '/admin/login';
               } else if (currentPath.includes('/vendor')) {
-                window.location.href = '/vendor/login';
+                window.location.href = '/vendor';
               } else {
                 window.location.href = '/login';
               }

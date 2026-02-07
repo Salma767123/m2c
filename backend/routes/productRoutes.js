@@ -11,11 +11,18 @@ const {
   getProductForAdmin,
   approveProduct,
   rejectProduct,
-  getAllProductsForAdmin
+  getAllProductsForAdmin,
+  // Public functions
+  getPublicProducts,
+  getPublicProduct
 } = require('../controllers/productController');
 const { authenticateToken, requireVendorRole, requireAdminRole } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Public routes (no authentication required)
+router.get('/public', getPublicProducts);
+router.get('/public/:id', getPublicProduct);
 
 // Admin routes (no vendor role required)
 router.get('/admin/all', authenticateToken, requireAdminRole, getAllProductsForAdmin);

@@ -2,28 +2,66 @@
 
 import ProductCard from '../ProductCard/ProductCard';
 import Category from '@/components/WebSite/CategoryCopy/Category';
-import { products } from '@/components/mockData/products';
-import { Search, Filter, Grid, List, ChevronDown, X, Star } from 'lucide-react';
+import { Search, Filter, Grid, List, ChevronDown, Star } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { productService, Product } from '@/services/productService';
 
 const Products = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState('createdAt');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  
   // Filter states
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
-  const [priceRange, setPriceRange] = useState({ min: 0, max: 100 });
-  const [selectedNewArrivals, setSelectedNewArrivals] = useState('');
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
   const [selectedRating, setSelectedRating] = useState(0);
-  const [selectedDiscount, setSelectedDiscount] = useState('');
+  const [inStockOnly, setInStockOnly] = useState(false);
   
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch products from API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await productService.getPublicProducts({
+          page: currentPage,
+          limit: 12,
+          search: searchTerm || undefined,
+          category: selectedCategory !== 'All' ? selectedCategory : undefined,
+          minPrice: priceRange.min > 0 ? priceRange.min : undefined,
+          maxPrice: priceRange.max < 1000 ? priceRange.max : undefined,
+          sortBy: sortBy === 'price-low' || sortBy === 'price-high' ? 'basePrice' : sortBy,
+          sortOrder: sortBy === 'price-low' ? 'asc' : 'desc',
+          inStock: inStockOnly || undefined
+        });
+        
+        if (response.success && response.data) {
+          setProducts(response.data.items);
+          setTotalPages(response.data.pagination.totalPages);
+          setTotalItems(response.data.pagination.totalItems);
+        }
+      } catch (error) {
+        console.error('Failed to fetch products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [currentPage, searchTerm, selectedCategory, priceRange, sortBy, inStockOnly]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -44,77 +82,33 @@ const Products = () => {
 
   // Extract unique values for filters
   const availableColors = ['Red', 'Blue', 'Green', 'Yellow', 'White', 'Black', 'Multi'];
-  const maxPrice = Math.max(...products.map(p => p.price));
 
   // Clear all filters
   const clearAllFilters = () => {
     setSelectedColors([]);
-    setPriceRange({ min: 0, max: 100 });
-    setSelectedNewArrivals('');
+    setPriceRange({ min: 0, max: 1000 });
     setSelectedRating(0);
-    setSelectedDiscount('');
     setSelectedCategory('All');
     setSearchTerm('');
+    setInStockOnly(false);
+    setCurrentPage(1);
   };
 
-  // Check if product is new arrival
-  const isNewArrival = (days: number) => {
-    // For demo purposes, we'll consider products with higher ratings as newer
-    // In real app, you'd have a createdDate field
-    return true; // Simplified for demo
-  };
-
-  // Filter and sort products
-  const filteredProducts = products
-    .filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-      
-      // Color filter (simplified - in real app you'd have color field)
-      const matchesColor = selectedColors.length === 0 || selectedColors.some(color => 
-        product.tags.some(tag => tag.toLowerCase().includes(color.toLowerCase()))
-      );
-      
-      // Price filter
-      const matchesPrice = product.price >= priceRange.min && product.price <= priceRange.max;
-      
-      // New arrivals filter
-      const matchesNewArrivals = !selectedNewArrivals || 
-        (selectedNewArrivals === '30' && isNewArrival(30)) ||
-        (selectedNewArrivals === '90' && isNewArrival(90));
-      
-      // Rating filter
-      const matchesRating = selectedRating === 0 || product.rating >= selectedRating;
-      
-      // Discount filter
-      const matchesDiscount = !selectedDiscount || 
-        (selectedDiscount === '10' && product.discount && product.discount >= 10) ||
-        (selectedDiscount === '20' && product.discount && product.discount >= 20) ||
-        (selectedDiscount === '30' && product.discount && product.discount >= 30) ||
-        (selectedDiscount === 'any' && product.discount && product.discount > 0);
-      
-      return matchesSearch && matchesCategory && matchesColor && matchesPrice && 
-             matchesNewArrivals && matchesRating && matchesDiscount;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'price-low':
-          return a.price - b.price;
-        case 'price-high':
-          return b.price - a.price;
-        case 'rating':
-          return b.rating - a.rating;
-        case 'name':
-        default:
-          return a.name.localeCompare(b.name);
-      }
-    });
+  // Filter products locally (for color and rating which aren't in API)
+  const filteredProducts = products.filter(product => {
+    const matchesColor = selectedColors.length === 0 || selectedColors.some(color => 
+      product.tags?.some(tag => tag.toLowerCase().includes(color.toLowerCase()))
+    );
+    
+    const matchesRating = selectedRating === 0 || (product.rating && product.rating >= selectedRating);
+    
+    return matchesColor && matchesRating;
+  });
 
   const activeFiltersCount = selectedColors.length + 
-    (selectedNewArrivals ? 1 : 0) + (selectedRating > 0 ? 1 : 0) + (selectedDiscount ? 1 : 0) +
-    (priceRange.min > 0 || priceRange.max < 100 ? 1 : 0);
+    (selectedRating > 0 ? 1 : 0) +
+    (priceRange.min > 0 || priceRange.max < 1000 ? 1 : 0) +
+    (inStockOnly ? 1 : 0);
 
   return (
     <div className='font-sans'>
@@ -136,7 +130,7 @@ const Products = () => {
       {/* Filters and Search */}
       <section className="py-8 bg-white">
         <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:items-between gap-4">
             {/* Search */}
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -144,7 +138,10 @@ const Products = () => {
                 type="text"
                 placeholder="Search products..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full pl-10 pr-4 py-2 text-gray-600 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
               />
             </div>
@@ -177,6 +174,7 @@ const Products = () => {
                           onClick={() => {
                             setSelectedCategory(category);
                             setShowCategoryDropdown(false);
+                            setCurrentPage(1);
                           }}
                           className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100"
                         >
@@ -194,7 +192,7 @@ const Products = () => {
                   onClick={() => setShowSortDropdown(!showSortDropdown)}
                   className="inline-flex items-center justify-between w-45 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                 >
-                  {sortBy === 'name' && 'Sort by Name'}
+                  {sortBy === 'createdAt' && 'Newest First'}
                   {sortBy === 'price-low' && 'Price: Low to High'}
                   {sortBy === 'price-high' && 'Price: High to Low'}
                   {sortBy === 'rating' && 'Highest Rated'}
@@ -204,7 +202,7 @@ const Products = () => {
                   <div className="absolute z-10 w-45 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
                     <div className="py-1">
                       {[
-                        { value: 'name', label: 'Sort by Name' },
+                        { value: 'createdAt', label: 'Newest First' },
                         { value: 'price-low', label: 'Price: Low to High' },
                         { value: 'price-high', label: 'Price: High to Low' },
                         { value: 'rating', label: 'Highest Rated' }
@@ -214,6 +212,7 @@ const Products = () => {
                           onClick={() => {
                             setSortBy(option.value);
                             setShowSortDropdown(false);
+                            setCurrentPage(1);
                           }}
                           className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100"
                         >
@@ -245,7 +244,7 @@ const Products = () => {
 
           {/* Results Count */}
           <div className="mt-4 text-sm text-gray-600">
-            Showing {filteredProducts.length} of {products.length} products
+            Showing {filteredProducts.length} of {totalItems} products
             {selectedCategory !== 'All' && ` in ${selectedCategory}`}
             {searchTerm && ` matching "${searchTerm}"`}
           </div>
@@ -273,28 +272,20 @@ const Products = () => {
                   </div>
 
                   <div className="space-y-6">
-                    {/* Color Filter */}
+                    {/* In Stock Filter */}
                     <div>
-                      <h4 className="text-base font-medium text-gray-900 mb-3">Color</h4>
-                      <div className="space-y-2">
-                        {availableColors.map((color) => (
-                          <label key={color} className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={selectedColors.includes(color)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedColors([...selectedColors, color]);
-                                } else {
-                                  setSelectedColors(selectedColors.filter(c => c !== color));
-                                }
-                              }}
-                              className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                            />
-                            <span className="ml-2 text-sm text-gray-700">{color}</span>
-                          </label>
-                        ))}
-                      </div>
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inStockOnly}
+                          onChange={(e) => {
+                            setInStockOnly(e.target.checked);
+                            setCurrentPage(1);
+                          }}
+                          className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="ml-2 text-sm font-medium text-gray-700">In Stock Only</span>
+                      </label>
                     </div>
 
                     {/* Price Range Filter */}
@@ -318,36 +309,34 @@ const Products = () => {
                             className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-amber-500 focus:border-amber-500"
                           />
                         </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max={maxPrice}
-                          value={priceRange.max}
-                          onChange={(e) => setPriceRange({...priceRange, max: Number(e.target.value)})}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                        />
+                        <button
+                          onClick={() => setCurrentPage(1)}
+                          className="w-full bg-amber-600 text-white px-4 py-2 rounded text-sm hover:bg-amber-700"
+                        >
+                          Apply Price Filter
+                        </button>
                       </div>
                     </div>
 
-                    {/* New Arrivals Filter */}
+                    {/* Color Filter */}
                     <div>
-                      <h4 className="text-base font-medium text-gray-900 mb-3">New Arrivals</h4>
+                      <h4 className="text-base font-medium text-gray-900 mb-3">Color</h4>
                       <div className="space-y-2">
-                        {[
-                          { value: '', label: 'All Products' },
-                          { value: '30', label: 'Last 30 days' },
-                          { value: '90', label: 'Last 90 days' }
-                        ].map((option) => (
-                          <label key={option.value} className="flex items-center">
+                        {availableColors.map((color) => (
+                          <label key={color} className="flex items-center">
                             <input
-                              type="radio"
-                              name="newArrivals"
-                              value={option.value}
-                              checked={selectedNewArrivals === option.value}
-                              onChange={(e) => setSelectedNewArrivals(e.target.value)}
-                              className="border-gray-300 text-amber-600 focus:ring-amber-500"
+                              type="checkbox"
+                              checked={selectedColors.includes(color)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedColors([...selectedColors, color]);
+                                } else {
+                                  setSelectedColors(selectedColors.filter(c => c !== color));
+                                }
+                              }}
+                              className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
                             />
-                            <span className="ml-2 text-sm text-gray-700">{option.label}</span>
+                            <span className="ml-2 text-sm text-gray-700">{color}</span>
                           </label>
                         ))}
                       </div>
@@ -395,42 +384,6 @@ const Products = () => {
                         </label>
                       </div>
                     </div>
-
-                    {/* Discount Filter */}
-                    <div>
-                      <h4 className="text-base font-medium text-gray-900 mb-3">Discount</h4>
-                      <div className="space-y-2">
-                        {[
-                          { value: '', label: 'All Products' },
-                          { value: 'any', label: 'Any Discount' },
-                          { value: '10', label: '10% Off or More' },
-                          { value: '20', label: '20% Off or More' },
-                          { value: '30', label: '30% Off or More' }
-                        ].map((option) => (
-                          <label key={option.value} className="flex items-center cursor-pointer">
-                            <input
-                              type="radio"
-                              name="discount"
-                              value={option.value}
-                              checked={selectedDiscount === option.value}
-                              onChange={(e) => setSelectedDiscount(e.target.value)}
-                              className="border-gray-300 text-amber-600 focus:ring-amber-500"
-                            />
-                            <span className="ml-2 text-sm text-gray-700">{option.label}</span>
-                            {option.value && option.value !== 'any' && (
-                              <span className="ml-auto text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full">
-                                {option.value}%+
-                              </span>
-                            )}
-                            {option.value === 'any' && (
-                              <span className="ml-auto text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                                Sale
-                              </span>
-                            )}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -438,7 +391,14 @@ const Products = () => {
 
             {/* Products Grid */}
             <div className="flex-1">
-              {filteredProducts.length === 0 ? (
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="text-gray-400 mb-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto"></div>
+                  </div>
+                  <p className="text-gray-600">Loading products...</p>
+                </div>
+              ) : filteredProducts.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="text-gray-400 mb-4">
                     <Search className="w-16 h-16 mx-auto" />
@@ -455,96 +415,40 @@ const Products = () => {
                   </button>
                 </div>
               ) : (
-                <div className={`${
-                  viewMode === 'grid' 
-                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
-                    : 'space-y-4'
-                }`}>
-                  {viewMode === 'grid' ? (
-                    filteredProducts.map((product) => (
+                <>
+                  <div className={`${
+                    viewMode === 'grid' 
+                      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
+                      : 'space-y-4'
+                  }`}>
+                    {filteredProducts.map((product) => (
                       <ProductCard key={product.id} product={product} />
-                    ))
-                  ) : (
-                    filteredProducts.map((product) => (
-                      <div key={product.id} className="bg-white border-2 border-gray-200 rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 flex gap-4 p-4">
-                        {/* Left: Product Image */}
-                        <div className="w-64 h-56 shrink-0">
-                          <div className="w-full h-full bg-linear-to-br from-gray-100 to-gray-200 overflow-hidden flex items-center justify-center group cursor-pointer relative rounded-lg">
-                            <img
-                              src={Array.isArray(product.images) ? product.images[0] : product.images}
-                              alt={product.name}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                            />
-                            {product.discount && (
-                              <div className="absolute top-3 left-3 bg-gray-800 text-white px-3 py-1.5 rounded text-sm font-semibold">
-                                {product.discount}% OFF
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                    ))}
+                  </div>
 
-                        {/* Center: Product Details */}
-                        <div className="flex-1 flex flex-col justify-between">
-                          {/* Header */}
-                          <div>
-                            <span className="text-sm text-blue-600 font-medium">{product.category}</span>
-                            
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 hover:text-gray-800 transition-colors">
-                              {product.name}
-                            </h3>
-                            <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                              {product.description}
-                            </p>
-
-                            {/* Rating */}
-                            <div className="flex items-center gap-2 mb-4">
-                              <div className="flex items-center">
-                                {Array.from({ length: 5 }, (_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={`w-4 h-4 ${
-                                      i < Math.floor(product.rating)
-                                        ? 'text-yellow-400 fill-current'
-                                        : 'text-gray-300'
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                              <span className="text-sm text-gray-600">({product.rating})</span>
-                            </div>
-
-                            {/* Price */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-2xl font-bold text-gray-900">
-                                ${product.price.toFixed(2)}
-                              </span>
-                              {product.discount && (
-                                <>
-                                  <span className="text-sm text-gray-500 line-through">
-                                    ${(product.price / (1 - product.discount / 100)).toFixed(2)}
-                                  </span>
-                                  <span className="text-xs bg-[#1A2830] text-white font-semibold px-2 py-1 rounded-md">
-                                    Save {product.discount}%
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Right: Action Buttons (Vertical Stack) */}
-                        <div className="flex flex-col gap-3 justify-center w-40 shrink-0">
-                          <button className="w-full bg-linear-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white font-semibold py-3 rounded transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg">
-                            View Details
-                          </button>
-                          <button className="w-full bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold py-3 rounded transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg">
-                            Add to Cart
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="mt-8 flex justify-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      >
+                        Previous
+                      </button>
+                      <span className="px-4 py-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      >
+                        Next
+                      </button>
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           </div>

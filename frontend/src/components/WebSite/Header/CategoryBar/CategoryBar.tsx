@@ -3,64 +3,71 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { categoryService } from '@/services/categoryService';
 
-const categories = [
-  {
-    id: 'towels',
-    name: 'Towels',
-    image: '/assets/images/categories/c1.jpg'
-  },
-  {
-    id: 'kitchen-linen',
-    name: 'Kitchen Linen',
-    image: '/assets/images/categories/c2.jpg'
-  },
-  {
-    id: 'bath-linen',
-    name: 'Bath Linen',
-    image: '/assets/images/categories/c3.jpg'
-  },
-  {
-    id: 'table-linen',
-    name: 'Table Linen',
-    image: '/assets/images/categories/c4.jpg'
-  },
-  {
-    id: 'cotton-jute-bags',
-    name: 'Cotton & Jute Bags',
-    image: '/assets/images/categories/c5.jpg'
-  },
-  {
-    id: 'pillow-covers',
-    name: 'Pillow & Covers',
-    image: '/assets/images/categories/c6.jpg'
-  },
-  {
-    id: 'non-terry-towels',
-    name: 'Non Terry Towels',
-    image: '/assets/images/categories/c7.jpg'
-  }
-];
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  image?: string;
+}
 
 const Category = () => {
   const pathname = usePathname();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const isActiveCategory = (categoryId: string) => {
-    return pathname.includes(categoryId);
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryService.getAllCategories({
+          status: 'ACTIVE',
+          showRootOnly: 'true',
+          sortBy: 'sortOrder',
+          sortOrder: 'asc'
+        });
+        
+        if (response.success && response.data) {
+          setCategories(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  const isActiveCategory = (categorySlug: string) => {
+    return pathname.includes(categorySlug);
   };
+
+  if (loading) {
+    return (
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="h-12 flex items-center justify-center">
+            <div className="text-sm text-gray-500">Loading categories...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white shadow-sm">
-
       <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="h-12 flex items-center justify-center mx-auto overflow-x-auto scrollbar-hide">
           
           {categories.slice(0, 8).map((category) => (
             <Link
               key={category.id}
-              href={`/categories/${category.id}`}
+              href={`/categories/${category.slug}`}
               className={`px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap transition-all duration-200 shrink-0 ${
-                isActiveCategory(category.id)
+                isActiveCategory(category.slug)
                   ? 'text-white bg-[#222222] shadow-sm text-lg font-semibold transform scale-105'
                   : 'text-[#444444] hover:text-white hover:bg-[#212121] text-base'
               }`}
@@ -68,17 +75,6 @@ const Category = () => {
               {category.name}
             </Link>
           ))}
-
-          {/* <Link
-            href="/categories"
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg font-medium text-sm sm:text-base whitespace-nowrap transition-all duration-200 shrink-0 ${
-              pathname === '/categories'
-                ? 'text-white bg-[#222222] shadow-sm text-lg font-semibold'
-                  : 'text-[#444444] hover:text-white hover:bg-[#212121] text-sm'
-            }`}
-          >
-            All Categories
-          </Link> */}
 
           {categories.length > 8 && (
             <Link

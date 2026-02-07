@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Link from 'next/link'
+import axios from '@/lib/axios'
 
 interface ResetPasswordData {
   password: string
@@ -147,28 +148,21 @@ export default function ResetPassword() {
     setIsLoading(true)
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          token,
-          password: formData.password 
-        }),
+      const response = await axios.post('/auth/reset-password', { 
+        token,
+        password: formData.password 
       })
 
-      if (response.ok) {
+      if (response.data.success) {
         setPasswordReset(true)
         showSuccessToast('Password reset successfully!')
       } else {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Failed to reset password')
+        throw new Error(response.data.error || 'Failed to reset password')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Reset password error:', error)
-      showErrorToast(error instanceof Error ? error.message : 'Failed to reset password')
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to reset password'
+      showErrorToast(errorMessage)
     } finally {
       setIsLoading(false)
     }

@@ -136,7 +136,7 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
   if (response.status === 401) {
     const isLoginAttempt = url.includes('/auth/login') || 
                           url.includes('/auth/admin/login') ||
-                          url.includes('/auth/vendor/login') ||
+                          url.includes('/auth/vendor') ||
                           url.includes('/vendors/login');
     
     if (!isLoginAttempt) {

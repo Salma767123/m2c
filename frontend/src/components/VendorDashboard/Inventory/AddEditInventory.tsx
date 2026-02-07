@@ -93,7 +93,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         const vendorToken = localStorage.getItem('vendorToken')
         if (!vendorToken) {
           console.log('No vendor token found, redirecting to login')
-          router.push('/vendor/login')
+          router.push('/vendor')
           return
         }
         
@@ -104,7 +104,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         console.error('Error loading vendor categories:', error)
         if (error.response?.status === 401) {
           alert('Authentication required. Please login again.')
-          router.push('/vendor/login')
+          router.push('/vendor')
         } else {
           alert('Failed to load categories. Using default categories.')
           // Fallback to some default categories if API fails
@@ -152,7 +152,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
             router.push('/vendor/dashboard/inventory')
           } else if (error.response?.status === 401) {
             alert('Authentication required. Please login again.')
-            router.push('/vendor/login')
+            router.push('/vendor')
           } else {
             alert('Failed to load inventory data: ' + error.message)
           }
@@ -262,7 +262,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         alert(error.response.data.message || 'Invalid data provided')
       } else if (error.response?.status === 401) {
         alert('Authentication required. Please login again.')
-        router.push('/vendor/login')
+        router.push('/vendor')
       } else {
         alert('Failed to save inventory item. Please try again.')
       }

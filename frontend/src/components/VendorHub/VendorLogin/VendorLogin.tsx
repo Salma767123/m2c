@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
@@ -305,12 +306,12 @@ export default function VendorLogin() {
                       Remember me
                     </span>
                   </label>
-                  <button
-                    type="button"
+                  <Link 
+                    href="/vendor/forgot-password"
                     className="text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
                   >
                     Forgot password?
-                  </button>
+                  </Link>
                 </div>
 
                 {/* Sign In Button - Primary */}

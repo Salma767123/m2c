@@ -1,12 +1,10 @@
+import VendorForgotPassword from '@/components/VendorHub/VendorForgotPassword/VendorForgotPassword'
 
-import Forgot from "@/components/WebSite/Forgot/Forgot";
+export default function VendorForgotPasswordPage() {
+  return <VendorForgotPassword />
+}
 
-export default function ForgotPage() {
- 
-
-  return (
-    <div>
-      <Forgot/>
-    </div>
-  );
+export const metadata = {
+  title: 'Forgot Password | Vendor Portal',
+  description: 'Reset your vendor account password by entering your email address.',
 }

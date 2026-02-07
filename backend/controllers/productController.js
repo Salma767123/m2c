@@ -1152,6 +1152,204 @@ const getAllProductsForAdmin = async (req, res) => {
   }
 };
 
+// Public endpoint: Get all approved products for website
+const getPublicProducts = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 12,
+      search,
+      category,
+      subCategory,
+      minPrice,
+      maxPrice,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      inStock
+    } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build where clause
+    const where = {
+      status: 'ACTIVE',
+      approvalStatus: 'APPROVED'
+    };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { tags: { has: search } }
+      ];
+    }
+
+    if (category) {
+      where.category = category;
+    }
+
+    if (subCategory) {
+      where.subCategory = subCategory;
+    }
+
+    if (minPrice || maxPrice) {
+      where.basePrice = {};
+      if (minPrice) where.basePrice.gte = parseFloat(minPrice);
+      if (maxPrice) where.basePrice.lte = parseFloat(maxPrice);
+    }
+
+    if (inStock === 'true') {
+      where.inStock = true;
+      where.totalStock = { gt: 0 };
+    }
+
+    // Get total count
+    const totalItems = await prisma.product.count({ where });
+
+    // Get products
+    const products = await prisma.product.findMany({
+      where,
+      skip,
+      take: parseInt(limit),
+      orderBy: { [sortBy]: sortOrder },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        category: true,
+        subCategory: true,
+        basePrice: true,
+        originalPrice: true,
+        discount: true,
+        rating: true,
+        reviews: true,
+        images: true,
+        tags: true,
+        inStock: true,
+        totalStock: true,
+        hasVariants: true,
+        variants: {
+          select: {
+            id: true,
+            size: true,
+            color: true,
+            colorHex: true,
+            price: true,
+            stock: true,
+            images: true
+          }
+        },
+        fabricType: true,
+        material: true,
+        dimensions: true,
+        weight: true,
+        createdAt: true
+      }
+    });
+
+    const totalPages = Math.ceil(totalItems / parseInt(limit));
+
+    res.json({
+      success: true,
+      data: {
+        items: products,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalItems,
+          hasNextPage: parseInt(page) < totalPages,
+          hasPrevPage: parseInt(page) > 1,
+          limit: parseInt(limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get public products error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch products'
+    });
+  }
+};
+
+// Public endpoint: Get single product by ID for website
+const getPublicProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await prisma.product.findFirst({
+      where: {
+        id,
+        status: 'ACTIVE',
+        approvalStatus: 'APPROVED'
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        category: true,
+        subCategory: true,
+        basePrice: true,
+        originalPrice: true,
+        discount: true,
+        rating: true,
+        reviews: true,
+        images: {
+          orderBy: { sortOrder: 'asc' }
+        },
+        tags: true,
+        inStock: true,
+        totalStock: true,
+        hasVariants: true,
+        variants: {
+          select: {
+            id: true,
+            size: true,
+            color: true,
+            colorHex: true,
+            sku: true,
+            price: true,
+            stock: true,
+            images: true
+          },
+          orderBy: { createdAt: 'asc' }
+        },
+        fabricType: true,
+        material: true,
+        fabricSpecifications: true,
+        dimensions: true,
+        weight: true,
+        pricingTiers: true,
+        bulkPricingEnabled: true,
+        singleUnitPricingEnabled: true,
+        minimumOrderQuantity: true,
+        maximumOrderQuantity: true,
+        dispatchTimeline: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found or not available'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: product
+    });
+  } catch (error) {
+    console.error('Get public product error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch product'
+    });
+  }
+};
+
 module.exports = {
   createProduct,
   getVendorProducts,
@@ -1164,5 +1362,8 @@ module.exports = {
   getProductForAdmin,
   approveProduct,
   rejectProduct,
-  getAllProductsForAdmin
+  getAllProductsForAdmin,
+  // Public functions
+  getPublicProducts,
+  getPublicProduct
 };

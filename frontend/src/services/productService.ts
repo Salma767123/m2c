@@ -228,6 +228,50 @@ class ProductService {
       throw new Error(error.response?.data?.message || 'Failed to fetch available inventory items');
     }
   }
+
+  // Get public products (for website - no authentication required)
+  async getPublicProducts(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    category?: string;
+    subCategory?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    inStock?: boolean;
+  }): Promise<{
+    success: boolean;
+    data: {
+      items: Product[];
+      pagination: {
+        currentPage: number;
+        totalPages: number;
+        totalItems: number;
+        hasNextPage: boolean;
+        hasPrevPage: boolean;
+        limit: number;
+      };
+    };
+  }> {
+    try {
+      const response = await axios.get('/products/public', { params });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch products');
+    }
+  }
+
+  // Get single public product (for website - no authentication required)
+  async getPublicProduct(id: string): Promise<{ success: boolean; data?: Product; message?: string }> {
+    try {
+      const response = await axios.get(`/products/public/${id}`);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to fetch product');
+    }
+  }
 }
 
 export const productService = new ProductService();
