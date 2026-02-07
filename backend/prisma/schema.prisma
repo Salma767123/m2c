@@ -637,7 +637,6 @@ model Order {
   
   // Vendor Information (for single vendor orders)
   vendorId              String?   @db.ObjectId
-  vendor                Vendor?   @relation(fields: [vendorId], references: [id])
   
   // Admin Hub Processing
   adminReview           AdminReview?
@@ -663,7 +662,6 @@ model OrderItem {
   
   // Product Information
   productId             String    @db.ObjectId
-  product               Product   @relation(fields: [productId], references: [id])
   productName           String
   productImage          String?
   
@@ -728,14 +726,13 @@ model AdminReview {
   @@map("admin_reviews")
 }
 
-// Add relation to existing models
-model VendorExtended {
-  orders                Order[]
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
 }
 
-model ProductExtended {
-  orderItems            OrderItem[]
-}
 
 // Enums for Order Management
 enum OrderStatus {
@@ -750,11 +747,4 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
   RETURNED
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  REFUNDED
 }
