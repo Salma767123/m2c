@@ -1,13 +1,47 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
-import { products, Product as MockProduct } from '@/components/mockData/products';
+import { publicProductService, PublicProduct } from '@/services/publicProductService';
 
 export default function BestSeller() {
-  // Sort by rating (descending) to get best seller products
-  const bestSellerProducts: MockProduct[] = products
-    .sort((a, b) => b.rating - a.rating)
-    .slice(0, 4);
+  const [products, setProducts] = useState<PublicProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBestSellerProducts = async () => {
+      setIsLoading(true);
+      try {
+        const response = await publicProductService.getBestSellerProducts(4);
+        if (response.success && response.data) {
+          setProducts(response.data.items);
+        }
+      } catch (error) {
+        console.error('Error fetching best seller products:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBestSellerProducts();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <section className="bg-white py-8 sm:py-12 md:py-16 lg:py-20 font-sans">
+        <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-700 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading best seller products...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (products.length === 0) {
+    return null; // Don't show section if no products
+  }
 
   return (
     <section className="bg-white py-8 sm:py-12 md:py-16 lg:py-20 font-sans">
@@ -37,7 +71,7 @@ export default function BestSeller() {
 
         {/* Products Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 md:gap-6 lg:gap-8">
-          {bestSellerProducts.map((product) => (
+          {products.map((product) => (
             <div key={product.id} className="w-full">
               <ProductCard product={product} />
             </div>

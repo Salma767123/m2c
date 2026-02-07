@@ -11,7 +11,7 @@ interface ProductCardProps {
 }
 
 const ProductCard = ({ product }: ProductCardProps) => {
-  // Type guard to check if it's a ServiceProduct
+  // Type guard to check if it's a ServiceProduct (from API)
   const isServiceProduct = (p: any): p is ServiceProduct => {
     return 'vendorId' in p && 'createdAt' in p;
   };
@@ -19,14 +19,28 @@ const ProductCard = ({ product }: ProductCardProps) => {
   // Get the primary image or first image
   let primaryImage: string | undefined;
   
-  if (isServiceProduct(product)) {
-    // Service product with ProductImage[] structure
-    primaryImage = product.images?.find(img => img.isPrimary)?.url || 
-                   product.images?.[0]?.url;
-  } else {
-    // Mock product with string[] structure
-    primaryImage = product.images?.[0];
+  // Check if images is an array and has items
+  if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+    const firstImage = product.images[0];
+    
+    // Check if it's an object with url property (ServiceProduct)
+    if (typeof firstImage === 'object' && firstImage !== null && 'url' in firstImage) {
+      const images = product.images as Array<{ url: string; isPrimary: boolean }>;
+      const primaryImg = images.find(img => img.isPrimary && img.url && img.url.trim() !== '');
+      const firstImg = images.find(img => img.url && img.url.trim() !== '');
+      primaryImage = primaryImg?.url || firstImg?.url;
+    } 
+    // Check if it's a string (MockProduct)
+    else if (typeof firstImage === 'string') {
+      const images = product.images as string[];
+      primaryImage = images.find(img => img && img.trim() !== '');
+    }
   }
+
+  // Fallback placeholder image
+  const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect width="400" height="400" fill="%23f3f4f6"/%3E%3Cpath d="M200 150 L250 200 L200 250 L150 200 Z" fill="%239ca3af"/%3E%3Ccircle cx="200" cy="200" r="60" fill="none" stroke="%239ca3af" stroke-width="4"/%3E%3C/svg%3E';
+  
+  const imageUrl = primaryImage || placeholderImage;
 
   // Get price - handle both basePrice and price
   const displayPrice = isServiceProduct(product) ? product.basePrice : product.price;
@@ -35,22 +49,17 @@ const ProductCard = ({ product }: ProductCardProps) => {
     <Link href={`/products/${product.id}`} className="block h-full">
       <div className="bg-white font-sans rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col cursor-pointer">
         <div className="relative h-45 sm:h-75 w-full overflow-hidden shrink-0 bg-gradient-to-br from-gray-100 to-gray-200">
-          {primaryImage ? (
-            <Image
-              src={primaryImage}
-              alt={product.name}
-              fill
-              className="object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-              }}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Package className="w-16 h-16 text-gray-400" />
-            </div>
-          )}
+          <Image
+            src={imageUrl}
+            alt={product.name}
+            fill
+            className="object-cover"
+            unoptimized={!primaryImage} // Don't optimize placeholder SVG
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = placeholderImage;
+            }}
+          />
           {product.discount && (
             <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-sm font-semibold">
               {product.discount}% OFF

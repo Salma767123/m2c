@@ -289,9 +289,16 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     status: 'ACTIVE'
   })
 
-  const [newTag, setNewTag] = useState('')
+  const [selectedTag, setSelectedTag] = useState('')
   const [newCareInstruction, setNewCareInstruction] = useState('')
   const [activeTab, setActiveTab] = useState('basic')
+  
+  // Predefined tag options
+  const tagOptions = [
+    { value: 'Featured', label: 'Featured' },
+    { value: 'Top Selling', label: 'Top Selling' },
+    { value: 'Best Seller', label: 'Best Seller' }
+  ]
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<any>(null)
   // Auto-save functionality (optional)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -644,12 +651,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   }
 
   const addTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
+    if (selectedTag && !formData.tags.includes(selectedTag)) {
       setFormData(prev => ({
         ...prev,
-        tags: [...prev.tags, newTag.trim()]
+        tags: [...prev.tags, selectedTag]
       }))
-      setNewTag('')
+      setSelectedTag('')
     }
   }
 
@@ -1213,16 +1220,16 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Tags
                     </label>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newTag}
-                          onChange={(e) => setNewTag(e.target.value)}
-                          placeholder="Add a tag"
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                        />
+                        <div className="flex-1">
+                          <Dropdown
+                            value={selectedTag}
+                            options={tagOptions}
+                            onChange={(value) => setSelectedTag(value as string)}
+                            placeholder="Select a tag"
+                          />
+                        </div>
                         <Button type="button" onClick={addTag} className="bg-gray-900 text-white">
                           Add
                         </Button>
@@ -1231,7 +1238,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         {formData.tags.map((tag) => (
                           <span
                             key={tag}
-                            className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                            className="inline-flex items-center px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
                           >
                             {tag}
                             <button
@@ -1244,6 +1251,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           </span>
                         ))}
                       </div>
+                      {formData.tags.length === 0 && (
+                        <p className="text-xs text-gray-500">No tags added yet. Select from the dropdown above.</p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
