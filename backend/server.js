@@ -36,6 +36,23 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const productRoutes = require('./routes/productRoutes');
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    message: 'M2C API Server',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth',
+      vendors: '/api/vendors',
+      categories: '/api/categories',
+      products: '/api/products',
+      inventory: '/api/inventory'
+    }
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ 
