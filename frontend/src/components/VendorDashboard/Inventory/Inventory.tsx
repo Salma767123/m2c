@@ -54,6 +54,8 @@ export default function Inventory() {
         setIsLoading(true)
         
         // Check if vendor is logged in
+        if (typeof window === 'undefined') return;
+        
         const vendorToken = localStorage.getItem('vendorToken')
         if (!vendorToken) {
           console.log('No vendor token found, redirecting to login')

@@ -33,17 +33,17 @@ export interface ProductFormData {
   };
   
   // Variants Management
-  variants: ProductVariant[];
+  variants?: ProductVariant[];
   hasVariants: boolean;
   
   // Base Product Info
   baseSku: string;
   
   // Images
-  images: ProductImage[];
+  images?: ProductImage[];
   
   // Pricing Configuration
-  pricingTiers: PricingTier[];
+  pricingTiers?: PricingTier[];
   bulkPricingEnabled: boolean;
   singleUnitPricingEnabled: boolean;
   

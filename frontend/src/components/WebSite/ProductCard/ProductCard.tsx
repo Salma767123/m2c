@@ -2,17 +2,34 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Product } from '@/services/productService';
+import { Product as ServiceProduct } from '@/services/productService';
+import { Product as MockProduct } from '@/components/mockData/products';
 import { Star, Package } from 'lucide-react';
 
 interface ProductCardProps {
-  product: Product;
+  product: ServiceProduct | MockProduct;
 }
 
 const ProductCard = ({ product }: ProductCardProps) => {
+  // Type guard to check if it's a ServiceProduct
+  const isServiceProduct = (p: any): p is ServiceProduct => {
+    return 'vendorId' in p && 'createdAt' in p;
+  };
+
   // Get the primary image or first image
-  const primaryImage = product.images?.find(img => img.isPrimary)?.url || 
-                       product.images?.[0]?.url;
+  let primaryImage: string | undefined;
+  
+  if (isServiceProduct(product)) {
+    // Service product with ProductImage[] structure
+    primaryImage = product.images?.find(img => img.isPrimary)?.url || 
+                   product.images?.[0]?.url;
+  } else {
+    // Mock product with string[] structure
+    primaryImage = product.images?.[0];
+  }
+
+  // Get price - handle both basePrice and price
+  const displayPrice = isServiceProduct(product) ? product.basePrice : product.price;
 
   return (
     <Link href={`/products/${product.id}`} className="block h-full">
@@ -78,7 +95,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
           <div className="shrink-0">
             <div className="flex items-center space-x-2">
               <span className="text-xl font-bold text-gray-900">
-                ${product.basePrice?.toFixed(2) || '0.00'}
+                ${displayPrice?.toFixed(2) || '0.00'}
               </span>
               {product.originalPrice && (
                 <div className="flex items-center space-x-1 gap-2">

@@ -32,6 +32,8 @@ const VendorOrderManagement: React.FC = () => {
 
   const handleProcessOrder = (orderId: string) => {
     // Get shipping details from localStorage
+    if (typeof window === 'undefined') return;
+    
     const storedShipping = localStorage.getItem(`shipping_${orderId}`);
     if (!storedShipping) {
       alert('No shipping details found. Please create shipping first.');
@@ -181,6 +183,7 @@ const VendorOrderManagement: React.FC = () => {
   };
 
   const hasShippingDetails = (orderId: string) => {
+    if (typeof window === 'undefined') return false;
     return localStorage.getItem(`shipping_${orderId}`) !== null;
   };
 

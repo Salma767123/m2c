@@ -52,29 +52,27 @@ export default function VendorSettings() {
       
       setVendorInfo({
         companyName: vendor.companyName || '',
-        companyDescription: vendor.companyDescription || '',
+        companyDescription: '', // Not available in VendorProfile
         businessPhone: vendor.businessPhone || '',
         businessEmail: vendor.businessEmail || '',
         website: vendor.website || '',
         businessAddress: vendor.businessAddress || '',
         businessCity: vendor.businessCity || '',
         businessState: vendor.businessState || '',
-        businessZipCode: vendor.businessZipCode || '',
+        businessZipCode: '', // Not available in VendorProfile
         businessCountry: vendor.businessCountry || '',
         ownerName: vendor.ownerName || '',
         ownerEmail: vendor.ownerEmail || '',
         ownerPhone: vendor.ownerPhone || '',
-        ownerAddress: vendor.ownerAddress || '',
-        ownerCity: vendor.ownerCity || '',
-        ownerState: vendor.ownerState || '',
-        ownerZipCode: vendor.ownerZipCode || '',
-        ownerCountry: vendor.ownerCountry || '',
-        companyLogo: vendor.companyLogo
+        ownerAddress: '', // Not available in VendorProfile
+        ownerCity: '', // Not available in VendorProfile
+        ownerState: '', // Not available in VendorProfile
+        ownerZipCode: '', // Not available in VendorProfile
+        ownerCountry: '' // Not available in VendorProfile
       });
       
-      if (vendor.companyLogo) {
-        setLogoPreview(vendor.companyLogo);
-      }
+      // Note: companyLogo is not available in VendorProfile type
+      // You may need to add it to the backend response
     } catch (error) {
       console.error('Failed to load vendor profile:', error);
       showErrorToast('Error', 'Failed to load vendor profile');

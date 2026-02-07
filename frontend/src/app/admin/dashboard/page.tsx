@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DashboardStats from '@/components/AdminDashboard/Dashboard/DashboardStats'
 import RecentActivity from '@/components/AdminDashboard/Dashboard/RecentActivity'
@@ -8,7 +8,7 @@ import VendorsTable from '@/components/AdminDashboard/Vendors/VendorsTable'
 import { storeAuth } from '@/lib/auth'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -68,5 +68,20 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   )
 }

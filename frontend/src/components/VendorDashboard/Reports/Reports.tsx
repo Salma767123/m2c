@@ -9,14 +9,15 @@ interface ReportData {
   period: string;
   revenue: number;
   customers: number;
+  orders: number;
   avgOrderValue: number;
 }
 
 const mockReportData: ReportData[] = [
-  { period: 'Jan 2024', revenue: 12450, customers: 89, avgOrderValue: 79.81 },
-  { period: 'Dec 2023', revenue: 10200, customers: 76, avgOrderValue: 71.83 },
-  { period: 'Nov 2023', revenue: 9800, customers: 72, avgOrderValue: 73.13 },
-  { period: 'Oct 2023', revenue: 11200, customers: 81, avgOrderValue: 75.68 }
+  { period: 'Jan 2024', revenue: 12450, customers: 89, orders: 156, avgOrderValue: 79.81 },
+  { period: 'Dec 2023', revenue: 10200, customers: 76, orders: 142, avgOrderValue: 71.83 },
+  { period: 'Nov 2023', revenue: 9800, customers: 72, orders: 134, avgOrderValue: 73.13 },
+  { period: 'Oct 2023', revenue: 11200, customers: 81, orders: 148, avgOrderValue: 75.68 }
 ];
 
 export default function Reports() {

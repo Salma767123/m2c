@@ -1,11 +1,11 @@
 'use client';
 import Link from 'next/link';
 import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
-import { products } from '@/components/mockData/products';
+import { products, Product as MockProduct } from '@/components/mockData/products';
 
 export default function BestSeller() {
   // Sort by rating (descending) to get best seller products
-  const bestSellerProducts = products
+  const bestSellerProducts: MockProduct[] = products
     .sort((a, b) => b.rating - a.rating)
     .slice(0, 4);
 
