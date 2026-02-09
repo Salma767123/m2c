@@ -35,7 +35,7 @@ export interface VendorRegistrationData {
   
   // Vendor Type & Products
   vendorType: string | string[];
-  marketType: string;
+  marketType: string | string[];
   selectedCategories: Record<string, string[]>;
   
   // Manufacturing Facilities

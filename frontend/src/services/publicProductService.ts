@@ -7,6 +7,7 @@ export interface PublicProduct {
   category: string;
   subCategory?: string;
   basePrice: number;
+  adminFixedPrice?: number; // Admin's fixed price (overrides basePrice for display)
   originalPrice?: number;
   discount?: number;
   rating?: number;

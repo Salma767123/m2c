@@ -113,6 +113,36 @@ class AdminProductService {
     }
   }
 
+  // Create product (admin)
+  async createProduct(productData: any): Promise<AdminProductResponse> {
+    try {
+      const response = await axios.post('/products/admin', productData);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to create product');
+    }
+  }
+
+  // Update product (admin)
+  async updateProduct(id: string, productData: any): Promise<AdminProductResponse> {
+    try {
+      const response = await axios.put(`/products/admin/${id}`, productData);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to update product');
+    }
+  }
+
+  // Delete product (admin)
+  async deleteProduct(id: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await axios.delete(`/products/admin/${id}`);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to delete product');
+    }
+  }
+
   // Approve a product
   async approveProduct(id: string, adminPrice?: number): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
     try {

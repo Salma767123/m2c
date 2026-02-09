@@ -84,7 +84,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         
         // Vendor Type & Products
         vendorType: data.vendorType || ['manufacturer'],
-        marketType: data.marketType || 'domestic',
+        marketType: Array.isArray(data.marketType) ? data.marketType : (data.marketType ? [data.marketType] : ['domestic']),
         selectedCategories: data.selectedCategories || {},
         
         // Manufacturing Facilities
@@ -279,11 +279,15 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
     return labels[types] || types;
   };
 
-  const getMarketTypeLabel = (type: string) => {
+  const getMarketTypeLabel = (type: string | string[]) => {
     const labels: { [key: string]: string } = {
       'domestic': 'Domestic',
       'international': 'International'
     };
+    
+    if (Array.isArray(type)) {
+      return type.map(t => labels[t] || t).join(', ');
+    }
     return labels[type] || type;
   };
 

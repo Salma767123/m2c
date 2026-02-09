@@ -72,7 +72,7 @@ interface VendorFormData {
   
   // Vendor Type & Products
   vendorType: string | string[]
-  marketType: string
+  marketType: string | string[]
   selectedCategories: { [key: string]: string[] }
   expandedCategories: { [key: string]: boolean }
   
@@ -174,7 +174,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     
     // Vendor Type & Products
     vendorType: [],
-    marketType: '',
+    marketType: [],
     selectedCategories: {},
     expandedCategories: {},
     

@@ -9,6 +9,9 @@ const {
   getAvailableInventoryItems,
   // Admin functions
   getProductForAdmin,
+  createProductByAdmin,
+  updateProductByAdmin,
+  deleteProductByAdmin,
   approveProduct,
   rejectProduct,
   getAllProductsForAdmin,
@@ -24,9 +27,12 @@ const router = express.Router();
 router.get('/public', getPublicProducts);
 router.get('/public/:id', getPublicProduct);
 
-// Admin routes (no vendor role required)
+// Admin routes (require admin authentication)
 router.get('/admin/all', authenticateToken, requireAdminRole, getAllProductsForAdmin);
 router.get('/admin/:id', authenticateToken, requireAdminRole, getProductForAdmin);
+router.post('/admin', authenticateToken, requireAdminRole, createProductByAdmin);
+router.put('/admin/:id', authenticateToken, requireAdminRole, updateProductByAdmin);
+router.delete('/admin/:id', authenticateToken, requireAdminRole, deleteProductByAdmin);
 router.put('/:id/approve', authenticateToken, requireAdminRole, approveProduct);
 router.put('/:id/reject', authenticateToken, requireAdminRole, rejectProduct);
 

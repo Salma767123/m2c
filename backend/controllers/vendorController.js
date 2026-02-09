@@ -206,6 +206,7 @@ const registerVendor = async (req, res) => {
 
     // Parse JSON fields
     const parsedVendorType = typeof vendorType === 'string' ? JSON.parse(vendorType) : vendorType;
+    const parsedMarketType = typeof marketType === 'string' ? JSON.parse(marketType) : marketType;
     const parsedSelectedCategories = typeof selectedCategories === 'string' ? JSON.parse(selectedCategories) : selectedCategories;
     const parsedEnabledFacilities = typeof enabledFacilities === 'string' ? JSON.parse(enabledFacilities) : enabledFacilities;
     const parsedFacilityDetails = typeof facilityDetails === 'string' ? JSON.parse(facilityDetails) : facilityDetails;
@@ -257,7 +258,7 @@ const registerVendor = async (req, res) => {
         annualTurnover: employeeCount, // Using employee count as proxy for now
         exportExperience: hasImportExport === 'yes',
         exportCountries: parsedExportCountries || [],
-        primaryMarkets: parsedImportCountries || [],
+        primaryMarkets: Array.isArray(parsedMarketType) ? parsedMarketType : (parsedMarketType ? [parsedMarketType] : []),
         
         // Manufacturing Facilities
         factoryAddress: warehouseAddress,

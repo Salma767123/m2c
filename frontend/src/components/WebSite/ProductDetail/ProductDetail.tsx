@@ -172,8 +172,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
     ));
   };
 
-  // Get current price based on selected variant or base price
-  const currentPrice = selectedVariant?.price || product.basePrice;
+  // Get current price based on selected variant or admin fixed price or base price
+  const currentPrice = selectedVariant?.price || product.adminFixedPrice || product.basePrice;
   const originalPrice = product.originalPrice;
 
   // Get current image URL
