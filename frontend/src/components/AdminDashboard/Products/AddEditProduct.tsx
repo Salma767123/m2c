@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import Dropdown from '@/components/UI/Dropdown'
 import { ArrowLeft, Save, X, Upload, Package } from 'lucide-react'
 import Link from 'next/link'
-import { categories } from '@/components/mockData/products'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 
 // Mock data for inventory items (these would come from API)
@@ -46,16 +45,6 @@ const mockInventoryItems = [
     currentStock: 15,
     hasProductCreated: true // Already has a product created
   }
-]
-
-// Mock vendors data
-const mockVendors = [
-  { id: '1', name: 'Cotton Mills Ltd', email: 'contact@cottonmills.com', status: 'active' },
-  { id: '2', name: 'Textile Pro Industries', email: 'info@textilepro.com', status: 'active' },
-  { id: '3', name: 'Home Decor Inc', email: 'sales@homedecor.com', status: 'active' },
-  { id: '4', name: 'Sleep Comfort Co', email: 'orders@sleepcomfort.com', status: 'active' },
-  { id: '5', name: 'Warm Textiles', email: 'support@warmtextiles.com', status: 'active' },
-  { id: '6', name: 'Luxury Linens Co', email: 'hello@luxurylinens.com', status: 'active' }
 ]
 
 // Helper function to get color name from hex value
@@ -218,6 +207,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
   
+  // State for dynamic data
+  const [vendors, setVendors] = useState<Array<{ id: string; name: string; email: string }>>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [isLoadingVendors, setIsLoadingVendors] = useState(true)
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+  
   const [formData, setFormData] = useState<ProductFormData>({
     // Inventory Connection (NEW)
     inventoryItemId: inventoryId || '',
@@ -301,6 +296,52 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [newCareInstruction, setNewCareInstruction] = useState('')
   const [activeTab, setActiveTab] = useState('basic')
   
+  // Load vendors and categories on mount
+  useEffect(() => {
+    const loadVendorsAndCategories = async () => {
+      try {
+        // Load vendors
+        setIsLoadingVendors(true)
+        const { default: VendorService } = await import('@/services/vendorService')
+        const vendorsResponse = await VendorService.getAllVendors({ status: 'APPROVED' })
+        
+        if (vendorsResponse.vendors) {
+          setVendors(vendorsResponse.vendors.map(v => ({
+            id: v.id,
+            name: v.companyName,
+            email: v.businessEmail
+          })))
+        }
+      } catch (error) {
+        console.error('Error loading vendors:', error)
+        showErrorToast('Load Failed', 'Unable to load vendors')
+      } finally {
+        setIsLoadingVendors(false)
+      }
+
+      try {
+        // Load categories
+        setIsLoadingCategories(true)
+        const { categoryService } = await import('@/services/categoryService')
+        const categoriesResponse = await categoryService.getCategories({
+          status: 'ACTIVE',
+          showRootOnly: true
+        })
+        
+        if (categoriesResponse.data) {
+          setCategories(categoriesResponse.data.map(c => c.name))
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error)
+        showErrorToast('Load Failed', 'Unable to load categories')
+      } finally {
+        setIsLoadingCategories(false)
+      }
+    }
+
+    loadVendorsAndCategories()
+  }, [])
+  
   // Predefined tag options
   const tagOptions = [
     { value: 'Featured', label: 'Featured' },
@@ -342,105 +383,99 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (isEdit && productId) {
       setIsLoadingData(true)
       
-      // Simulate API call to fetch product data
+      // Fetch actual product data from API
       const loadProductData = async () => {
         try {
-          // In a real app, you'd fetch from your API
-          // For now, we'll simulate loading
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          const { adminProductService } = await import('@/services/adminProductService')
+          const response = await adminProductService.getProduct(productId)
           
-          // Mock product data for editing
-          setFormData({
-            inventoryItemId: '1',
-            isFromInventory: true,
+          if (response.success && response.data) {
+            const product = response.data
             
-            // Vendor Information
-            vendorId: '1',
-            vendorName: 'Cotton Mills Ltd',
-            
-            name: 'Premium Cotton Bed Sheet Set',
-            description: 'Luxurious 100% cotton bed sheet set with superior comfort and durability',
-            category: categories[0],
-            subCategory: 'Cotton Sheets',
-            
-            // Pricing Information
-            basePrice: 89.99,
-            originalPrice: 99.99,
-            discount: 10,
-            
-            // Product Rating & Reviews
-            rating: 4.5,
-            reviews: 128,
-            
-            fabricType: 'Cotton',
-            material: '100% Organic Cotton',
-            fabricSpecifications: {
-              type: 'Cotton',
-              composition: '100% Cotton',
-              weight: '200 GSM',
-              weave: 'Percale',
-              finish: 'Pre-shrunk',
-              careInstructions: ['Machine wash cold', 'Tumble dry low', 'Iron if needed']
-            },
-            
-            variants: [
-              {
-                id: '1',
-                size: 'Queen',
-                color: 'White',
-                colorHex: '#FFFFFF',
-                sku: 'CS-Q-WHT-001',
-                price: 89.99,
-                stock: 25,
-                images: []
+            // Map API response to form data
+            setFormData({
+              inventoryItemId: product.id,
+              isFromInventory: true,
+              
+              // Vendor Information
+              vendorId: product.vendorId,
+              vendorName: product.vendor?.companyName || '',
+              
+              name: product.name,
+              description: product.description,
+              category: product.category,
+              subCategory: product.subCategory || '',
+              
+              // Pricing Information
+              basePrice: product.basePrice,
+              originalPrice: product.originalPrice,
+              discount: product.discount,
+              
+              // Product Rating & Reviews
+              rating: undefined,
+              reviews: undefined,
+              
+              fabricType: product.fabricType || '',
+              material: product.material || '',
+              fabricSpecifications: product.fabricSpecifications || {
+                type: '',
+                composition: '',
+                weight: '',
+                weave: '',
+                finish: '',
+                careInstructions: []
               },
-              {
-                id: '2',
-                size: 'King',
-                color: 'White',
-                colorHex: '#FFFFFF',
-                sku: 'CS-K-WHT-001',
-                price: 99.99,
-                stock: 15,
+              
+              variants: product.variants?.map(v => ({
+                id: v.id,
+                size: v.size,
+                color: v.color,
+                colorHex: '#000000', // Default, can be enhanced
+                sku: `${product.baseSku}-${v.size}-${v.color}`,
+                price: v.price,
+                stock: v.stock,
                 images: []
-              }
-            ],
-            hasVariants: true,
-            
-            baseSku: 'CS-001',
-            
-            images: [],
-            
-            pricingTiers: [
-              { minQuantity: 1, maxQuantity: 9, price: 89.99 },
-              { minQuantity: 10, maxQuantity: 49, price: 79.99, discount: 11 },
-              { minQuantity: 50, price: 69.99, discount: 22 }
-            ],
-            bulkPricingEnabled: true,
-            singleUnitPricingEnabled: true,
-            
-            totalStock: 40,
-            lowStockThreshold: 5,
-            trackInventory: true,
-            
-            minimumOrderQuantity: 2,
-            maximumOrderQuantity: 100,
-            
-            dispatchTimeline: {
-              processingDays: 0,
-              shippingDays: 0,
-              totalDays: 0
-            },
-            
-            tags: ['premium', 'cotton', 'bedding'],
-            dimensions: '230x250 cm',
-            weight: '1.2 kg',
-            inStock: true,
-            status: 'active'
-          })
-        } catch (error) {
+              })) || [],
+              hasVariants: product.hasVariants,
+              
+              baseSku: product.baseSku,
+              
+              // Map actual product images
+              images: product.images?.map(img => ({
+                id: img.id,
+                url: img.url,
+                alt: img.alt || product.name,
+                isPrimary: img.isPrimary,
+                imageType: img.imageType as 'cover' | 'gallery'
+              })) || [],
+              
+              pricingTiers: product.pricingTiers || [{ minQuantity: 1, price: product.basePrice }],
+              bulkPricingEnabled: product.bulkPricingEnabled,
+              singleUnitPricingEnabled: product.singleUnitPricingEnabled,
+              
+              totalStock: product.totalStock,
+              lowStockThreshold: product.lowStockThreshold,
+              trackInventory: product.trackInventory,
+              
+              minimumOrderQuantity: product.minimumOrderQuantity,
+              maximumOrderQuantity: product.maximumOrderQuantity,
+              
+              dispatchTimeline: product.dispatchTimeline || {
+                processingDays: 0,
+                shippingDays: 0,
+                totalDays: 0
+              },
+              
+              tags: product.tags || [],
+              dimensions: product.dimensions,
+              weight: product.weight,
+              inStock: product.inStock,
+              status: product.status === 'ACTIVE' ? 'active' : product.status === 'INACTIVE' ? 'pending' : 'suspended'
+            })
+          }
+        } catch (error: any) {
           console.error('Error loading product data:', error)
-          showErrorToast('Failed to Load Product', 'Unable to load product data. Please try again.')
+          showErrorToast('Failed to Load Product', error.message || 'Unable to load product data. Please try again.')
         } finally {
           setIsLoadingData(false)
         }
@@ -500,7 +535,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   // Vendor Selection Functions
   const handleVendorSelect = (vendorId: string) => {
-    const vendor = mockVendors.find(v => v.id === vendorId)
+    const vendor = vendors.find(v => v.id === vendorId)
     if (vendor) {
       setFormData(prev => ({
         ...prev,
@@ -858,25 +893,30 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     setIsLoading(true)
 
     try {
-      if (isEdit) {
-        console.log('Updating product:', productId, formData)
-        // API call: PUT /api/products/${productId}
-        showSuccessToast('Product Updated', 'Your product has been updated successfully.')
+      const { adminProductService } = await import('@/services/adminProductService')
+      
+      if (isEdit && productId) {
+        // Update existing product
+        const response = await adminProductService.updateProduct(productId, formData)
+        
+        if (response.success) {
+          showSuccessToast('Product Updated', 'Product has been updated successfully.')
+          setHasUnsavedChanges(false)
+          router.push('/admin/dashboard/products')
+        }
       } else {
-        console.log('Creating product:', formData)
-        // API call: POST /api/products
-        showSuccessToast('Product Created', 'Your product has been created successfully.')
+        // Create new product
+        const response = await adminProductService.createProduct(formData)
+        
+        if (response.success) {
+          showSuccessToast('Product Created', 'Product has been created successfully.')
+          setHasUnsavedChanges(false)
+          router.push('/admin/dashboard/products')
+        }
       }
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Redirect back to products list
-      router.push('/admin/dashboard/products')
-      setHasUnsavedChanges(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error)
-      showErrorToast('Save Failed', 'Unable to save product. Please try again.')
+      showErrorToast('Save Failed', error.message || 'Unable to save product. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -968,15 +1008,19 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     <Dropdown
                       label="Vendor *"
                       value={formData.vendorId || ''}
-                      options={mockVendors.map(vendor => ({
+                      options={vendors.map(vendor => ({
                         value: vendor.id,
                         label: `${vendor.name} (${vendor.email})`
                       }))}
-                      placeholder="Select Vendor"
+                      placeholder={isLoadingVendors ? "Loading vendors..." : "Select Vendor"}
                       onChange={(value) => handleVendorSelect(value as string)}
+                      disabled={isLoadingVendors || isEdit}
                     />
                     {formData.vendorName && (
                       <p className="text-xs text-gray-500 mt-1">Selected: {formData.vendorName}</p>
+                    )}
+                    {isEdit && (
+                      <p className="text-xs text-blue-600 mt-1">ℹ️ Vendor cannot be changed when editing</p>
                     )}
                   </div>
                   
@@ -1091,8 +1135,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         label="Category *"
                         value={formData.category}
                         options={categories}
-                        placeholder="Select Category"
+                        placeholder={isLoadingCategories ? "Loading categories..." : "Select Category"}
                         onChange={(value) => setFormData(prev => ({ ...prev, category: value as string, subCategory: '' }))}
+                        disabled={isLoadingCategories}
                       />
                       {formData.isFromInventory && (
                         <p className="text-xs text-gray-500 mt-1">From inventory item</p>
@@ -1105,6 +1150,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         options={formData.category ? categorySubcategories[formData.category] || [] : []}
                         placeholder="Select Sub-Category"
                         onChange={(value) => setFormData(prev => ({ ...prev, subCategory: value as string }))}
+                        disabled={!formData.category}
                       />
                     </div>
                   </div>

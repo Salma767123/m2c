@@ -30,7 +30,7 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
   const [formData, setFormData] = useState({
     // allow multiple selections; accept legacy single-value strings
     vendorType: Array.isArray(data.vendorType) ? data.vendorType : (data.vendorType ? [data.vendorType] : []),
-    marketType: data.marketType || '',
+    marketType: Array.isArray(data.marketType) ? data.marketType : (data.marketType ? [data.marketType] : []),
     selectedCategories: data.selectedCategories || {},
     expandedCategories: data.expandedCategories || {}
   });
@@ -129,6 +129,17 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
       return {
         ...prev,
         vendorType: exists ? current.filter(t => t !== typeId) : [...current, typeId]
+      };
+    });
+  };
+
+  const toggleMarketType = (typeId: string) => {
+    setFormData(prev => {
+      const current: string[] = prev.marketType || [];
+      const exists = current.includes(typeId);
+      return {
+        ...prev,
+        marketType: exists ? current.filter(t => t !== typeId) : [...current, typeId]
       };
     });
   };
@@ -260,9 +271,9 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
                {marketTypes.map((type) => (
                  <div
                    key={type.id}
-                   onClick={() => handleInputChange("marketType", type.id)}
+                   onClick={() => toggleMarketType(type.id)}
                    className={`p-4 rounded-4xl cursor-pointer transition-colors ${
-                     formData.marketType === type.id
+                     (formData.marketType || []).includes(type.id)
                        ? "border-2 border-blue-600 bg-blue-50 text-blue-700 "
                        : "bg-gray-100 text-gray-500"
                    }`}

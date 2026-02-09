@@ -13,6 +13,7 @@ export interface ProductFormData {
   
   // Pricing Information
   basePrice: number;
+  adminFixedPrice?: number; // Admin's fixed price (overrides basePrice for display)
   originalPrice?: number;
   discount?: number;
   

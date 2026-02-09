@@ -13,7 +13,7 @@ interface ProductCardProps {
 const ProductCard = ({ product }: ProductCardProps) => {
   // Type guard to check if it's a ServiceProduct (from API)
   const isServiceProduct = (p: any): p is ServiceProduct => {
-    return 'vendorId' in p && 'createdAt' in p;
+    return 'basePrice' in p || 'adminFixedPrice' in p;
   };
 
   // Get the primary image or first image
@@ -42,8 +42,19 @@ const ProductCard = ({ product }: ProductCardProps) => {
   
   const imageUrl = primaryImage || placeholderImage;
 
-  // Get price - handle both basePrice and price
-  const displayPrice = isServiceProduct(product) ? product.basePrice : product.price;
+  // Get price - use adminFixedPrice if available, otherwise basePrice or price
+  let displayPrice: number | undefined;
+  
+  if (isServiceProduct(product)) {
+    // For API products, prioritize adminFixedPrice, then basePrice
+    // Use nullish coalescing to handle 0 values correctly
+    displayPrice = product.adminFixedPrice !== null && product.adminFixedPrice !== undefined 
+      ? product.adminFixedPrice 
+      : product.basePrice;
+  } else {
+    // For mock products, use price property
+    displayPrice = (product as any).price;
+  }
 
   return (
     <Link href={`/products/${product.id}`} className="block h-full">
