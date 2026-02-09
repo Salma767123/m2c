@@ -130,8 +130,8 @@ const Products = () => {
       {/* Filters and Search */}
       <section className="py-8 bg-white">
         <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:items-between gap-4">
-            {/* Search */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Search - Left Side */}
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -146,7 +146,8 @@ const Products = () => {
               />
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4">
+            {/* Controls - Right Side */}
+            <div className="flex flex-wrap items-center gap-3">
               {/* Filter Toggle */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -160,13 +161,13 @@ const Products = () => {
               <div className="relative" ref={categoryDropdownRef}>
                 <button
                   onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  className="inline-flex items-center justify-between w-45 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  className="inline-flex items-center justify-between min-w-[160px] px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                 >
-                  {selectedCategory === 'All' ? 'All Categories' : selectedCategory}
-                  <ChevronDown className="ml-2 h-4 w-4" />
+                  <span className="truncate">{selectedCategory === 'All' ? 'All Categories' : selectedCategory}</span>
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0" />
                 </button>
                 {showCategoryDropdown && (
-                  <div className="absolute z-10 w-45 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                  <div className="absolute right-0 z-10 w-56 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
                     <div className="py-1">
                       {['All', 'Kitchen Towels', 'Hand Towels', 'Bath Towels', 'Aprons', 'Table Linens', 'Decorative Textiles'].map((category) => (
                         <button
@@ -190,16 +191,18 @@ const Products = () => {
               <div className="relative" ref={sortDropdownRef}>
                 <button
                   onClick={() => setShowSortDropdown(!showSortDropdown)}
-                  className="inline-flex items-center justify-between w-45 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  className="inline-flex items-center justify-between min-w-[180px] px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                 >
-                  {sortBy === 'createdAt' && 'Newest First'}
-                  {sortBy === 'price-low' && 'Price: Low to High'}
-                  {sortBy === 'price-high' && 'Price: High to Low'}
-                  {sortBy === 'rating' && 'Highest Rated'}
-                  <ChevronDown className="ml-2 h-4 w-4" />
+                  <span className="truncate">
+                    {sortBy === 'createdAt' && 'Newest First'}
+                    {sortBy === 'price-low' && 'Price: Low to High'}
+                    {sortBy === 'price-high' && 'Price: High to Low'}
+                    {sortBy === 'rating' && 'Highest Rated'}
+                  </span>
+                  <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0" />
                 </button>
                 {showSortDropdown && (
-                  <div className="absolute z-10 w-45 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                  <div className="absolute right-0 z-10 w-56 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
                     <div className="py-1">
                       {[
                         { value: 'createdAt', label: 'Newest First' },
@@ -229,12 +232,14 @@ const Products = () => {
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 ${viewMode === 'grid' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  title="Grid View"
                 >
                   <Grid className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
                   className={`p-2 ${viewMode === 'list' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  title="List View"
                 >
                   <List className="w-5 h-5" />
                 </button>

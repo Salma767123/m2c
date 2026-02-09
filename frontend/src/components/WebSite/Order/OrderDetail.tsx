@@ -22,6 +22,7 @@ import {
   MessageCircle
 } from "lucide-react"
 import { products } from "@/components/mockData/products"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/UI/Card"
 
 interface OrderDetailProps {
   orderId: string
@@ -186,16 +187,18 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
     return (
       <div className="min-h-screen bg-slate-50 py-8 font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-            <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">Order Not Found</h3>
-            <p className="text-slate-600 mb-6">The order you're looking for doesn't exist or has been removed.</p>
-            <Link href="/order">
-              <button className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors">
-                Back to Orders
-              </button>
-            </Link>
-          </div>
+          <Card className="border p-12 text-center">
+            <CardContent>
+              <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-slate-900 mb-2">Order Not Found</h3>
+              <p className="text-slate-600 mb-6">The order you're looking for doesn't exist or has been removed.</p>
+              <Link href="/order">
+                <button className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors">
+                  Back to Orders
+                </button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
@@ -236,79 +239,83 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
           </div>
         </div>
             {/* Order Status Timeline */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-4">Order Status</h2>
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col items-center">
-                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2">
-                    <CheckCircle className="w-5 h-5 text-white" />
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="text-xl">Order Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2">
+                      <CheckCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="text-sm font-medium text-green-600">Confirmed</span>
+                    <span className="text-xs text-slate-500">Jan 15</span>
                   </div>
-                  <span className="text-sm font-medium text-green-600">Confirmed</span>
-                  <span className="text-xs text-slate-500">Jan 15</span>
-                </div>
-                <div className={`flex-1 h-0.5 mx-4 ${
-                  orderDetails.status === "Processing" || orderDetails.status === "Shipped" || orderDetails.status === "Delivered" 
-                    ? "bg-yellow-300" : "bg-slate-300"
-                }`}></div>
-                <div className="flex flex-col items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                    orderDetails.status === "Processing" || orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
-                      ? "bg-yellow-500" : "bg-slate-300"
-                  }`}>
-                    <Package className="w-5 h-5 text-white" />
+                  <div className={`flex-1 h-0.5 mx-4 ${
+                    orderDetails.status === "Processing" || orderDetails.status === "Shipped" || orderDetails.status === "Delivered" 
+                      ? "bg-yellow-300" : "bg-slate-300"
+                  }`}></div>
+                  <div className="flex flex-col items-center">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                      orderDetails.status === "Processing" || orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
+                        ? "bg-yellow-500" : "bg-slate-300"
+                    }`}>
+                      <Package className="w-5 h-5 text-white" />
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      orderDetails.status === "Processing" || orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
+                        ? "text-yellow-600" : "text-slate-500"
+                    }`}>Processing</span>
+                    <span className="text-xs text-slate-500">
+                      {orderDetails.status === "Processing" ? "Current" : orderDetails.status === "Shipped" || orderDetails.status === "Delivered" ? "Complete" : "Pending"}
+                    </span>
                   </div>
-                  <span className={`text-sm font-medium ${
-                    orderDetails.status === "Processing" || orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
-                      ? "text-yellow-600" : "text-slate-500"
-                  }`}>Processing</span>
-                  <span className="text-xs text-slate-500">
-                    {orderDetails.status === "Processing" ? "Current" : orderDetails.status === "Shipped" || orderDetails.status === "Delivered" ? "Complete" : "Pending"}
-                  </span>
-                </div>
-                <div className={`flex-1 h-0.5 mx-4 ${
-                  orderDetails.status === "Shipped" || orderDetails.status === "Delivered" 
-                    ? "bg-blue-300" : "bg-slate-300"
-                }`}></div>
-                <div className="flex flex-col items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                    orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
-                      ? "bg-blue-500" : "bg-slate-300"
-                  }`}>
-                    <Truck className="w-5 h-5 text-white" />
+                  <div className={`flex-1 h-0.5 mx-4 ${
+                    orderDetails.status === "Shipped" || orderDetails.status === "Delivered" 
+                      ? "bg-blue-300" : "bg-slate-300"
+                  }`}></div>
+                  <div className="flex flex-col items-center">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                      orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
+                        ? "bg-blue-500" : "bg-slate-300"
+                    }`}>
+                      <Truck className="w-5 h-5 text-white" />
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
+                        ? "text-blue-600" : "text-slate-500"
+                    }`}>Shipped</span>
+                    <span className="text-xs text-slate-500">
+                      {orderDetails.status === "Shipped" ? "Current" : orderDetails.status === "Delivered" ? "Complete" : "Pending"}
+                    </span>
                   </div>
-                  <span className={`text-sm font-medium ${
-                    orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
-                      ? "text-blue-600" : "text-slate-500"
-                  }`}>Shipped</span>
-                  <span className="text-xs text-slate-500">
-                    {orderDetails.status === "Shipped" ? "Current" : orderDetails.status === "Delivered" ? "Complete" : "Pending"}
-                  </span>
-                </div>
-                <div className={`flex-1 h-0.5 mx-4 ${
-                  orderDetails.status === "Delivered" ? "bg-green-300" : "bg-slate-300"
-                }`}></div>
-                <div className="flex flex-col items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                    orderDetails.status === "Delivered" ? "bg-green-500" : "bg-slate-300"
-                  }`}>
-                    <CheckCircle className="w-5 h-5 text-white" />
+                  <div className={`flex-1 h-0.5 mx-4 ${
+                    orderDetails.status === "Delivered" ? "bg-green-300" : "bg-slate-300"
+                  }`}></div>
+                  <div className="flex flex-col items-center">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                      orderDetails.status === "Delivered" ? "bg-green-500" : "bg-slate-300"
+                    }`}>
+                      <CheckCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      orderDetails.status === "Delivered" ? "text-green-600" : "text-slate-500"
+                    }`}>Delivered</span>
+                    <span className="text-xs text-slate-500">
+                      {orderDetails.status === "Delivered" ? "Complete" : "Pending"}
+                    </span>
                   </div>
-                  <span className={`text-sm font-medium ${
-                    orderDetails.status === "Delivered" ? "text-green-600" : "text-slate-500"
-                  }`}>Delivered</span>
-                  <span className="text-xs text-slate-500">
-                    {orderDetails.status === "Delivered" ? "Complete" : "Pending"}
-                  </span>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Ordered Items */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
-                <h2 className="text-xl font-bold text-slate-900">Ordered Items</h2>
-              </div>
-              <div className="p-6">
+            <Card className="border overflow-hidden">
+              <CardHeader className="border-b bg-slate-50">
+                <CardTitle className="text-xl">Ordered Items</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
                 <div className="space-y-6">
                   {orderDetails.items.map((item) => (
                     <div key={item.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:shadow-md transition-shadow">
@@ -367,18 +374,18 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Order Summary & Details */}
           <div className="lg:col-span-1 space-y-6">
             {/* Order Summary */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden sticky top-8">
-              <div className="px-6 py-4 border-b border-slate-200 bg-slate-100">
-                <h2 className="text-xl font-bold text-slate-900">Order Summary</h2>
-              </div>
-              <div className="p-6 space-y-4">
+            <Card className="border overflow-hidden sticky top-8">
+              <CardHeader className="border-b bg-slate-100">
+                <CardTitle className="text-xl">Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
                 <div className="flex justify-between">
                   <span className="text-slate-600">Subtotal</span>
                   <span className="font-medium">${orderDetails.subtotal.toFixed(2)}</span>
@@ -397,15 +404,15 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     <span>${orderDetails.total.toFixed(2)}</span>
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Delivery Information */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 bg-slate-100">
-                <h2 className="text-xl font-bold text-slate-900">Delivery Info</h2>
-              </div>
-              <div className="p-6 space-y-4">
+            <Card className="border overflow-hidden">
+              <CardHeader className="border-b bg-slate-100">
+                <CardTitle className="text-xl">Delivery Info</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
                 <div className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-blue-600" />
                   <div>
@@ -434,19 +441,19 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     <p className="text-sm text-slate-600">{orderDetails.paymentMethod}</p>
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
         {/* Related Products - Separate Bottom Section */}
         <div className="mt-12">
-          <div className="bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 bg-white">
-              <h2 className="text-2xl font-bold text-slate-900">You Might Also Like</h2>
-              <p className="text-slate-600">Products similar to your order</p>
-            </div>
-            <div className="p-6">
+          <Card className="border overflow-hidden">
+            <CardHeader className="border-b">
+              <CardTitle className="text-2xl">You Might Also Like</CardTitle>
+              <CardDescription>Products similar to your order</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {relatedProducts.map((product) => (
                   <div key={product.id} className="group border border-slate-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:border-slate-300">
@@ -513,8 +520,8 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

@@ -4,6 +4,19 @@ import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { mockOrders, Order, OrderStatus, getStatusColor, getStatusLabel } from '../../../../../components/mockData/orders';
 import AdminReviewModal, { AdminReviewData } from '../../../../../components/AdminDashboard/Orders/AdminReviewModal';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../../components/UI/Card';
+import { 
+  FileText, 
+  Factory, 
+  Package, 
+  Truck, 
+  Building2, 
+  CheckCircle, 
+  XCircle, 
+  Home,
+  ClipboardList,
+  ArrowLeft
+} from 'lucide-react';
 
 const AdminOrderDetailPage: React.FC = () => {
   const params = useParams();
@@ -96,27 +109,28 @@ const AdminOrderDetailPage: React.FC = () => {
   };
 
   const getStatusIcon = (status: OrderStatus) => {
+    const iconClass = "w-5 h-5";
     switch (status) {
       case OrderStatus.ORDER_CREATED:
-        return '📝';
+        return <FileText className={iconClass} />;
       case OrderStatus.VENDOR_PROCESSING:
-        return '🏭';
+        return <Factory className={iconClass} />;
       case OrderStatus.PACKED_BY_VENDOR:
-        return '📦';
+        return <Package className={iconClass} />;
       case OrderStatus.IN_TRANSIT_TO_ADMIN_HUB:
-        return '🚚';
+        return <Truck className={iconClass} />;
       case OrderStatus.RECEIVED_AT_ADMIN_HUB:
-        return '🏢';
+        return <Building2 className={iconClass} />;
       case OrderStatus.APPROVED_BY_ADMIN_HUB:
-        return '✅';
+        return <CheckCircle className={iconClass} />;
       case OrderStatus.REJECTED_BY_ADMIN_HUB:
-        return '❌';
+        return <XCircle className={iconClass} />;
       case OrderStatus.SHIPPED_TO_CUSTOMER:
-        return '🚛';
+        return <Truck className={iconClass} />;
       case OrderStatus.DELIVERED:
-        return '🏠';
+        return <Home className={iconClass} />;
       default:
-        return '📋';
+        return <ClipboardList className={iconClass} />;
     }
   };
 
@@ -125,49 +139,49 @@ const AdminOrderDetailPage: React.FC = () => {
       status: OrderStatus.ORDER_CREATED,
       title: 'Order Created',
       description: 'Customer placed the order',
-      icon: '📝'
+      icon: <FileText className="w-5 h-5" />
     },
     {
       status: OrderStatus.VENDOR_PROCESSING,
       title: 'Vendor Processing',
       description: 'Vendor confirmed and processing order',
-      icon: '🏭'
+      icon: <Factory className="w-5 h-5" />
     },
     {
       status: OrderStatus.PACKED_BY_VENDOR,
       title: 'Packed by Vendor',
       description: 'Products packed and ready for shipment',
-      icon: '📦'
+      icon: <Package className="w-5 h-5" />
     },
     {
       status: OrderStatus.IN_TRANSIT_TO_ADMIN_HUB,
       title: 'In Transit to Admin Hub',
       description: 'Shipped from vendor to admin hub',
-      icon: '🚚'
+      icon: <Truck className="w-5 h-5" />
     },
     {
       status: OrderStatus.RECEIVED_AT_ADMIN_HUB,
       title: 'Received at Admin Hub',
       description: 'Package received for quality check',
-      icon: '🏢'
+      icon: <Building2 className="w-5 h-5" />
     },
     {
       status: OrderStatus.APPROVED_BY_ADMIN_HUB,
       title: 'Approved by Admin Hub',
       description: 'Quality check passed, ready for customer',
-      icon: '✅'
+      icon: <CheckCircle className="w-5 h-5" />
     },
     {
       status: OrderStatus.SHIPPED_TO_CUSTOMER,
       title: 'Shipped to Customer',
       description: 'Package shipped to customer address',
-      icon: '🚛'
+      icon: <Truck className="w-5 h-5" />
     },
     {
       status: OrderStatus.DELIVERED,
       title: 'Delivered',
       description: 'Order delivered to customer',
-      icon: '🏠'
+      icon: <Home className="w-5 h-5" />
     }
   ];
 
@@ -223,9 +237,7 @@ const AdminOrderDetailPage: React.FC = () => {
             onClick={() => router.back()}
             className="text-blue-600 hover:text-blue-800 transition-colors mb-2 flex items-center"
           >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            <ArrowLeft className="w-4 h-4 mr-1" />
             Back to Orders
           </button>
           <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
@@ -240,9 +252,11 @@ const AdminOrderDetailPage: React.FC = () => {
         {/* Left Column - Order Info */}
         <div className="space-y-6">
           {/* Customer Information */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Customer Information</h3>
-            <div className="space-y-3 text-sm">
+          <Card>
+            <CardHeader className="p-6 pb-4">
+              <CardTitle className="text-base">Customer Information</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Name:</span>
                 <span className="font-medium">{order.customerName}</span>
@@ -255,25 +269,29 @@ const AdminOrderDetailPage: React.FC = () => {
                 <span className="text-gray-600">Phone:</span>
                 <span className="font-medium">{order.customerPhone}</span>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Shipping Address */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Shipping Address</h3>
-            <div className="text-sm">
+          <Card>
+            <CardHeader className="p-6 pb-4">
+              <CardTitle className="text-base">Shipping Address</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 text-sm">
               <p className="font-medium">{order.shippingAddress.name}</p>
               <p>{order.shippingAddress.address}</p>
               <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
               <p>{order.shippingAddress.country}</p>
               <p className="mt-2 text-gray-600">Phone: {order.shippingAddress.phone}</p>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Order Items */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Order Items</h3>
-            <div className="space-y-4">
+          <Card>
+            <CardHeader className="p-6 pb-4">
+              <CardTitle className="text-base">Order Items</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 space-y-4">
               {order.items.map((item) => (
                 <div key={item.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
                   <img
@@ -296,13 +314,15 @@ const AdminOrderDetailPage: React.FC = () => {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Order Summary */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Order Summary</h3>
-            <div className="space-y-2 text-sm">
+          <Card>
+            <CardHeader className="p-6 pb-4">
+              <CardTitle className="text-base">Order Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
                 <span>${order.subtotal.toFixed(2)}</span>
@@ -325,14 +345,16 @@ const AdminOrderDetailPage: React.FC = () => {
                 <span>Total:</span>
                 <span>${order.totalAmount.toFixed(2)}</span>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Admin Review (if exists) */}
           {order.adminReview && (
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Admin Review</h3>
-              <div className="space-y-3 text-sm">
+            <Card>
+              <CardHeader className="p-6 pb-4">
+                <CardTitle className="text-base">Admin Review</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 pt-0 space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status:</span>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -373,37 +395,43 @@ const AdminOrderDetailPage: React.FC = () => {
                     <span>{new Date(order.adminReview.reviewedAt).toLocaleString()}</span>
                   </div>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           )}
         </div>
 
         {/* Right Column - Order Flow */}
         <div className="space-y-6">
           {/* Current Status */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Current Status</h3>
-            <div className="flex items-center space-x-4">
-              <span className="text-3xl">{getStatusIcon(order.status)}</span>
-              <div>
-                <p className="font-medium text-gray-900 text-lg">{getStatusLabel(order.status)}</p>
-                <p className="text-sm text-gray-600">
-                  Updated: {new Date(order.statusHistory[order.statusHistory.length - 1]?.timestamp || order.orderDate).toLocaleString()}
-                </p>
+          <Card>
+            <CardHeader className="p-6 pb-4">
+              <CardTitle className="text-base">Current Status</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0">
+              <div className="flex items-center space-x-4">
+                <div className="text-blue-600">{getStatusIcon(order.status)}</div>
+                <div>
+                  <p className="font-medium text-gray-900 text-lg">{getStatusLabel(order.status)}</p>
+                  <p className="text-sm text-gray-600">
+                    Updated: {new Date(order.statusHistory[order.statusHistory.length - 1]?.timestamp || order.orderDate).toLocaleString()}
+                  </p>
+                </div>
               </div>
-            </div>
-            {order.trackingReference && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <span className="text-sm text-gray-600">Tracking Reference:</span>
-                <span className="ml-2 font-mono text-sm font-medium">{order.trackingReference}</span>
-              </div>
-            )}
-          </div>
+              {order.trackingReference && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Tracking Reference:</span>
+                  <span className="ml-2 font-mono text-sm font-medium">{order.trackingReference}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Order Flow Timeline */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Order Flow Progress</h3>
-            <div className="space-y-4">
+          <Card>
+            <CardHeader className="p-6 pb-4">
+              <CardTitle className="text-base">Order Flow Progress</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 space-y-4">
               {orderSteps.map((step, index) => {
                 const isCompleted = index <= currentStepIndex;
                 const isCurrent = index === currentStepIndex;
@@ -412,14 +440,14 @@ const AdminOrderDetailPage: React.FC = () => {
                 return (
                   <div key={step.status} className="flex items-start space-x-4">
                     <div className="flex flex-col items-center">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                         isRejected 
-                          ? 'bg-red-100 border-2 border-red-500' 
+                          ? 'bg-red-100 border-2 border-red-500 text-red-600' 
                           : isCompleted 
-                            ? 'bg-green-100 border-2 border-green-500' 
+                            ? 'bg-green-100 border-2 border-green-500 text-green-600' 
                             : isCurrent 
-                              ? 'bg-blue-100 border-2 border-blue-500' 
-                              : 'bg-gray-100 border-2 border-gray-300'
+                              ? 'bg-blue-100 border-2 border-blue-500 text-blue-600' 
+                              : 'bg-gray-100 border-2 border-gray-300 text-gray-400'
                       }`}>
                         {step.icon}
                       </div>
@@ -451,19 +479,21 @@ const AdminOrderDetailPage: React.FC = () => {
                   </div>
                 );
               })}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Status History */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Status History</h3>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
+          <Card>
+            <CardHeader className="p-6 pb-4">
+              <CardTitle className="text-base">Status History</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 space-y-3 max-h-64 overflow-y-auto">
               {order.statusHistory.slice().reverse().map((history) => (
                 <div key={history.id} className="bg-gray-50 p-3 rounded-lg">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <span className="text-lg">{getStatusIcon(history.status)}</span>
+                        <div className="text-gray-600">{getStatusIcon(history.status)}</div>
                         <span className="font-medium text-gray-900">{getStatusLabel(history.status)}</span>
                       </div>
                       {history.comment && (
@@ -479,8 +509,8 @@ const AdminOrderDetailPage: React.FC = () => {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

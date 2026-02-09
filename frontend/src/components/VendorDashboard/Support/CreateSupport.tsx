@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ArrowLeft, Send, Paperclip } from 'lucide-react'
 import Link from 'next/link'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+import Dropdown from '@/components/UI/Dropdown'
 
 export default function CreateSupport() {
   const [formData, setFormData] = useState({
@@ -16,11 +17,25 @@ export default function CreateSupport() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }))
+  }
+
+  const handleCategoryChange = (value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      category: value as string
+    }))
+  }
+
+  const handlePriorityChange = (value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      priority: value as string
     }))
   }
 
@@ -65,7 +80,7 @@ export default function CreateSupport() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-420 mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/vendor/dashboard/support" className="text-blue-600 hover:text-blue-700">
@@ -99,40 +114,36 @@ export default function CreateSupport() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Category */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Category <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="category"
+            <Dropdown
+              label="Category"
               value={formData.category}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="technical">Technical Issue</option>
-              <option value="billing">Billing & Payments</option>
-              <option value="account">Account Management</option>
-              <option value="product">Product Listing</option>
-              <option value="shipping">Shipping & Returns</option>
-              <option value="other">Other</option>
-            </select>
+              options={[
+                { value: 'technical', label: 'Technical Issue' },
+                { value: 'billing', label: 'Billing & Payments' },
+                { value: 'account', label: 'Account Management' },
+                { value: 'product', label: 'Product Listing' },
+                { value: 'shipping', label: 'Shipping & Returns' },
+                { value: 'other', label: 'Other' }
+              ]}
+              onChange={handleCategoryChange}
+              placeholder="Select category"
+            />
           </div>
 
           {/* Priority */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Priority <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="priority"
+            <Dropdown
+              label="Priority"
               value={formData.priority}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
+              options={[
+                { value: 'low', label: 'Low' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'high', label: 'High' },
+                { value: 'urgent', label: 'Urgent' }
+              ]}
+              onChange={handlePriorityChange}
+              placeholder="Select priority"
+            />
           </div>
         </div>
 
@@ -181,11 +192,11 @@ export default function CreateSupport() {
               <ul className="space-y-1">
                 {formData.attachments.map((file, index) => (
                   <li key={index} className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                    <span>{file.name}</span>
+                    <span className="truncate">{file.name}</span>
                     <button
                       type="button"
                       onClick={() => removeAttachment(index)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 ml-2 flex-shrink-0"
                     >
                       ✕
                     </button>
@@ -197,18 +208,18 @@ export default function CreateSupport() {
         </div>
 
         {/* Buttons */}
-        <div className="flex gap-3 pt-4 border-t">
+        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
           >
             <Send className="w-4 h-4" />
             {isSubmitting ? 'Submitting...' : 'Submit Ticket'}
           </button>
           <Link
             href="/vendor/dashboard/support"
-            className="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-center px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel
           </Link>

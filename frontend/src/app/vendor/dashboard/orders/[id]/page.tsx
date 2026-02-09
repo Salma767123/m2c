@@ -247,7 +247,7 @@ export default function VendorOrderDetailPage({ params }: { params: Promise<{ id
           onClick={handleProcessed}
           className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
         >
-          Process
+          Proceed
         </button>
       );
     }

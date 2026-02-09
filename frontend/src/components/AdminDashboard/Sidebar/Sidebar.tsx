@@ -69,11 +69,6 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    title: "Invoice & Billing",
-    icon: Receipt,
-    href: "/admin/dashboard/billing",
-  },
-  {
     title: "Users",
     icon: Users,
     subItems: [
@@ -92,7 +87,19 @@ const navigation: NavigationItem[] = [
   {
     title: "Reviews",
     icon: MessageSquare,
-    href: "/admin/dashboard/reviews",
+    subItems: [
+      { title: "Customer Reviews", href: "/admin/dashboard/reviews/customer" },
+      { title: "Vendor Product Reviews", href: "/admin/dashboard/reviews/vendor-products" },
+    ],
+  },
+    {
+    title: "Invoice & Billing",
+    icon: Receipt,
+    subItems: [
+      { title: "Invoices", href: "/admin/dashboard/billing/invoices" },
+      { title: "Billings", href: "/admin/dashboard/billing/billings" },
+      { title: "Settlement", href: "/admin/dashboard/billing/settlement" },
+    ],
   },
   {
     title: "Reports",

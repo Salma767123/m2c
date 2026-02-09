@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Order, OrderStatus, getStatusColor, getStatusLabel } from '../../mockData/orders';
+import { Card, CardContent, CardHeader, CardTitle } from '../../UI/Card';
 
 interface OrderDetailProps {
   order: Order;
@@ -115,9 +116,11 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, onClose }) => {
             {/* Left Column - Order Info */}
             <div className="space-y-6">
               {/* Customer Information */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Customer Information</h3>
-                <div className="space-y-2 text-sm">
+              <Card className="bg-gray-50">
+                <CardHeader className="p-4 pb-3">
+                  <CardTitle className="text-base">Customer Information</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-2 text-sm">
                   <div>
                     <span className="text-gray-600">Name:</span>
                     <span className="ml-2 font-medium">{order.customerName}</span>
@@ -130,54 +133,62 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, onClose }) => {
                     <span className="text-gray-600">Phone:</span>
                     <span className="ml-2 font-medium">{order.customerPhone}</span>
                   </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
               {/* Shipping Address */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Shipping Address</h3>
-                <div className="text-sm">
+              <Card className="bg-gray-50">
+                <CardHeader className="p-4 pb-3">
+                  <CardTitle className="text-base">Shipping Address</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 text-sm">
                   <p className="font-medium">{order.shippingAddress.name}</p>
                   <p>{order.shippingAddress.address}</p>
                   <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
                   <p>{order.shippingAddress.country}</p>
                   <p className="mt-1 text-gray-600">Phone: {order.shippingAddress.phone}</p>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
               {/* Order Items */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Order Items</h3>
-                <div className="space-y-3">
+              <Card className="bg-gray-50">
+                <CardHeader className="p-4 pb-3">
+                  <CardTitle className="text-base">Order Items</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-3">
                   {order.items.map((item) => (
-                    <div key={item.id} className="flex items-center space-x-4 bg-white p-3 rounded border">
-                      <img
-                        src={item.productImage}
-                        alt={item.productName}
-                        className="w-16 h-16 object-cover rounded"
-                      />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{item.productName}</h4>
-                        <p className="text-sm text-gray-600">
-                          SKU: {item.sku} | Qty: {item.quantity}
-                          {item.size && ` | Size: ${item.size}`}
-                          {item.color && ` | Color: ${item.color}`}
-                        </p>
-                        <p className="text-sm text-gray-600">Vendor: {item.vendorName}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-gray-900">${item.totalPrice.toFixed(2)}</p>
-                        <p className="text-sm text-gray-600">${item.unitPrice.toFixed(2)} each</p>
-                      </div>
-                    </div>
+                    <Card key={item.id} className="bg-white">
+                      <CardContent className="p-3 flex items-center space-x-4">
+                        <img
+                          src={item.productImage}
+                          alt={item.productName}
+                          className="w-16 h-16 object-cover rounded"
+                        />
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">{item.productName}</h4>
+                          <p className="text-sm text-gray-600">
+                            SKU: {item.sku} | Qty: {item.quantity}
+                            {item.size && ` | Size: ${item.size}`}
+                            {item.color && ` | Color: ${item.color}`}
+                          </p>
+                          <p className="text-sm text-gray-600">Vendor: {item.vendorName}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-gray-900">${item.totalPrice.toFixed(2)}</p>
+                          <p className="text-sm text-gray-600">${item.unitPrice.toFixed(2)} each</p>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
               {/* Order Summary */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Order Summary</h3>
-                <div className="space-y-2 text-sm">
+              <Card className="bg-gray-50">
+                <CardHeader className="p-4 pb-3">
+                  <CardTitle className="text-base">Order Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
                     <span>${order.subtotal.toFixed(2)}</span>
@@ -200,14 +211,16 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, onClose }) => {
                     <span>Total:</span>
                     <span>${order.totalAmount.toFixed(2)}</span>
                   </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
               {/* Admin Review (if exists) */}
               {order.adminReview && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">Admin Review</h3>
-                  <div className="space-y-3 text-sm">
+                <Card className="bg-gray-50">
+                  <CardHeader className="p-4 pb-3">
+                    <CardTitle className="text-base">Admin Review</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 space-y-3 text-sm">
                     <div>
                       <span className="text-gray-600">Status:</span>
                       <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
@@ -248,37 +261,45 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, onClose }) => {
                         <span className="ml-2">{new Date(order.adminReview.reviewedAt).toLocaleString()}</span>
                       </div>
                     )}
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
 
             {/* Right Column - Order Flow */}
             <div className="space-y-6">
               {/* Current Status */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Current Status</h3>
-                <div className="flex items-center space-x-3">
-                  <span className="text-2xl">{getStatusIcon(order.status)}</span>
-                  <div>
-                    <p className="font-medium text-gray-900">{getStatusLabel(order.status)}</p>
-                    <p className="text-sm text-gray-600">
-                      Updated: {new Date(order.statusHistory[order.statusHistory.length - 1]?.timestamp || order.orderDate).toLocaleString()}
-                    </p>
+              <Card className="bg-blue-50">
+                <CardHeader className="p-4 pb-3">
+                  <CardTitle className="text-base">Current Status</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-2xl">{getStatusIcon(order.status)}</span>
+                    <div>
+                      <p className="font-medium text-gray-900">{getStatusLabel(order.status)}</p>
+                      <p className="text-sm text-gray-600">
+                        Updated: {new Date(order.statusHistory[order.statusHistory.length - 1]?.timestamp || order.orderDate).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                {order.trackingReference && (
-                  <div className="mt-3 p-2 bg-white rounded border">
-                    <span className="text-sm text-gray-600">Tracking Reference:</span>
-                    <span className="ml-2 font-mono text-sm font-medium">{order.trackingReference}</span>
-                  </div>
-                )}
-              </div>
+                  {order.trackingReference && (
+                    <Card className="mt-3 bg-white">
+                      <CardContent className="p-2">
+                        <span className="text-sm text-gray-600">Tracking Reference:</span>
+                        <span className="ml-2 font-mono text-sm font-medium">{order.trackingReference}</span>
+                      </CardContent>
+                    </Card>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Order Flow Timeline */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-4">Order Flow Progress</h3>
-                <div className="space-y-4">
+              <Card className="bg-gray-50">
+                <CardHeader className="p-4 pb-3">
+                  <CardTitle className="text-base">Order Flow Progress</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-4">
                   {orderSteps.map((step, index) => {
                     const isCompleted = index <= currentStepIndex;
                     const isCurrent = index === currentStepIndex;
@@ -326,36 +347,40 @@ const OrderDetail: React.FC<OrderDetailProps> = ({ order, onClose }) => {
                       </div>
                     );
                   })}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
               {/* Status History */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Status History</h3>
-                <div className="space-y-3 max-h-64 overflow-y-auto">
+              <Card className="bg-gray-50">
+                <CardHeader className="p-4 pb-3">
+                  <CardTitle className="text-base">Status History</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-3 max-h-64 overflow-y-auto">
                   {order.statusHistory.slice().reverse().map((history) => (
-                    <div key={history.id} className="bg-white p-3 rounded border">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-lg">{getStatusIcon(history.status)}</span>
-                            <span className="font-medium text-gray-900">{getStatusLabel(history.status)}</span>
-                          </div>
-                          {history.comment && (
-                            <p className="text-sm text-gray-600 mt-1">{history.comment}</p>
-                          )}
-                          <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                            <span>{new Date(history.timestamp).toLocaleString()}</span>
-                            {history.updatedByType && (
-                              <span className="capitalize">by {history.updatedByType}</span>
+                    <Card key={history.id} className="bg-white">
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg">{getStatusIcon(history.status)}</span>
+                              <span className="font-medium text-gray-900">{getStatusLabel(history.status)}</span>
+                            </div>
+                            {history.comment && (
+                              <p className="text-sm text-gray-600 mt-1">{history.comment}</p>
                             )}
+                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                              <span>{new Date(history.timestamp).toLocaleString()}</span>
+                              {history.updatedByType && (
+                                <span className="capitalize">by {history.updatedByType}</span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   ))}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
