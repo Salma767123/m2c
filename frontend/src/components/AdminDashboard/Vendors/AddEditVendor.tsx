@@ -75,6 +75,7 @@ interface VendorFormData {
   marketType: string | string[]
   selectedCategories: { [key: string]: string[] }
   expandedCategories: { [key: string]: boolean }
+  categoryRemarks?: string
   
   // Manufacturing Facilities (if manufacturer)
   enabledFacilities: { [key: string]: boolean }
@@ -177,6 +178,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     marketType: [],
     selectedCategories: {},
     expandedCategories: {},
+    categoryRemarks: '',
     
     // Manufacturing Facilities
     enabledFacilities: {},

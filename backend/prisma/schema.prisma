@@ -220,6 +220,7 @@ model Vendor {
   productCategories     String[]  @default([])
   productTypes          String[]  @default([])
   specializations       String[]  @default([])
+  categoryRemarks       String?   // Additional remarks about product categories
   
   // Certifications & Logistics
   certifications        VendorCertification[]

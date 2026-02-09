@@ -86,6 +86,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         vendorType: data.vendorType || ['manufacturer'],
         marketType: Array.isArray(data.marketType) ? data.marketType : (data.marketType ? [data.marketType] : ['domestic']),
         selectedCategories: data.selectedCategories || {},
+        categoryRemarks: data.categoryRemarks || '',
         
         // Manufacturing Facilities
         enabledFacilities: data.enabledFacilities || {},
@@ -404,6 +405,13 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
                 'None selected'
               )
             } />
+            {data.categoryRemarks && (
+              <InfoRow label="Category Remarks" value={
+                <div className="text-sm bg-gray-50 p-2 rounded border border-gray-200">
+                  {data.categoryRemarks}
+                </div>
+              } />
+            )}
           </div>
         </FormCard>
 

@@ -32,7 +32,8 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
     vendorType: Array.isArray(data.vendorType) ? data.vendorType : (data.vendorType ? [data.vendorType] : []),
     marketType: Array.isArray(data.marketType) ? data.marketType : (data.marketType ? [data.marketType] : []),
     selectedCategories: data.selectedCategories || {},
-    expandedCategories: data.expandedCategories || {}
+    expandedCategories: data.expandedCategories || {},
+    categoryRemarks: data.categoryRemarks || ''
   });
 
   // Fetch categories from API
@@ -372,6 +373,23 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
            </div>
          </section>
        )}
+
+       {/* Category Remarks */}
+       <section className="bg-white border border-gray-200 rounded-lg">
+         <div className="px-4 py-3">
+           <h2 className="text-lg font-semibold text-gray-900">Additional Remarks</h2>
+           <p className="text-sm text-gray-600">Any additional information about your product categories</p>
+         </div>
+         <div className="p-4">
+           <textarea
+             value={formData.categoryRemarks}
+             onChange={(e) => handleInputChange('categoryRemarks', e.target.value)}
+             placeholder="Enter any additional remarks about your product categories, specializations, or unique offerings..."
+             rows={4}
+             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+           />
+         </div>
+       </section>
 
        {/* Navigation */}
        <div className="flex justify-between text-white ">

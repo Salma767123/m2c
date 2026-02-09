@@ -100,6 +100,7 @@ const registerVendor = async (req, res) => {
       vendorType,
       marketType,
       selectedCategories,
+      categoryRemarks,
       
       // Manufacturing Facilities (if manufacturer)
       enabledFacilities,
@@ -284,6 +285,7 @@ const registerVendor = async (req, res) => {
         productCategories: Object.keys(parsedSelectedCategories || {}),
         productTypes: Object.values(parsedSelectedCategories || {}).flat(),
         specializations: parsedSelectedCertifications || [],
+        categoryRemarks: categoryRemarks || null,
         
         // Logistics Information
         shippingMethods: parsedShippingMethods || [],

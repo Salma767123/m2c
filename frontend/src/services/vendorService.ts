@@ -37,6 +37,7 @@ export interface VendorRegistrationData {
   vendorType: string | string[];
   marketType: string | string[];
   selectedCategories: Record<string, string[]>;
+  categoryRemarks?: string;
   
   // Manufacturing Facilities
   enabledFacilities?: Record<string, boolean>;
