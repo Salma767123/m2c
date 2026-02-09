@@ -154,7 +154,7 @@ const Header = () => {
               <Link href="/" className="flex items-center">
                 <div className="text-center">
                   <h1 className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-3xl font-bold bg-linear-to-r from-[#212121] to-[#222222] bg-clip-text text-transparent leading-tight line-clamp-2">
-                    M 2 C MarkDowns Private Limited
+                    M 2 C MarkDowns Private Limiteddd
                   </h1>
                 </div>
               </Link>
