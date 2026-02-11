@@ -24,7 +24,8 @@ import {
   XCircle,
   AlertTriangle,
   FileText,
-  Download
+  Download,
+  Eye
 } from 'lucide-react'
 import VendorService, { VendorProfile } from '@/services/vendorService'
 import { toast } from '@/hooks/use-toast'
@@ -795,12 +796,20 @@ function DocumentsTab({ vendor }: { vendor: VendorProfile }) {
                   </div>
                 </div>
                 {doc.documentUrl && (
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </a>
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer">
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </a>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer" download>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </a>
+                    </Button>
+                  </div>
                 )}
               </div>
             ))}

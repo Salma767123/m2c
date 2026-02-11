@@ -1,11 +1,12 @@
 import AddEditInventory from '@/components/AdminDashboard/Inventory/AddEditInventory'
 
 interface EditInventoryPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
-export default function EditInventoryPage({ params }: EditInventoryPageProps) {
-  return <AddEditInventory inventoryId={params.id} isEdit={true} />
+export default async function EditInventoryPage({ params }: EditInventoryPageProps) {
+  const { id } = await params
+  return <AddEditInventory inventoryId={id} isEdit={true} />
 }
