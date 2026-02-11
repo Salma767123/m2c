@@ -21,6 +21,8 @@ import {
   Shield,
   ShoppingCart,
   Headphones,
+  ClipboardCheck,
+  UserCheck,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -49,7 +51,15 @@ const navigation: NavigationItem[] = [
   {
     title: "Vendors",
     icon: Store,
-    href: "/admin/dashboard/vendors",
+    subItems: [
+      { title: "All Vendors", href: "/admin/dashboard/vendors" },
+      { title: "Assign QC Checker", href: "/admin/dashboard/vendors/assign-qc" },
+    ],
+  },
+  {
+    title: "QC Checker",
+    icon: ClipboardCheck,
+   href: "/admin/dashboard/qc-checker"
   },
   {
     title: "Categories",
@@ -80,10 +90,7 @@ const navigation: NavigationItem[] = [
   {
     title: "Roles & Permissions",
     icon: Shield,
-    subItems: [
-      { title: "All Roles", href: "/admin/dashboard/roles-permissions" },
-      { title: "Create Role", href: "/admin/dashboard/roles-permissions/add" },
-    ],
+    href: "/admin/dashboard/roles-permissions",
   },
   {
     title: "Reviews",

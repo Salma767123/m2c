@@ -99,10 +99,14 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
   const getPageInfo = () => {
     const pageMap: Record<string, { title: string; icon: React.ComponentType<any> }> = {
       '/admin/dashboard': { title: 'Dashboard', icon: LayoutDashboard },
-      '/admin/dashboard/vendors': { title: 'Vendors', icon: Store },
-      '/admin/dashboard/vendors/add': { title: 'Vendors', icon: Store },
-      '/admin/dashboard/vendors/edit': { title: 'Vendors', icon: Store },
-      '/admin/dashboard/vendors/view': { title: 'Vendors', icon: Store },
+      '/admin/dashboard/vendors': { title: 'All Vendors', icon: Store },
+      '/admin/dashboard/vendors/add': { title: 'All Vendors', icon: Store },
+      '/admin/dashboard/vendors/edit': { title: 'All Vendors', icon: Store },
+      '/admin/dashboard/vendors/view': { title: 'All Vendors', icon: Store },
+      '/admin/dashboard/vendors/assign-qc-checker': { title: 'Assign QC Checker', icon: Store },
+      '/admin/dashboard/vendors/assign-qc-checker/add': { title: 'Create Assignment', icon: Store },
+      '/admin/dashboard/qc-checker': { title: 'All Checkers', icon: Shield },
+      '/admin/dashboard/qc-checker/create': { title: 'Create Checker', icon: Shield },
       '/admin/dashboard/products': { title: 'All Products', icon: Package },
       '/admin/dashboard/products/add': { title: 'All Products', icon: Package },
       '/admin/dashboard/products/edit': { title: 'All Products', icon: Package },
@@ -142,10 +146,13 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
       return { title: 'Support', icon: HelpCircle }
     }
     if (pathname.startsWith('/admin/dashboard/vendors/view/')) {
-      return { title: 'Vendors', icon: Store }
+      return { title: 'All Vendors', icon: Store }
+    }
+    if (pathname.startsWith('/admin/dashboard/vendors/inspection/')) {
+      return { title: 'All Vendors', icon: Store }
     }
     if (pathname.startsWith('/admin/dashboard/vendors/edit/')) {
-      return { title: 'Vendors', icon: Store }
+      return { title: 'All Vendors', icon: Store }
     }
     if (pathname.startsWith('/admin/dashboard/products/edit/')) {
       return { title: 'All Products', icon: Package }

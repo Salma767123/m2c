@@ -290,11 +290,6 @@ export default function VendorsTable() {
                 onChange={(value) => handleStatusFilter(value as string)}
               />
             </div>
-            
-            <Button onClick={handleSearch} variant="outline">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
           </div>
         </div>
       </CardHeader>

@@ -43,7 +43,11 @@ export function Breadcrumb() {
     'invoices': 'Invoices',
     'billings': 'Billings',
     'settlement': 'Settlement',
-    'vendor-products': 'Vendor Product Reviews'
+    'vendor-products': 'Vendor Product Reviews',
+    'qc-checker': 'QC Checker',
+    'create': 'Create',
+    'assign-qc-checker': 'Assign QC Checker',
+    'inspection': 'Inspection Details'
   }
 
   // Generate breadcrumb items from pathname
