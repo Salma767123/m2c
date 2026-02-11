@@ -77,8 +77,19 @@ export default function CompanyDetails({
     gstFile: null,
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
   };
 
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -218,6 +229,55 @@ export default function CompanyDetails({
     options.find((opt: any) => opt.label === formData.country) || null;
 
   const handleNext = () => {
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.businessType) newErrors.businessType = 'Business Type is required';
+    if (!formData.companyName) newErrors.companyName = 'Company Name is required';
+    if (!formData.gstNumber) {
+      newErrors.gstNumber = 'GST Number is required';
+    } else if (!/^[A-Z0-9]{15}$/i.test(formData.gstNumber)) {
+      newErrors.gstNumber = 'GST Number must be exactly 15 alphanumeric characters';
+    }
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    if (!formData.phone) {
+      newErrors.phone = 'Phone is required';
+    } else {
+      // Remove spaces, hyphens, parentheses but keep the + sign
+      const cleanPhone = formData.phone.replace(/[\s\-\(\)]/g, '');
+      // Check if it starts with + and has 11-16 digits, or has 10-15 digits without +
+      if (!/^(\+?[0-9]{10,15})$/.test(cleanPhone)) {
+        newErrors.phone = 'Please enter a valid phone number (10-15 digits, optional + prefix)';
+      }
+    }
+    if (!formData.address) newErrors.address = 'Address is required';
+    if (!formData.city) newErrors.city = 'City is required';
+    if (!formData.state) newErrors.state = 'State is required';
+    if (!formData.zipCode) newErrors.zipCode = 'ZIP Code is required';
+    if (!formData.country) newErrors.country = 'Country is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      // Mark all fields as touched to show errors
+      const allTouched: Record<string, boolean> = {};
+      Object.keys(newErrors).forEach(key => {
+        allTouched[key] = true;
+      });
+      setTouched(allTouched);
+      
+      // Scroll to first error
+      const firstErrorField = Object.keys(newErrors)[0];
+      const element = document.querySelector(`[name="${firstErrorField}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     // If "Same as warehouse address" is checked, copy company address to warehouse fields
     const updatedData: FormData & { [key: string]: any } = { ...formData };
     
@@ -250,7 +310,7 @@ export default function CompanyDetails({
         <section className="bg-white border border-gray-200 rounded-lg shadow-sm ">
           <div className="px-6 py-4">
             <h2 className="text-xl font-bold text-gray-900 flex items-center">
-              Business Type
+              Business Type <span className="text-red-500 text-lg ml-1">*</span>
             </h2>
             <p className="text-muted-foreground mt-1">
               Tell us about your business entity and legal information
@@ -265,6 +325,8 @@ export default function CompanyDetails({
                   className={`p-4 rounded-4xl cursor-pointer transition-colors ${
                     formData.businessType === type.id
                       ? "border-2 border-blue-600 bg-blue-50 text-blue-700 "
+                      : errors.businessType && touched.businessType
+                      ? "border-2 border-red-500 bg-red-50"
                       : "bg-gray-100 text-gray-500"
                   }`}
                 >
@@ -272,6 +334,9 @@ export default function CompanyDetails({
                 </div>
               ))}
             </div>
+            {errors.businessType && touched.businessType && (
+              <p className="text-red-500 text-sm mt-2">{errors.businessType}</p>
+            )}
           </div>
         </section>
 
@@ -290,32 +355,51 @@ export default function CompanyDetails({
                 Company Name <span className="text-red-500 text-lg">*</span>
               </label>
               <div className="relative">
-                {/* <Building2 className="absolute left-3 top-3 w-5 h-5 text-gray-400" /> */}
                 <input
                   type="text"
+                  name="companyName"
                   value={formData.companyName}
                   onChange={(e) =>
                     handleInputChange("companyName", e.target.value)
                   }
-                  className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onBlur={() => handleBlur("companyName")}
+                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.companyName && touched.companyName
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="Enter Company Name"
                 />
               </div>
+              {errors.companyName && touched.companyName && (
+                <p className="text-red-500 text-sm mt-1">{errors.companyName}</p>
+              )}
             </div>
 
             <div>
               <label className="block text-base font-medium text-gray-700 mb-2">
-                GST Number
+                GST Number <span className="text-red-500 text-lg">*</span>
               </label>
               <div className="relative">
                 <input
                   type="text"
+                  name="gstNumber"
                   value={formData.gstNumber}
-                  onChange={(e) => handleInputChange("gstNumber", e.target.value)}
-                  className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="GSTIN / Tax ID"
+                  onChange={(e) => handleInputChange("gstNumber", e.target.value.toUpperCase())}
+                  onBlur={() => handleBlur("gstNumber")}
+                  maxLength={15}
+                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.gstNumber && touched.gstNumber
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
+                  placeholder="22AAAAA0000A1Z5"
                 />
               </div>
+              <p className="text-xs text-gray-500 mt-1">15 alphanumeric characters (e.g., 22AAAAA0000A1Z5)</p>
+              {errors.gstNumber && touched.gstNumber && (
+                <p className="text-red-500 text-sm mt-1">{errors.gstNumber}</p>
+              )}
             </div>
  
             <div>
@@ -323,15 +407,23 @@ export default function CompanyDetails({
                 Business Email <span className="text-red-500 text-lg">*</span>
               </label>
               <div className="relative">
-                {/* <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" /> */}
                 <input
                   type="email"
+                  name="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onBlur={() => handleBlur("email")}
+                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.email && touched.email
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="company@example.com"
                 />
               </div>
+              {errors.email && touched.email && (
+                <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+              )}
             </div>
 
             <div>
@@ -339,15 +431,23 @@ export default function CompanyDetails({
                 Phone Number <span className="text-red-500 text-lg">*</span>
               </label>
               <div className="relative">
-                {/* <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" /> */}
                 <input
                   type="tel"
+                  name="phone"
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
-                  className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onBlur={() => handleBlur("phone")}
+                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.phone && touched.phone
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="+1 (555) 000-0000"
                 />
               </div>
+              {errors.phone && touched.phone && (
+                <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
+              )}
             </div>
 
             <div>
@@ -533,11 +633,20 @@ export default function CompanyDetails({
               </label>
               <input
                 type="text"
+                name="address"
                 value={formData.address}
                 onChange={(e) => handleInputChange("address", e.target.value)}
-                className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onBlur={() => handleBlur("address")}
+                className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors.address && touched.address
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-300'
+                }`}
                 placeholder="Enter Street Address"
               />
+              {errors.address && touched.address && (
+                <p className="text-red-500 text-sm mt-1">{errors.address}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -547,11 +656,20 @@ export default function CompanyDetails({
                 </label>
                 <input
                   type="text"
+                  name="city"
                   value={formData.city}
                   onChange={(e) => handleInputChange("city", e.target.value)}
-                  className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onBlur={() => handleBlur("city")}
+                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.city && touched.city
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="City"
                 />
+                {errors.city && touched.city && (
+                  <p className="text-red-500 text-sm mt-1">{errors.city}</p>
+                )}
               </div>
 
               <div>
@@ -560,11 +678,20 @@ export default function CompanyDetails({
                 </label>
                 <input
                   type="text"
+                  name="state"
                   value={formData.state}
                   onChange={(e) => handleInputChange("state", e.target.value)}
-                  className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onBlur={() => handleBlur("state")}
+                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.state && touched.state
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="State"
                 />
+                {errors.state && touched.state && (
+                  <p className="text-red-500 text-sm mt-1">{errors.state}</p>
+                )}
               </div>
 
               <div>
@@ -573,11 +700,20 @@ export default function CompanyDetails({
                 </label>
                 <input
                   type="text"
+                  name="zipCode"
                   value={formData.zipCode}
                   onChange={(e) => handleInputChange("zipCode", e.target.value)}
-                  className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onBlur={() => handleBlur("zipCode")}
+                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.zipCode && touched.zipCode
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="ZIP Code"
                 />
+                {errors.zipCode && touched.zipCode && (
+                  <p className="text-red-500 text-sm mt-1">{errors.zipCode}</p>
+                )}
               </div>
             </div>
 
@@ -588,14 +724,25 @@ export default function CompanyDetails({
               <Select
                 options={options}
                 value={selectedOption}
-                onChange={(option: any) =>
-                  handleInputChange("country", option ? option.label : "")
-                }
+                onChange={(option: any) => {
+                  handleInputChange("country", option ? option.label : "");
+                  handleBlur("country");
+                }}
                 className="w-full"
                 classNamePrefix="react-select"
                 instanceId="company-country-select"
                 isClearable
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderColor: errors.country && touched.country ? '#ef4444' : base.borderColor,
+                    backgroundColor: errors.country && touched.country ? '#fef2f2' : base.backgroundColor,
+                  })
+                }}
               />
+              {errors.country && touched.country && (
+                <p className="text-red-500 text-sm mt-1">{errors.country}</p>
+              )}
             </div>
 
             <div className="flex items-center">

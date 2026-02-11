@@ -28,11 +28,57 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     employeeCount: data.employeeCount || ''
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
   };
 
   const handleNext = () => {
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.ownerName) newErrors.ownerName = 'Owner Name is required';
+    if (!formData.ownerEmail) {
+      newErrors.ownerEmail = 'Owner Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ownerEmail)) {
+      newErrors.ownerEmail = 'Please enter a valid email address';
+    }
+    if (!formData.ownerPhone) {
+      newErrors.ownerPhone = 'Owner Phone is required';
+    } else {
+      const cleanPhone = formData.ownerPhone.replace(/[\s\-\(\)]/g, '');
+      if (!/^(\+?[0-9]{10,15})$/.test(cleanPhone)) {
+        newErrors.ownerPhone = 'Please enter a valid phone number (10-15 digits, optional + prefix)';
+      }
+    }
+    if (!formData.yearEstablished) newErrors.yearEstablished = 'Year Established is required';
+    if (!formData.employeeCount) newErrors.employeeCount = 'Employee Count is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      const allTouched: Record<string, boolean> = {};
+      Object.keys(newErrors).forEach(key => {
+        allTouched[key] = true;
+      });
+      setTouched(allTouched);
+      
+      const firstErrorField = Object.keys(newErrors)[0];
+      const element = document.querySelector(`[name="${firstErrorField}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     onUpdateData(formData);
     onNext();
   };
@@ -62,48 +108,75 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         <div className="p-6 space-y-6 ">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Owner Full Name *
+              Owner Full Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
+              name="ownerName"
               value={formData.ownerName}
               onChange={(e) => handleInputChange('ownerName', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onBlur={() => handleBlur('ownerName')}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.ownerName && touched.ownerName
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-gray-300'
+              }`}
               placeholder="Enter owner's full name"
             />
+            {errors.ownerName && touched.ownerName && (
+              <p className="text-red-500 text-sm mt-1">{errors.ownerName}</p>
+            )}
           </div>
 
           
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Owner Email *
+                Owner Email <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                 <input
                   type="email"
+                  name="ownerEmail"
                   value={formData.ownerEmail}
                   onChange={(e) => handleInputChange('ownerEmail', e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onBlur={() => handleBlur('ownerEmail')}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.ownerEmail && touched.ownerEmail
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="owner@company.com"
                 />
               </div>
+              {errors.ownerEmail && touched.ownerEmail && (
+                <p className="text-red-500 text-sm mt-1">{errors.ownerEmail}</p>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Owner Phone *
+                Owner Phone <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                 <input
                   type="tel"
+                  name="ownerPhone"
                   value={formData.ownerPhone}
                   onChange={(e) => handleInputChange('ownerPhone', e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onBlur={() => handleBlur('ownerPhone')}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.ownerPhone && touched.ownerPhone
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-300'
+                  }`}
                   placeholder="+1 (555) 000-0000"
                 />
               </div>
+              {errors.ownerPhone && touched.ownerPhone && (
+                <p className="text-red-500 text-sm mt-1">{errors.ownerPhone}</p>
+              )}
             </div>
         
         </div>
@@ -121,12 +194,15 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
           <div>
             <Dropdown
               id="year-established"
-              label="Year Business Established *"
+              label="Year Business Established"
               value={formData.yearEstablished}
               options={years}
               placeholder="Select year"
               onChange={(v) => handleInputChange('yearEstablished', v)}
             />
+            {errors.yearEstablished && touched.yearEstablished && (
+              <p className="text-red-500 text-sm mt-1">{errors.yearEstablished}</p>
+            )}
           </div>
         </div>
       </section>
@@ -142,7 +218,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         <div className="p-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-4">
-              Number of Employees *
+              Number of Employees <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {employeeRanges.map((range) => (
@@ -152,6 +228,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-colors text-center ${
                     formData.employeeCount === range.id
                       ? 'border-blue-600 bg-blue-50'
+                      : errors.employeeCount && touched.employeeCount
+                      ? 'border-red-500 bg-red-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -160,6 +238,9 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                 </div>
               ))}
             </div>
+            {errors.employeeCount && touched.employeeCount && (
+              <p className="text-red-500 text-sm mt-2">{errors.employeeCount}</p>
+            )}
           </div>
         </div>
       </section>

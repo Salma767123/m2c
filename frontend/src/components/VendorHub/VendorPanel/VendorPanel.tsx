@@ -30,6 +30,7 @@ interface FormData {
 export default function VendorPanel() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({});
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
   // Check if Manufacturing Facilities step should be included
   const isManufacturer = () => {
@@ -79,9 +80,18 @@ export default function VendorPanel() {
     setFormData(prev => ({ ...prev, ...stepData }));
   };
 
+  const markStepAsCompleted = (step: number) => {
+    if (!completedSteps.includes(step)) {
+      setCompletedSteps(prev => [...prev, step]);
+    }
+  };
+
   const nextStep = () => {
     const maxStep = steps.length - 1;
     if (currentStep < maxStep) {
+      // Mark current step as completed
+      markStepAsCompleted(currentStep);
+      
       // Special handling when moving from Vendor Type & Products step
       if (currentStep === 3) {
         // If not a manufacturer, skip Manufacturing Facilities
@@ -108,7 +118,13 @@ export default function VendorPanel() {
   };
 
   const goToStep = (step: number) => {
-    setCurrentStep(step);
+    // Only allow going to completed steps or the next immediate step
+    if (step <= currentStep || completedSteps.includes(step - 1)) {
+      setCurrentStep(step);
+    } else {
+      // Show alert that previous steps must be completed
+      alert('Please complete the previous steps before proceeding to this step.');
+    }
   };
 
   const renderStep = () => {
@@ -144,59 +160,70 @@ export default function VendorPanel() {
           <div className="p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-6">Registration Progress</h2>
             <div className="space-y-4">
-              {steps.map((step, index) => (
-                <div
-                  key={index}
-                  className={`flex items-center space-x-3 cursor-pointer p-3 rounded-lg transition-all duration-200 ${
-                    index === currentStep
-                      ? 'bg-gray-200 border-r-6 border-[#3d3d3d]'
-                      : index < currentStep
-                      ? 'bg-green-50 hover:bg-green-100'
-                      : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => goToStep(index)}
-                >
-                  {/* Step Number/Icon */}
+              {steps.map((step, index) => {
+                const isCompleted = completedSteps.includes(index);
+                const isCurrent = index === currentStep;
+                const isAccessible = index <= currentStep || isCompleted || (index > 0 && completedSteps.includes(index - 1));
+                
+                return (
                   <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-                      index === currentStep
-                        ? 'bg-[#313131] text-white'
-                        : index < currentStep
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-200 text-gray-600'
+                    key={index}
+                    className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
+                      isCurrent
+                        ? 'bg-gray-200 border-r-6 border-[#3d3d3d]'
+                        : isCompleted
+                        ? 'bg-green-50 hover:bg-green-100 cursor-pointer'
+                        : isAccessible
+                        ? 'hover:bg-gray-50 cursor-pointer'
+                        : 'opacity-50 cursor-not-allowed'
                     }`}
+                    onClick={() => isAccessible && goToStep(index)}
                   >
-                    {index < currentStep ? (
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      index + 1
-                    )}
-                  </div>
-                  
-                  {/* Step Title */}
-                  <div className="flex-1">
-                    <p
-                      className={`text-base font-bold ${
-                        index === currentStep
-                          ? 'text-[#313131]'
-                          : index < currentStep
-                          ? 'text-green-900'
-                          : 'text-gray-600'
+                    {/* Step Number/Icon */}
+                    <div
+                      className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
+                        isCurrent
+                          ? 'bg-[#313131] text-white'
+                          : isCompleted
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-200 text-gray-600'
                       }`}
                     >
-                      {step}
-                    </p>
-                    {index === currentStep && (
-                      <p className="text-sm text-[#313131] mt-1">Current Step</p>
-                    )}
-                    {index < currentStep && (
-                      <p className="text-sm text-green-600 mt-1">Completed</p>
-                    )}
+                      {isCompleted ? (
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      ) : (
+                        index + 1
+                      )}
+                    </div>
+                    
+                    {/* Step Title */}
+                    <div className="flex-1">
+                      <p
+                        className={`text-base font-bold ${
+                          isCurrent
+                            ? 'text-[#313131]'
+                            : isCompleted
+                            ? 'text-green-900'
+                            : 'text-gray-600'
+                        }`}
+                      >
+                        {step}
+                      </p>
+                      {isCurrent && (
+                        <p className="text-sm text-[#313131] mt-1">Current Step</p>
+                      )}
+                      {isCompleted && (
+                        <p className="text-sm text-green-600 mt-1">Completed</p>
+                      )}
+                      {!isAccessible && !isCurrent && !isCompleted && (
+                        <p className="text-sm text-gray-400 mt-1">Locked</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             
             {/* Progress Summary */}

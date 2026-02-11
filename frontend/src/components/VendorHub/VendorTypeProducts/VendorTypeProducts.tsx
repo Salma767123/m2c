@@ -36,6 +36,9 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
     categoryRemarks: data.categoryRemarks || ''
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
   // Fetch categories from API
   useEffect(() => {
     const fetchCategories = async () => {
@@ -132,6 +135,11 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
         vendorType: exists ? current.filter(t => t !== typeId) : [...current, typeId]
       };
     });
+    // Clear error when user makes a selection
+    if (errors.vendorType) {
+      setErrors(prev => ({ ...prev, vendorType: '' }));
+    }
+    setTouched(prev => ({ ...prev, vendorType: true }));
   };
 
   const toggleMarketType = (typeId: string) => {
@@ -143,6 +151,11 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
         marketType: exists ? current.filter(t => t !== typeId) : [...current, typeId]
       };
     });
+    // Clear error when user makes a selection
+    if (errors.marketType) {
+      setErrors(prev => ({ ...prev, marketType: '' }));
+    }
+    setTouched(prev => ({ ...prev, marketType: true }));
   };
   
    const handleInputChange = (field: string, value: any) => {
@@ -174,9 +187,52 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
          }
        };
      });
+     // Clear error when user makes a selection
+     if (errors.selectedCategories) {
+       setErrors(prev => ({ ...prev, selectedCategories: '' }));
+     }
+     setTouched(prev => ({ ...prev, selectedCategories: true }));
    };
 
    const handleNext = () => {
+     // Validate required fields
+     const newErrors: Record<string, string> = {};
+     
+     if (!formData.vendorType || formData.vendorType.length === 0) {
+       newErrors.vendorType = 'Please select at least one Vendor Type';
+     }
+
+     if (!formData.marketType || formData.marketType.length === 0) {
+       newErrors.marketType = 'Please select at least one Market Focus option';
+     }
+
+     // Check if at least one product category is selected
+     const hasSelectedCategories = Object.values(formData.selectedCategories).some(
+       (subCategories: any) => subCategories && subCategories.length > 0
+     );
+
+     if (!hasSelectedCategories) {
+       newErrors.selectedCategories = 'Please select at least one product category';
+     }
+
+     if (Object.keys(newErrors).length > 0) {
+       setErrors(newErrors);
+       // Mark all fields as touched to show errors
+       const allTouched: Record<string, boolean> = {};
+       Object.keys(newErrors).forEach(key => {
+         allTouched[key] = true;
+       });
+       setTouched(allTouched);
+       
+       // Scroll to first error section
+       const firstErrorField = Object.keys(newErrors)[0];
+       const element = document.querySelector(`[data-section="${firstErrorField}"]`);
+       if (element) {
+         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+       }
+       return;
+     }
+
      onUpdateData(formData);
      onNext();
    };
@@ -236,9 +292,11 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
            </div>
 
        {/* Vendor Type */}
-       <section className="bg-white border border-gray-200 rounded-lg">
+       <section className="bg-white border border-gray-200 rounded-lg" data-section="vendorType">
          <div className="px-4 py-3">
-           <h2 className="text-lg font-semibold text-gray-900">Vendor Type</h2>
+           <h2 className="text-lg font-semibold text-gray-900">
+             Vendor Type <span className="text-red-500 text-lg">*</span>
+           </h2>
          </div>
          <div className="px-6 pb-6">
              <div className="flex flex-wrap gap-2">
@@ -249,6 +307,8 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
                    className={`p-4 rounded-4xl cursor-pointer transition-colors ${
                      (formData.vendorType || []).includes(type.id)
                        ? "border-2 border-blue-600 bg-blue-50 text-blue-700 "
+                       : errors.vendorType && touched.vendorType
+                       ? "border-2 border-red-500 bg-red-50"
                        : "bg-gray-100 text-gray-500"
                    }`}
                  >
@@ -256,15 +316,18 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
                  </div>
                ))}
              </div>
+             {errors.vendorType && touched.vendorType && (
+               <p className="text-red-500 text-sm mt-2">{errors.vendorType}</p>
+             )}
            </div>
        </section>
 
        {/* Market Type */}
-       <section className="bg-white border border-gray-200 rounded-lg">
+       <section className="bg-white border border-gray-200 rounded-lg" data-section="marketType">
          <div className="px-4 py-3">
            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
              <Globe className="w-5 h-5 mr-2" />
-             Market Focus
+             Market Focus <span className="text-red-500 text-lg ml-1">*</span>
            </h2>
          </div>
          <div className="px-6 pb-6">
@@ -276,6 +339,8 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
                    className={`p-4 rounded-4xl cursor-pointer transition-colors ${
                      (formData.marketType || []).includes(type.id)
                        ? "border-2 border-blue-600 bg-blue-50 text-blue-700 "
+                       : errors.marketType && touched.marketType
+                       ? "border-2 border-red-500 bg-red-50"
                        : "bg-gray-100 text-gray-500"
                    }`}
                  >
@@ -283,16 +348,21 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
                  </div>
                ))}
              </div>
+             {errors.marketType && touched.marketType && (
+               <p className="text-red-500 text-sm mt-2">{errors.marketType}</p>
+             )}
            </div>
        </section>
 
        {/* Product Categories */}
-       <section className="bg-white border border-gray-200 rounded-lg">
+       <section className="bg-white border border-gray-200 rounded-lg" data-section="selectedCategories">
          <div className="px-4 py-3">
-           <h2 className="text-lg font-semibold text-gray-900">Product Categories</h2>
+           <h2 className="text-lg font-semibold text-gray-900">
+             Product Categories <span className="text-red-500 text-lg">*</span>
+           </h2>
            <p className="text-sm text-gray-600">Select the categories that match your products</p>
          </div>
-         <div className="p-4">
+         <div className={`p-4 ${errors.selectedCategories && touched.selectedCategories ? 'bg-red-50 border-2 border-red-500 rounded-lg' : ''}`}>
            <div className="space-y-4">
              {categories.map((category) => (
                <div key={category.id} className="border border-gray-200 rounded-lg">
@@ -344,6 +414,9 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
                </div>
              ))}
            </div>
+           {errors.selectedCategories && touched.selectedCategories && (
+             <p className="text-red-500 text-sm mt-2">{errors.selectedCategories}</p>
+           )}
          </div>
        </section>
 

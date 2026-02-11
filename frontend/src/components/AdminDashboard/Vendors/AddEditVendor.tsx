@@ -136,6 +136,7 @@ const businessTypes = [
 export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
+  const [completedSteps, setCompletedSteps] = useState<number[]>([])
   const [formData, setFormData] = useState<VendorFormData>({
     // Company Details
     businessType: '',
@@ -294,6 +295,11 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   const nextStep = () => {
     const maxStep = filteredSteps.length - 1
     if (currentStep < maxStep) {
+      // Mark current step as completed
+      if (!completedSteps.includes(currentStep)) {
+        setCompletedSteps(prev => [...prev, currentStep])
+      }
+      
       // Special handling when moving from Vendor Type & Products step
       if (currentStep === 3) {
         // If not a manufacturer, skip Manufacturing Facilities
@@ -320,7 +326,15 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   }
 
   const goToStep = (step: number) => {
-    setCurrentStep(step)
+    // Only allow navigation to current step or completed steps
+    // Do NOT allow jumping to next step without completing current one
+    const canNavigate = step === currentStep || completedSteps.includes(step)
+    
+    if (canNavigate) {
+      setCurrentStep(step)
+    } else {
+      alert('Please complete the current section before proceeding to this step.')
+    }
   }
 
   const handleSubmit = async () => {
@@ -331,7 +345,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       // API call would go here
       // await createOrUpdateVendor(formData)
       
-      router.push('/dashboard/vendors')
+      router.push('/admin/dashboard/vendors')
     } catch (error) {
       console.error('Error submitting vendor:', error)
     }
@@ -385,30 +399,39 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
             <div className="space-y-4">
               {filteredSteps.map((step, index) => {
                 const Icon = step.icon
+                const isCompleted = completedSteps.includes(index)
+                const isCurrent = index === currentStep
+                const isAccessible = isCurrent || isCompleted
+                const isLocked = !isAccessible
+                
                 return (
                   <div
                     key={index}
-                    className={`flex items-center space-x-3 cursor-pointer p-3 rounded-lg transition-all duration-200 ${
-                      index === currentStep
-                        ? 'bg-gray-200 border-r-4 border-[#313131]'
-                        : index < currentStep
-                        ? 'bg-green-50 hover:bg-green-100'
-                        : 'hover:bg-gray-50'
+                    className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
+                      isCurrent
+                        ? 'bg-gray-200 border-r-4 border-[#313131] cursor-pointer'
+                        : isCompleted
+                        ? 'bg-green-50 hover:bg-green-100 cursor-pointer'
+                        : 'bg-gray-50 opacity-60 cursor-not-allowed'
                     }`}
                     onClick={() => goToStep(index)}
                   >
                     <div
                       className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-                        index === currentStep
+                        isCurrent
                           ? 'bg-[#313131] text-white'
-                          : index < currentStep
+                          : isCompleted
                           ? 'bg-green-600 text-white'
-                          : 'bg-gray-200 text-gray-600'
+                          : 'bg-gray-300 text-gray-500'
                       }`}
                     >
-                      {index < currentStep ? (
+                      {isCompleted ? (
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      ) : isLocked ? (
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                         </svg>
                       ) : (
                         <Icon className="w-4 h-4" />
@@ -418,20 +441,23 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                     <div className="flex-1">
                       <p
                         className={`text-sm font-medium ${
-                          index === currentStep
+                          isCurrent
                             ? 'text-[#313131]'
-                            : index < currentStep
+                            : isCompleted
                             ? 'text-green-900'
-                            : 'text-gray-600'
+                            : 'text-gray-400'
                         }`}
                       >
                         {step.title}
                       </p>
-                      {index === currentStep && (
+                      {isCurrent && (
                         <p className="text-xs text-[#313131] mt-1">Current Step</p>
                       )}
-                      {index < currentStep && (
+                      {isCompleted && (
                         <p className="text-xs text-green-600 mt-1">Completed</p>
+                      )}
+                      {isLocked && (
+                        <p className="text-xs text-gray-400 mt-1">Locked</p>
                       )}
                     </div>
                   </div>

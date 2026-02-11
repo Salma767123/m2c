@@ -58,6 +58,9 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     }
   }));
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
   const addAlternateContact = () => {
     if (formData.alternateContacts.length < 3) {
       const newContact: Contact = {
@@ -92,6 +95,15 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         [field]: value
       }
     }));
+    // Clear error when user starts typing
+    const errorKey = `mainContact.${field}`;
+    if (errors[errorKey]) {
+      setErrors(prev => ({ ...prev, [errorKey]: '' }));
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
   };
 
   const updateAlternateContact = (id: string, field: string, value: string) => {
@@ -121,6 +133,58 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
   };
 
   const handleNext = () => {
+    // Validate main contact required fields
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.mainContact.name || formData.mainContact.name.trim() === '') {
+      newErrors['mainContact.name'] = 'Name is required';
+    }
+
+    if (!formData.mainContact.designation || formData.mainContact.designation.trim() === '') {
+      newErrors['mainContact.designation'] = 'Designation is required';
+    }
+
+    if (!formData.mainContact.email1 || formData.mainContact.email1.trim() === '') {
+      newErrors['mainContact.email1'] = 'Email is required';
+    } else {
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.mainContact.email1)) {
+        newErrors['mainContact.email1'] = 'Please enter a valid email address';
+      }
+    }
+
+    if (!formData.mainContact.phone1 || formData.mainContact.phone1.trim() === '') {
+      newErrors['mainContact.phone1'] = 'Phone is required';
+    } else {
+      const cleanPhone = formData.mainContact.phone1.replace(/[\s\-\(\)]/g, '');
+      if (!/^(\+?[0-9]{10,15})$/.test(cleanPhone)) {
+        newErrors['mainContact.phone1'] = 'Please enter a valid phone number (10-15 digits, optional + prefix)';
+      }
+    }
+
+    if (!formData.mainContact.department || formData.mainContact.department.trim() === '') {
+      newErrors['mainContact.department'] = 'Department is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      // Mark all fields as touched to show errors
+      const allTouched: Record<string, boolean> = {};
+      Object.keys(newErrors).forEach(key => {
+        allTouched[key] = true;
+      });
+      setTouched(allTouched);
+      
+      // Scroll to first error
+      const firstErrorField = Object.keys(newErrors)[0].split('.')[1];
+      const element = document.querySelector(`[name="mainContact.${firstErrorField}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     onUpdateData(formData);
     onNext();
   };
@@ -155,42 +219,69 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name *
+                Full Name <span className="text-red-500 text-lg">*</span>
               </label>
               <input
                 type="text"
+                name="mainContact.name"
                 value={formData.mainContact.name}
                 onChange={(e) => updateMainContact('name', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onBlur={() => handleBlur('mainContact.name')}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors['mainContact.name'] && touched['mainContact.name']
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-300'
+                }`}
                 placeholder="John Smith"
                 required
               />
+              {errors['mainContact.name'] && touched['mainContact.name'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['mainContact.name']}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Designation *
+                Designation <span className="text-red-500 text-lg">*</span>
               </label>
               <input
                 type="text"
+                name="mainContact.designation"
                 value={formData.mainContact.designation}
                 onChange={(e) => updateMainContact('designation', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onBlur={() => handleBlur('mainContact.designation')}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors['mainContact.designation'] && touched['mainContact.designation']
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-300'
+                }`}
                 placeholder="Sales Manager"
                 required
               />
+              {errors['mainContact.designation'] && touched['mainContact.designation'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['mainContact.designation']}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address 1 *
+                Email Address 1 <span className="text-red-500 text-lg">*</span>
               </label>
               <input
                 type="email"
+                name="mainContact.email1"
                 value={formData.mainContact.email1}
                 onChange={(e) => updateMainContact('email1', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onBlur={() => handleBlur('mainContact.email1')}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors['mainContact.email1'] && touched['mainContact.email1']
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-300'
+                }`}
                 placeholder="john@company.com"
                 required
               />
+              {errors['mainContact.email1'] && touched['mainContact.email1'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['mainContact.email1']}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -206,16 +297,25 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number 1 *
+                Phone Number 1 <span className="text-red-500 text-lg">*</span>
               </label>
               <input
                 type="tel"
+                name="mainContact.phone1"
                 value={formData.mainContact.phone1}
                 onChange={(e) => updateMainContact('phone1', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onBlur={() => handleBlur('mainContact.phone1')}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors['mainContact.phone1'] && touched['mainContact.phone1']
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-gray-300'
+                }`}
                 placeholder="+1 (555) 123-4567"
                 required
               />
+              {errors['mainContact.phone1'] && touched['mainContact.phone1'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['mainContact.phone1']}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -231,7 +331,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Department
+                Department <span className="text-red-500 text-lg">*</span>
               </label>
               <Dropdown
                 id="main-contact-department"
@@ -240,6 +340,9 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                 onChange={(v) => updateMainContact('department', String(v))}
                 placeholder="Select department"
               />
+              {errors['mainContact.department'] && touched['mainContact.department'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['mainContact.department']}</p>
+              )}
             </div>
           </div>
         </div>
