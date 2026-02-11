@@ -59,6 +59,14 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   const [vendorSubcategories, setVendorSubcategories] = useState<Array<{id: string; name: string; slug: string}>>([])
   const [filteredSubcategories, setFilteredSubcategories] = useState<Array<{id: string; name: string; slug: string}>>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+  
+  // Track original stock for edit mode
+  const [originalStock, setOriginalStock] = useState<number>(0)
+  
+  // Stock change reason modal
+  const [showStockReasonModal, setShowStockReasonModal] = useState(false)
+  const [stockChangeReason, setStockChangeReason] = useState('')
+  const [pendingFormData, setPendingFormData] = useState<InventoryFormData | null>(null)
 
   const [formData, setFormData] = useState<InventoryFormData>({
     name: '',
@@ -147,6 +155,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           const inventoryItem = await inventoryService.getItem(inventoryId)
           const formattedData = inventoryService.formatForForm(inventoryItem)
           setFormData(formattedData)
+          // Store original stock for comparison
+          setOriginalStock(inventoryItem.currentStock)
         } catch (error: any) {
           console.error('Error loading inventory data:', error)
           if (error.response?.status === 404) {
@@ -240,14 +250,45 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
       return
     }
     
+    // Check if stock changed in edit mode
+    if (isEdit && formData.currentStock !== originalStock) {
+      // Show reason modal
+      setPendingFormData(formData)
+      setShowStockReasonModal(true)
+      return
+    }
+    
+    // Proceed with normal save
+    await saveInventory(formData, null)
+  }
+
+  const saveInventory = async (data: InventoryFormData, stockReason: string | null) => {
     setIsLoading(true)
 
     try {
-      const apiData = inventoryService.formatForAPI(formData)
+      const apiData = inventoryService.formatForAPI(data)
       
       if (isEdit && inventoryId) {
         console.log('Updating inventory item:', inventoryId, apiData)
-        await inventoryService.updateItem(inventoryId, apiData)
+        
+        // If stock changed, update it separately with reason
+        if (data.currentStock !== originalStock && stockReason) {
+          await inventoryService.updateStock(inventoryId, {
+            currentStock: data.currentStock,
+            reason: stockReason,
+            notes: data.notes
+          })
+          
+          // Update other fields (excluding stock)
+          const { currentStock, ...otherData } = apiData
+          if (Object.keys(otherData).length > 0) {
+            await inventoryService.updateItem(inventoryId, otherData)
+          }
+        } else {
+          // No stock change, update normally
+          await inventoryService.updateItem(inventoryId, apiData)
+        }
+        
         console.log('✅ Inventory item updated successfully')
       } else {
         console.log('Creating inventory item:', apiData)
@@ -271,6 +312,20 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleStockReasonSubmit = async () => {
+    if (!stockChangeReason.trim() || stockChangeReason.trim().length < 5) {
+      alert('Please provide a reason (minimum 5 characters)')
+      return
+    }
+    
+    if (!pendingFormData) return
+    
+    setShowStockReasonModal(false)
+    await saveInventory(pendingFormData, stockChangeReason)
+    setStockChangeReason('')
+    setPendingFormData(null)
   }
 
   const handleCreateProduct = () => {
@@ -773,6 +828,56 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           </div>
         </div>
       </form>
+
+      {/* Stock Change Reason Modal */}
+      {showStockReasonModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">Stock Change Reason Required</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Stock changed from {originalStock} to {formData.currentStock} units
+              </p>
+            </div>
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reason for stock change <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={stockChangeReason}
+                onChange={(e) => setStockChangeReason(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                placeholder="e.g., New shipment received, Damaged items removed, Inventory correction"
+                rows={4}
+                autoFocus
+              />
+              <p className="text-xs text-gray-500 mt-1">Minimum 5 characters required</p>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex space-x-3">
+              <Button
+                type="button"
+                onClick={() => {
+                  setShowStockReasonModal(false)
+                  setStockChangeReason('')
+                  setPendingFormData(null)
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleStockReasonSubmit}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={!stockChangeReason.trim() || stockChangeReason.trim().length < 5}
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

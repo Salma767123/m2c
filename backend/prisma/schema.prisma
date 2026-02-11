@@ -450,10 +450,34 @@ model Inventory {
   productId         String?   @db.ObjectId
   products          Product[] @relation("InventoryProducts")
   
+  // Stock Change History
+  stockHistory      StockChangeHistory[]
+  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@map("inventory")
+}
+
+model StockChangeHistory {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  inventoryId   String    @db.ObjectId
+  inventory     Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  
+  // Stock Change Details
+  previousStock Int
+  newStock      Int
+  changeAmount  Int       // Can be positive (increase) or negative (decrease)
+  reason        String
+  
+  // User Information
+  changedBy     String    // User ID (Admin or Vendor)
+  changedByType String    // "admin" or "vendor"
+  changedByName String?   // Name of the person who made the change
+  
+  createdAt     DateTime  @default(now())
+
+  @@map("stock_change_history")
 }
 
 enum InventoryStatus {

@@ -1091,9 +1091,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         }
                         placeholder="Select Category"
                         onChange={(value) => setFormData(prev => ({ ...prev, category: value as string, subCategory: '' }))}
-                        disabled={formData.isFromInventory}
+                        disabled={formData.isFromInventory && !isEdit}
                       />
-                      {formData.isFromInventory && (
+                      {formData.isFromInventory && !isEdit && (
                         <p className="text-xs text-gray-500 mt-1">From inventory item</p>
                       )}
                     </div>
@@ -1112,9 +1112,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         }
                         placeholder="Select Sub-Category"
                         onChange={(value) => setFormData(prev => ({ ...prev, subCategory: value as string }))}
-                        disabled={formData.isFromInventory}
+                        disabled={formData.isFromInventory && !isEdit}
                       />
-                      {formData.isFromInventory && (
+                      {formData.isFromInventory && !isEdit && (
                         <p className="text-xs text-gray-500 mt-1">From inventory item</p>
                       )}
                     </div>
