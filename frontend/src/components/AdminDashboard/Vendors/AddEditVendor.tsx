@@ -345,7 +345,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       // API call would go here
       // await createOrUpdateVendor(formData)
       
-      router.push('/dashboard/vendors')
+      router.push('/admin/dashboard/vendors')
     } catch (error) {
       console.error('Error submitting vendor:', error)
     }
