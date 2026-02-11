@@ -83,7 +83,7 @@ export default function CreateSupport() {
     <div className="max-w-420 mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/vendor/dashboard/support" className="text-blue-600 hover:text-blue-700">
+        <Link href="/vendor/dashboard/support" className="text-white bg-gray-900 p-2 rounded">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
@@ -212,7 +212,7 @@ export default function CreateSupport() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
           >
             <Send className="w-4 h-4" />
             {isSubmitting ? 'Submitting...' : 'Submit Ticket'}

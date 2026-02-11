@@ -27,9 +27,9 @@ import {
   Download
 } from 'lucide-react'
 import VendorService, { VendorProfile } from '@/services/vendorService'
-import RejectionModal from './SimpleRejectionModal'
-import SuspensionModal from './SimpleSuspensionModal'
 import { toast } from '@/hooks/use-toast'
+import RejectionModal from './RejectionModal'
+import SuspensionModal from './SuspensionModal'
 
 interface VendorViewProps {
   vendorId: string
@@ -202,7 +202,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center space-x-4">
               <Button
@@ -309,7 +309,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'overview' && <OverviewTab vendor={vendor} />}
         {activeTab === 'details' && <DetailsTab vendor={vendor} />}
         {activeTab === 'products' && <ProductsTab vendor={vendor} />}

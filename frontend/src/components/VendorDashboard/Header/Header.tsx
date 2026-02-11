@@ -17,7 +17,6 @@ import {
   HelpCircle,
   LayoutDashboard,
   Package,
-  Users,
   BarChart3,
   FileText,
   Truck,
@@ -77,12 +76,31 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
     const pageMap: Record<string, { title: string; icon: React.ComponentType<any> }> = {
       '/vendor/dashboard': { title: 'Dashboard', icon: LayoutDashboard },
       '/vendor/dashboard/products': { title: 'Products', icon: Package },
+      '/vendor/dashboard/products/add': { title: 'Products', icon: Package },
+      '/vendor/dashboard/products/edit': { title: 'Products', icon: Package },
       '/vendor/dashboard/inventory': { title: 'Inventory', icon: Package },
-      '/vendor/dashboard/earnings': { title: 'Earnings', icon: BarChart3 },
+      '/vendor/dashboard/inventory/add': { title: 'Inventory', icon: Package },
+      '/vendor/dashboard/inventory/edit': { title: 'Inventory', icon: Package },
+      '/vendor/dashboard/orders': { title: 'Orders', icon: Truck },
+      '/vendor/dashboard/earnings': { title: 'Overview', icon: BarChart3 },
+      '/vendor/dashboard/earnings/payouts': { title: 'Payouts', icon: BarChart3 },
       '/vendor/dashboard/reports': { title: 'Reports', icon: FileText },
       '/vendor/dashboard/support': { title: 'Support', icon: HelpCircle },
-      '/vendor/dashboard/settings': { title: 'Settings', icon: Settings },
+      '/vendor/dashboard/support/create': { title: 'Support', icon: HelpCircle },
+      '/vendor/dashboard/settings': { title: 'Vendor Settings', icon: Settings },
+      '/vendor/dashboard/settings/bank': { title: 'Bank Details', icon: Settings },
       '/vendor/dashboard/profile': { title: 'Profile', icon: User },
+      '/vendor/dashboard/profile/bank': { title: 'Profile', icon: User },
+    }
+
+    // Handle dynamic routes like /vendor/dashboard/orders/[id] or /vendor/dashboard/products/[id]
+    if (pathname.startsWith('/vendor/dashboard/orders/') && pathname !== '/vendor/dashboard/orders') {
+      return { title: 'Orders', icon: Truck }
+    }
+    if (pathname.startsWith('/vendor/dashboard/products/') && 
+        !pathname.includes('/add') && 
+        !pathname.includes('/edit')) {
+      return { title: 'Products', icon: Package }
     }
 
     return pageMap[pathname] || { title: 'Dashboard', icon: LayoutDashboard }
@@ -166,7 +184,7 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
             </div>
 
             {/* Search Bar - Desktop */}
-            <div className="relative hidden lg:block ml-8">
+            {/* <div className="relative hidden lg:block ml-8">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -175,7 +193,7 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-[#222222] w-64 text-sm transition-all"
               />
-            </div>
+            </div> */}
           </div>
 
           {/* Right Section */}

@@ -5,6 +5,7 @@ import { Search, Eye, CheckCircle, XCircle } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
+import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 
 interface Settlement {
   id: string;
@@ -97,6 +98,7 @@ export default function Settlement() {
 
   return (
     <div className="p-6">
+      <Breadcrumb />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Settlement</h1>
         <p className="text-gray-600 mt-1">Track and manage vendor payment settlements</p>

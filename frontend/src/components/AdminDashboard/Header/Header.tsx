@@ -98,18 +98,69 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
   // Map pathnames to titles and icons
   const getPageInfo = () => {
     const pageMap: Record<string, { title: string; icon: React.ComponentType<any> }> = {
-      '/dashboard': { title: 'Dashboard', icon: LayoutDashboard },
-      '/dashboard/vendors': { title: 'Vendors Management', icon: Store },
-      '/dashboard/products': { title: 'Products Management', icon: Package },
-      '/dashboard/inventory': { title: 'Inventory Management', icon: Warehouse },
-      '/dashboard/billing': { title: 'Invoice & Billing', icon: Receipt },
-      '/dashboard/categories': { title: 'Categories Management', icon: Tags },
-      '/dashboard/users': { title: 'Users Management', icon: Users },
-      '/dashboard/cms': { title: 'Content Management', icon: Edit3 },
-      '/dashboard/reviews': { title: 'Reviews Management', icon: MessageSquare },
-      '/dashboard/reports': { title: 'Reports', icon: FileText },
-      '/dashboard/admins': { title: 'Admin Management', icon: Shield },
-      '/dashboard/settings': { title: 'Settings', icon: Settings },
+      '/admin/dashboard': { title: 'Dashboard', icon: LayoutDashboard },
+      '/admin/dashboard/vendors': { title: 'Vendors', icon: Store },
+      '/admin/dashboard/vendors/add': { title: 'Vendors', icon: Store },
+      '/admin/dashboard/vendors/edit': { title: 'Vendors', icon: Store },
+      '/admin/dashboard/vendors/view': { title: 'Vendors', icon: Store },
+      '/admin/dashboard/products': { title: 'All Products', icon: Package },
+      '/admin/dashboard/products/add': { title: 'All Products', icon: Package },
+      '/admin/dashboard/products/edit': { title: 'All Products', icon: Package },
+      '/admin/dashboard/products/vendor-requests': { title: 'Vendor Requests', icon: Package },
+      '/admin/dashboard/inventory': { title: 'Inventory', icon: Warehouse },
+      '/admin/dashboard/inventory/add': { title: 'Inventory', icon: Warehouse },
+      '/admin/dashboard/inventory/edit': { title: 'Inventory', icon: Warehouse },
+      '/admin/dashboard/orders': { title: 'Orders', icon: Receipt },
+      '/admin/dashboard/billing': { title: 'Invoice & Billing', icon: Receipt },
+      '/admin/dashboard/billing/invoices': { title: 'Invoices', icon: Receipt },
+      '/admin/dashboard/billing/billings': { title: 'Billings', icon: Receipt },
+      '/admin/dashboard/billing/settlement': { title: 'Settlement', icon: Receipt },
+      '/admin/dashboard/categories': { title: 'Categories', icon: Tags },
+      '/admin/dashboard/categories/add': { title: 'Categories', icon: Tags },
+      '/admin/dashboard/categories/edit': { title: 'Categories', icon: Tags },
+      '/admin/dashboard/categories/view': { title: 'Categories', icon: Tags },
+      '/admin/dashboard/users': { title: 'Users', icon: Users },
+      '/admin/dashboard/users/customer-management': { title: 'Customer Management', icon: Users },
+      '/admin/dashboard/users/user-management': { title: 'User Management', icon: Users },
+      '/admin/dashboard/cms': { title: 'Content Management', icon: Edit3 },
+      '/admin/dashboard/reviews': { title: 'Reviews', icon: MessageSquare },
+      '/admin/dashboard/reviews/customer': { title: 'Customer Reviews', icon: MessageSquare },
+      '/admin/dashboard/reviews/vendor-products': { title: 'Vendor Product Reviews', icon: MessageSquare },
+      '/admin/dashboard/reports': { title: 'Reports', icon: FileText },
+      '/admin/dashboard/support': { title: 'Support', icon: HelpCircle },
+      '/admin/dashboard/roles-permissions': { title: 'All Roles', icon: Shield },
+      '/admin/dashboard/roles-permissions/add': { title: 'Create Role', icon: Shield },
+      '/admin/dashboard/roles-permissions/edit': { title: 'All Roles', icon: Shield },
+      '/admin/dashboard/settings': { title: 'Settings', icon: Settings },
+    }
+
+    // Handle dynamic routes like /admin/dashboard/orders/[id], /admin/dashboard/support/[id], etc.
+    if (pathname.startsWith('/admin/dashboard/orders/') && pathname !== '/admin/dashboard/orders') {
+      return { title: 'Orders', icon: Receipt }
+    }
+    if (pathname.startsWith('/admin/dashboard/support/') && pathname !== '/admin/dashboard/support') {
+      return { title: 'Support', icon: HelpCircle }
+    }
+    if (pathname.startsWith('/admin/dashboard/vendors/view/')) {
+      return { title: 'Vendors', icon: Store }
+    }
+    if (pathname.startsWith('/admin/dashboard/vendors/edit/')) {
+      return { title: 'Vendors', icon: Store }
+    }
+    if (pathname.startsWith('/admin/dashboard/products/edit/')) {
+      return { title: 'All Products', icon: Package }
+    }
+    if (pathname.startsWith('/admin/dashboard/inventory/edit/')) {
+      return { title: 'Inventory', icon: Warehouse }
+    }
+    if (pathname.startsWith('/admin/dashboard/categories/edit/')) {
+      return { title: 'Categories', icon: Tags }
+    }
+    if (pathname.startsWith('/admin/dashboard/categories/view/')) {
+      return { title: 'Categories', icon: Tags }
+    }
+    if (pathname.startsWith('/admin/dashboard/roles-permissions/edit/')) {
+      return { title: 'All Roles', icon: Shield }
     }
 
     return pageMap[pathname] || { title: 'Dashboard', icon: LayoutDashboard }
@@ -171,7 +222,7 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
             </div>
 
             {/* Search Bar - Desktop */}
-            <div className="relative hidden lg:block ml-8">
+            {/* <div className="relative hidden lg:block ml-8">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -180,7 +231,7 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-500 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-[#222222] w-64 md:w-96 text-sm transition-all"
               />
-            </div>
+            </div> */}
           </div>
 
           {/* Right Section */}
@@ -207,9 +258,9 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
               <MessageSquare className="h-5 w-5" />
             </Button>
 
-            <Button variant="ghost" size="sm" className="text-gray-700 hover:bg-gray-100">
+            {/* <Button variant="ghost" size="sm" className="text-gray-700 hover:bg-gray-100">
               <HelpCircle className="h-5 w-5" />
-            </Button>
+            </Button> */}
 
             {/* Notifications */}
             <div className="relative" ref={notificationsRef}>

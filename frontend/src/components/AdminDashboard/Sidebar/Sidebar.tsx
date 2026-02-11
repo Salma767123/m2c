@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Shield,
   ShoppingCart,
+  Headphones,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -100,6 +101,11 @@ const navigation: NavigationItem[] = [
       { title: "Billings", href: "/admin/dashboard/billing/billings" },
       { title: "Settlement", href: "/admin/dashboard/billing/settlement" },
     ],
+  },
+  {
+    title: "Support",
+    icon: Headphones,
+    href: "/admin/dashboard/support",
   },
   {
     title: "Reports",

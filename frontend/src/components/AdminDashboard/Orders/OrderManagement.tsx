@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import { mockOrders, Order, OrderStatus, getStatusColor, getStatusLabel, getPaymentStatusColor } from '../../mockData/orders';
 import AdminReviewModal, { AdminReviewData } from './AdminReviewModal';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../UI/Card';
+import { Card, CardContent } from '../../UI/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../UI/Table';
 import Dropdown from '../../UI/Dropdown';
+import { Breadcrumb } from '../Breadcrumb/Breadcrumb';
 
 const OrderManagement: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>(mockOrders);
@@ -136,6 +137,7 @@ const OrderManagement: React.FC = () => {
 
   return (
     <div className="p-6">
+      <Breadcrumb />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Management</h1>
         <p className="text-gray-600">Manage and track all customer orders through the fulfillment process</p>

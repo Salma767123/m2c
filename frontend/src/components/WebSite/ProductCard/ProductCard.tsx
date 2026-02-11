@@ -63,7 +63,8 @@ const ProductCard = ({ product }: ProductCardProps) => {
           <Image
             src={imageUrl}
             alt={product.name}
-            fill
+            width={400}
+            height={400}
             className="object-cover"
             unoptimized={!primaryImage} // Don't optimize placeholder SVG
             onError={(e) => {

@@ -37,9 +37,13 @@ export function Breadcrumb() {
     'support': 'Support',
     'analytics': 'Analytics',
     'customers': 'Customers',
-    'customer': 'Customer Orders',
+    'customer': 'Customer Reviews',
     'vendor-requests': 'Vendor Requests',
-    'roles-permissions': 'Roles & Permissions'
+    'roles-permissions': 'Roles & Permissions',
+    'invoices': 'Invoices',
+    'billings': 'Billings',
+    'settlement': 'Settlement',
+    'vendor-products': 'Vendor Product Reviews'
   }
 
   // Generate breadcrumb items from pathname

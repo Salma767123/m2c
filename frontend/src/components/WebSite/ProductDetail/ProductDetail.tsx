@@ -225,7 +225,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                         ref={setImageRef}
                         src={currentImageUrl}
                         alt={product.name}
-                        fill
+                        width={600} 
+                        height={600}
                         className="object-cover transition-opacity duration-300"
                         style={{ opacity: isImageHovered ? 0.8 : 1 }}
                       />

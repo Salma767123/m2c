@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { Star, Search, Eye, AlertCircle } from "lucide-react";
 import { mockOrders } from "../../mockData/orders";
-import { Card, CardContent, CardHeader, CardTitle } from "../../UI/Card";
+import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
+import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 
 interface VendorProductReview {
   id: string;
@@ -113,6 +114,7 @@ export default function VendorProductReviews() {
 
   return (
     <div className="p-6">
+      <Breadcrumb />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Vendor Product Reviews</h1>
         <p className="text-gray-600 mt-1">Review and approve vendor product submissions</p>

@@ -18,8 +18,8 @@ import Dropdown from '@/components/UI/Dropdown'
 import { Edit, Eye, CheckCircle, XCircle, Search, Filter, Plus } from 'lucide-react'
 import VendorService, { VendorProfile, VendorFilters } from '@/services/vendorService'
 import { formatDate } from '@/lib/utils'
-import RejectionModal from './SimpleRejectionModal'
-import SuspensionModal from './SimpleSuspensionModal'
+import RejectionModal from './RejectionModal'
+import SuspensionModal from './SuspensionModal'
 import { toast } from '@/hooks/use-toast'
 
 const getStatusBadge = (status: string) => {
