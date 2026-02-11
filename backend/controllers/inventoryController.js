@@ -4,7 +4,16 @@ const prisma = new PrismaClient();
 // Create new inventory item
 const createInventoryItem = async (req, res) => {
   try {
-    const vendorId = req.user.vendorId || req.user.id;
+    const isAdmin = req.user.role?.toUpperCase() === 'ADMIN';
+    const vendorId = isAdmin ? req.body.vendorId : (req.user.vendorId || req.user.id);
+    
+    if (!vendorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor ID is required'
+      });
+    }
+    
     const {
       name,
       sku,
@@ -152,13 +161,22 @@ const getVendorInventory = async (req, res) => {
 // Get single inventory item
 const getInventoryItem = async (req, res) => {
   try {
+    const isAdmin = req.user.role?.toUpperCase() === 'ADMIN';
     const vendorId = req.user.vendorId || req.user.id;
     const { id } = req.params;
 
+    const whereClause = isAdmin ? { id } : { id, vendorId };
+    
     const inventoryItem = await prisma.inventory.findFirst({
-      where: {
-        id,
-        vendorId
+      where: whereClause,
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            companyName: true,
+            email: true
+          }
+        }
       }
     });
 
@@ -187,6 +205,7 @@ const getInventoryItem = async (req, res) => {
 // Update inventory item
 const updateInventoryItem = async (req, res) => {
   try {
+    const isAdmin = req.user.role?.toUpperCase() === 'ADMIN';
     const vendorId = req.user.vendorId || req.user.id;
     const { id } = req.params;
     const {
@@ -203,15 +222,14 @@ const updateInventoryItem = async (req, res) => {
       sourceType,
       supplier,
       lastRestocked,
-      notes
+      notes,
+      vendorId: bodyVendorId
     } = req.body;
 
-    // Check if inventory item exists and belongs to vendor
+    // Check if inventory item exists
+    const whereClause = isAdmin ? { id } : { id, vendorId };
     const existingItem = await prisma.inventory.findFirst({
-      where: {
-        id,
-        vendorId
-      }
+      where: whereClause
     });
 
     if (!existingItem) {
@@ -243,29 +261,37 @@ const updateInventoryItem = async (req, res) => {
       });
     }
 
+    // Build update data
+    const updateData = {
+      ...(name && { name }),
+      ...(sku && { sku }),
+      ...(category && { category }),
+      ...(subcategory !== undefined && { subcategory }),
+      ...(description !== undefined && { description }),
+      ...(manufacturingDate !== undefined && { 
+        manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null 
+      }),
+      ...(currentStock !== undefined && { currentStock: parseInt(currentStock) }),
+      ...(minStock !== undefined && { minStock: parseInt(minStock) }),
+      ...(location !== undefined && { location }),
+      ...(status && { status }),
+      ...(sourceType !== undefined && { sourceType }),
+      ...(supplier !== undefined && { supplier }),
+      ...(lastRestocked !== undefined && { 
+        lastRestocked: lastRestocked ? new Date(lastRestocked) : null 
+      }),
+      ...(notes !== undefined && { notes })
+    };
+
+    // Admin can change vendor
+    if (isAdmin && bodyVendorId) {
+      updateData.vendorId = bodyVendorId;
+    }
+
     // Update inventory item
     const updatedItem = await prisma.inventory.update({
       where: { id },
-      data: {
-        ...(name && { name }),
-        ...(sku && { sku }),
-        ...(category && { category }),
-        ...(subcategory !== undefined && { subcategory }),
-        ...(description !== undefined && { description }),
-        ...(manufacturingDate !== undefined && { 
-          manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null 
-        }),
-        ...(currentStock !== undefined && { currentStock: parseInt(currentStock) }),
-        ...(minStock !== undefined && { minStock: parseInt(minStock) }),
-        ...(location !== undefined && { location }),
-        ...(status && { status }),
-        ...(sourceType !== undefined && { sourceType }),
-        ...(supplier !== undefined && { supplier }),
-        ...(lastRestocked !== undefined && { 
-          lastRestocked: lastRestocked ? new Date(lastRestocked) : null 
-        }),
-        ...(notes !== undefined && { notes })
-      }
+      data: updateData
     });
 
     res.json({
@@ -287,15 +313,14 @@ const updateInventoryItem = async (req, res) => {
 // Delete inventory item
 const deleteInventoryItem = async (req, res) => {
   try {
+    const isAdmin = req.user.role?.toUpperCase() === 'ADMIN';
     const vendorId = req.user.vendorId || req.user.id;
     const { id } = req.params;
 
-    // Check if inventory item exists and belongs to vendor
+    // Check if inventory item exists
+    const whereClause = isAdmin ? { id } : { id, vendorId };
     const existingItem = await prisma.inventory.findFirst({
-      where: {
-        id,
-        vendorId
-      }
+      where: whereClause
     });
 
     if (!existingItem) {
@@ -337,8 +362,16 @@ const deleteInventoryItem = async (req, res) => {
 const updateStock = async (req, res) => {
   try {
     const vendorId = req.user.vendorId || req.user.id;
+    const isAdmin = req.user.role?.toUpperCase() === 'ADMIN';
     const { id } = req.params;
-    const { currentStock, notes } = req.body;
+    const { currentStock, reason, notes } = req.body;
+
+    console.log('=== UPDATE STOCK REQUEST ===');
+    console.log('User role:', req.user.role);
+    console.log('Is Admin:', isAdmin);
+    console.log('Inventory ID:', id);
+    console.log('Current Stock:', currentStock);
+    console.log('Reason:', reason);
 
     if (currentStock === undefined) {
       return res.status(400).json({
@@ -347,12 +380,118 @@ const updateStock = async (req, res) => {
       });
     }
 
-    // Check if inventory item exists and belongs to vendor
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Reason for stock change is required'
+      });
+    }
+
+    // Check if inventory item exists
+    const whereClause = isAdmin ? { id } : { id, vendorId };
+    console.log('Where clause:', whereClause);
+    
     const existingItem = await prisma.inventory.findFirst({
-      where: {
-        id,
-        vendorId
+      where: whereClause
+    });
+
+    console.log('Existing item found:', !!existingItem);
+    if (existingItem) {
+      console.log('Item details:', {
+        id: existingItem.id,
+        name: existingItem.name,
+        vendorId: existingItem.vendorId,
+        currentStock: existingItem.currentStock
+      });
+    }
+
+    if (!existingItem) {
+      console.log('❌ Inventory item not found with ID:', id);
+      return res.status(404).json({
+        success: false,
+        message: 'Inventory item not found'
+      });
+    }
+
+    const newStock = parseInt(currentStock);
+    const previousStock = existingItem.currentStock;
+    const changeAmount = newStock - previousStock;
+
+    // Get user information
+    let changedByName = '';
+    if (isAdmin) {
+      const admin = await prisma.admin.findUnique({
+        where: { id: req.user.id },
+        select: { name: true }
+      });
+      changedByName = admin?.name || 'Admin';
+    } else {
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { ownerName: true }
+      });
+      changedByName = vendor?.ownerName || 'Vendor';
+    }
+
+    console.log('Updating stock from', previousStock, 'to', newStock);
+
+    // Update stock and create history record in a transaction
+    const [updatedItem, historyRecord] = await prisma.$transaction([
+      prisma.inventory.update({
+        where: { id },
+        data: {
+          currentStock: newStock,
+          ...(notes && { notes }),
+          lastRestocked: new Date()
+        }
+      }),
+      prisma.stockChangeHistory.create({
+        data: {
+          inventoryId: id,
+          previousStock,
+          newStock,
+          changeAmount,
+          reason: reason.trim(),
+          changedBy: req.user.id,
+          changedByType: isAdmin ? 'admin' : 'vendor',
+          changedByName
+        }
+      })
+    ]);
+
+    console.log('✅ Stock updated successfully');
+
+    res.json({
+      success: true,
+      message: 'Stock updated successfully',
+      data: {
+        inventory: updatedItem,
+        history: historyRecord
       }
+    });
+
+  } catch (error) {
+    console.error('❌ Error updating stock:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Get stock change history for an inventory item
+const getStockHistory = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId || req.user.id;
+    const isAdmin = req.user.role?.toUpperCase() === 'ADMIN';
+    const { id } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+
+    // Check if inventory item exists and user has access
+    const whereClause = isAdmin ? { id } : { id, vendorId };
+    const existingItem = await prisma.inventory.findFirst({
+      where: whereClause
     });
 
     if (!existingItem) {
@@ -362,24 +501,41 @@ const updateStock = async (req, res) => {
       });
     }
 
-    // Update stock
-    const updatedItem = await prisma.inventory.update({
-      where: { id },
-      data: {
-        currentStock: parseInt(currentStock),
-        ...(notes && { notes }),
-        lastRestocked: new Date()
-      }
+    // Get total count
+    const totalItems = await prisma.stockChangeHistory.count({
+      where: { inventoryId: id }
     });
+
+    // Get history records with pagination
+    const history = await prisma.stockChangeHistory.findMany({
+      where: { inventoryId: id },
+      orderBy: { createdAt: 'desc' },
+      skip: (parseInt(page) - 1) * parseInt(limit),
+      take: parseInt(limit)
+    });
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalItems / parseInt(limit));
+    const hasNextPage = parseInt(page) < totalPages;
+    const hasPrevPage = parseInt(page) > 1;
 
     res.json({
       success: true,
-      message: 'Stock updated successfully',
-      data: updatedItem
+      data: {
+        history,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalItems,
+          hasNextPage,
+          hasPrevPage,
+          limit: parseInt(limit)
+        }
+      }
     });
 
   } catch (error) {
-    console.error('Error updating stock:', error);
+    console.error('Error fetching stock history:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -700,6 +856,7 @@ module.exports = {
   updateInventoryItem,
   deleteInventoryItem,
   updateStock,
+  getStockHistory,
   getInventoryStats,
   getVendorCategories,
   getAllInventory,

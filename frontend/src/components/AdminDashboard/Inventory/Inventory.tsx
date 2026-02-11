@@ -13,10 +13,13 @@ import {
   TableRow,
 } from '@/components/UI/Table'
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
-import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2 } from 'lucide-react'
+import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import axiosInstance from '@/lib/axios'
+import StockUpdateModal from '@/components/Shared/StockUpdateModal'
+import StockHistoryModal from '@/components/Shared/StockHistoryModal'
+import inventoryService from '@/services/inventoryService'
 
 interface InventoryItem {
   id: string
@@ -64,6 +67,19 @@ export default function Inventory() {
     outOfStockItems: 0,
     totalStockUnits: 0
   })
+
+  // Stock update modal state
+  const [stockUpdateModal, setStockUpdateModal] = useState<{
+    isOpen: boolean
+    item: InventoryItem | null
+  }>({ isOpen: false, item: null })
+  const [isUpdatingStock, setIsUpdatingStock] = useState(false)
+  
+  // Stock history modal state
+  const [stockHistoryModal, setStockHistoryModal] = useState<{
+    isOpen: boolean
+    item: InventoryItem | null
+  }>({ isOpen: false, item: null })
 
   // Fetch inventory stats
   useEffect(() => {
@@ -122,6 +138,52 @@ export default function Inventory() {
     if (statusFilter === 'in_stock') return item.currentStock > item.minStock
     return true
   })
+
+  const handleUpdateStock = (item: InventoryItem) => {
+    setStockUpdateModal({ isOpen: true, item })
+  }
+
+  const handleViewHistory = (item: InventoryItem) => {
+    setStockHistoryModal({ isOpen: true, item })
+  }
+
+  const handleStockUpdate = async (newStock: number, reason: string, notes?: string) => {
+    if (!stockUpdateModal.item) return
+
+    setIsUpdatingStock(true)
+    try {
+      await inventoryService.adminUpdateStock(stockUpdateModal.item.id, {
+        currentStock: newStock,
+        reason,
+        notes
+      })
+
+      // Reload data
+      const params: any = {
+        page: currentPage,
+        limit: 10
+      }
+      if (searchTerm) params.search = searchTerm
+      if (categoryFilter !== 'all') params.category = categoryFilter
+
+      const [inventoryResponse, statsResponse] = await Promise.all([
+        axiosInstance.get('/inventory/admin/all', { params }),
+        axiosInstance.get('/inventory/admin/stats')
+      ])
+
+      if (inventoryResponse.data.success) {
+        setInventoryItems(inventoryResponse.data.data.items)
+      }
+      if (statsResponse.data.success) {
+        setStats(statsResponse.data.data)
+      }
+    } catch (error) {
+      console.error('Error updating stock:', error)
+      throw error
+    } finally {
+      setIsUpdatingStock(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -301,9 +363,23 @@ export default function Inventory() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleUpdateStock(item)}
+                            >
+                              Update Stock
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleViewHistory(item)}
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
                             <Link href={`/admin/dashboard/inventory/edit/${item.id}`}>
-                              <Button variant="ghost" size="sm">
-                                Edit
+                              <Button variant="outline" size="sm">
+                                <Edit className="h-4 w-4" />
                               </Button>
                             </Link>
                           </div>
@@ -344,6 +420,31 @@ export default function Inventory() {
           )}
         </CardContent>
       </Card>
+
+      {/* Stock Update Modal */}
+      {stockUpdateModal.item && (
+        <StockUpdateModal
+          isOpen={stockUpdateModal.isOpen}
+          onClose={() => setStockUpdateModal({ isOpen: false, item: null })}
+          onConfirm={handleStockUpdate}
+          currentStock={stockUpdateModal.item.currentStock}
+          itemName={stockUpdateModal.item.name}
+          itemSku={stockUpdateModal.item.sku}
+          isLoading={isUpdatingStock}
+        />
+      )}
+
+      {/* Stock History Modal */}
+      {stockHistoryModal.item && (
+        <StockHistoryModal
+          isOpen={stockHistoryModal.isOpen}
+          onClose={() => setStockHistoryModal({ isOpen: false, item: null })}
+          inventoryId={stockHistoryModal.item.id}
+          itemName={stockHistoryModal.item.name}
+          itemSku={stockHistoryModal.item.sku}
+          isAdmin={true}
+        />
+      )}
     </div>
   )
 }

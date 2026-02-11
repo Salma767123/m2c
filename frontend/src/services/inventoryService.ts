@@ -64,7 +64,33 @@ export interface UpdateInventoryData extends Partial<CreateInventoryData> {}
 
 export interface UpdateStockData {
   currentStock: number;
+  reason: string;
   notes?: string;
+}
+
+export interface StockChangeHistory {
+  id: string;
+  inventoryId: string;
+  previousStock: number;
+  newStock: number;
+  changeAmount: number;
+  reason: string;
+  changedBy: string;
+  changedByType: 'admin' | 'vendor';
+  changedByName?: string;
+  createdAt: string;
+}
+
+export interface StockHistoryResponse {
+  history: StockChangeHistory[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+    limit: number;
+  };
 }
 
 export interface InventoryFilters {
@@ -144,9 +170,50 @@ class InventoryService {
   }
 
   // Update stock levels
-  async updateStock(id: string, data: UpdateStockData): Promise<InventoryItem> {
+  async updateStock(id: string, data: UpdateStockData): Promise<{ inventory: InventoryItem; history: StockChangeHistory }> {
     const response = await axios.patch(`${this.baseURL}/${id}/stock`, data);
     return response.data.data;
+  }
+
+  // Get stock change history
+  async getStockHistory(id: string, page: number = 1, limit: number = 20): Promise<StockHistoryResponse> {
+    const response = await axios.get(`${this.baseURL}/${id}/history?page=${page}&limit=${limit}`);
+    return response.data.data;
+  }
+
+  // Admin: Update stock levels
+  async adminUpdateStock(id: string, data: UpdateStockData): Promise<{ inventory: InventoryItem; history: StockChangeHistory }> {
+    const response = await axios.patch(`${this.baseURL}/admin/${id}/stock`, data);
+    return response.data.data;
+  }
+
+  // Admin: Get stock change history
+  async adminGetStockHistory(id: string, page: number = 1, limit: number = 20): Promise<StockHistoryResponse> {
+    const response = await axios.get(`${this.baseURL}/admin/${id}/history?page=${page}&limit=${limit}`);
+    return response.data.data;
+  }
+
+  // Admin: Create inventory item
+  async adminCreateItem(data: CreateInventoryData & { vendorId: string }): Promise<InventoryItem> {
+    const response = await axios.post(`${this.baseURL}/admin`, data);
+    return response.data.data;
+  }
+
+  // Admin: Get single inventory item
+  async adminGetItem(id: string): Promise<InventoryItem> {
+    const response = await axios.get(`${this.baseURL}/admin/${id}`);
+    return response.data.data;
+  }
+
+  // Admin: Update inventory item
+  async adminUpdateItem(id: string, data: UpdateInventoryData & { vendorId?: string }): Promise<InventoryItem> {
+    const response = await axios.put(`${this.baseURL}/admin/${id}`, data);
+    return response.data.data;
+  }
+
+  // Admin: Delete inventory item
+  async adminDeleteItem(id: string): Promise<void> {
+    await axios.delete(`${this.baseURL}/admin/${id}`);
   }
 
   // Helper method to format inventory data for frontend forms

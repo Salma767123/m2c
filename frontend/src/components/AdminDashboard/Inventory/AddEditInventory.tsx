@@ -91,6 +91,14 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
   const [subcategories, setSubcategories] = useState<Array<{ id: string; name: string; slug: string }>>([])
   const [selectedCategoryName, setSelectedCategoryName] = useState('')
+  
+  // Track original stock for edit mode
+  const [originalStock, setOriginalStock] = useState<number>(0)
+  
+  // Stock change reason modal
+  const [showStockReasonModal, setShowStockReasonModal] = useState(false)
+  const [stockChangeReason, setStockChangeReason] = useState('')
+  const [pendingFormData, setPendingFormData] = useState<InventoryFormData | null>(null)
 
   const [formData, setFormData] = useState<InventoryFormData>({
     name: '',
@@ -122,44 +130,87 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
   // Load inventory data for editing
   useEffect(() => {
-    if (isEdit && inventoryId) {
+    if (isEdit && inventoryId && !isLoadingCategories && categories.length > 0) {
       setIsLoadingData(true)
       
-      // Simulate API call to fetch inventory data
       const loadInventoryData = async () => {
         try {
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          console.log('Loading inventory data for ID:', inventoryId)
           
-          // Mock inventory data
+          // Fetch actual inventory data from API
+          const response = await axiosInstance.get(`/inventory/admin/all?limit=1000`)
+          const inventoryItems = response.data.data.items || []
+          const item = inventoryItems.find((inv: any) => inv.id === inventoryId)
+          
+          if (!item) {
+            console.error('Inventory item not found')
+            alert('Inventory item not found')
+            router.push('/admin/dashboard/inventory')
+            return
+          }
+
+          console.log('Loaded inventory item:', item)
+          console.log('Available categories:', categories)
+          
+          // Store original stock for comparison
+          setOriginalStock(item.currentStock || 0)
+          
+          // Find the category to get its ID
+          const categoryMatch = categories.find(c => 
+            c.name.toLowerCase() === item.category?.toLowerCase() || c.id === item.category
+          )
+          const categoryId = categoryMatch?.id || ''
+          
+          console.log('Category match:', categoryMatch, 'ID:', categoryId)
+          
+          // If category is found, load its subcategories
+          if (categoryMatch && categoryMatch.subcategories) {
+            setSubcategories(categoryMatch.subcategories)
+            setSelectedCategoryName(categoryMatch.name)
+          }
+          
+          // Find subcategory ID if it exists
+          let subcategoryId = ''
+          if (item.subcategory && categoryMatch?.subcategories) {
+            const subcategoryMatch = categoryMatch.subcategories.find(
+              (sc: any) => sc.name.toLowerCase() === item.subcategory?.toLowerCase() || sc.id === item.subcategory
+            )
+            subcategoryId = subcategoryMatch?.id || ''
+            console.log('Subcategory match:', subcategoryMatch, 'ID:', subcategoryId)
+          }
+          
           setFormData({
-            name: 'Cotton Kitchen Towel',
-            sku: 'KL-CKT-001',
-            category: 'Kitchen Linen',
-            subcategory: '',
-            description: 'High-quality cotton kitchen towel with excellent absorbency',
-            manufacturingDate: '2024-01-10',
+            name: item.name || '',
+            sku: item.sku || '',
+            category: categoryId,
+            subcategory: subcategoryId,
+            description: item.description || '',
+            manufacturingDate: item.manufacturingDate ? new Date(item.manufacturingDate).toISOString().split('T')[0] : '',
             
             // Vendor Information
-            vendorId: '1',
-            vendorName: 'Cotton Mills Ltd',
+            vendorId: item.vendorId || '',
+            vendorName: item.vendor?.companyName || '',
             
-            currentStock: 45,
-            minStock: 10,
-            location: 'Main Warehouse - Section A',
+            currentStock: item.currentStock || 0,
+            minStock: item.minStock || 5,
+            location: item.location || '',
             
-            status: 'active',
+            status: item.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
             trackInventory: true,
             
-            sourceType: 'supplier',
-            supplier: 'Cotton Mills Ltd',
-            lastRestocked: '2024-01-15',
-            notes: 'Popular item, restock regularly',
+            sourceType: item.sourceType?.toLowerCase() as 'supplier' | 'manufacture' | null,
+            supplier: item.supplier || '',
+            lastRestocked: item.lastRestocked ? new Date(item.lastRestocked).toISOString().split('T')[0] : '',
+            notes: item.notes || '',
             
-            hasProductCreated: false,
-            productId: ''
+            hasProductCreated: item.hasProductCreated || false,
+            productId: item.productId || ''
           })
+          
+          console.log('Form data set with category:', categoryId, 'subcategory:', subcategoryId, 'vendor:', item.vendorId)
         } catch (error) {
           console.error('Error loading inventory data:', error)
+          alert('Failed to load inventory data')
         } finally {
           setIsLoadingData(false)
         }
@@ -167,7 +218,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
       loadInventoryData()
     }
-  }, [isEdit, inventoryId])
+  }, [isEdit, inventoryId, categories, isLoadingCategories, router])
 
   // Fetch vendors from API
   useEffect(() => {
@@ -335,34 +386,109 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
       return
     }
     
+    // Check if stock changed in edit mode
+    if (isEdit && formData.currentStock !== originalStock) {
+      // Show reason modal
+      setPendingFormData(formData)
+      setShowStockReasonModal(true)
+      return
+    }
+    
+    // Proceed with normal save
+    await saveInventory(formData, null)
+  }
+
+  const saveInventory = async (data: InventoryFormData, stockReason: string | null) => {
     setIsLoading(true)
 
     try {
       // Get category and subcategory names for submission
-      const categoryName = categories.find(c => c.id === formData.category)?.name || formData.category
-      const subcategoryName = subcategories.find(s => s.id === formData.subcategory)?.name || formData.subcategory
+      const categoryName = categories.find(c => c.id === data.category)?.name || data.category
+      const subcategoryName = subcategories.find(s => s.id === data.subcategory)?.name || data.subcategory
       
       const submitData = {
-        ...formData,
+        ...data,
         category: categoryName,
-        subcategory: subcategoryName
+        subcategory: subcategoryName,
+        status: data.status?.toUpperCase() as 'ACTIVE' | 'INACTIVE',
+        sourceType: data.sourceType?.toUpperCase() as 'SUPPLIER' | 'MANUFACTURE' | null
       }
       
-      if (isEdit) {
-        console.log('Updating inventory item:', inventoryId, submitData)
-        // API call: PUT /api/admin/inventory/${inventoryId}
+      if (isEdit && inventoryId) {
+        console.log('=== UPDATING INVENTORY ===')
+        console.log('Inventory ID:', inventoryId)
+        console.log('Stock changed:', data.currentStock !== originalStock)
+        console.log('Original stock:', originalStock)
+        console.log('New stock:', data.currentStock)
+        console.log('Stock reason:', stockReason)
+        
+        // If stock changed, update it separately with reason via admin endpoint
+        if (data.currentStock !== originalStock && stockReason) {
+          console.log('Updating stock with reason via PATCH /inventory/admin/' + inventoryId + '/stock')
+          await axiosInstance.patch(`/inventory/admin/${inventoryId}/stock`, {
+            currentStock: data.currentStock,
+            reason: stockReason,
+            notes: data.notes
+          })
+          
+          // Update other fields (excluding stock)
+          const { currentStock, ...otherData } = submitData
+          if (Object.keys(otherData).length > 0) {
+            console.log('Updating other fields via PUT /inventory/admin/' + inventoryId)
+            await axiosInstance.put(`/inventory/admin/${inventoryId}`, otherData)
+          }
+        } else {
+          // No stock change, update normally
+          console.log('Updating all fields via PUT /inventory/admin/' + inventoryId)
+          await axiosInstance.put(`/inventory/admin/${inventoryId}`, submitData)
+        }
+        
+        console.log('✅ Inventory item updated successfully')
       } else {
-        console.log('Creating inventory item:', submitData)
-        // API call: POST /api/admin/inventory
+        console.log('=== CREATING INVENTORY ===')
+        console.log('Submit data:', submitData)
+        
+        // Ensure vendorId is included for creation
+        if (!submitData.vendorId) {
+          throw new Error('Vendor ID is required')
+        }
+        
+        console.log('Creating via POST /inventory/admin')
+        await axiosInstance.post('/inventory/admin', submitData)
+        console.log('✅ Inventory item created successfully')
       }
       
-      await new Promise(resolve => setTimeout(resolve, 1000))
       router.push('/admin/dashboard/inventory')
-    } catch (error) {
-      console.error('Error saving inventory item:', error)
+    } catch (error: any) {
+      console.error('❌ Error saving inventory item:', error)
+      console.error('Error response:', error.response)
+      console.error('Error data:', error.response?.data)
+      
+      // Better error handling
+      if (error.response?.data?.message) {
+        alert(error.response.data.message)
+      } else if (error.message) {
+        alert(error.message)
+      } else {
+        alert('Failed to save inventory item')
+      }
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleStockReasonSubmit = async () => {
+    if (!stockChangeReason.trim() || stockChangeReason.trim().length < 5) {
+      alert('Please provide a reason (minimum 5 characters)')
+      return
+    }
+    
+    if (!pendingFormData) return
+    
+    setShowStockReasonModal(false)
+    await saveInventory(pendingFormData, stockChangeReason)
+    setStockChangeReason('')
+    setPendingFormData(null)
   }
 
   // Show loading state while fetching data
@@ -897,6 +1023,56 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           </div>
         </div>
       </form>
+
+      {/* Stock Change Reason Modal */}
+      {showStockReasonModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">Stock Change Reason Required</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Stock changed from {originalStock} to {formData.currentStock} units
+              </p>
+            </div>
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reason for stock change <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={stockChangeReason}
+                onChange={(e) => setStockChangeReason(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                placeholder="e.g., New shipment received, Damaged items removed, Inventory correction"
+                rows={4}
+                autoFocus
+              />
+              <p className="text-xs text-gray-500 mt-1">Minimum 5 characters required</p>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex space-x-3">
+              <Button
+                type="button"
+                onClick={() => {
+                  setShowStockReasonModal(false)
+                  setStockChangeReason('')
+                  setPendingFormData(null)
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleStockReasonSubmit}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={!stockChangeReason.trim() || stockChangeReason.trim().length < 5}
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
