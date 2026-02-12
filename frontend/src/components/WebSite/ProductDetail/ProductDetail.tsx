@@ -23,6 +23,7 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
   const [isImageHovered, setIsImageHovered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [imageRef, setImageRef] = useState<HTMLImageElement | null>(null);
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -105,14 +106,29 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
     
     try {
       const variantInfo = selectedVariant ? ` (${selectedVariant.size} - ${selectedVariant.color})` : '';
-      console.log(`Added ${product.name}${variantInfo} to cart`);
+      console.log(`Added ${quantity} x ${product.name}${variantInfo} to cart`);
       
       showSuccessToast(
         'Added to Cart!', 
-        `${product.name}${variantInfo} has been added to your cart.`
+        `${quantity} x ${product.name}${variantInfo} has been added to your cart.`
       );
+      
+      // Reset quantity after adding
+      setQuantity(1);
     } catch (error) {
       showErrorToast('Failed to Add', 'Unable to add item to cart. Please try again.');
+    }
+  };
+
+  // Handle quantity increment
+  const handleIncrement = () => {
+    setQuantity(prev => prev + 1);
+  };
+
+  // Handle quantity decrement
+  const handleDecrement = () => {
+    if (quantity > 1) {
+      setQuantity(prev => prev - 1);
     }
   };
 
@@ -432,22 +448,43 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
 
                       {/* Action Buttons */}
                       {product.inStock && (!selectedVariant || selectedVariant.stock > 0) && (
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={handleAddToCart}
-                            disabled={product.hasVariants && !selectedVariant}
-                            className="flex-1 bg-white text-black border-2 border-gray-700 py-2.5 px-3 rounded-lg hover:bg-gray-700 hover:text-white transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Add to cart
-                          </button>
-                          <button
-                            onClick={handleBuyNow}
-                            disabled={product.hasVariants && !selectedVariant}
-                            className="flex-1 bg-[#1d1d1d] text-white py-2.5 px-3 rounded-lg hover:from-orange-600 hover:to-gray-600 transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Buy Now
-                          </button>
-                        </div>
+                        <>
+                          {/* Quantity Selector */}
+                          <div className="flex items-center justify-center gap-3 mb-3">
+                            <span className="text-sm font-semibold text-gray-700">Quantity:</span>
+                            <button
+                              onClick={handleDecrement}
+                              disabled={quantity <= 1}
+                              className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              <span className="text-xl font-semibold">−</span>
+                            </button>
+                            <span className="w-16 text-center font-bold text-lg">{quantity}</span>
+                            <button
+                              onClick={handleIncrement}
+                              className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                            >
+                              <span className="text-xl font-semibold">+</span>
+                            </button>
+                          </div>
+                          
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={handleAddToCart}
+                              disabled={product.hasVariants && !selectedVariant}
+                              className="flex-1 bg-white text-black border-2 border-gray-700 py-2.5 px-3 rounded-lg hover:bg-gray-700 hover:text-white transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Add to cart
+                            </button>
+                            <button
+                              onClick={handleBuyNow}
+                              disabled={product.hasVariants && !selectedVariant}
+                              className="flex-1 bg-[#1d1d1d] text-white py-2.5 px-3 rounded-lg hover:from-orange-600 hover:to-gray-600 transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Buy Now
+                            </button>
+                          </div>
+                        </>
                       )}
                       {product.hasVariants && !selectedVariant && (
                         <p className="text-xs text-amber-600 mt-2 text-center">Please select a variant</p>

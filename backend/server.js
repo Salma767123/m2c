@@ -87,6 +87,8 @@ const vendorSettingsRoutes = require('./routes/vendorSettingsRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const productRoutes = require('./routes/productRoutes');
+const cartRoutes = require('./routes/cartRoutes');
+const wishlistRoutes = require('./routes/wishlistRoutes');
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -100,7 +102,9 @@ app.get('/', (req, res) => {
       vendors: '/api/vendors',
       categories: '/api/categories',
       products: '/api/products',
-      inventory: '/api/inventory'
+      inventory: '/api/inventory',
+      cart: '/api/cart',
+      wishlist: '/api/wishlist'
     }
   });
 });
@@ -121,6 +125,8 @@ app.use('/api/vendor-settings', vendorSettingsRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 // 404 handler
 app.use((req, res) => {

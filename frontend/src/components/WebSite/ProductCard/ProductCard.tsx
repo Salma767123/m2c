@@ -1,16 +1,127 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Product as ServiceProduct } from '@/services/productService';
 import { Product as MockProduct } from '@/components/mockData/products';
-import { Star, Package } from 'lucide-react';
+import { Star, ShoppingCart, Heart } from 'lucide-react';
+import { cartService } from '@/services/cartService';
+import { wishlistService } from '@/services/wishlistService';
+import { userAuthService } from '@/services/userAuthService';
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
 interface ProductCardProps {
   product: ServiceProduct | MockProduct;
 }
 
 const ProductCard = ({ product }: ProductCardProps) => {
+  const [isInWishlist, setIsInWishlist] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+
+  // Check if user is authenticated
+  const isAuthenticated = userAuthService.isAuthenticated();
+
+  // Check if product is in wishlist on mount
+  useEffect(() => {
+    if (isAuthenticated) {
+      // For authenticated users, check via API (optional - can be implemented later)
+      setIsInWishlist(false);
+    } else {
+      // For guest users, check local storage
+      setIsInWishlist(wishlistService.isInLocalWishlist(product.id));
+    }
+  }, [product.id, isAuthenticated]);
+
+  // Handle Add to Cart
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent navigation to product page
+    e.stopPropagation();
+
+    if (!product.inStock) {
+      showErrorToast('Out of Stock', 'This product is currently out of stock');
+      return;
+    }
+
+    setIsAddingToCart(true);
+
+    try {
+      if (isAuthenticated) {
+        // For authenticated users, add to cart via API
+        await cartService.addToCart(product.id, quantity);
+        showSuccessToast('Added to Cart', `${quantity} x ${product.name} added to your cart`);
+      } else {
+        // For guest users, add to local storage
+        cartService.addToLocalCart(product.id, quantity);
+        showSuccessToast('Added to Cart', `${quantity} x ${product.name} added to your cart`);
+      }
+      // Reset quantity after adding
+      setQuantity(1);
+    } catch (error: any) {
+      console.error('Error adding to cart:', error);
+      showErrorToast('Failed', error.message || 'Unable to add item to cart');
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
+
+  // Handle quantity increment
+  const handleIncrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setQuantity(prev => prev + 1);
+  };
+
+  // Handle quantity decrement
+  const handleDecrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (quantity > 1) {
+      setQuantity(prev => prev - 1);
+    }
+  };
+
+  // Handle Wishlist Toggle
+  const handleToggleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent navigation to product page
+    e.stopPropagation();
+
+    setIsTogglingWishlist(true);
+
+    try {
+      if (isAuthenticated) {
+        // For authenticated users, toggle via API
+        if (isInWishlist) {
+          await wishlistService.removeFromWishlist(product.id);
+          setIsInWishlist(false);
+          showSuccessToast('Removed', `${product.name} removed from wishlist`);
+        } else {
+          await wishlistService.addToWishlist(product.id);
+          setIsInWishlist(true);
+          showSuccessToast('Added', `${product.name} added to wishlist`);
+        }
+      } else {
+        // For guest users, toggle in local storage
+        if (isInWishlist) {
+          wishlistService.removeFromLocalWishlist(product.id);
+          setIsInWishlist(false);
+          showSuccessToast('Removed', `${product.name} removed from wishlist`);
+        } else {
+          wishlistService.addToLocalWishlist(product.id);
+          setIsInWishlist(true);
+          showSuccessToast('Added', `${product.name} added to wishlist`);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error toggling wishlist:', error);
+      showErrorToast('Failed', error.message || 'Unable to update wishlist');
+    } finally {
+      setIsTogglingWishlist(false);
+    }
+  };
+
   // Type guard to check if it's a ServiceProduct (from API)
   const isServiceProduct = (p: any): p is ServiceProduct => {
     return 'basePrice' in p || 'adminFixedPrice' in p;
@@ -77,8 +188,25 @@ const ProductCard = ({ product }: ProductCardProps) => {
               {product.discount}% OFF
             </div>
           )}
+          
+          {/* Wishlist Button */}
+          <button
+            onClick={handleToggleWishlist}
+            disabled={isTogglingWishlist}
+            className={`absolute top-2 ${product.inStock ? 'right-2' : 'right-28'} p-2 rounded-full transition-all duration-200 ${
+              isInWishlist 
+                ? 'bg-red-500 text-white hover:bg-red-600' 
+                : 'bg-white/90 text-gray-700 hover:bg-white hover:text-red-500'
+            } disabled:opacity-50 disabled:cursor-not-allowed shadow-md z-10`}
+            title={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+          >
+            <Heart 
+              className={`w-4 h-4 sm:w-5 sm:h-5 ${isInWishlist ? 'fill-current' : ''}`} 
+            />
+          </button>
+          
           {!product.inStock && (
-            <div className="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded text-sm">
+            <div className="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded text-sm z-0">
               Out of Stock
             </div>
           )}
@@ -114,23 +242,57 @@ const ProductCard = ({ product }: ProductCardProps) => {
           
           {/* Bottom content - fixed at bottom */}
           <div className="shrink-0">
-            <div className="flex items-center space-x-2">
-              <span className="text-xl font-bold text-gray-900">
-                ${displayPrice?.toFixed(2) || '0.00'}
-              </span>
-              {product.originalPrice && (
-                <div className="flex items-center space-x-1 gap-2">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl font-bold text-gray-900">
+                  ${displayPrice?.toFixed(2) || '0.00'}
+                </span>
+                {product.originalPrice && (
                   <span className="text-xs sm:text-sm text-red-600 line-through">
                     ${product.originalPrice.toFixed(2)}
                   </span>
-                  {product.discount && (
-                    <span className="hidden sm:flex text-xs bg-[#1A2830] text-white px-2 py-1 rounded-md font-semibold">
-                      Save {product.discount}%
-                    </span>
-                  )}
-                </div>
+                )}
+              </div>
+              {product.discount && (
+                <span className="text-xs bg-[#1A2830] text-white px-2 py-1 rounded-md font-semibold">
+                  {product.discount}% OFF
+                </span>
               )}
             </div>
+            
+            {/* Quantity Selector */}
+            {product.inStock && (
+              <div className="flex items-center gap-2 mb-2">
+                <button
+                  onClick={handleDecrement}
+                  disabled={quantity <= 1}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <span className="text-lg font-semibold">−</span>
+                </button>
+                <span className="w-12 text-center font-semibold">{quantity}</span>
+                <button
+                  onClick={handleIncrement}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-lg font-semibold">+</span>
+                </button>
+              </div>
+            )}
+            
+            {/* Add to Cart Button */}
+            <button
+              onClick={handleAddToCart}
+              disabled={!product.inStock || isAddingToCart}
+              className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
+                product.inStock
+                  ? 'bg-gray-800 text-white hover:bg-gray-900 active:scale-95'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              {isAddingToCart ? 'Adding...' : product.inStock ? 'Add to Cart' : 'Out of Stock'}
+            </button>
           </div>
         </div>
       </div>

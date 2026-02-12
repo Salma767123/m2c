@@ -115,32 +115,53 @@ class UserAuthService {
 
   // Store auth token and user data
   storeAuthData(token: string, user: any, rememberMe: boolean = false): void {
-    const storage = rememberMe ? localStorage : sessionStorage;
-    storage.setItem('userToken', token);
-    storage.setItem('userData', JSON.stringify(user));
+    if (typeof window === 'undefined') return;
+    try {
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem('userToken', token);
+      storage.setItem('userData', JSON.stringify(user));
+    } catch (error) {
+      console.error('Failed to store auth data:', error);
+    }
   }
 
   // Get stored auth token
   getAuthToken(): string | null {
-    return localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
+    if (typeof window === 'undefined') return null;
+    try {
+      return localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
+    } catch {
+      return null;
+    }
   }
 
   // Get stored user data
   getUserData(): any | null {
-    const userData = localStorage.getItem('userData') || sessionStorage.getItem('userData');
-    return userData ? JSON.parse(userData) : null;
+    if (typeof window === 'undefined') return null;
+    try {
+      const userData = localStorage.getItem('userData') || sessionStorage.getItem('userData');
+      return userData ? JSON.parse(userData) : null;
+    } catch {
+      return null;
+    }
   }
 
   // Clear auth data
   clearAuthData(): void {
-    localStorage.removeItem('userToken');
-    localStorage.removeItem('userData');
-    sessionStorage.removeItem('userToken');
-    sessionStorage.removeItem('userData');
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem('userToken');
+      localStorage.removeItem('userData');
+      sessionStorage.removeItem('userToken');
+      sessionStorage.removeItem('userData');
+    } catch (error) {
+      console.error('Failed to clear auth data:', error);
+    }
   }
 
   // Check if user is authenticated
   isAuthenticated(): boolean {
+    if (typeof window === 'undefined') return false;
     return !!this.getAuthToken();
   }
 }

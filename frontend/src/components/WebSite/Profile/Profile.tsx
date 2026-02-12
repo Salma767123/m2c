@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   User,  
   SquarePen, 
@@ -8,19 +8,23 @@ import {
   X,  
   Bell, 
   Package, 
-  Heart, 
   LogOut
 } from 'lucide-react';
 import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
-import Wishlist from '@/components/WebSite/Profile/Wishlist';
 import Notifications from '@/components/WebSite/Profile/Notifications';
 import type { UserProfile } from '@/components/WebSite/Profile/types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { userProfileService } from '@/services/userProfileService';
+import { userAuthService } from '@/services/userAuthService';
+import { useRouter } from 'next/navigation';
 
 const Profile = () => {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
   // User data with placeholders
   const [userProfile, setUserProfile] = useState<UserProfile>({
@@ -29,18 +33,14 @@ const Profile = () => {
     lastName: '',
     email: '',
     phone: '',
-    dateOfBirth: '',
     gender: 'male',
     address: {
       addressLine1: '',
-      addressLine2: '',
-      landmark: '',
       city: '',
       state: '',
       zipCode: '',
       country: 'United States'
     },
-    avatar: '',
     joinDate: new Date().toISOString().split('T')[0],
     preferences: {
       newsletter: false,
@@ -51,10 +51,95 @@ const Profile = () => {
 
   const [editedProfile, setEditedProfile] = useState<UserProfile>(userProfile);
 
-  const handleSave = () => {
-    setUserProfile(editedProfile);
-    setIsEditing(false);
-    // Here you would typically make an API call to save the profile
+  // Load user profile on mount
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      setIsLoading(true);
+      const response = await userProfileService.getProfile();
+      
+      if (response.success && response.data) {
+        const userData = response.data;
+        
+        // Split name into first and last name
+        const nameParts = userData.name?.split(' ') || ['', ''];
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        const profile: UserProfile = {
+          id: userData.id,
+          firstName,
+          lastName,
+          email: userData.email,
+          phone: userData.phoneNumber || '',
+          gender: 'male', // Default, can be enhanced later
+          address: {
+            addressLine1: userData.address || '',
+            city: userData.city || '',
+            state: userData.state || '',
+            zipCode: userData.zipCode || '',
+            country: userData.country || 'United States'
+          },
+          joinDate: new Date(userData.createdAt).toISOString().split('T')[0],
+          preferences: {
+            newsletter: false,
+            smsNotifications: false,
+            emailNotifications: false
+          }
+        };
+        
+        setUserProfile(profile);
+        setEditedProfile(profile);
+      }
+    } catch (error: any) {
+      console.error('Error loading profile:', error);
+      showErrorToast('Load Failed', error.message || 'Unable to load profile data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      
+      // Combine first and last name
+      const fullName = `${editedProfile.firstName} ${editedProfile.lastName}`.trim();
+      
+      if (!fullName) {
+        showErrorToast('Validation Error', 'Name is required');
+        return;
+      }
+      
+      // Prepare update data
+      const updateData = {
+        name: fullName,
+        phoneNumber: editedProfile.phone,
+        address: editedProfile.address.addressLine1,
+        city: editedProfile.address.city,
+        state: editedProfile.address.state,
+        zipCode: editedProfile.address.zipCode,
+        country: editedProfile.address.country
+      };
+      
+      const response = await userProfileService.updateProfile(updateData);
+      
+      if (response.success) {
+        setUserProfile(editedProfile);
+        setIsEditing(false);
+        showSuccessToast('Profile Updated', 'Your profile has been updated successfully');
+        // Reload profile to get updated data from backend
+        await loadUserProfile();
+      }
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      showErrorToast('Save Failed', error.message || 'Unable to save profile changes');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -62,10 +147,24 @@ const Profile = () => {
     setIsEditing(false);
   };
 
+  const handleLogout = async () => {
+    try {
+      await userAuthService.logout();
+      userAuthService.clearAuthData(); // Clear stored auth data
+      showSuccessToast('Logged Out', 'You have been logged out successfully');
+      router.push('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if API call fails, clear local data
+      userAuthService.clearAuthData();
+      showErrorToast('Logout Failed', 'Unable to logout. Please try again.');
+      router.push('/');
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Profile Information', icon: User },
     { id: 'orders', label: 'Order History', icon: Package },
-    { id: 'wishlist', label: 'Wishlist', icon: Heart },
     { id: 'notifications', label: 'Notifications', icon: Bell }
   ];
 
@@ -76,6 +175,17 @@ const Profile = () => {
   const renderNotificationsTab = () => (
     <Notifications editedProfile={editedProfile} setEditedProfile={setEditedProfile} />
   );
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 py-8 font-sans flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 font-sans ">
@@ -111,14 +221,16 @@ const Profile = () => {
                     <div className="flex gap-1 ml-2">
                       <button
                         onClick={handleSave}
-                        className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors"
+                        disabled={isSaving}
+                        className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors disabled:opacity-50"
                         title="Save"
                       >
                         <Save className="w-4 h-4" />
                       </button>
                       <button
                         onClick={handleCancel}
-                        className="p-1.5 text-slate-600 hover:bg-slate-100 rounded transition-colors"
+                        disabled={isSaving}
+                        className="p-1.5 text-slate-600 hover:bg-slate-100 rounded transition-colors disabled:opacity-50"
                         title="Cancel"
                       >
                         <X className="w-4 h-4" />
@@ -149,7 +261,10 @@ const Profile = () => {
                 
                 <hr className="my-4 border-slate-200" />
                 
-                <button className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                <button 
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                >
                   <LogOut className="w-5 h-5" />
                   <span className="font-medium">Sign Out</span>
                 </button>
@@ -162,7 +277,6 @@ const Profile = () => {
             {activeTab === 'profile' && renderProfileTab()}
             {activeTab === 'notifications' && renderNotificationsTab()}
             {activeTab === 'orders' && <OrderHistory />}
-            {activeTab === 'wishlist' && <Wishlist />}
           </div>
         </div>
       </div>
