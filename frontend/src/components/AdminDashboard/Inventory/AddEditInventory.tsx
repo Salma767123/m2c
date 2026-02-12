@@ -130,7 +130,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
   // Load inventory data for editing
   useEffect(() => {
-    if (isEdit && inventoryId && !isLoadingCategories && categories.length > 0) {
+    if (isEdit && inventoryId) {
       setIsLoadingData(true)
       
       const loadInventoryData = async () => {
@@ -150,64 +150,85 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           }
 
           console.log('Loaded inventory item:', item)
-          console.log('Available categories:', categories)
           
           // Store original stock for comparison
           setOriginalStock(item.currentStock || 0)
           
-          // Find the category to get its ID
-          const categoryMatch = categories.find(c => 
-            c.name.toLowerCase() === item.category?.toLowerCase() || c.id === item.category
-          )
-          const categoryId = categoryMatch?.id || ''
-          
-          console.log('Category match:', categoryMatch, 'ID:', categoryId)
-          
-          // If category is found, load its subcategories
-          if (categoryMatch && categoryMatch.subcategories) {
-            setSubcategories(categoryMatch.subcategories)
-            setSelectedCategoryName(categoryMatch.name)
+          // Load vendor-specific categories first
+          if (item.vendorId) {
+            try {
+              const categoriesResponse = await axiosInstance.get(`/inventory/admin/vendor/${item.vendorId}/categories`)
+              const vendorCategories = categoriesResponse.data.data.categories || []
+              const vendorSubcategories = categoriesResponse.data.data.subcategories || []
+              
+              // Transform to match Category interface
+              const transformedCategories: Category[] = vendorCategories.map((cat: any) => ({
+                id: cat.id,
+                name: cat.name,
+                slug: cat.slug || '',
+                subcategories: vendorSubcategories
+              }))
+              
+              setCategories(transformedCategories)
+              console.log('Loaded vendor categories:', transformedCategories)
+              
+              // Find the category to get its ID
+              const categoryMatch = transformedCategories.find(c => 
+                c.name.toLowerCase() === item.category?.toLowerCase() || c.id === item.category
+              )
+              const categoryId = categoryMatch?.id || ''
+              
+              console.log('Category match:', categoryMatch, 'ID:', categoryId)
+              
+              // If category is found, load its subcategories
+              if (categoryMatch && categoryMatch.subcategories) {
+                setSubcategories(categoryMatch.subcategories)
+                setSelectedCategoryName(categoryMatch.name)
+              }
+              
+              // Find subcategory ID if it exists
+              let subcategoryId = ''
+              if (item.subcategory && vendorSubcategories) {
+                const subcategoryMatch = vendorSubcategories.find(
+                  (sc: any) => sc.name.toLowerCase() === item.subcategory?.toLowerCase() || sc.id === item.subcategory
+                )
+                subcategoryId = subcategoryMatch?.id || ''
+                console.log('Subcategory match:', subcategoryMatch, 'ID:', subcategoryId)
+              }
+              
+              setFormData({
+                name: item.name || '',
+                sku: item.sku || '',
+                category: categoryId,
+                subcategory: subcategoryId,
+                description: item.description || '',
+                manufacturingDate: item.manufacturingDate ? new Date(item.manufacturingDate).toISOString().split('T')[0] : '',
+                
+                // Vendor Information
+                vendorId: item.vendorId || '',
+                vendorName: item.vendor?.companyName || '',
+                
+                currentStock: item.currentStock || 0,
+                minStock: item.minStock || 5,
+                location: item.location || '',
+                
+                status: item.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
+                trackInventory: true,
+                
+                sourceType: item.sourceType?.toLowerCase() as 'supplier' | 'manufacture' | null,
+                supplier: item.supplier || '',
+                lastRestocked: item.lastRestocked ? new Date(item.lastRestocked).toISOString().split('T')[0] : '',
+                notes: item.notes || '',
+                
+                hasProductCreated: item.hasProductCreated || false,
+                productId: item.productId || ''
+              })
+              
+              console.log('Form data set with category:', categoryId, 'subcategory:', subcategoryId, 'vendor:', item.vendorId)
+            } catch (error) {
+              console.error('Error loading vendor categories:', error)
+            }
           }
-          
-          // Find subcategory ID if it exists
-          let subcategoryId = ''
-          if (item.subcategory && categoryMatch?.subcategories) {
-            const subcategoryMatch = categoryMatch.subcategories.find(
-              (sc: any) => sc.name.toLowerCase() === item.subcategory?.toLowerCase() || sc.id === item.subcategory
-            )
-            subcategoryId = subcategoryMatch?.id || ''
-            console.log('Subcategory match:', subcategoryMatch, 'ID:', subcategoryId)
-          }
-          
-          setFormData({
-            name: item.name || '',
-            sku: item.sku || '',
-            category: categoryId,
-            subcategory: subcategoryId,
-            description: item.description || '',
-            manufacturingDate: item.manufacturingDate ? new Date(item.manufacturingDate).toISOString().split('T')[0] : '',
-            
-            // Vendor Information
-            vendorId: item.vendorId || '',
-            vendorName: item.vendor?.companyName || '',
-            
-            currentStock: item.currentStock || 0,
-            minStock: item.minStock || 5,
-            location: item.location || '',
-            
-            status: item.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
-            trackInventory: true,
-            
-            sourceType: item.sourceType?.toLowerCase() as 'supplier' | 'manufacture' | null,
-            supplier: item.supplier || '',
-            lastRestocked: item.lastRestocked ? new Date(item.lastRestocked).toISOString().split('T')[0] : '',
-            notes: item.notes || '',
-            
-            hasProductCreated: item.hasProductCreated || false,
-            productId: item.productId || ''
-          })
-          
-          console.log('Form data set with category:', categoryId, 'subcategory:', subcategoryId, 'vendor:', item.vendorId)
         } catch (error) {
           console.error('Error loading inventory data:', error)
           alert('Failed to load inventory data')
@@ -218,7 +239,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
       loadInventoryData()
     }
-  }, [isEdit, inventoryId, categories, isLoadingCategories, router])
+  }, [isEdit, inventoryId, router])
 
   // Fetch vendors from API
   useEffect(() => {
@@ -249,32 +270,32 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     fetchVendors()
   }, [])
 
-  // Fetch categories from API
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        setIsLoadingCategories(true)
-        
-        const response = await axiosInstance.get('/categories/tree', {
-          params: { 
-            status: 'ACTIVE',
-            includeInactive: false 
-          }
-        })
-        
-        console.log('Fetched categories response:', response.data)
-        setCategories(response.data.data || [])
-      } catch (error: any) {
-        console.error('Error fetching categories:', error)
-        console.error('Error details:', error.response?.data || error.message)
-        setCategories([])
-      } finally {
-        setIsLoadingCategories(false)
-      }
-    }
-
-    fetchCategories()
-  }, [])
+  // Fetch categories from API - REMOVED (now loaded per vendor)
+  // useEffect(() => {
+  //   const fetchCategories = async () => {
+  //     try {
+  //       setIsLoadingCategories(true)
+  //       
+  //       const response = await axiosInstance.get('/categories/tree', {
+  //         params: { 
+  //           status: 'ACTIVE',
+  //           includeInactive: false 
+  //         }
+  //       })
+  //       
+  //       console.log('Fetched categories response:', response.data)
+  //       setCategories(response.data.data || [])
+  //     } catch (error: any) {
+  //       console.error('Error fetching categories:', error)
+  //       console.error('Error details:', error.response?.data || error.message)
+  //       setCategories([])
+  //     } finally {
+  //       setIsLoadingCategories(false)
+  //     }
+  //   }
+  //
+  //   fetchCategories()
+  // }, [])
 
   // Auto-generate SKU from name and category - REMOVED (Manual entry only)
   // const generateSKU = (name: string, categoryName: string, subcategoryName?: string) => {
@@ -346,14 +367,48 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   }
 
   // Vendor Selection Functions
-  const handleVendorSelect = (vendorId: string) => {
+  const handleVendorSelect = async (vendorId: string) => {
     const vendor = vendors.find(v => v.id === vendorId)
     if (vendor) {
       setFormData(prev => ({
         ...prev,
         vendorId: vendor.id,
-        vendorName: vendor.companyName
+        vendorName: vendor.companyName,
+        category: '', // Reset category when vendor changes
+        subcategory: '' // Reset subcategory when vendor changes
       }))
+
+      // Load vendor-specific categories
+      try {
+        setIsLoadingCategories(true)
+        const response = await axiosInstance.get(`/inventory/admin/vendor/${vendorId}/categories`)
+        console.log('Loaded vendor categories:', response.data.data)
+        
+        const vendorCategories = response.data.data.categories || []
+        const vendorSubcategories = response.data.data.subcategories || []
+        
+        // Transform to match Category interface
+        const transformedCategories: Category[] = vendorCategories.map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug || '',
+          subcategories: vendorSubcategories.filter((sub: any) => 
+            // Filter subcategories that belong to this category
+            // This assumes subcategories have a parentId or similar field
+            true // For now, include all subcategories
+          )
+        }))
+        
+        setCategories(transformedCategories)
+        setSubcategories([]) // Reset subcategories
+        setSelectedCategoryName('')
+      } catch (error) {
+        console.error('Error loading vendor categories:', error)
+        setCategories([])
+        setSubcategories([])
+      } finally {
+        setIsLoadingCategories(false)
+      }
     }
   }
 
@@ -593,10 +648,23 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                         value: cat.id,
                         label: cat.name
                       }))}
-                      placeholder={isLoadingCategories ? "Loading categories..." : "Select Category"}
+                      placeholder={
+                        !formData.vendorId 
+                          ? "Select vendor first" 
+                          : isLoadingCategories 
+                          ? "Loading categories..." 
+                          : categories.length === 0 
+                          ? "No categories available" 
+                          : "Select Category"
+                      }
                       onChange={(value) => handleDropdownChange('category', value as string)}
-                      disabled={isLoadingCategories}
+                      disabled={!formData.vendorId || isLoadingCategories}
                     />
+                    {!formData.vendorId && (
+                      <p className="text-xs text-slate-500 mt-1 italic">
+                        Please select a vendor first to load their categories
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Dropdown
