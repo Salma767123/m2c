@@ -101,16 +101,32 @@ export default function LoginForm({ onGoogleAuth }: LoginFormProps) {
     setIsLoading(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Import the user auth service
+      const { userAuthService } = await import('@/services/userAuthService')
       
-      // Mock successful login
-      showSuccessToast('Login Successful', 'Welcome back! Redirecting to continue shopping...')
+      // Call the backend login API
+      const response = await userAuthService.login({
+        email: loginData.email,
+        password: loginData.password
+      })
       
-      // Redirect to profile or home page
-      window.location.href = '/'
-    } catch (error) {
-      showErrorToast('Login Failed', 'Invalid credentials. Please try again.')
+      if (response.success) {
+        // Store auth data
+        userAuthService.storeAuthData(response.data.token, response.data.user, loginData.rememberMe)
+        
+        showSuccessToast('Login Successful', `Welcome back, ${response.data.user.name}!`)
+        
+        // Redirect to home page
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 1000)
+      } else {
+        showErrorToast('Login Failed', response.message || 'Invalid credentials. Please try again.')
+      }
+    } catch (error: any) {
+      console.error('Login error:', error)
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Invalid credentials. Please try again.'
+      showErrorToast('Login Failed', errorMessage)
     } finally {
       setIsLoading(false)
     }

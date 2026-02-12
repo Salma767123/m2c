@@ -10,9 +10,18 @@ import LeftSideContent from './LeftSideContent'
 export default function LoginRegister() {
   const [isLogin, setIsLogin] = useState(true)
 
-  const handleGoogleAuth = () => {
-    showSuccessToast('Google Sign-In', 'Redirecting to Google authentication...')
-    // Implement Google OAuth logic here
+  const handleGoogleAuth = async () => {
+    try {
+      showSuccessToast('Google Sign-In', 'Redirecting to Google authentication...')
+      
+      // Import the user auth service
+      const { userAuthService } = await import('@/services/userAuthService')
+      
+      // Redirect to Google OAuth
+      userAuthService.initiateGoogleLogin()
+    } catch (error) {
+      console.error('Google auth error:', error)
+    }
   }
 
   return (

@@ -436,16 +436,19 @@ const updateStock = async (req, res) => {
     console.log('Updating stock from', previousStock, 'to', newStock);
 
     // Update stock and create history record in a transaction
-    const [updatedItem, historyRecord] = await prisma.$transaction([
-      prisma.inventory.update({
+    const result = await prisma.$transaction(async (tx) => {
+      // Update inventory stock
+      const updatedItem = await tx.inventory.update({
         where: { id },
         data: {
           currentStock: newStock,
           ...(notes && { notes }),
           lastRestocked: new Date()
         }
-      }),
-      prisma.stockChangeHistory.create({
+      });
+
+      // Create stock history record
+      const historyRecord = await tx.stockChangeHistory.create({
         data: {
           inventoryId: id,
           previousStock,
@@ -456,9 +459,34 @@ const updateStock = async (req, res) => {
           changedByType: isAdmin ? 'admin' : 'vendor',
           changedByName
         }
-      })
-    ]);
+      });
 
+      // Sync stock with linked products
+      if (existingItem.hasProductCreated && existingItem.productId) {
+        await tx.product.update({
+          where: { id: existingItem.productId },
+          data: { totalStock: newStock }
+        });
+        console.log('✅ Synced stock with product:', existingItem.productId);
+      }
+
+      // Also update any products linked via inventoryItemId
+      const linkedProducts = await tx.product.findMany({
+        where: { inventoryItemId: id }
+      });
+
+      if (linkedProducts.length > 0) {
+        await tx.product.updateMany({
+          where: { inventoryItemId: id },
+          data: { totalStock: newStock }
+        });
+        console.log('✅ Synced stock with', linkedProducts.length, 'linked product(s)');
+      }
+
+      return { updatedItem, historyRecord };
+    });
+
+    const { updatedItem, historyRecord } = result;
     console.log('✅ Stock updated successfully');
 
     res.json({

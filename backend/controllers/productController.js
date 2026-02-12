@@ -156,6 +156,11 @@ const createProduct = async (req, res) => {
 
     // Start transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Determine the stock to use - if from inventory, use inventory's currentStock
+      const productStock = (isFromInventory && inventoryItem) 
+        ? inventoryItem.currentStock 
+        : (parseInt(totalStock) || 0);
+
       // Create product
       const product = await tx.product.create({
         data: {
@@ -182,7 +187,7 @@ const createProduct = async (req, res) => {
           pricingTiers: pricingTiers || [],
           bulkPricingEnabled: bulkPricingEnabled || false,
           singleUnitPricingEnabled: singleUnitPricingEnabled !== false,
-          totalStock: parseInt(totalStock) || 0,
+          totalStock: productStock,
           lowStockThreshold: parseInt(lowStockThreshold) || 10,
           trackInventory: trackInventory !== false,
           minimumOrderQuantity: parseInt(minimumOrderQuantity) || 1,
@@ -641,6 +646,15 @@ const updateProduct = async (req, res) => {
         }
       }
     });
+
+    // Sync stock with linked inventory if totalStock was updated (outside transaction)
+    if (updateData.totalStock !== undefined && existingProduct.inventoryItemId) {
+      await prisma.inventory.update({
+        where: { id: existingProduct.inventoryItemId },
+        data: { currentStock: parseInt(updateData.totalStock) }
+      });
+      console.log('✅ Synced stock with inventory:', existingProduct.inventoryItemId);
+    }
 
     res.json({
       success: true,
@@ -1230,6 +1244,11 @@ const createProductByAdmin = async (req, res) => {
 
     // Start transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Determine the stock to use - if from inventory, use inventory's currentStock
+      const productStock = (isFromInventory && inventoryItem) 
+        ? inventoryItem.currentStock 
+        : (parseInt(totalStock) || 0);
+
       // Create product
       const product = await tx.product.create({
         data: {
@@ -1257,7 +1276,7 @@ const createProductByAdmin = async (req, res) => {
           pricingTiers: pricingTiers || [],
           bulkPricingEnabled: bulkPricingEnabled || false,
           singleUnitPricingEnabled: singleUnitPricingEnabled !== false,
-          totalStock: parseInt(totalStock) || 0,
+          totalStock: productStock,
           lowStockThreshold: parseInt(lowStockThreshold) || 10,
           trackInventory: trackInventory !== false,
           minimumOrderQuantity: parseInt(minimumOrderQuantity) || 1,
@@ -1518,6 +1537,14 @@ const updateProductByAdmin = async (req, res) => {
         data: productUpdateData
       });
 
+      // Sync stock with linked inventory if totalStock was updated
+      if (updateData.totalStock !== undefined && existingProduct.inventoryItemId) {
+        await tx.inventory.update({
+          where: { id: existingProduct.inventoryItemId },
+          data: { currentStock: parseInt(updateData.totalStock) }
+        });
+        console.log('✅ Synced stock with inventory:', existingProduct.inventoryItemId);
+      }
       // Update variants if provided
       if (updateData.variants !== undefined) {
         // Delete existing variants

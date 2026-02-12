@@ -394,8 +394,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
             
             // Map API response to form data
             setFormData({
-              inventoryItemId: product.id,
-              isFromInventory: true,
+              inventoryItemId: product.inventory?.id || '',
+              isFromInventory: !!product.inventory,
               
               // Vendor Information
               vendorId: product.vendorId,
@@ -472,6 +472,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               inStock: product.inStock,
               status: product.status === 'ACTIVE' ? 'active' : product.status === 'INACTIVE' ? 'pending' : 'suspended'
             })
+            
+            // Set selected inventory item if exists
+            if (product.inventory) {
+              setSelectedInventoryItem({
+                id: product.inventory.id,
+                name: product.inventory.name,
+                sku: product.inventory.sku,
+                currentStock: product.inventory.currentStock,
+                category: product.inventory.category
+              })
+            }
           }
         } catch (error: any) {
           console.error('Error loading product data:', error)
