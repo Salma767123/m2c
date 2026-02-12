@@ -546,17 +546,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     
-    if (name.includes('.')) {
-      // Handle nested object updates (e.g., fabricSpecifications.type)
-      const [parent, child] = name.split('.')
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent as keyof ProductFormData] as any,
-          [child]: value
-        }
-      }))
-    } else if (name.includes('dispatchTimeline.')) {
+    // Handle dispatchTimeline with auto-calculation FIRST (before generic dot notation)
+    if (name.startsWith('dispatchTimeline.')) {
       const field = name.replace('dispatchTimeline.', '')
       const numValue = parseInt(value) || 0
       setFormData(prev => ({
@@ -569,6 +560,16 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
             : field === 'shippingDays'
             ? prev.dispatchTimeline.processingDays + numValue
             : prev.dispatchTimeline.totalDays
+        }
+      }))
+    } else if (name.includes('.')) {
+      // Handle other nested object updates (e.g., fabricSpecifications.type)
+      const [parent, child] = name.split('.')
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent as keyof ProductFormData] as any,
+          [child]: value
         }
       }))
     } else {
