@@ -47,6 +47,13 @@ export interface AdminProduct {
     businessEmail: string;
     status: string;
   };
+  inventory?: {
+    id: string;
+    name: string;
+    sku: string;
+    currentStock: number;
+    category: string;
+  };
   images: Array<{
     id: string;
     url: string;

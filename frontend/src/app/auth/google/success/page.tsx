@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { userAuthService } from '@/services/userAuthService'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
-export default function GoogleAuthSuccessPage() {
+function GoogleAuthSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -55,5 +55,20 @@ export default function GoogleAuthSuccessPage() {
         <p className="text-gray-500 text-sm">Please wait while we redirect you</p>
       </div>
     </div>
+  )
+}
+
+export default function GoogleAuthSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <GoogleAuthSuccessContent />
+    </Suspense>
   )
 }
