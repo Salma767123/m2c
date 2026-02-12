@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { userAuthService } from '@/services/userAuthService'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/UI/Button'
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
@@ -121,5 +121,23 @@ export default function VerifyEmailPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center">
+            <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Loading...</h1>
+            <p className="text-gray-600">Please wait...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   )
 }
