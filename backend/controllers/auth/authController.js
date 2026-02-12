@@ -1040,7 +1040,7 @@ const logout = async (req, res) => {
     // Get user info before logout
     let user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true, name: true, fcmTokens: true },
+      select: { email: true, name: true },
     });
     let userType = "user";
 
@@ -1052,23 +1052,16 @@ const logout = async (req, res) => {
       userType = "admin";
     }
 
-    // ✅ FIX: Remove FCM token from database on logout
-    if (fcmToken && user) {
+    // ✅ FIX: Remove FCM token from database on logout (only for admin)
+    if (fcmToken && user && userType === 'admin') {
       try {
         const tokens = Array.isArray(user.fcmTokens) ? user.fcmTokens : [];
         const updatedTokens = tokens.filter(t => t.token !== fcmToken);
 
-        if (userType === 'user') {
-          await prisma.user.update({
-            where: { id: userId },
-            data: { fcmTokens: updatedTokens },
-          });
-        } else {
-          await prisma.admin.update({
-            where: { id: userId },
-            data: { fcmTokens: updatedTokens },
-          });
-        }
+        await prisma.admin.update({
+          where: { id: userId },
+          data: { fcmTokens: updatedTokens },
+        });
 
         console.log(`✅ FCM token removed on logout for ${userType}: ${user.name} - Remaining devices: ${updatedTokens.length}`);
       } catch (fcmError) {

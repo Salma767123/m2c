@@ -108,6 +108,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         }
         
         const categoriesData = await inventoryService.getVendorCategories()
+        console.log('Loaded vendor categories:', categoriesData.categories)
         setVendorCategories(categoriesData.categories)
         setVendorSubcategories(categoriesData.subcategories)
       } catch (error: any) {
@@ -145,15 +146,52 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     }
   }, [vendorSubcategories, formData.category])
 
-  // Load inventory data for editing
+  // Debug: Log when formData.category or vendorCategories change
   useEffect(() => {
-    if (isEdit && inventoryId) {
+    console.log('Current formData.category:', formData.category)
+    console.log('Available vendor categories:', vendorCategories.map(c => c.name))
+    console.log('Category match found:', vendorCategories.some(c => c.name === formData.category))
+  }, [formData.category, vendorCategories])
+
+  // Load inventory data for editing (only after categories are loaded)
+  useEffect(() => {
+    if (isEdit && inventoryId && !isLoadingCategories) {
       setIsLoadingData(true)
       
       const loadInventoryData = async () => {
         try {
           const inventoryItem = await inventoryService.getItem(inventoryId)
+          console.log('Loaded inventory item:', inventoryItem)
           const formattedData = inventoryService.formatForForm(inventoryItem)
+          console.log('Formatted data:', formattedData)
+          console.log('Category from inventory:', formattedData.category)
+          
+          // Normalize category to match vendor categories (case-insensitive)
+          if (formattedData.category && vendorCategories.length > 0) {
+            const matchingCategory = vendorCategories.find(
+              cat => cat.name.toLowerCase() === formattedData.category.toLowerCase()
+            )
+            if (matchingCategory) {
+              formattedData.category = matchingCategory.name
+              console.log('Normalized category to:', matchingCategory.name)
+            } else {
+              console.warn('No matching category found for:', formattedData.category)
+            }
+          }
+          
+          // Normalize subcategory to match vendor subcategories (case-insensitive)
+          if (formattedData.subcategory && vendorSubcategories.length > 0) {
+            const matchingSubcategory = vendorSubcategories.find(
+              sub => sub.name.toLowerCase() === formattedData.subcategory.toLowerCase()
+            )
+            if (matchingSubcategory) {
+              formattedData.subcategory = matchingSubcategory.name
+              console.log('Normalized subcategory to:', matchingSubcategory.name)
+            } else {
+              console.warn('No matching subcategory found for:', formattedData.subcategory)
+            }
+          }
+          
           setFormData(formattedData)
           // Store original stock for comparison
           setOriginalStock(inventoryItem.currentStock)
@@ -180,7 +218,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         setIsLoadingData(false)
       }
     }
-  }, [isEdit, inventoryId, router])
+  }, [isEdit, inventoryId, router, isLoadingCategories, vendorCategories, vendorSubcategories])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target

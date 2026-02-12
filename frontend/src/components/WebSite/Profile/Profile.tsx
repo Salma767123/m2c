@@ -6,31 +6,21 @@ import {
   SquarePen, 
   Save, 
   X,  
-  Shield, 
   Bell, 
-  CreditCard, 
   Package, 
   Heart, 
-  Settings,
   LogOut
 } from 'lucide-react';
 import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
 import Wishlist from '@/components/WebSite/Profile/Wishlist';
-import PaymentMethods from '@/components/WebSite/Profile/PaymentMethods';
 import Notifications from '@/components/WebSite/Profile/Notifications';
-import Security from '@/components/WebSite/Profile/Security';
-import SettingsTab from '@/components/WebSite/Profile/Settings';
 import type { UserProfile } from '@/components/WebSite/Profile/types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
-  const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // User data with placeholders
   const [userProfile, setUserProfile] = useState<UserProfile>({
@@ -60,11 +50,6 @@ const Profile = () => {
   });
 
   const [editedProfile, setEditedProfile] = useState<UserProfile>(userProfile);
-  const [passwords, setPasswords] = useState({
-    current: '',
-    new: '',
-    confirm: ''
-  });
 
   const handleSave = () => {
     setUserProfile(editedProfile);
@@ -77,49 +62,15 @@ const Profile = () => {
     setIsEditing(false);
   };
 
-  const handlePasswordChange = () => {
-    if (passwords.new !== passwords.confirm) {
-      showErrorToast('Password Mismatch', 'New passwords do not match.');
-      return;
-    }
-    try {
-      // Here you would make an API call to change the password
-      setPasswords({ current: '', new: '', confirm: '' });
-      setShowPasswordChange(false);
-      showSuccessToast('Password Changed', 'Your password has been updated successfully.');
-    } catch (error) {
-      showErrorToast('Password Change Failed', 'Unable to change password. Please try again.');
-    }
-  };
-
   const tabs = [
     { id: 'profile', label: 'Profile Information', icon: User },
     { id: 'orders', label: 'Order History', icon: Package },
     { id: 'wishlist', label: 'Wishlist', icon: Heart },
-    { id: 'payment', label: 'Payment Methods', icon: CreditCard },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'security', label: 'Security', icon: Shield },
-    { id: 'settings', label: 'Settings', icon: Settings }
+    { id: 'notifications', label: 'Notifications', icon: Bell }
   ];
 
   const renderProfileTab = () => (
     <ProfileTab editedProfile={editedProfile} setEditedProfile={setEditedProfile} isEditing={isEditing} />
-  );
-
-  const renderSecurityTab = () => (
-    <Security
-      showPasswordChange={showPasswordChange}
-      setShowPasswordChange={setShowPasswordChange}
-      showCurrentPassword={showCurrentPassword}
-      setShowCurrentPassword={setShowCurrentPassword}
-      showNewPassword={showNewPassword}
-      setShowNewPassword={setShowNewPassword}
-      showConfirmPassword={showConfirmPassword}
-      setShowConfirmPassword={setShowConfirmPassword}
-      passwords={passwords}
-      setPasswords={setPasswords}
-      handlePasswordChange={handlePasswordChange}
-    />
   );
 
   const renderNotificationsTab = () => (
@@ -209,12 +160,9 @@ const Profile = () => {
           {/* Main Content */}
           <div className="flex-1">
             {activeTab === 'profile' && renderProfileTab()}
-            {activeTab === 'security' && renderSecurityTab()}
             {activeTab === 'notifications' && renderNotificationsTab()}
             {activeTab === 'orders' && <OrderHistory />}
             {activeTab === 'wishlist' && <Wishlist />}
-            {activeTab === 'payment' && <PaymentMethods />}
-            {activeTab === 'settings' && <SettingsTab />}
           </div>
         </div>
       </div>

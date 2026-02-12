@@ -31,6 +31,8 @@ const Header = () => {
   const [selectedCurrency, setSelectedCurrency] = useState("USD");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
+  const [userName, setUserName] = useState("");
 
   const modalRef = useRef<HTMLDivElement>(null);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
@@ -89,25 +91,44 @@ const Header = () => {
     setIsMenuOpen(false);
   }, [pathname]);
 
-  // Check if admin is logged in
+  // Check if admin or user is logged in
   useEffect(() => {
-    const checkAdminAuth = () => {
+    const checkAuth = () => {
+      // Check admin auth
       const adminLoggedIn = isAuthenticated()
       setIsAdminLoggedIn(adminLoggedIn)
+      
+      // Check user auth
+      const userToken = localStorage.getItem('userToken') || sessionStorage.getItem('userToken')
+      const userData = localStorage.getItem('userData') || sessionStorage.getItem('userData')
+      
+      if (userToken && userData) {
+        setIsUserLoggedIn(true)
+        try {
+          const user = JSON.parse(userData)
+          setUserName(user.name || '')
+        } catch (error) {
+          console.error('Error parsing user data:', error)
+          setIsUserLoggedIn(false)
+        }
+      } else {
+        setIsUserLoggedIn(false)
+        setUserName('')
+      }
     }
     
     // Check immediately and also on storage changes
-    checkAdminAuth()
+    checkAuth()
     
     // Listen for storage changes (in case user logs in/out in another tab)
     const handleStorageChange = () => {
-      checkAdminAuth()
+      checkAuth()
     }
     
     window.addEventListener('storage', handleStorageChange)
     
     // Also check periodically in case of same-tab changes
-    const interval = setInterval(checkAdminAuth, 1000)
+    const interval = setInterval(checkAuth, 1000)
     
     return () => {
       window.removeEventListener('storage', handleStorageChange)
@@ -118,6 +139,51 @@ const Header = () => {
   const isActiveLink = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
+  };
+
+  const handleLogout = async () => {
+    try {
+      // Import user auth service and toast utils
+      const { userAuthService } = await import('@/services/userAuthService')
+      const { showSuccessToast } = await import('@/lib/toast-utils')
+      
+      // Call logout API
+      await userAuthService.logout()
+      
+      // Clear auth data
+      userAuthService.clearAuthData()
+      
+      // Update state
+      setIsUserLoggedIn(false)
+      setUserName('')
+      setShowAccountDropdown(false)
+      
+      // Show success toast
+      showSuccessToast('Logged Out', 'You have been successfully logged out.')
+      
+      // Redirect to home after a short delay to show toast
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 1000)
+    } catch (error) {
+      console.error('Logout error:', error)
+      const { showSuccessToast } = await import('@/lib/toast-utils')
+      
+      // Clear data anyway
+      localStorage.removeItem('userToken')
+      sessionStorage.removeItem('userToken')
+      localStorage.removeItem('userData')
+      sessionStorage.removeItem('userData')
+      setIsUserLoggedIn(false)
+      setUserName('')
+      
+      // Show success toast even on error since we're clearing locally
+      showSuccessToast('Logged Out', 'You have been logged out.')
+      
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 1000)
+    }
   };
 
   return (
@@ -338,6 +404,14 @@ const Header = () => {
                 {showAccountDropdown && (
                   <div className="absolute right-0 mt-2 w-48 sm:w-56 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="p-2 space-y-1">
+                      {isUserLoggedIn && userName && (
+                        <>
+                          <div className="px-3 sm:px-4 py-2 border-b border-slate-100">
+                            <p className="text-xs text-slate-500">Signed in as</p>
+                            <p className="text-sm font-semibold text-slate-800 truncate">{userName}</p>
+                          </div>
+                        </>
+                      )}
                       {isAdminLoggedIn && (
                         <>
                           <Link
@@ -351,31 +425,44 @@ const Header = () => {
                           <hr className="my-2 border-slate-100" />
                         </>
                       )}
-                      <Link
-                        href="/profile"
-                        className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-slate-700 hover:bg-gray-50 hover:text-gray-600 transition-all duration-150 font-medium"
-                        onClick={() => setShowAccountDropdown(false)}
-                      >
-                        <IconUserFilled className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
-                        <span>My Profile</span>
-                      </Link>
-                      <Link
-                        href="/order"
-                        className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-slate-700 hover:bg-gray-50 hover:text-gray-600 transition-all duration-150 font-medium"
-                        onClick={() => setShowAccountDropdown(false)}
-                      >
-                        <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span>My Orders</span>
-                      </Link>
-                      <hr className="my-2 border-slate-100" />
-                      <Link
-                        href="/login"
-                        className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-700 transition-all duration-150 text-left font-medium"
-                        onClick={() => setShowAccountDropdown(false)}
-                      >
-                        <User className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span>Login</span>
-                      </Link>
+                      {isUserLoggedIn && (
+                        <>
+                          <Link
+                            href="/profile"
+                            className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-slate-700 hover:bg-gray-50 hover:text-gray-600 transition-all duration-150 font-medium"
+                            onClick={() => setShowAccountDropdown(false)}
+                          >
+                            <IconUserFilled className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                            <span>My Profile</span>
+                          </Link>
+                          <Link
+                            href="/order"
+                            className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-slate-700 hover:bg-gray-50 hover:text-gray-600 transition-all duration-150 font-medium"
+                            onClick={() => setShowAccountDropdown(false)}
+                          >
+                            <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <span>My Orders</span>
+                          </Link>
+                          <hr className="my-2 border-slate-100" />
+                          <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-red-600 hover:bg-red-50 transition-all duration-150 text-left font-medium"
+                          >
+                            <User className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <span>Logout</span>
+                          </button>
+                        </>
+                      )}
+                      {!isUserLoggedIn && (
+                        <Link
+                          href="/login"
+                          className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-700 transition-all duration-150 text-left font-medium"
+                          onClick={() => setShowAccountDropdown(false)}
+                        >
+                          <User className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <span>Login</span>
+                        </Link>
+                      )}
                     </div>
                   </div>
                 )}
@@ -467,6 +554,13 @@ const Header = () => {
 
               <hr className="my-3 sm:my-4 border-slate-200" />
 
+              {isUserLoggedIn && userName && (
+                <div className="px-3 sm:px-4 py-2 bg-gray-50 rounded-lg mb-2">
+                  <p className="text-xs text-slate-500">Signed in as</p>
+                  <p className="text-sm font-semibold text-slate-800 truncate">{userName}</p>
+                </div>
+              )}
+
               {isAdminLoggedIn && (
                 <>
                   <Link
@@ -481,23 +575,40 @@ const Header = () => {
                 </>
               )}
 
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-slate-700 hover:bg-slate-100 hover:text-gray-600 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <IconUserFilled className="w-4 h-4" />
-                My Account
-              </Link>
-              
-              <Link
-                href="/login"
-                className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-slate-700 hover:bg-slate-100 hover:text-gray-600 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <User className="w-4 h-4" />
-                Login
-              </Link>
+              {isUserLoggedIn && (
+                <>
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-slate-700 hover:bg-slate-100 hover:text-gray-600 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <IconUserFilled className="w-4 h-4" />
+                    My Account
+                  </Link>
+                  
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      handleLogout()
+                    }}
+                    className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base text-left"
+                  >
+                    <User className="w-4 h-4" />
+                    Logout
+                  </button>
+                </>
+              )}
+
+              {!isUserLoggedIn && (
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 text-slate-700 hover:bg-slate-100 hover:text-gray-600 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <User className="w-4 h-4" />
+                  Login
+                </Link>
+              )}
             </div>
           </div>
         )}

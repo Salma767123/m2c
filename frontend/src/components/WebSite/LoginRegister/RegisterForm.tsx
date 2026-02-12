@@ -193,16 +193,37 @@ export default function RegisterForm({ onGoogleAuth }: RegisterFormProps) {
     setIsLoading(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Import the user auth service
+      const { userAuthService } = await import('@/services/userAuthService')
       
-      // Mock successful registration
-      showSuccessToast('Registration Successful', 'Welcome! Your account has been created. Start shopping now!')
+      // Combine first and last name
+      const fullName = `${registerData.firstName} ${registerData.lastName}`.trim()
       
-      // Redirect to profile or home page
-      window.location.href = '/'
-    } catch (error) {
-      showErrorToast('Registration Failed', 'Something went wrong. Please try again.')
+      // Call the backend register API
+      const response = await userAuthService.register({
+        email: registerData.email,
+        password: registerData.password,
+        name: fullName,
+        phoneNumber: registerData.phone
+      })
+      
+      if (response.success) {
+        showSuccessToast(
+          'Registration Successful', 
+          'Please check your email to verify your account before signing in.'
+        )
+        
+        // Redirect to login page after a short delay
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 2000)
+      } else {
+        showErrorToast('Registration Failed', response.message || 'Something went wrong. Please try again.')
+      }
+    } catch (error: any) {
+      console.error('Registration error:', error)
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Something went wrong. Please try again.'
+      showErrorToast('Registration Failed', errorMessage)
     } finally {
       setIsLoading(false)
     }

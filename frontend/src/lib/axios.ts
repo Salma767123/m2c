@@ -13,11 +13,12 @@ const axiosInstance: AxiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Get token from localStorage or sessionStorage
-    // Check for admin token first, then vendor token
+    // Check for admin token first, then vendor token, then user token
     const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
     const vendorToken = localStorage.getItem('vendorToken');
+    const userToken = localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
     
-    const token = adminToken || vendorToken;
+    const token = adminToken || vendorToken || userToken;
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -55,6 +56,10 @@ axiosInstance.interceptors.response.use(
             sessionStorage.removeItem('adminToken');
             localStorage.removeItem('vendorToken');
             localStorage.removeItem('vendorData');
+            localStorage.removeItem('userToken');
+            sessionStorage.removeItem('userToken');
+            localStorage.removeItem('userData');
+            sessionStorage.removeItem('userData');
             if (typeof window !== 'undefined') {
               // Redirect based on current path
               const currentPath = window.location.pathname;
