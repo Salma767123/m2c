@@ -1,18 +1,13 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
 import {
   User,
-  Camera,
   MapPin,
-  Calendar,
   Phone,
   Mail,
-  ChevronDown,
   User2,
 } from "lucide-react";
 import Dropdown from "@/components/UI/Dropdown";
-import DatePicker from "@/components/UI/DatePicker";
 import type { UserProfile } from "./types";
 
 interface ProfileTabProps {
@@ -26,20 +21,6 @@ export default function ProfileTab({
   setEditedProfile,
   isEditing,
 }: ProfileTabProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setEditedProfile({ ...editedProfile, avatar: result });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleInputChange = (field: string, value: string) => {
     if (field.includes(".")) {
       const [parent, child] = field.split(".");
@@ -75,51 +56,6 @@ export default function ProfileTab({
             <h3 className="text-lg font-semibold text-slate-900">
               Personal Information
             </h3>
-          </div>
-          {/* Avatar Section */}
-          <div className="flex items-center gap-6 mb-4 p-4 bg-slate-50 rounded-lg">
-            <div className="relative">
-              <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center overflow-hidden">
-                {editedProfile.avatar ? (
-                  <img
-                    src={editedProfile.avatar}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <User className="w-8 h-8 text-slate-400" />
-                )}
-              </div>
-              {isEditing && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 w-8 h-8 bg-gray-600 text-white rounded-full flex items-center justify-center hover:bg-gray-700 transition-colors"
-                >
-                  <Camera className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            <div>
-              <h3 className="font-semibold text-slate-900">Profile Picture</h3>
-              <p className="text-sm text-slate-600">
-                Upload a photo to personalize your account
-              </p>
-              {isEditing && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="mt-2 text-sm text-gray-600 hover:text-gray-700"
-                >
-                  Change Photo
-                </button>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarChange}
-              className="hidden"
-            />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -177,14 +113,6 @@ export default function ProfileTab({
               />
             </div>
             <div>
-              <DatePicker
-                label="Date of Birth"
-                value={editedProfile.dateOfBirth}
-                onChange={(value) => handleInputChange("dateOfBirth", value)}
-                placeholder="Select your date of birth"
-              />
-            </div>
-            <div>
               <Dropdown
                 label="Gender"
                 value={editedProfile.gender}
@@ -213,7 +141,7 @@ export default function ProfileTab({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Address Line 1
+                Address
               </label>
               <input
                 type="text"
@@ -222,37 +150,7 @@ export default function ProfileTab({
                   handleInputChange("address.addressLine1", e.target.value)
                 }
                 disabled={!isEditing}
-                placeholder="Street address, P.O. box, company name"
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:bg-slate-50 disabled:text-slate-500"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Address Line 2
-              </label>
-              <input
-                type="text"
-                value={editedProfile.address.addressLine2}
-                onChange={(e) =>
-                  handleInputChange("address.addressLine2", e.target.value)
-                }
-                disabled={!isEditing}
-                placeholder="Apartment, suite, unit, building, floor, etc."
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:bg-slate-50 disabled:text-slate-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Landmark
-              </label>
-              <input
-                type="text"
-                value={editedProfile.address.landmark}
-                onChange={(e) =>
-                  handleInputChange("address.landmark", e.target.value)
-                }
-                disabled={!isEditing}
-                placeholder="Nearby landmark"
+                placeholder="Enter your full address"
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:bg-slate-50 disabled:text-slate-500"
               />
             </div>

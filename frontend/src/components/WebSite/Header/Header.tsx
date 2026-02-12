@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Search,
   ShoppingCart,
+  Heart,
   Menu,
   Globe,
   ChevronDown,
@@ -18,6 +19,9 @@ import { IconUserFilled } from '@tabler/icons-react';
 import { categories } from "@/components/mockData/products";
 import Category from "./CategoryBar/CategoryBar";
 import { getStoredAuth, isAuthenticated } from "@/lib/auth";
+import { cartService } from "@/services/cartService";
+import { wishlistService } from "@/services/wishlistService";
+import { userAuthService } from "@/services/userAuthService";
 
 const Header = () => {
   const pathname = usePathname();
@@ -33,6 +37,8 @@ const Header = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
+  const [cartCount, setCartCount] = useState(0);
+  const [wishlistCount, setWishlistCount] = useState(0);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const languageDropdownRef = useRef<HTMLDivElement>(null);
@@ -134,7 +140,48 @@ const Header = () => {
       window.removeEventListener('storage', handleStorageChange)
       clearInterval(interval)
     }
-  }, []);
+  }, [])
+
+  // Load cart and wishlist counts
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        if (userAuthService.isAuthenticated()) {
+          // Load from backend for authenticated users
+          try {
+            const cartResponse = await cartService.getCart();
+            if (cartResponse.success && cartResponse.data) {
+              setCartCount(cartResponse.data.itemCount || 0);
+            }
+          } catch (error) {
+            console.error('Error loading cart count:', error);
+          }
+
+          try {
+            const wishlistResponse = await wishlistService.getWishlist();
+            if (wishlistResponse.success && wishlistResponse.data) {
+              setWishlistCount(wishlistResponse.data.count || 0);
+            }
+          } catch (error) {
+            console.error('Error loading wishlist count:', error);
+          }
+        } else {
+          // Not authenticated - set counts to 0
+          setCartCount(0);
+          setWishlistCount(0);
+        }
+      } catch (error) {
+        console.error('Error loading counts:', error);
+      }
+    };
+
+    loadCounts();
+
+    // Reload counts periodically
+    const interval = setInterval(loadCounts, 5000);
+
+    return () => clearInterval(interval);
+  }, [isUserLoggedIn]);
 
   const isActiveLink = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -228,15 +275,30 @@ const Header = () => {
 
             {/* Section 3: Action Icons (30% on desktop, 50% on mobile/tablet) */}
             <div className="w-[50%] md:w-[30%] flex items-center justify-end gap-1 sm:gap-2 md:gap-3 shrink-0">
+              {/* Wishlist */}
+              <Link
+                href="/wishlist"
+                className="relative p-1.5 sm:p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-105"
+              >
+                <Heart className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#212121] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs">
+                    {wishlistCount > 99 ? '99+' : wishlistCount}
+                  </span>
+                )}
+              </Link>
+              
               {/* Cart */}
               <Link
                 href="/cart"
                 className="relative p-1.5 sm:p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-105"
               >
                 <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
-                <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#212121] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs">
-                  0
-                </span>
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#212121] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
               </Link>
 
               {/* Search Icon */}

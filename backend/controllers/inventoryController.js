@@ -876,6 +876,57 @@ const getAllInventoryStats = async (req, res) => {
     });
   }
 };
+// Admin: Get inventory items by vendor ID (for product creation)
+const getInventoryByVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { includeUsed = 'false' } = req.query;
+
+    if (!vendorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor ID is required'
+      });
+    }
+
+    // Build filter conditions
+    const where = {
+      vendorId,
+      status: 'ACTIVE',
+      ...(includeUsed === 'false' && { hasProductCreated: false })
+    };
+
+    // Get inventory items
+    const inventoryItems = await prisma.inventory.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        category: true,
+        subcategory: true,
+        description: true,
+        currentStock: true,
+        hasProductCreated: true,
+        productId: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      data: inventoryItems
+    });
+
+  } catch (error) {
+    console.error('Error fetching inventory by vendor:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
 
 module.exports = {
   createInventoryItem,
@@ -888,5 +939,6 @@ module.exports = {
   getInventoryStats,
   getVendorCategories,
   getAllInventory,
-  getAllInventoryStats
+  getAllInventoryStats,
+  getInventoryByVendor
 };

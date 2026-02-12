@@ -1,7 +1,5 @@
 export interface Address {
   addressLine1: string
-  addressLine2: string
-  landmark: string
   city: string
   state: string
   zipCode: string
@@ -14,10 +12,8 @@ export interface UserProfile {
   lastName: string
   email: string
   phone: string
-  dateOfBirth: string
   gender: 'male' | 'female' | 'other'
   address: Address
-  avatar: string
   joinDate: string
   preferences: {
     newsletter: boolean

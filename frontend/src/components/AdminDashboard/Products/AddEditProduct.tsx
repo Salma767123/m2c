@@ -10,42 +10,17 @@ import { ArrowLeft, Save, X, Upload, Package } from 'lucide-react'
 import Link from 'next/link'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 
-// Mock data for inventory items (these would come from API)
-const mockInventoryItems = [
-  {
-    id: '1',
-    name: 'Cotton Kitchen Towel',
-    sku: 'KL-CKT-001',
-    category: 'Kitchen Linen',
-    description: 'High-quality cotton kitchen towel with excellent absorbency',
-    costPrice: 6.50,
-    sellingPrice: 12.99,
-    currentStock: 45,
-    hasProductCreated: false
-  },
-  {
-    id: '2',
-    name: 'Handwoven Bath Towel',
-    sku: 'BL-HBT-002',
-    category: 'Bath Linen',
-    description: 'Luxurious handwoven bath towel',
-    costPrice: 12.00,
-    sellingPrice: 24.99,
-    currentStock: 25,
-    hasProductCreated: false
-  },
-  {
-    id: '3',
-    name: 'Premium Bed Sheet Set',
-    sku: 'BL-PBS-003',
-    category: 'Bed Linen',
-    description: 'Premium quality bed sheet set',
-    costPrice: 45.00,
-    sellingPrice: 89.99,
-    currentStock: 15,
-    hasProductCreated: true // Already has a product created
-  }
-]
+interface InventoryItem {
+  id: string
+  name: string
+  sku: string
+  category: string
+  subcategory?: string
+  description?: string
+  currentStock: number
+  hasProductCreated: boolean
+  productId?: string
+}
 
 // Helper function to get color name from hex value
 const getColorName = (hex: string): string => {
@@ -210,8 +185,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   // State for dynamic data
   const [vendors, setVendors] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [categories, setCategories] = useState<string[]>([])
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [isLoadingVendors, setIsLoadingVendors] = useState(true)
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false)
   
   const [formData, setFormData] = useState<ProductFormData>({
     // Inventory Connection (NEW)
@@ -483,6 +460,21 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 category: product.inventory.category
               })
             }
+
+            // Load inventory items for the vendor when editing
+            if (product.vendorId) {
+              setIsLoadingInventory(true)
+              try {
+                const { default: inventoryService } = await import('@/services/inventoryService')
+                const items = await inventoryService.adminGetInventoryByVendor(product.vendorId, false)
+                setInventoryItems(items)
+              } catch (error) {
+                console.error('Error loading inventory items:', error)
+                setInventoryItems([])
+              } finally {
+                setIsLoadingInventory(false)
+              }
+            }
           }
         } catch (error: any) {
           console.error('Error loading product data:', error)
@@ -493,38 +485,20 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       }
 
       loadProductData()
-    } else if (inventoryId) {
-      // Pre-fill from inventory selection
-      const inventoryItem = mockInventoryItems.find(item => item.id === inventoryId)
-      if (inventoryItem) {
-        setSelectedInventoryItem(inventoryItem)
-        setFormData(prev => ({
-          ...prev,
-          inventoryItemId: inventoryId,
-          isFromInventory: true,
-          name: inventoryItem.name,
-          description: inventoryItem.description,
-          category: inventoryItem.category,
-          baseSku: inventoryItem.sku,
-          basePrice: inventoryItem.sellingPrice,
-          totalStock: inventoryItem.currentStock
-        }))
-      }
     }
-  }, [isEdit, productId, inventoryId])
+  }, [isEdit, productId])
 
   // Inventory Selection Functions
-  const handleInventorySelect = (inventoryItem: any) => {
+  const handleInventorySelect = (inventoryItem: InventoryItem) => {
     setSelectedInventoryItem(inventoryItem)
     setFormData(prev => ({
       ...prev,
       inventoryItemId: inventoryItem.id,
       isFromInventory: true,
       name: inventoryItem.name,
-      description: inventoryItem.description,
+      description: inventoryItem.description || '',
       category: inventoryItem.category,
       baseSku: inventoryItem.sku,
-      basePrice: inventoryItem.sellingPrice,
       totalStock: inventoryItem.currentStock
     }))
   }
@@ -539,13 +513,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       description: '',
       category: '',
       baseSku: '',
-      basePrice: 0,
       totalStock: 0
     }))
   }
 
   // Vendor Selection Functions
-  const handleVendorSelect = (vendorId: string) => {
+  const handleVendorSelect = async (vendorId: string) => {
     const vendor = vendors.find(v => v.id === vendorId)
     if (vendor) {
       setFormData(prev => ({
@@ -553,6 +526,20 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         vendorId: vendor.id,
         vendorName: vendor.name
       }))
+
+      // Load inventory items for the selected vendor
+      setIsLoadingInventory(true)
+      try {
+        const { default: inventoryService } = await import('@/services/inventoryService')
+        const items = await inventoryService.adminGetInventoryByVendor(vendorId, false)
+        setInventoryItems(items)
+      } catch (error) {
+        console.error('Error loading inventory items:', error)
+        showErrorToast('Load Failed', 'Unable to load inventory items for this vendor')
+        setInventoryItems([])
+      } finally {
+        setIsLoadingInventory(false)
+      }
     }
   }
 
@@ -1042,26 +1029,43 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       Choose an inventory item to create a detailed product with variants
                     </p>
                     
-                    {!selectedInventoryItem ? (
+                    {!formData.vendorId ? (
+                      <p className="text-sm text-gray-600 italic">
+                        Please select a vendor first to view their inventory items
+                      </p>
+                    ) : !selectedInventoryItem ? (
                       <div className="space-y-3">
-                        <Dropdown
-                          label="Available Inventory Items"
-                          value=""
-                          options={mockInventoryItems
-                            .filter(item => !item.hasProductCreated)
-                            .map(item => ({
-                              value: item.id,
-                              label: `${item.name} (${item.sku}) - Stock: ${item.currentStock}`
-                            }))}
-                          placeholder="Select an inventory item"
-                          onChange={(value) => {
-                            const item = mockInventoryItems.find(i => i.id === value)
-                            if (item) handleInventorySelect(item)
-                          }}
-                        />
-                        <p className="text-xs text-blue-700">
-                          Only inventory items without existing products are shown
-                        </p>
+                        {isLoadingInventory ? (
+                          <div className="flex items-center justify-center py-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-700"></div>
+                            <span className="ml-3 text-sm text-blue-700">Loading inventory items...</span>
+                          </div>
+                        ) : inventoryItems.length === 0 ? (
+                          <p className="text-sm text-gray-600 italic py-2">
+                            No available inventory items for this vendor
+                          </p>
+                        ) : (
+                          <>
+                            <Dropdown
+                              label="Available Inventory Items"
+                              value=""
+                              options={inventoryItems
+                                .filter(item => !item.hasProductCreated)
+                                .map(item => ({
+                                  value: item.id,
+                                  label: `${item.name} (${item.sku}) - Stock: ${item.currentStock}`
+                                }))}
+                              placeholder="Select an inventory item"
+                              onChange={(value) => {
+                                const item = inventoryItems.find(i => i.id === value)
+                                if (item) handleInventorySelect(item)
+                              }}
+                            />
+                            <p className="text-xs text-blue-700">
+                              Only inventory items without existing products are shown
+                            </p>
+                          </>
+                        )}
                       </div>
                     ) : (
                       <div className="bg-white border border-blue-300 rounded-lg p-4">
@@ -1085,10 +1089,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           <div>
                             <span className="text-gray-600">Current Stock:</span>
                             <span className="font-medium ml-2">{selectedInventoryItem.currentStock}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Base Price:</span>
-                            <span className="font-medium ml-2">${selectedInventoryItem.sellingPrice}</span>
                           </div>
                         </div>
                         <Link href={`/admin/dashboard/inventory/edit/${selectedInventoryItem.id}`}>

@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { products } from "@/components/mockData/products"
+import { cartService } from "@/services/cartService"
+import { userAuthService } from "@/services/userAuthService"
+import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import { 
   ShoppingCart, 
   Plus, 
@@ -22,17 +24,18 @@ import {
 
 interface OrderItem {
   id: string
+  productId: string
   name: string
   price: number
   originalPrice?: number
   images: string[]
   category: string
-  rating: number
-  reviews: number
+  rating?: number
+  reviews?: number
   inStock: boolean
   quantity: number
-  description: string
-  material: string
+  description?: string
+  material?: string
   discount?: number
 }
 
@@ -44,37 +47,65 @@ interface OrderSummary {
   total: number
 }
 
-const getInitialCartItems = (): OrderItem[] => {
-  return products.slice(0, 3).map(product => ({
-    id: product.id,
-    name: product.name,
-    price: product.price,
-    originalPrice: product.originalPrice,
-    images: product.images,
-    category: product.category,
-    rating: product.rating,
-    reviews: product.reviews,
-    inStock: product.inStock,
-    quantity: 1,
-    description: product.description,
-    material: product.material,
-    discount: product.discount
-  }))
-}
-
 export default function Order() {
   const [cartItems, setCartItems] = useState<OrderItem[]>([])
   const [isHydrated, setIsHydrated] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    setCartItems(getInitialCartItems())
-    setIsHydrated(true)
+    const fetchCart = async () => {
+      try {
+        setLoading(true)
+        const authenticated = userAuthService.isAuthenticated()
+        setIsAuthenticated(authenticated)
+
+        if (!authenticated) {
+          // Not authenticated - redirect to login
+          showErrorToast('Login Required', 'Please login to view your cart')
+          setTimeout(() => {
+            window.location.href = '/login'
+          }, 1500)
+          return
+        }
+
+        // Fetch from backend for authenticated users
+        const response = await cartService.getCart()
+        if (response.success && response.data) {
+          const items = response.data.items.map((item: any) => ({
+            id: item.id,
+            productId: item.productId,
+            name: item.product?.name || 'Unknown Product',
+            price: item.price,
+            originalPrice: item.product?.originalPrice,
+            images: item.product?.images?.map((img: any) => img.url) || [],
+            category: item.product?.category || '',
+            rating: item.product?.rating,
+            reviews: item.product?.reviews,
+            inStock: item.product?.inStock ?? true,
+            quantity: item.quantity,
+            description: item.product?.description,
+            material: item.product?.material,
+            discount: item.product?.discount
+          }))
+          setCartItems(items)
+        }
+      } catch (error) {
+        console.error('Failed to fetch cart:', error)
+        showErrorToast('Error', 'Failed to load cart items')
+      } finally {
+        setLoading(false)
+        setIsHydrated(true)
+      }
+    }
+
+    fetchCart()
   }, [])
 
   const [promoCode, setPromoCode] = useState("")
   const [appliedPromo, setAppliedPromo] = useState("")
 
-  if (!isHydrated) {
+  if (!isHydrated || loading) {
     return (
       <div className="min-h-screen bg-slate-50 py-8 font-sans">
         <div className="max-w-7xl xl:max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
@@ -83,6 +114,8 @@ export default function Order() {
             <p className="text-slate-600">Review your items and proceed to checkout</p>
           </div>
           <div className="animate-pulse">
+            <div className="h-32 bg-slate-200 rounded-2xl mb-4"></div>
+            <div className="h-32 bg-slate-200 rounded-2xl mb-4"></div>
             <div className="h-32 bg-slate-200 rounded-2xl"></div>
           </div>
         </div>
@@ -90,20 +123,37 @@ export default function Order() {
     )
   }
 
-  const updateQuantity = (id: string, newQuantity: number) => {
+  const updateQuantity = async (id: string, productId: string, newQuantity: number) => {
     if (newQuantity < 1) {
-      removeItem(id)
+      removeItem(id, productId)
       return
     }
-    setCartItems(items => 
-      items.map(item => 
-        item.id === id ? { ...item, quantity: newQuantity } : item
+
+    try {
+      // Update via API
+      await cartService.updateCartItem(id, newQuantity)
+      setCartItems(items => 
+        items.map(item => 
+          item.id === id ? { ...item, quantity: newQuantity } : item
+        )
       )
-    )
+      showSuccessToast('Updated', 'Cart item quantity updated')
+    } catch (error) {
+      console.error('Failed to update quantity:', error)
+      showErrorToast('Error', 'Failed to update quantity')
+    }
   }
 
-  const removeItem = (id: string) => {
-    setCartItems(items => items.filter(item => item.id !== id))
+  const removeItem = async (id: string, productId: string) => {
+    try {
+      // Remove via API
+      await cartService.removeFromCart(id)
+      setCartItems(items => items.filter(item => item.id !== id))
+      showSuccessToast('Removed', 'Item removed from cart')
+    } catch (error) {
+      console.error('Failed to remove item:', error)
+      showErrorToast('Error', 'Failed to remove item')
+    }
   }
 
   const applyPromoCode = () => {
@@ -153,11 +203,17 @@ export default function Order() {
                     <div className="flex items-start gap-4">
                       {/* Product Image */}
                       <div className="shrink-0">
-                        <img
-                          src={item.images[0]}
-                          alt={item.name}
-                          className="w-24 h-24 object-cover rounded-xl border border-slate-200"
-                        />
+                        {item.images && item.images.length > 0 ? (
+                          <img
+                            src={item.images[0]}
+                            alt={item.name}
+                            className="w-24 h-24 object-cover rounded-xl border border-slate-200"
+                          />
+                        ) : (
+                          <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-xl border border-slate-200">
+                            <Package className="w-8 h-8 text-gray-400" />
+                          </div>
+                        )}
                       </div>
 
                       {/* Product Details */}
@@ -170,16 +226,20 @@ export default function Order() {
                               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                                 {item.category}
                               </span>
-                              <div className="flex items-center gap-1">
-                                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                <span className="text-sm text-slate-600">{item.rating}</span>
-                                <span className="text-sm text-slate-500">({item.reviews})</span>
-                              </div>
+                              {item.rating !== undefined && (
+                                <div className="flex items-center gap-1">
+                                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                  <span className="text-sm text-slate-600">{item.rating}</span>
+                                  <span className="text-sm text-slate-500">({item.reviews || 0})</span>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                                {item.material}
-                              </span>
+                              {item.material && (
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                                  {item.material}
+                                </span>
+                              )}
                               {item.discount && (
                                 <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full font-semibold">
                                   Save {item.discount}%
@@ -188,7 +248,7 @@ export default function Order() {
                             </div>
                           </div>
                           <button
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(item.id, item.productId)}
                             className="p-2 text-slate-400 hover:text-gray-500 transition-colors"
                           >
                             <Trash2 className="w-5 h-5" />
@@ -198,9 +258,9 @@ export default function Order() {
                         {/* Price and Quantity */}
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-slate-900">${item.price}</span>
+                            <span className="text-xl font-bold text-slate-900">${item.price.toFixed(2)}</span>
                             {item.originalPrice && (
-                              <span className="text-sm text-slate-500 line-through">${item.originalPrice}</span>
+                              <span className="text-sm text-slate-500 line-through">${item.originalPrice.toFixed(2)}</span>
                             )}
                           </div>
 
@@ -210,7 +270,7 @@ export default function Order() {
                             )}
                             <div className="flex items-center border border-slate-300 rounded-lg">
                               <button
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                onClick={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
                                 className="p-2 hover:bg-slate-100 transition-colors"
                                 disabled={!item.inStock}
                               >
@@ -218,7 +278,7 @@ export default function Order() {
                               </button>
                               <span className="px-4 py-2 font-medium">{item.quantity}</span>
                               <button
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                onClick={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
                                 className="p-2 hover:bg-slate-100 transition-colors"
                                 disabled={!item.inStock}
                               >
@@ -336,22 +396,7 @@ export default function Order() {
                 </div>
               </div>
 
-              {/* Recently Viewed */}
-              <div className="mt-6 bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">You might also like</h3>
-                <div className="space-y-4">
-                  {products.slice(3, 5).map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer">
-                      <img src={item.images[0]} alt={item.name} className="w-12 h-12 object-cover rounded-lg" />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900 text-sm line-clamp-1">{item.name}</h4>
-                        <p className="text-gray-800 font-semibold text-sm">${item.price}</p>
-                      </div>
-                      <Plus className="w-5 h-5 text-slate-400 hover:text-gray-800 transition-colors" />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* Recently Viewed - Removed for now, can be added later with proper backend integration */}
             </div>
           )}
         </div>

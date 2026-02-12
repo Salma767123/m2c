@@ -216,6 +216,12 @@ class InventoryService {
     await axios.delete(`${this.baseURL}/admin/${id}`);
   }
 
+  // Admin: Get inventory items by vendor ID (for product creation)
+  async adminGetInventoryByVendor(vendorId: string, includeUsed: boolean = false): Promise<InventoryItem[]> {
+    const response = await axios.get(`${this.baseURL}/admin/vendor/${vendorId}?includeUsed=${includeUsed}`);
+    return response.data.data;
+  }
+
   // Helper method to format inventory data for frontend forms
   formatForForm(item: InventoryItem) {
     return {
