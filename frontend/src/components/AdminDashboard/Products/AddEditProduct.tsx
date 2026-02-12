@@ -168,7 +168,7 @@ interface ProductFormData {
   dimensions?: string
   weight?: string
   inStock: boolean
-  status: 'active' | 'pending' | 'suspended' | 'out_of_stock'
+  status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
 }
 
 interface AddEditProductProps {
@@ -185,6 +185,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   // State for dynamic data
   const [vendors, setVendors] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [categories, setCategories] = useState<string[]>([])
+  const [vendorSubcategories, setVendorSubcategories] = useState<Record<string, string[]>>({}) // Store subcategories by category
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [isLoadingVendors, setIsLoadingVendors] = useState(true)
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
@@ -266,16 +267,31 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     dimensions: '',
     weight: '',
     inStock: true,
-    status: 'pending'
+    status: 'ACTIVE'
   })
 
   const [selectedTag, setSelectedTag] = useState('')
   const [newCareInstruction, setNewCareInstruction] = useState('')
   const [activeTab, setActiveTab] = useState('basic')
   
-  // Load vendors and categories on mount
+  // Debug: Log category and subcategory changes
   useEffect(() => {
-    const loadVendorsAndCategories = async () => {
+    console.log('=== FORM DATA CATEGORY/SUBCATEGORY CHANGED ===')
+    console.log('Category:', formData.category)
+    console.log('SubCategory:', formData.subCategory)
+  }, [formData.category, formData.subCategory])
+  
+  // Debug: Log when categories are loaded
+  useEffect(() => {
+    console.log('=== CATEGORIES STATE CHANGED ===')
+    console.log('Categories:', categories)
+    console.log('Categories length:', categories.length)
+    console.log('Subcategories map:', vendorSubcategories)
+  }, [categories, vendorSubcategories])
+  
+  // Load vendors on mount (categories loaded per vendor)
+  useEffect(() => {
+    const loadVendors = async () => {
       try {
         // Load vendors
         setIsLoadingVendors(true)
@@ -295,28 +311,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       } finally {
         setIsLoadingVendors(false)
       }
-
-      try {
-        // Load categories
-        setIsLoadingCategories(true)
-        const { categoryService } = await import('@/services/categoryService')
-        const categoriesResponse = await categoryService.getCategories({
-          status: 'ACTIVE',
-          showRootOnly: true
-        })
-        
-        if (categoriesResponse.data) {
-          setCategories(categoriesResponse.data.map(c => c.name))
-        }
-      } catch (error) {
-        console.error('Error loading categories:', error)
-        showErrorToast('Load Failed', 'Unable to load categories')
-      } finally {
-        setIsLoadingCategories(false)
-      }
     }
 
-    loadVendorsAndCategories()
+    loadVendors()
   }, [])
   
   // Predefined tag options
@@ -447,7 +444,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               dimensions: product.dimensions,
               weight: product.weight,
               inStock: product.inStock,
-              status: product.status === 'ACTIVE' ? 'active' : product.status === 'INACTIVE' ? 'pending' : 'suspended'
+              status: product.status || 'ACTIVE'
             })
             
             // Set selected inventory item if exists
@@ -474,6 +471,37 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               } finally {
                 setIsLoadingInventory(false)
               }
+
+              // Load vendor-specific categories when editing
+              setIsLoadingCategories(true)
+              try {
+                // Use axios instance instead of fetch for proper authentication
+                const axiosInstance = (await import('@/lib/axios')).default
+                const response = await axiosInstance.get(`/inventory/admin/vendor/${product.vendorId}/categories`)
+                
+                const vendorCategories = response.data.data.categories || []
+                const vendorSubcats = response.data.data.subcategories || []
+                
+                // Set categories as names
+                setCategories(vendorCategories.map((c: any) => c.name))
+                
+                // Build subcategories map by category name
+                const subcatsMap: Record<string, string[]> = {}
+                vendorCategories.forEach((cat: any) => {
+                  const catSubcats = vendorSubcats.map((sub: any) => sub.name)
+                  if (catSubcats.length > 0) {
+                    subcatsMap[cat.name] = catSubcats
+                  }
+                })
+                
+                setVendorSubcategories(subcatsMap)
+              } catch (error) {
+                console.error('Error loading vendor categories:', error)
+                setCategories([])
+                setVendorSubcategories({})
+              } finally {
+                setIsLoadingCategories(false)
+              }
             }
           }
         } catch (error: any) {
@@ -490,17 +518,65 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   // Inventory Selection Functions
   const handleInventorySelect = (inventoryItem: InventoryItem) => {
+    console.log('=== INVENTORY ITEM SELECTED ===')
+    console.log('Inventory item:', inventoryItem)
+    console.log('Available categories:', categories)
+    console.log('Categories length:', categories.length)
+    console.log('Available subcategories map:', vendorSubcategories)
+    console.log('Inventory category:', inventoryItem.category)
+    console.log('Inventory subcategory:', inventoryItem.subcategory)
+    console.log('Is loading categories?', isLoadingCategories)
+    
+    // Warn if categories aren't loaded yet (shouldn't happen with disabled dropdown)
+    if (categories.length === 0) {
+      console.warn('⚠️ WARNING: Categories array is empty! This should not happen.')
+      showWarningToast('Please Wait', 'Categories are still loading. Please try again in a moment.')
+      return
+    }
+    
+    // Find the matching category with case-insensitive comparison
+    const matchedCategory = categories.find(
+      cat => cat.toLowerCase() === inventoryItem.category.toLowerCase()
+    )
+    
+    console.log('Matched category (case-corrected):', matchedCategory)
+    
+    if (!matchedCategory) {
+      console.warn('⚠️ WARNING: Inventory category not found in loaded categories!')
+      console.warn('Inventory category:', inventoryItem.category)
+      console.warn('Available categories:', categories)
+      showWarningToast('Category Mismatch', `Category "${inventoryItem.category}" not found in vendor's categories.`)
+    }
+    
+    // Find matching subcategory with case-insensitive comparison
+    const categorySubcats = matchedCategory ? vendorSubcategories[matchedCategory] || [] : []
+    const matchedSubcategory = inventoryItem.subcategory 
+      ? categorySubcats.find(sub => sub.toLowerCase() === inventoryItem.subcategory?.toLowerCase())
+      : ''
+    
+    console.log('Available subcategories for category:', categorySubcats)
+    console.log('Matched subcategory (case-corrected):', matchedSubcategory)
+    
     setSelectedInventoryItem(inventoryItem)
-    setFormData(prev => ({
-      ...prev,
-      inventoryItemId: inventoryItem.id,
-      isFromInventory: true,
-      name: inventoryItem.name,
-      description: inventoryItem.description || '',
-      category: inventoryItem.category,
-      baseSku: inventoryItem.sku,
-      totalStock: inventoryItem.currentStock
-    }))
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        inventoryItemId: inventoryItem.id,
+        isFromInventory: true,
+        // Don't auto-fill name - let user create unique product name
+        // name: inventoryItem.name,
+        description: inventoryItem.description || '',
+        category: matchedCategory || inventoryItem.category, // Use matched category with correct casing
+        subCategory: matchedSubcategory || inventoryItem.subcategory || '', // Use matched subcategory with correct casing
+        baseSku: inventoryItem.sku,
+        totalStock: inventoryItem.currentStock
+      }
+      
+      console.log('New form data after inventory selection:', newData)
+      console.log('Setting category to:', newData.category)
+      console.log('Setting subCategory to:', newData.subCategory)
+      return newData
+    })
   }
 
   const clearInventorySelection = () => {
@@ -512,6 +588,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       name: '',
       description: '',
       category: '',
+      subCategory: '', // Also clear subcategory
       baseSku: '',
       totalStock: 0
     }))
@@ -524,14 +601,70 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       setFormData(prev => ({
         ...prev,
         vendorId: vendor.id,
-        vendorName: vendor.name
+        vendorName: vendor.name,
+        category: '', // Reset category when vendor changes
+        subCategory: '' // Reset subcategory when vendor changes
       }))
 
-      // Load inventory items for the selected vendor
+      // Load vendor-specific categories FIRST (before inventory items)
+      setIsLoadingCategories(true)
+      try {
+        console.log('=== FETCHING VENDOR CATEGORIES ===')
+        console.log('Vendor ID:', vendorId)
+        
+        // Use axios instance instead of fetch for proper authentication
+        const { default: axiosInstance } = await import('@/lib/axios')
+        const response = await axiosInstance.get(`/inventory/admin/vendor/${vendorId}/categories`)
+        
+        console.log('Response data:', response.data)
+        
+        const vendorCategories = response.data.data.categories || []
+        const vendorSubcats = response.data.data.subcategories || []
+        
+        console.log('=== LOADED VENDOR CATEGORIES ===')
+        console.log('Categories:', vendorCategories)
+        console.log('Subcategories:', vendorSubcats)
+        
+        // Set categories as names
+        const categoryNames = vendorCategories.map((c: any) => c.name)
+        setCategories(categoryNames)
+        
+        // Build subcategories map by category name
+        const subcatsMap: Record<string, string[]> = {}
+        vendorCategories.forEach((cat: any) => {
+          // Find subcategories that belong to this category
+          const catSubcats = vendorSubcats
+            .filter((sub: any) => {
+              // Match by parent relationship if available, otherwise include all
+              return true // For now, we'll need to check the actual data structure
+            })
+            .map((sub: any) => sub.name)
+          
+          if (catSubcats.length > 0) {
+            subcatsMap[cat.name] = catSubcats
+          }
+        })
+        
+        setVendorSubcategories(subcatsMap)
+        console.log('Loaded vendor categories:', categoryNames)
+        console.log('Loaded vendor subcategories map:', subcatsMap)
+      } catch (error: any) {
+        console.error('Error loading vendor categories:', error)
+        console.error('Error response:', error.response?.data)
+        showErrorToast('Load Failed', 'Unable to load categories for this vendor')
+        setCategories([])
+        setVendorSubcategories({})
+      } finally {
+        setIsLoadingCategories(false)
+      }
+
+      // Load inventory items for the selected vendor AFTER categories are loaded
       setIsLoadingInventory(true)
       try {
         const { default: inventoryService } = await import('@/services/inventoryService')
         const items = await inventoryService.adminGetInventoryByVendor(vendorId, false)
+        console.log('=== LOADED INVENTORY ITEMS ===')
+        console.log('Items:', items)
         setInventoryItems(items)
       } catch (error) {
         console.error('Error loading inventory items:', error)
@@ -573,11 +706,27 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         }
       }))
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: type === 'number' ? parseFloat(value) || 0 : 
-                 type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-      }))
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          [name]: type === 'number' ? parseFloat(value) || 0 : 
+                   type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+        }
+        
+        // Auto-calculate discount percentage when originalPrice or basePrice changes
+        if ((name === 'originalPrice' || name === 'basePrice') && updated.originalPrice && updated.basePrice) {
+          const original = parseFloat(String(updated.originalPrice)) || 0
+          const base = parseFloat(String(updated.basePrice)) || 0
+          
+          if (original > base && base > 0) {
+            updated.discount = Math.round(((original - base) / original) * 100)
+          } else {
+            updated.discount = undefined
+          }
+        }
+        
+        return updated
+      })
     }
   }
 
@@ -1034,6 +1183,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       <p className="text-sm text-gray-600 italic">
                         Please select a vendor first to view their inventory items
                       </p>
+                    ) : isLoadingCategories ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-700"></div>
+                        <span className="ml-3 text-sm text-blue-700">Loading categories...</span>
+                      </div>
                     ) : !selectedInventoryItem ? (
                       <div className="space-y-3">
                         {isLoadingInventory ? (
@@ -1056,15 +1210,22 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                   value: item.id,
                                   label: `${item.name} (${item.sku}) - Stock: ${item.currentStock}`
                                 }))}
-                              placeholder="Select an inventory item"
+                              placeholder={isLoadingCategories ? "Loading categories first..." : "Select an inventory item"}
                               onChange={(value) => {
                                 const item = inventoryItems.find(i => i.id === value)
                                 if (item) handleInventorySelect(item)
                               }}
+                              disabled={isLoadingCategories}
                             />
-                            <p className="text-xs text-blue-700">
-                              Only inventory items without existing products are shown
-                            </p>
+                            {isLoadingCategories ? (
+                              <p className="text-xs text-blue-700">
+                                Please wait for categories to load before selecting an inventory item
+                              </p>
+                            ) : (
+                              <p className="text-xs text-blue-700">
+                                Only inventory items without existing products are shown
+                              </p>
+                            )}
                           </>
                         )}
                       </div>
@@ -1101,7 +1262,24 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     )}
                   </div>
 
-                  {/* Product Details (Auto-filled or Manual) */}
+                  {/* Inventory Item Name (when from inventory) */}
+                  {formData.isFromInventory && selectedInventoryItem && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Inventory Item Name
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedInventoryItem.name}
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
+                        placeholder="Inventory item name"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Reference from inventory item</p>
+                    </div>
+                  )}
+
+                  {/* Product Name */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Product Name *
@@ -1112,14 +1290,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       value={formData.name}
                       onChange={handleInputChange}
                       required
-                      disabled={formData.isFromInventory}
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${
-                        formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
-                      }`}
-                      placeholder="Enter product name"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                      placeholder={formData.isFromInventory ? "Enter a unique product name" : "Enter product name"}
                     />
                     {formData.isFromInventory && (
-                      <p className="text-xs text-gray-500 mt-1">Auto-filled from inventory item</p>
+                      <p className="text-xs text-gray-500 mt-1">Create a unique product name (can be different from inventory item name)</p>
                     )}
                   </div>
 
@@ -1147,11 +1322,22 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         label="Category *"
                         value={formData.category}
                         options={categories}
-                        placeholder={isLoadingCategories ? "Loading categories..." : "Select Category"}
+                        placeholder={
+                          !formData.vendorId 
+                            ? "Select vendor first" 
+                            : isLoadingCategories 
+                            ? "Loading categories..." 
+                            : categories.length === 0 
+                            ? "No categories available" 
+                            : "Select Category"
+                        }
                         onChange={(value) => setFormData(prev => ({ ...prev, category: value as string, subCategory: '' }))}
-                        disabled={isLoadingCategories}
+                        disabled={!formData.vendorId || isLoadingCategories}
                       />
-                      {formData.isFromInventory && (
+                      {!formData.vendorId && (
+                        <p className="text-xs text-gray-500 mt-1 italic">Please select a vendor first</p>
+                      )}
+                      {formData.isFromInventory && formData.vendorId && (
                         <p className="text-xs text-gray-500 mt-1">From inventory item</p>
                       )}
                     </div>
@@ -1159,7 +1345,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       <Dropdown
                         label="Sub-Category *"
                         value={formData.subCategory}
-                        options={formData.category ? categorySubcategories[formData.category] || [] : []}
+                        options={formData.category ? (vendorSubcategories[formData.category] || categorySubcategories[formData.category] || []) : []}
                         placeholder="Select Sub-Category"
                         onChange={(value) => setFormData(prev => ({ ...prev, subCategory: value as string }))}
                         disabled={!formData.category}
@@ -1766,6 +1952,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 <p className="text-xs text-gray-600 mb-1">You Save</p>
                                 <p className="text-2xl font-bold text-green-600">
                                   ₹{(formData.originalPrice - formData.basePrice).toFixed(2)}
+                                  {formData.discount && (
+                                    <span className="text-sm ml-1">({formData.discount}%)</span>
+                                  )}
                                 </p>
                               </div>
                             </>
@@ -2078,12 +2267,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     label="Product Status"
                     value={formData.status}
                     options={[
-                      { value: 'pending', label: 'Pending' },
-                      { value: 'active', label: 'Active' },
-                      { value: 'suspended', label: 'Suspended' },
-                      { value: 'out_of_stock', label: 'Out of Stock' }
+                      { value: 'ACTIVE', label: 'Active' },
+                      { value: 'INACTIVE', label: 'Inactive' },
+                      { value: 'OUT_OF_STOCK', label: 'Out of Stock' }
                     ]}
-                    onChange={(value) => setFormData(prev => ({ ...prev, status: value as 'active' | 'pending' | 'suspended' | 'out_of_stock' }))}
+                    onChange={(value) => setFormData(prev => ({ ...prev, status: value as 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK' }))}
                   />
                 </div>
 

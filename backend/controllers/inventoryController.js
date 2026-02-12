@@ -928,6 +928,107 @@ const getInventoryByVendor = async (req, res) => {
   }
 };
 
+// Admin: Get vendor's selected categories by vendor ID
+const getVendorCategoriesByVendorId = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    if (!vendorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor ID is required'
+      });
+    }
+
+    // Get vendor with their selected categories
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: {
+        productCategories: true,
+        productTypes: true
+      }
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    // If productCategories contains IDs, fetch the actual category data
+    let categories = [];
+    let subcategories = [];
+
+    if (vendor.productCategories && vendor.productCategories.length > 0) {
+      // Check if the first item looks like an ObjectId (24 characters, hex)
+      const firstCategory = vendor.productCategories[0];
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(firstCategory);
+
+      if (isObjectId) {
+        // Fetch category details from database
+        const categoryData = await prisma.category.findMany({
+          where: {
+            id: { in: vendor.productCategories },
+            status: 'ACTIVE'
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            parentId: true,
+            subcategories: {
+              where: { status: 'ACTIVE' },
+              select: {
+                id: true,
+                name: true,
+                slug: true
+              }
+            }
+          }
+        });
+
+        // Separate main categories and collect all subcategories
+        const mainCategories = categoryData.filter(cat => !cat.parentId);
+        const allSubcategories = categoryData.reduce((acc, cat) => {
+          if (cat.subcategories && cat.subcategories.length > 0) {
+            acc.push(...cat.subcategories);
+          }
+          return acc;
+        }, []);
+
+        categories = mainCategories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug
+        }));
+
+        subcategories = allSubcategories;
+      } else {
+        // Assume they are category names (legacy format)
+        categories = vendor.productCategories.map(name => ({ name }));
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        categories,
+        subcategories,
+        productTypes: vendor.productTypes
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching vendor categories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createInventoryItem,
   getVendorInventory,
@@ -940,5 +1041,6 @@ module.exports = {
   getVendorCategories,
   getAllInventory,
   getAllInventoryStats,
-  getInventoryByVendor
+  getInventoryByVendor,
+  getVendorCategoriesByVendorId
 };
