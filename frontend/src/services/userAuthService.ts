@@ -65,8 +65,15 @@ class UserAuthService {
 
   // Login user
   async login(data: UserLoginData): Promise<UserAuthResponse> {
-    const response = await axios.post(`${this.baseURL}/login`, data);
-    return response.data;
+    try {
+      const response = await axios.post(`${this.baseURL}/login`, data);
+      return response.data;
+    } catch (error: any) {
+      // The axios interceptor returns a custom error object: { message, status, data }
+      // Also handle standard axios error structure for backward compatibility
+      const errorMessage = error?.message || error.response?.data?.error || error.response?.data?.message || 'Invalid credentials';
+      throw new Error(errorMessage);
+    }
   }
 
   // Get current user profile

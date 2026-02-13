@@ -159,7 +159,9 @@ export default function AdminLogin() {
       }, 1000)
     } catch (error: any) {
       console.error('Super Admin login error:', error)
-      const errorMessage = error?.message || (error instanceof Error ? error.message : 'Invalid admin credentials. Please try again.')
+      // The axios interceptor returns a custom error object: { message, status, data }
+      // Also handle standard axios error structure for backward compatibility
+      const errorMessage = error?.message || error.response?.data?.error || error.response?.data?.message || 'Invalid admin credentials. Please try again.'
       showErrorToast('Login Failed', errorMessage)
     } finally {
       setIsLoading(false)

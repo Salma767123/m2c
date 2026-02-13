@@ -344,9 +344,25 @@ class VendorService {
       }
       
       return data;
-    } catch (error) {
-      console.error('Vendor login error:', error);
-      throw error;
+    } catch (error: any) {
+      // The axios interceptor returns a custom error object: { message, status, data }
+      // Also handle standard axios error structure for backward compatibility
+      let errorMessage = 'Invalid credentials';
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.data?.error) {
+        errorMessage = error.data.error;
+      } else if (error?.data?.message) {
+        errorMessage = error.data.message;
+      }
+      
+      console.error('Vendor login error:', { error, errorMessage });
+      throw new Error(errorMessage);
     }
   }
   
