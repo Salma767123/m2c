@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/UI/Button';
 import { Shield, Upload, Package, Award, CheckCircle, X, FileText, Download, Calendar } from 'lucide-react';
@@ -53,6 +53,22 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
   });
 
   const [uploadErrors, setUploadErrors] = useState<{[key: string]: string}>({});
+
+  // Sync formData with data prop when it changes (for edit mode)
+  useEffect(() => {
+    console.log('CertificationsLogistics: data prop changed', data)
+    setFormData({
+      selectedCertifications: data.selectedCertifications || [],
+      certificationFiles: data.certificationFiles || {},
+      certificationExpiryDates: data.certificationExpiryDates || {},
+      packagingCapabilities: data.packagingCapabilities || '',
+      warehousingCapacity: data.warehousingCapacity || '',
+      logisticsPartners: data.logisticsPartners || '',
+      shippingMethods: data.shippingMethods || [],
+      qualityControlProcess: data.qualityControlProcess || '',
+      complianceStandards: data.complianceStandards || ''
+    })
+  }, [data])
 
   const handleCertificationToggle = (certId: string) => {
     setFormData(prev => {

@@ -5,6 +5,7 @@ const {
   updateVendorProfile,
   getAllVendors,
   getVendorById,
+  updateVendorById,
   approveVendor,
   rejectVendor,
   suspendVendor,
@@ -27,6 +28,7 @@ router.put('/profile', authenticateToken, updateVendorProfile);
 // Admin only routes
 router.get('/all', authenticateToken, requireRole('admin'), getAllVendors);
 router.get('/:vendorId', authenticateToken, requireRole('admin'), getVendorById);
+router.put('/:vendorId', authenticateToken, requireRole('admin'), vendorUploadFields, handleUploadError, updateVendorById);
 router.put('/:vendorId/approve', authenticateToken, requireRole('admin'), approveVendor);
 router.put('/:vendorId/reject', authenticateToken, requireRole('admin'), rejectVendor);
 router.put('/:vendorId/suspend', authenticateToken, requireRole('admin'), suspendVendor);

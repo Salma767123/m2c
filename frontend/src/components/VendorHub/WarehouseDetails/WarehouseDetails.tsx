@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { Button } from "@/components/UI/Button";
 import {
@@ -51,6 +51,22 @@ export default function WarehouseDetails({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Sync formData with data prop when it changes (for edit mode)
+  useEffect(() => {
+    console.log('WarehouseDetails: data prop changed', data)
+    setFormData({
+      ownershipType: data.ownershipType || "",
+      warehouseAddress: data.warehouseAddress || "",
+      warehouseCity: data.warehouseCity || "",
+      warehouseState: data.warehouseState || "",
+      warehouseZip: data.warehouseZip || "",
+      warehouseCountry: data.warehouseCountry || "United States",
+      factoryImages: data.factoryImages || [],
+      routeMap: data.routeMap || null,
+      mapLink: data.mapLink || "",
+    })
+  }, [data]);
 
   // Check if address was copied from company details
   const isAddressCopied = data.sameAsWarehouse && 

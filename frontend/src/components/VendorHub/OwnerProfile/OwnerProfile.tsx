@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
 import Dropdown from '@/components/UI/Dropdown';
 import { User, Calendar, Users, Mail, Phone } from 'lucide-react';
@@ -30,6 +30,18 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Sync formData with data prop when it changes (for edit mode)
+  useEffect(() => {
+    console.log('OwnerProfile: data prop changed', data)
+    setFormData({
+      ownerName: data.ownerName || '',
+      ownerEmail: data.ownerEmail || '',
+      ownerPhone: data.ownerPhone || '',
+      yearEstablished: data.yearEstablished || '',
+      employeeCount: data.employeeCount || ''
+    })
+  }, [data]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));

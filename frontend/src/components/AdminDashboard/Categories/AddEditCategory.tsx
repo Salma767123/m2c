@@ -21,13 +21,11 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
   const [activeTab, setActiveTab] = useState<'category' | 'subcategories'>('category')
-  const [parentCategories, setParentCategories] = useState<Category[]>([])
 
   const [categoryData, setCategoryData] = useState<CategoryFormData>({
     name: '',
     description: '',
     slug: '',
-    parentId: '',
     status: 'ACTIVE',
     image: '', // You can test with: '/assets/images/categories/cs1.jpg'
     metaTitle: '',
@@ -46,20 +44,10 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
 
   // Load category data for editing
   useEffect(() => {
-    loadParentCategories()
     if (isEdit && categoryId) {
       loadCategoryData()
     }
   }, [isEdit, categoryId])
-
-  const loadParentCategories = async () => {
-    try {
-      const categories = await categoryService.getParentCategories()
-      setParentCategories(categories)
-    } catch (error) {
-      console.error('Failed to load parent categories:', error)
-    }
-  }
 
   const loadCategoryData = async () => {
     if (!categoryId) return
@@ -73,7 +61,6 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
         name: category.name,
         description: category.description,
         slug: category.slug,
-        parentId: category.parentId || '',
         status: category.status,
         image: category.image || '',
         metaTitle: category.metaTitle || '',
@@ -483,25 +470,6 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                         placeholder="0"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Parent Category
-                    </label>
-                    <Dropdown
-                      value={categoryData.parentId || ''}
-                      options={[
-                        { value: '', label: 'None (Main Category)' },
-                        ...parentCategories.map(parent => ({
-                          value: parent.id,
-                          label: parent.name
-                        }))
-                      ]}
-                      onChange={(value) => setCategoryData(prev => ({ ...prev, parentId: value as string }))}
-                      placeholder="Select parent category"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Leave empty to create a main category</p>
                   </div>
 
                   {/* SEO Section */}
