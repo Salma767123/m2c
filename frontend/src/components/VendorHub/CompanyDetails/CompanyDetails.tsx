@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Select from "react-select";
 import countryList from "react-select-country-list";
 import { Button } from "@/components/UI/Button";
@@ -79,6 +79,29 @@ export default function CompanyDetails({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Sync formData with data prop when it changes (for edit mode)
+  useEffect(() => {
+    console.log('CompanyDetails: data prop changed', data)
+    setFormData({
+      businessType: data.businessType || "",
+      companyName: data.companyName || "",
+      gstNumber: data.gstNumber || "",
+      email: data.email || "",
+      phone: data.phone || "",
+      website: data.website || "",
+      address: data.address || "",
+      city: data.city || "",
+      state: data.state || "",
+      zipCode: data.zipCode || "",
+      country: data.country || "India",
+      sameAsWarehouse: data.sameAsWarehouse || false,
+      logo: data.logo || null,
+      logoFile: null,
+      gstDocument: data.gstDocument || null,
+      gstFile: null,
+    })
+  }, [data]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

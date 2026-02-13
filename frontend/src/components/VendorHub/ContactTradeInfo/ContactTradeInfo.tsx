@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
 import { Phone, Mail, User, Plus, Trash2, Globe, MapPin } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
@@ -60,6 +60,44 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Sync formData with data prop when it changes (for edit mode)
+  useEffect(() => {
+    console.log('ContactTradeInfo: data prop changed', data)
+    setFormData({
+      mainContact: {
+        name: data?.mainContact?.name || '',
+        designation: data?.mainContact?.designation || '',
+        email1: data?.mainContact?.email || data?.mainContact?.email1 || '',
+        email2: data?.mainContact?.email2 || '',
+        phone1: data?.mainContact?.phone || data?.mainContact?.phone1 || '',
+        phone2: data?.mainContact?.phone2 || '',
+        department: data?.mainContact?.department || 'Sales'
+      },
+      alternateContacts: (data?.alternateContacts || []).map((c: any) => ({
+        id: c.id || Date.now().toString(),
+        name: c.name || '',
+        designation: c.designation || '',
+        email1: c.email || c.email1 || '',
+        email2: c.email2 || '',
+        phone1: c.phone || c.phone1 || '',
+        phone2: c.phone2 || '',
+        department: c.department || 'Sales'
+      })),
+      hasImportExport: data.hasImportExport || 'no',
+      importCountries: data.importCountries || [],
+      exportCountries: data.exportCountries || [],
+      tradeLicenseNumber: data.tradeLicenseNumber || '',
+      businessRegistrationNumber: data.businessRegistrationNumber || '',
+      taxIdentificationNumber: data.taxIdentificationNumber || '',
+      bankingDetails: data.bankingDetails || {
+        bankName: '',
+        accountNumber: '',
+        swiftCode: '',
+        iban: ''
+      }
+    })
+  }, [data]);
 
   const addAlternateContact = () => {
     if (formData.alternateContacts.length < 3) {

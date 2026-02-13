@@ -540,6 +540,7 @@ const getVendorById = async (req, res) => {
       include: {
         certifications: true,
         documents: true,
+        bankDetails: true,
         _count: {
           select: {
             certifications: true,
@@ -563,6 +564,235 @@ const getVendorById = async (req, res) => {
   } catch (error) {
     console.error('Get vendor by ID error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Update vendor by ID (Admin only)
+const updateVendorById = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const updateData = req.body;
+
+    console.log('Admin updating vendor:', vendorId);
+    console.log('Update data received:', updateData);
+    console.log('Files received:', req.files);
+
+    // Check if vendor exists
+    const existingVendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: {
+        certifications: true
+      }
+    });
+
+    if (!existingVendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    // Handle file uploads for certificates
+    let certificationFileUrls = {};
+    if (req.files?.certificationFiles) {
+      try {
+        const certResults = await uploadFiles(req.files.certificationFiles, 'vendor-certifications');
+        // Map certification files to their respective certification IDs
+        certResults.forEach((result, index) => {
+          const certId = req.body[`certificationId_${index}`];
+          if (certId) {
+            certificationFileUrls[certId] = result.cloudinaryUrl;
+          }
+        });
+        console.log('Uploaded certification files:', certificationFileUrls);
+      } catch (uploadError) {
+        console.error('Certificate file upload error:', uploadError);
+        return res.status(500).json({ 
+          error: 'Failed to upload certificate files: ' + uploadError.message 
+        });
+      }
+    }
+
+    // Parse JSON fields if they're strings
+    const parsedSelectedCertifications = typeof updateData.selectedCertifications === 'string' 
+      ? JSON.parse(updateData.selectedCertifications) 
+      : updateData.selectedCertifications;
+    
+    const parsedCertificationExpiryDates = typeof updateData.certificationExpiryDates === 'string'
+      ? JSON.parse(updateData.certificationExpiryDates)
+      : updateData.certificationExpiryDates;
+
+    const parsedSelectedCategories = typeof updateData.selectedCategories === 'string'
+      ? JSON.parse(updateData.selectedCategories)
+      : updateData.selectedCategories;
+
+    const parsedMarketType = typeof updateData.marketType === 'string'
+      ? JSON.parse(updateData.marketType)
+      : updateData.marketType;
+
+    const parsedVendorType = typeof updateData.vendorType === 'string'
+      ? JSON.parse(updateData.vendorType)
+      : updateData.vendorType;
+
+    const parsedShippingMethods = typeof updateData.shippingMethods === 'string'
+      ? JSON.parse(updateData.shippingMethods)
+      : updateData.shippingMethods;
+
+    const parsedExportCountries = typeof updateData.exportCountries === 'string'
+      ? JSON.parse(updateData.exportCountries)
+      : updateData.exportCountries;
+
+    // Prepare update data - map form fields to database fields
+    const vendorUpdateData = {
+      // Company Details
+      companyName: updateData.companyName,
+      businessEmail: updateData.email,
+      businessPhone: updateData.phone,
+      website: updateData.website,
+      businessAddress: updateData.address,
+      businessCity: updateData.city,
+      businessState: updateData.state,
+      businessCountry: updateData.country || 'India',
+      
+      // Owner Profile
+      ownerName: updateData.ownerName,
+      ownerEmail: updateData.ownerEmail,
+      ownerPhone: updateData.ownerPhone,
+      establishedYear: updateData.yearEstablished ? parseInt(updateData.yearEstablished) : null,
+      annualTurnover: updateData.employeeCount,
+      
+      // Warehouse Details
+      warehouseAddress: updateData.warehouseAddress,
+      warehouseCity: updateData.warehouseCity,
+      warehouseState: updateData.warehouseState,
+      storageCapacity: updateData.warehousingCapacity,
+      
+      // Vendor Type & Products
+      vendorType: Array.isArray(parsedVendorType) && parsedVendorType.includes('manufacturer') 
+        ? 'TEXTILE_MANUFACTURER' 
+        : 'TRADING_COMPANY',
+      primaryMarkets: parsedMarketType || [],
+      productCategories: Object.keys(parsedSelectedCategories || {}),
+      productTypes: Object.values(parsedSelectedCategories || {}).flat(),
+      
+      // Logistics
+      shippingMethods: parsedShippingMethods || [],
+      qualityControl: updateData.qualityControlProcess,
+      
+      // Trade Info
+      exportExperience: updateData.hasImportExport === 'yes',
+      exportCountries: parsedExportCountries || [],
+      
+      // Status (admin can update these)
+      status: updateData.status?.toUpperCase() || existingVendor.status
+    };
+
+    // Update vendor
+    const updatedVendor = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: vendorUpdateData
+    });
+
+    // Handle certifications update
+    if (parsedSelectedCertifications && Array.isArray(parsedSelectedCertifications)) {
+      // Get existing certifications to preserve document URLs if no new file uploaded
+      const existingCerts = await prisma.vendorCertification.findMany({
+        where: { vendorId }
+      });
+
+      // Create a map of existing cert URLs
+      const existingCertUrls = {};
+      existingCerts.forEach(cert => {
+        if (cert.documentUrl) {
+          existingCertUrls[cert.name.toLowerCase()] = cert.documentUrl;
+        }
+      });
+
+      // Delete existing certifications
+      await prisma.vendorCertification.deleteMany({
+        where: { vendorId }
+      });
+
+      // Create new certifications
+      if (parsedSelectedCertifications.length > 0) {
+        const certificationData = parsedSelectedCertifications.map(certId => {
+          const certIdUpper = certId.toUpperCase();
+          // Use new uploaded file URL, or preserve existing URL, or null
+          const documentUrl = certificationFileUrls[certId] || existingCertUrls[certId] || null;
+          
+          return {
+            vendorId,
+            name: certIdUpper,
+            issuedBy: 'Certification Authority',
+            expiryDate: parsedCertificationExpiryDates?.[certId] 
+              ? new Date(parsedCertificationExpiryDates[certId]) 
+              : null,
+            documentUrl
+          };
+        });
+
+        await prisma.vendorCertification.createMany({
+          data: certificationData
+        });
+      }
+    }
+
+    // Update bank details if provided
+    const parsedBankingDetails = typeof updateData.bankingDetails === 'string'
+      ? JSON.parse(updateData.bankingDetails)
+      : updateData.bankingDetails;
+
+    if (parsedBankingDetails && parsedBankingDetails.bankName) {
+      // Check if bank details exist
+      const existingBankDetails = await prisma.vendorBankDetails.findFirst({
+        where: { vendorId }
+      });
+
+      if (existingBankDetails) {
+        await prisma.vendorBankDetails.update({
+          where: { id: existingBankDetails.id },
+          data: {
+            bankName: parsedBankingDetails.bankName,
+            accountNumber: parsedBankingDetails.accountNumber,
+            ifscCode: parsedBankingDetails.swiftCode || 'SWIFT000'
+          }
+        });
+      } else {
+        await prisma.vendorBankDetails.create({
+          data: {
+            vendorId,
+            bankName: parsedBankingDetails.bankName,
+            accountNumber: parsedBankingDetails.accountNumber,
+            ifscCode: parsedBankingDetails.swiftCode || 'SWIFT000',
+            accountType: 'Current',
+            branchName: parsedBankingDetails.bankName + ' Branch',
+            branchAddress: updateData.address
+          }
+        });
+      }
+    }
+
+    // Fetch updated vendor with relations
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: {
+        certifications: true,
+        documents: true,
+        bankDetails: true
+      }
+    });
+
+    res.json({
+      message: 'Vendor updated successfully',
+      vendor: {
+        ...vendor,
+        password: undefined
+      }
+    });
+
+  } catch (error) {
+    console.error('Update vendor by ID error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -878,6 +1108,7 @@ module.exports = {
   updateVendorProfile,
   getAllVendors,
   getVendorById,
+  updateVendorById,
   approveVendor,
   rejectVendor,
   suspendVendor,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Factory, Settings, Palette, Printer, Scissors } from 'lucide-react';
@@ -80,6 +80,15 @@ export default function ManufacturingFacilities({ onNext, onPrev, onUpdateData, 
     enabledFacilities: data.enabledFacilities || {},
     facilityDetails: data.facilityDetails || {}
   });
+
+  // Sync formData with data prop when it changes (for edit mode)
+  useEffect(() => {
+    console.log('ManufacturingFacilities: data prop changed', data)
+    setFormData({
+      enabledFacilities: data.enabledFacilities || {},
+      facilityDetails: data.facilityDetails || {}
+    })
+  }, [data])
 
   const handleToggleFacility = (facilityId: string) => {
     setFormData(prev => ({

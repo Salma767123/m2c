@@ -137,6 +137,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
   const [completedSteps, setCompletedSteps] = useState<number[]>([])
+  const [isLoadingVendorData, setIsLoadingVendorData] = useState(mode === 'edit')
   const [formData, setFormData] = useState<VendorFormData>({
     // Company Details
     businessType: '',
@@ -282,11 +283,148 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 
   useEffect(() => {
     if (mode === 'edit' && vendorId) {
-      // Load vendor data for editing
-      // This would typically fetch from an API
-      console.log('Loading vendor data for ID:', vendorId)
+      loadVendorData(vendorId)
     }
   }, [mode, vendorId])
+
+  const loadVendorData = async (id: string) => {
+    try {
+      setIsLoadingVendorData(true)
+      console.log('Loading vendor data for ID:', id)
+      
+      // Import VendorService dynamically to avoid circular dependencies
+      const VendorService = (await import('@/services/vendorService')).default
+      
+      const response = await VendorService.getVendorById(id)
+      const vendor = response.vendor
+      
+      console.log('Vendor data loaded:', vendor)
+      
+      // Map vendor data to form structure
+      setFormData({
+        // Company Details
+        businessType: 'corporation', // Default since companyType is not in the interface
+        companyName: vendor.companyName || '',
+        gstNumber: '', // Not stored in vendor table
+        email: vendor.businessEmail || vendor.email || '',
+        phone: vendor.businessPhone || '',
+        website: vendor.website || '',
+        address: vendor.businessAddress || '',
+        city: vendor.businessCity || '',
+        state: vendor.businessState || '',
+        zipCode: '', // businessZipCode not in interface
+        country: vendor.businessCountry || 'India',
+        sameAsWarehouse: false,
+        logo: null, // companyLogo not in interface
+        logoFile: null,
+        gstDocument: null,
+        gstFile: null,
+        
+        // Warehouse Details
+        ownershipType: 'owned', // Default
+        warehouseAddress: vendor.warehouseAddress || '',
+        warehouseCity: vendor.warehouseCity || '',
+        warehouseState: vendor.warehouseState || '',
+        warehouseZip: '', // warehouseZipCode not in interface
+        warehouseCountry: 'India', // warehouseCountry not in interface
+        factoryImages: [],
+        routeMap: null,
+        mapLink: '',
+        
+        // Owner Profile
+        ownerName: vendor.ownerName || '',
+        ownerEmail: vendor.ownerEmail || '',
+        ownerPhone: vendor.ownerPhone || '',
+        yearEstablished: vendor.establishedYear?.toString() || '',
+        employeeCount: vendor.annualTurnover || '',
+        
+        // Vendor Type & Products
+        vendorType: vendor.vendorType === 'TEXTILE_MANUFACTURER' ? ['manufacturer'] : ['trader'],
+        marketType: vendor.primaryMarkets || [],
+        selectedCategories: vendor.productCategories?.reduce((acc: any, cat: string) => {
+          acc[cat] = vendor.productTypes || []
+          return acc
+        }, {}) || {},
+        expandedCategories: {},
+        categoryRemarks: '', // categoryRemarks not in interface
+        
+        // Manufacturing Facilities
+        enabledFacilities: {},
+        facilityDetails: {},
+        
+        // Certifications & Logistics
+        // Map certification names from backend (UPPERCASE) to frontend IDs (lowercase)
+        selectedCertifications: vendor.certifications?.map((cert: any) => {
+          // Convert backend name (e.g., "OEKO-TEX") to frontend ID (e.g., "oeko-tex")
+          return cert.name.toLowerCase();
+        }) || [],
+        certificationFiles: {},
+        certificationExpiryDates: vendor.certifications?.reduce((acc: any, cert: any) => {
+          if (cert.expiryDate) {
+            // Use lowercase cert name as key to match frontend IDs
+            const certId = cert.name.toLowerCase();
+            acc[certId] = new Date(cert.expiryDate).toISOString().split('T')[0]
+          }
+          return acc
+        }, {}) || {},
+        packagingCapabilities: '',
+        warehousingCapacity: vendor.storageCapacity || '',
+        logisticsPartners: '',
+        shippingMethods: vendor.shippingMethods || [],
+        qualityControlProcess: vendor.qualityControl || '',
+        complianceStandards: '',
+        
+        // Contact & Trade Info
+        mainContact: {
+          name: vendor.ownerName || '',
+          designation: 'Owner',
+          email1: vendor.ownerEmail || '',
+          email2: '',
+          phone1: vendor.ownerPhone || '',
+          phone2: '',
+          department: 'Management'
+        },
+        alternateContacts: [],
+        hasImportExport: vendor.exportExperience ? 'yes' : 'no',
+        importCountries: [],
+        exportCountries: vendor.exportCountries || [],
+        tradeLicenseNumber: '',
+        businessRegistrationNumber: '',
+        taxIdentificationNumber: '',
+        bankingDetails: vendor.bankDetails ? {
+          bankName: vendor.bankDetails.bankName || '',
+          accountNumber: vendor.bankDetails.accountNumber || '',
+          swiftCode: vendor.bankDetails.ifscCode || '',
+          iban: ''
+        } : {
+          bankName: '',
+          accountNumber: '',
+          swiftCode: '',
+          iban: ''
+        },
+        
+        // Status
+        status: vendor.status?.toLowerCase() as 'active' | 'pending' | 'suspended' || 'pending',
+        approvalStatus: vendor.status === 'APPROVED' ? 'approved' : vendor.status === 'REJECTED' ? 'rejected' : 'pending'
+      })
+      
+      // Mark all steps as completed for edit mode
+      setCompletedSteps([0, 1, 2, 3, 4, 5, 6, 7])
+      
+    } catch (error) {
+      console.error('Error loading vendor data:', error)
+      
+      // Show error toast
+      const { toast } = await import('@/hooks/use-toast')
+      toast({
+        title: 'Error',
+        description: 'Failed to load vendor data. Please try again.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoadingVendorData(false)
+    }
+  }
 
   const updateFormData = (stepData: Partial<VendorFormData>) => {
     setFormData(prev => ({ ...prev, ...stepData }))
@@ -325,7 +463,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     }
   }
 
-  const goToStep = (step: number) => {
+  const goToStep = async (step: number) => {
     // Only allow navigation to current step or completed steps
     // Do NOT allow jumping to next step without completing current one
     const canNavigate = step === currentStep || completedSteps.includes(step)
@@ -333,21 +471,61 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     if (canNavigate) {
       setCurrentStep(step)
     } else {
-      alert('Please complete the current section before proceeding to this step.')
+      // Show warning toast
+      const { toast } = await import('@/hooks/use-toast')
+      toast({
+        title: 'Step Locked',
+        description: 'Please complete the current section before proceeding to this step.',
+        variant: 'destructive'
+      })
     }
   }
 
   const handleSubmit = async () => {
     try {
-      // Submit vendor data
       console.log('Submitting vendor data:', formData)
       
-      // API call would go here
-      // await createOrUpdateVendor(formData)
+      if (mode === 'edit' && vendorId) {
+        // Update existing vendor
+        const VendorService = (await import('@/services/vendorService')).default
+        console.log('Calling updateVendorById with vendorId:', vendorId)
+        const response = await VendorService.updateVendorById(vendorId, formData)
+        console.log('Update response:', response)
+        
+        // Show success message using toast instead of alert
+        const { toast } = await import('@/hooks/use-toast')
+        toast({
+          title: 'Success',
+          description: 'Vendor updated successfully!',
+        })
+        
+        // Wait a bit before redirecting so user sees the success message
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      } else {
+        // Create new vendor - would need to implement registerVendor for admin
+        console.log('Create vendor not yet implemented for admin')
+        const { toast } = await import('@/hooks/use-toast')
+        toast({
+          title: 'Not Implemented',
+          description: 'Vendor creation from admin panel not yet implemented',
+          variant: 'destructive'
+        })
+        return // Don't redirect if not implemented
+      }
       
       router.push('/admin/dashboard/vendors')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting vendor:', error)
+      console.error('Error details:', error.response?.data || error.message)
+      
+      const { toast } = await import('@/hooks/use-toast')
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || error.message || 'Failed to save vendor',
+        variant: 'destructive'
+      })
+      
+      throw error // Re-throw to let the loading state know there was an error
     }
   }
 
@@ -370,7 +548,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       case 6:
         return <ContactTradeInfo onNext={nextStep} onPrev={prevStep} onUpdateData={updateFormData} data={formData} />
       case 7:
-        return <AdminReviewSubmitStep formData={formData} onSubmit={handleSubmit} onGoToStep={(step) => goToStep(getLogicalStepIndex(step))} />
+        return <AdminReviewSubmitStep formData={formData} onSubmit={handleSubmit} onGoToStep={(step) => goToStep(getLogicalStepIndex(step))} mode={mode} />
       default:
         return <CompanyDetails onNext={nextStep} onUpdateData={updateFormData} data={formData} />
     }
@@ -378,6 +556,14 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {isLoadingVendorData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-700 mb-4"></div>
+            <p className="text-gray-700 font-medium">Loading vendor data...</p>
+          </div>
+        </div>
+      )}
       <div className="flex h-full">
         {/* Left Sidebar - Progress Steps */}
         <div className="w-1/5 bg-white shadow-lg border-r border-gray-200 rounded-lg">
@@ -522,29 +708,39 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 function AdminReviewSubmitStep({ 
   formData, 
   onSubmit, 
-  onGoToStep 
+  onGoToStep,
+  mode
 }: { 
   formData: VendorFormData
   onSubmit: () => void
-  onGoToStep: (step: number) => void 
+  onGoToStep: (step: number) => void
+  mode: 'add' | 'edit'
 }) {
   const [adminNotes, setAdminNotes] = useState('')
-  const [initialStatus, setInitialStatus] = useState<'active' | 'pending' | 'suspended'>('pending')
-  const [initialApprovalStatus, setInitialApprovalStatus] = useState<'approved' | 'pending' | 'rejected'>('pending')
+  const [initialStatus, setInitialStatus] = useState<'active' | 'pending' | 'suspended'>(formData.status || 'pending')
+  const [initialApprovalStatus, setInitialApprovalStatus] = useState<'approved' | 'pending' | 'rejected'>(formData.approvalStatus || 'pending')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleAdminSubmit = () => {
-    // Include admin-specific data
-    const adminData = {
-      ...formData,
-      status: initialStatus,
-      approvalStatus: initialApprovalStatus,
-      adminNotes,
-      createdBy: 'admin', // This would come from auth context
-      createdAt: new Date().toISOString()
-    }
+  const handleAdminSubmit = async () => {
+    if (isSubmitting) return // Prevent double submission
     
-    console.log('Admin creating vendor with data:', adminData)
-    onSubmit()
+    setIsSubmitting(true)
+    try {
+      // Include admin-specific data
+      const adminData = {
+        ...formData,
+        status: initialStatus,
+        approvalStatus: initialApprovalStatus,
+        adminNotes,
+        createdBy: 'admin', // This would come from auth context
+        createdAt: new Date().toISOString()
+      }
+      
+      console.log(`Admin ${mode === 'edit' ? 'updating' : 'creating'} vendor with data:`, adminData)
+      await onSubmit()
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -555,7 +751,7 @@ function AdminReviewSubmitStep({
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Initial Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
             <select
               value={initialStatus}
               onChange={(e) => setInitialStatus(e.target.value as any)}
@@ -588,30 +784,133 @@ function AdminReviewSubmitStep({
             onChange={(e) => setAdminNotes(e.target.value)}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Add any notes about this vendor registration..."
+            placeholder="Add any notes about this vendor..."
           />
         </div>
       </div>
 
-      {/* Use the original ReviewSubmit component for data display */}
-      <div className="bg-white border border-gray-200 rounded-lg">
-        <ReviewSubmit 
-          onPrev={() => {}} 
-          onGoToStep={onGoToStep} 
-          data={formData} 
-        />
+      {/* Vendor Data Summary - Read Only */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Vendor Information Summary</h3>
+        
+        <div className="space-y-6">
+          {/* Company Details */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
+              Company Details
+              <button
+                onClick={() => onGoToStep(0)}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                Edit
+              </button>
+            </h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Company Name:</span>
+                <span className="ml-2 font-medium">{formData.companyName || 'Not provided'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Email:</span>
+                <span className="ml-2 font-medium">{formData.email || 'Not provided'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Phone:</span>
+                <span className="ml-2 font-medium">{formData.phone || 'Not provided'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Business Type:</span>
+                <span className="ml-2 font-medium capitalize">{formData.businessType || 'Not provided'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Owner Details */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
+              Owner Information
+              <button
+                onClick={() => onGoToStep(2)}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                Edit
+              </button>
+            </h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Owner Name:</span>
+                <span className="ml-2 font-medium">{formData.ownerName || 'Not provided'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Owner Email:</span>
+                <span className="ml-2 font-medium">{formData.ownerEmail || 'Not provided'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Owner Phone:</span>
+                <span className="ml-2 font-medium">{formData.ownerPhone || 'Not provided'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Year Established:</span>
+                <span className="ml-2 font-medium">{formData.yearEstablished || 'Not provided'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Vendor Type */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
+              Vendor Type & Products
+              <button
+                onClick={() => onGoToStep(3)}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                Edit
+              </button>
+            </h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Vendor Type:</span>
+                <span className="ml-2 font-medium capitalize">
+                  {Array.isArray(formData.vendorType) 
+                    ? formData.vendorType.join(', ') 
+                    : formData.vendorType || 'Not provided'}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Market Type:</span>
+                <span className="ml-2 font-medium capitalize">
+                  {Array.isArray(formData.marketType) 
+                    ? formData.marketType.join(', ') 
+                    : formData.marketType || 'Not provided'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Admin Submit Button */}
       <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={() => onGoToStep(6)}>
+        <Button 
+          variant="outline" 
+          onClick={() => onGoToStep(6)}
+          disabled={isSubmitting}
+        >
           Back to Previous Step
         </Button>
         <Button
           onClick={handleAdminSubmit}
-          className="bg-[#313131] text-white hover:bg-[#222222]"
+          disabled={isSubmitting}
+          className="bg-[#313131] text-white hover:bg-[#222222] disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Create Vendor Account
+          {isSubmitting ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              {mode === 'edit' ? 'Updating...' : 'Creating...'}
+            </>
+          ) : (
+            mode === 'edit' ? 'Update Vendor' : 'Create Vendor Account'
+          )}
         </Button>
       </div>
     </div>

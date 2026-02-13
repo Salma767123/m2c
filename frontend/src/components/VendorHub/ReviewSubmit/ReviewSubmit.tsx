@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { SquarePen, CheckCircle2, Calendar } from 'lucide-react';
+import Link from 'next/link';
+import { SquarePen, CheckCircle2, Calendar, Home } from 'lucide-react';
 import { Button } from '@/components/UI/Button';
 import VendorService, { VendorRegistrationData, VendorFiles } from '@/services/vendorService';
 
@@ -129,7 +130,15 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         gstDocument: data.gstFile,
         ownerPhoto: data.ownerPhotoFile,
         factoryImages: data.factoryImages?.map((img: any) => img.file).filter(Boolean) || [],
-        certificationFiles: data.certificationFiles || {}
+        // Extract File objects from certificationFiles (they're wrapped in metadata objects)
+        certificationFiles: data.certificationFiles 
+          ? Object.entries(data.certificationFiles).reduce((acc: Record<string, File>, [certId, fileData]: [string, any]) => {
+              if (fileData && fileData.file) {
+                acc[certId] = fileData.file;
+              }
+              return acc;
+            }, {})
+          : {}
       };
       
       // Submit registration
@@ -149,32 +158,44 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
   if (isSubmitted) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-4 text-center animate-fade-in">
-        <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
-          <CheckCircle2 className="w-10 h-10 text-success" />
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+          <CheckCircle2 className="w-10 h-10 text-green-600" />
         </div>
-        <h1 className="text-3xl font-bold text-foreground mb-4">Registration Submitted Successfully!</h1>
-        <p className="text-lg text-muted-foreground mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">Registration Submitted Successfully!</h1>
+        <p className="text-lg text-gray-600 mb-8">
           Thank you for registering as a vendor. Our team will review your application
           and contact you within <strong>48 hours</strong>.
         </p>
-        <div className="bg-surface rounded-lg p-6 text-left">
-          <h3 className="font-semibold text-foreground mb-3">What happens next?</h3>
-          <ul className="space-y-2 text-sm text-muted-foreground">
+        <div className="bg-gray-50 rounded-lg p-6 text-left mb-8">
+          <h3 className="font-semibold text-gray-900 mb-3">What happens next?</h3>
+          <ul className="space-y-2 text-sm text-gray-600">
             <li className="flex items-start gap-2">
-              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs shrink-0 mt-0.5">1</span>
+              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs shrink-0 mt-0.5">1</span>
               Our team will verify your submitted documents and information
             </li>
             <li className="flex items-start gap-2">
-              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs shrink-0 mt-0.5">2</span>
+              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs shrink-0 mt-0.5">2</span>
               You may receive a call for additional verification if needed
             </li>
             <li className="flex items-start gap-2">
-              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs shrink-0 mt-0.5">3</span>
+              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs shrink-0 mt-0.5">3</span>
               Once approved, you'll receive access to your vendor dashboard
             </li>
           </ul>
         </div>
-        <Button className="mt-8" onClick={() => (window.location.href = '/')}>Return to Home</Button>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Link href="/">
+            <Button className="bg-[#313131] hover:bg-[#222222] text-white px-8 py-3 text-base font-semibold flex items-center gap-2">
+              <Home className="w-5 h-5" />
+              Return to Homepage
+            </Button>
+          </Link>
+          <Link href="/vendor">
+            <Button variant="outline" className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 px-8 py-3 text-base font-semibold">
+              Vendor Login
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }

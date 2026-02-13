@@ -39,6 +39,18 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // Sync formData with data prop when it changes (for edit mode)
+  useEffect(() => {
+    console.log('VendorTypeProducts: data prop changed', data)
+    setFormData({
+      vendorType: Array.isArray(data.vendorType) ? data.vendorType : (data.vendorType ? [data.vendorType] : []),
+      marketType: Array.isArray(data.marketType) ? data.marketType : (data.marketType ? [data.marketType] : []),
+      selectedCategories: data.selectedCategories || {},
+      expandedCategories: data.expandedCategories || {},
+      categoryRemarks: data.categoryRemarks || ''
+    })
+  }, [data]);
+
   // Fetch categories from API
   useEffect(() => {
     const fetchCategories = async () => {
