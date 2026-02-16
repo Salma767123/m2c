@@ -19,8 +19,9 @@ interface Order {
   product: string;
   sku: string;
   orderDate: string;
-  status: "Pending" | "Assigned" | "Packed" | "Shipped" | "Received at Hub" | "Delivered";
-  customer: string;
+  status: "Pending" | "Assigned" | "Packed" | "Shipped";
+  vendor: string;
+  hub: string;
   amount: number;
 }
 
@@ -32,7 +33,8 @@ const mockOrders: Order[] = [
     sku: "CBS-001",
     orderDate: "2024-02-10",
     status: "Pending",
-    customer: "John Doe",
+    vendor: "Textile Traders",
+    hub: "Not Assigned",
     amount: 2500,
   },
   {
@@ -42,7 +44,8 @@ const mockOrders: Order[] = [
     sku: "SS-045",
     orderDate: "2024-02-11",
     status: "Assigned",
-    customer: "Jane Smith",
+    vendor: "Silk Emporium",
+    hub: "Mumbai Hub",
     amount: 5000,
   },
   {
@@ -52,7 +55,8 @@ const mockOrders: Order[] = [
     sku: "WB-023",
     orderDate: "2024-02-12",
     status: "Packed",
-    customer: "Mike Johnson",
+    vendor: "Wool Crafts",
+    hub: "Delhi Hub",
     amount: 3500,
   },
   {
@@ -62,34 +66,25 @@ const mockOrders: Order[] = [
     sku: "CTS-012",
     orderDate: "2024-02-13",
     status: "Shipped",
-    customer: "Sarah Williams",
+    vendor: "Home Textiles",
+    hub: "Bangalore Hub",
     amount: 1500,
-  },
-  {
-    id: "5",
-    orderId: "ORD-2024-005",
-    product: "Linen Curtains",
-    sku: "LC-089",
-    orderDate: "2024-02-14",
-    status: "Delivered",
-    customer: "David Brown",
-    amount: 4000,
   },
 ];
 
-export default function OrderManagement() {
+export default function VendorToHub() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  const statusOptions = ["All", "Pending", "Assigned", "Packed", "Shipped", "Received at Hub", "Delivered"];
+  const statusOptions = ["All", "Pending", "Assigned", "Packed", "Shipped"];
 
   const filteredOrders = mockOrders.filter((order) => {
     const matchesSearch =
       order.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.toLowerCase().includes(searchTerm.toLowerCase());
+      order.vendor.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "All" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -104,23 +99,19 @@ export default function OrderManagement() {
         return "bg-purple-100 text-purple-800";
       case "Shipped":
         return "bg-indigo-100 text-indigo-800";
-      case "Received at Hub":
-        return "bg-teal-100 text-teal-800";
-      case "Delivered":
-        return "bg-green-100 text-green-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
   };
 
   const handleViewOrder = (orderId: string) => {
-    router.push(`/admin/dashboard/orders/view/${orderId}`);
+    router.push(`/admin/dashboard/orders/vendor-to-hub/view/${orderId}`);
   };
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Orders</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{mockOrders.length}</p>
@@ -138,21 +129,15 @@ export default function OrderManagement() {
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <p className="text-sm text-gray-600">Packed</p>
+          <p className="text-2xl font-bold text-purple-600 mt-1">
+            {mockOrders.filter((o) => o.status === "Packed").length}
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Shipped</p>
           <p className="text-2xl font-bold text-indigo-600 mt-1">
             {mockOrders.filter((o) => o.status === "Shipped").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">At Hub</p>
-          <p className="text-2xl font-bold text-teal-600 mt-1">
-            {mockOrders.filter((o) => o.status === "Received at Hub").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Delivered</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">
-            {mockOrders.filter((o) => o.status === "Delivered").length}
           </p>
         </div>
       </div>
@@ -164,7 +149,7 @@ export default function OrderManagement() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
               type="text"
-              placeholder="Search by Order ID, Product, SKU, or Customer..."
+              placeholder="Search by Order ID, Product, SKU, or Vendor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
@@ -189,8 +174,9 @@ export default function OrderManagement() {
               <TableHead>Order ID</TableHead>
               <TableHead>Product</TableHead>
               <TableHead>SKU</TableHead>
+              <TableHead>Vendor</TableHead>
+              <TableHead>Hub</TableHead>
               <TableHead>Order Date</TableHead>
-              <TableHead>Customer</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Actions</TableHead>
@@ -199,7 +185,7 @@ export default function OrderManagement() {
           <TableBody>
             {filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                   No orders found
                 </TableCell>
               </TableRow>
@@ -209,8 +195,9 @@ export default function OrderManagement() {
                   <TableCell className="font-medium">{order.orderId}</TableCell>
                   <TableCell>{order.product}</TableCell>
                   <TableCell>{order.sku}</TableCell>
+                  <TableCell>{order.vendor}</TableCell>
+                  <TableCell>{order.hub}</TableCell>
                   <TableCell>{new Date(order.orderDate).toLocaleDateString()}</TableCell>
-                  <TableCell>{order.customer}</TableCell>
                   <TableCell>₹{order.amount.toLocaleString()}</TableCell>
                   <TableCell>
                     <span

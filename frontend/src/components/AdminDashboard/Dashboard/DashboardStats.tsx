@@ -1,14 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
-import { Users, Store, Package, TrendingUp, DollarSign } from 'lucide-react'
+import { Users, Store, ShoppingCart, DollarSign, TrendingUp } from 'lucide-react'
 
 const stats = [
   {
-    title: 'Total Revenue',
+    title: 'Total Earnings',
     value: '$45,231.89',
     change: '+20.1% from last month',
     icon: DollarSign,
     color: 'text-green-600',
-    borderColor: 'border-green-600',
     bgColor: 'bg-green-50',
   },
   {
@@ -17,41 +16,37 @@ const stats = [
     change: '+180 new vendors',
     icon: Store,
     color: 'text-blue-600',
-    borderColor: 'border-blue-600',
     bgColor: 'bg-blue-50',
   },
   {
-    title: 'Total Products',
-    value: '12,234',
-    change: '+19% from last month',
-    icon: Package,
-    color: 'text-purple-600',
-    borderColor: 'border-purple-600',
-    bgColor: 'bg-purple-50',
-  },
-  {
-    title: 'Active Users',
+    title: 'Total Customers',
     value: '8,945',
     change: '+12% from last month',
     icon: Users,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+  },
+  {
+    title: 'Total Orders',
+    value: '12,234',
+    change: '+19% from last month',
+    icon: ShoppingCart,
     color: 'text-indigo-600',
-    borderColor: 'border-indigo-600',
     bgColor: 'bg-indigo-50',
   },
   {
-    title: 'Growth Rate',
-    value: '24.5%',
-    change: '+4.2% from last quarter',
+    title: 'Total Income',
+    value: '$52,450',
+    change: '+15.3% from last month',
     icon: TrendingUp,
     color: 'text-emerald-600',
-    borderColor: 'border-emerald-600',
     bgColor: 'bg-emerald-50',
   },
 ]
 
 export default function DashboardStats() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       {stats.map((stat) => {
         const Icon = stat.icon
         return (

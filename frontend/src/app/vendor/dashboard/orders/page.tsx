@@ -1,10 +1,13 @@
-'use client';
+import VendorOrderManagement from "@/components/VendorDashboard/Orders/OrderManagement";
 
-import React from 'react';
-import VendorOrderManagement from '../../../../components/VendorDashboard/Orders/VendorOrderManagement';
-
-const VendorOrdersPage: React.FC = () => {
-  return <VendorOrderManagement />;
-};
-
-export default VendorOrdersPage;
+export default function VendorOrdersPage() {
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Order Management</h1>
+        <p className="text-gray-600 mt-1">Process and ship your assigned orders</p>
+      </div>
+      <VendorOrderManagement />
+    </div>
+  );
+}

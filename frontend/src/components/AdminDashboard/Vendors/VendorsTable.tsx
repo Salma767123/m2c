@@ -43,17 +43,6 @@ const getLocationString = (vendor: VendorProfile): string => {
   return parts.length > 0 ? parts.join(', ') : 'Not specified'
 }
 
-const getProductCount = (vendor: VendorProfile): number => {
-  return vendor.productCategories?.length || 0
-}
-
-const getRevenue = (vendor: VendorProfile): string => {
-  if (vendor.annualTurnover) {
-    return vendor.annualTurnover
-  }
-  return 'N/A'
-}
-
 const getRating = (vendor: VendorProfile): number => {
   // For now, return a default rating since it's not in the backend model
   // This could be calculated based on reviews/feedback in the future
@@ -317,8 +306,6 @@ export default function VendorsTable() {
                   <TableHead className="text-white">Vendor</TableHead>
                   <TableHead className="text-white">Location</TableHead>
                   <TableHead className="text-white">Status</TableHead>
-                  <TableHead className="text-white">Products</TableHead>
-                  <TableHead className="text-white">Revenue</TableHead>
                   <TableHead className="text-white">Rating</TableHead>
                   <TableHead className="text-white">Join Date</TableHead>
                   <TableHead className="text-white">Actions</TableHead>
@@ -336,8 +323,6 @@ export default function VendorsTable() {
                     </TableCell>
                     <TableCell>{getLocationString(vendor)}</TableCell>
                     <TableCell>{getStatusBadge(vendor.status)}</TableCell>
-                    <TableCell>{getProductCount(vendor)}</TableCell>
-                    <TableCell className="font-medium">{getRevenue(vendor)}</TableCell>
                     <TableCell>
                       <div className="flex items-center">
                         <span className="text-yellow-400">★</span>

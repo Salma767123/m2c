@@ -19,11 +19,12 @@ import {
   ChevronDown,
   ChevronRight,
   Shield,
-  ShoppingCart,
   Headphones,
   ClipboardCheck,
   UserCheck,
   Layers,
+  Ticket,
+  ShoppingCart,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -47,7 +48,10 @@ const navigation: NavigationItem[] = [
   {
     title: "Orders",
     icon: ShoppingCart,
-    href: "/admin/dashboard/orders",
+    subItems: [
+      { title: "Vendor to Hub", href: "/admin/dashboard/orders/vendor-to-hub" },
+      { title: "Hub to Customer", href: "/admin/dashboard/orders/hub-to-customer" },
+    ],
   },
   {
     title: "General",
@@ -73,6 +77,11 @@ const navigation: NavigationItem[] = [
     title: "Categories",
     icon: Tags,
     href: "/admin/dashboard/categories",
+  },
+  {
+    title: "Coupons",
+    icon: Ticket,
+    href: "/admin/dashboard/coupons",
   },
    {
     title: "Inventory",

@@ -3,8 +3,13 @@
 import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DashboardStats from '@/components/AdminDashboard/Dashboard/DashboardStats'
-import RecentActivity from '@/components/AdminDashboard/Dashboard/RecentActivity'
-import VendorsTable from '@/components/AdminDashboard/Vendors/VendorsTable'
+import EarningsChart from '@/components/AdminDashboard/Dashboard/EarningsChart'
+import SalesReportChart from '@/components/AdminDashboard/Dashboard/SalesReportChart'
+import RecentOrders from '@/components/AdminDashboard/Dashboard/RecentOrders'
+import TopSellingProducts from '@/components/AdminDashboard/Dashboard/TopSellingProducts'
+import VendorRecentProducts from '@/components/AdminDashboard/Dashboard/VendorRecentProducts'
+import RecentVendors from '@/components/AdminDashboard/Dashboard/RecentVendors'
+import VendorInventoryRestock from '@/components/AdminDashboard/Dashboard/VendorInventoryRestock'
 import { storeAuth } from '@/lib/auth'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
@@ -50,21 +55,46 @@ function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6">
-        {/* Stats Cards */}
-        <DashboardStats />
+      {/* Stats Cards */}
+      <DashboardStats />
 
-        {/* Main Content Grid */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Recent Activity */}
-          <div className="lg:col-span-1">
-            <RecentActivity />
-          </div>
+      {/* Charts Section */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Earnings & Revenue Chart */}
+        <EarningsChart />
 
-          {/* Vendors Table */}
-          <div className="lg:col-span-2">
-            <VendorsTable />
-          </div>
+        {/* Sales Report Pie Chart */}
+        <SalesReportChart />
+      </div>
+
+      {/* Main Content Grid - Row 1 */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Recent Orders */}
+        <div className="lg:col-span-1">
+          <RecentOrders />
+        </div>
+
+        {/* Top Selling Products */}
+        <div className="lg:col-span-1">
+          <TopSellingProducts />
+        </div>
+
+        {/* Vendor Recent Products */}
+        <div className="lg:col-span-1">
+          <VendorRecentProducts />
+        </div>
+      </div>
+
+      {/* Main Content Grid - Row 2 */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Recently Added Vendors */}
+        <div>
+          <RecentVendors />
+        </div>
+
+        {/* Recent Inventory Restocks */}
+        <div>
+          <VendorInventoryRestock />
         </div>
       </div>
     </div>

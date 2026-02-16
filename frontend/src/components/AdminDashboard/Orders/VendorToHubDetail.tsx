@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Package, CreditCard, User, MapPin, Building2, Truck } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 
-interface OrderDetailProps {
+interface VendorToHubDetailProps {
   orderId: string;
 }
 
@@ -24,18 +24,25 @@ const mockHubs: Hub[] = [
   { id: "5", name: "Kolkata Hub", location: "Kolkata, West Bengal" },
 ];
 
-export default function OrderDetail({ orderId }: OrderDetailProps) {
+export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   const router = useRouter();
-  const [showModal, setShowModal] = useState(false);
+  const [showHubModal, setShowHubModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedHub, setSelectedHub] = useState("");
-  const [orderStatus, setOrderStatus] = useState("Shipped"); // Track current status
+  const [orderStatus, setOrderStatus] = useState("Shipped");
+  
+  // Review form state
+  const [rating, setRating] = useState(0);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [review, setReview] = useState("");
+  const [notice, setNotice] = useState("");
 
   // Mock order data
   const order = {
     orderId: "ORD-2024-001",
     orderDate: "2024-02-10",
     status: orderStatus,
-    assignedHub: "Mumbai Hub", // Hub that was assigned
+    assignedHub: "Mumbai Hub",
     product: {
       name: "Cotton Bedsheet Set",
       sku: "CBS-001",
@@ -56,12 +63,6 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
       address: "456, Textile Market, Surat, Gujarat - 395003",
       gst: "27AABCT1234F1Z5",
     },
-    customer: {
-      name: "John Doe",
-      email: "john.doe@example.com",
-      phone: "+91 98765 12345",
-      address: "123, MG Road, Mumbai, Maharashtra - 400001",
-    },
     shipping: {
       carrier: "Blue Dart",
       trackingId: "BD123456789IN",
@@ -70,10 +71,10 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   };
 
   const handleProceed = () => {
-    setShowModal(true);
+    setShowHubModal(true);
   };
 
-  const handleConfirm = () => {
+  const handleConfirmHub = () => {
     if (!selectedHub) {
       showErrorToast("Please select a hub");
       return;
@@ -81,27 +82,30 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
 
     const hubName = mockHubs.find((h) => h.id === selectedHub)?.name;
     showSuccessToast(`Order assigned to ${hubName}`);
-    setShowModal(false);
+    setShowHubModal(false);
     setOrderStatus("Assigned");
-    
-    // Redirect back to orders list
-    setTimeout(() => {
-      router.push("/admin/dashboard/orders");
-    }, 1500);
   };
 
   const handleMarkAsReceived = () => {
-    setOrderStatus("Received at Hub");
-    showSuccessToast("Order marked as received at hub");
+    setShowReviewModal(true);
   };
 
-  const handleMarkAsDelivered = () => {
-    setOrderStatus("Delivered");
-    showSuccessToast("Order marked as delivered to customer");
+  const handleSubmitReview = () => {
+    if (rating === 0) {
+      showErrorToast("Please provide a rating");
+      return;
+    }
+    if (!review.trim()) {
+      showErrorToast("Please provide a review");
+      return;
+    }
+
+    showSuccessToast("Review submitted successfully. Vendor order marked as delivered.");
+    setShowReviewModal(false);
     
-    // Redirect back to orders list
+    // Redirect to Hub to Customer orders
     setTimeout(() => {
-      router.push("/admin/dashboard/orders");
+      router.push("/admin/dashboard/orders/hub-to-customer");
     }, 1500);
   };
 
@@ -117,7 +121,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Vendor to Hub Order</h1>
             <p className="text-sm text-gray-600 mt-1">Order ID: {order.orderId}</p>
           </div>
         </div>
@@ -136,14 +140,6 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
               className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium"
             >
               Mark as Received at Hub
-            </button>
-          )}
-          {order.status === "Received at Hub" && (
-            <button
-              onClick={handleMarkAsDelivered}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-            >
-              Mark as Delivered
             </button>
           )}
         </div>
@@ -168,9 +164,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
               order.status === "Pending" ? "text-yellow-600" :
               order.status === "Assigned" ? "text-blue-600" :
               order.status === "Packed" ? "text-purple-600" :
-              order.status === "Shipped" ? "text-indigo-600" :
-              order.status === "Received at Hub" ? "text-teal-600" :
-              "text-green-600"
+              "text-indigo-600"
             }`}>
               {order.status}
             </p>
@@ -257,37 +251,15 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             <p className="text-sm text-gray-600">GST Number</p>
             <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.gst}</p>
           </div>
-        </div>
-      </div>
-
-      {/* Customer Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center gap-2 mb-4">
-          <User className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-600">Customer Name</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.customer.name}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Email</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.customer.email}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Phone</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.customer.phone}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Delivery Address</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.customer.address}</p>
+          <div className="md:col-span-2">
+            <p className="text-sm text-gray-600">Address</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.address}</p>
           </div>
         </div>
       </div>
 
-      {/* Vendor Shipping Details - Show only if order is shipped or later */}
-      {(order.status === "Shipped" || order.status === "Received at Hub" || order.status === "Delivered") && order.shipping && (
+      {/* Vendor Shipping Details */}
+      {(order.status === "Shipped") && order.shipping && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-4">
             <Truck className="h-5 w-5 text-gray-600" />
@@ -318,7 +290,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
       )}
 
       {/* Hub Selection Modal */}
-      {showModal && (
+      {showHubModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
@@ -388,16 +360,130 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
 
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => setShowHubModal(false)}
                 className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               >
                 Cancel
               </button>
               <button
-                onClick={handleConfirm}
+                onClick={handleConfirmHub}
                 className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
               >
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Review Vendor Delivery</h2>
+                <p className="text-sm text-gray-600 mt-1">Provide feedback on the received order</p>
+              </div>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Order Info */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Order Information</h3>
+                <div className="flex gap-4">
+                  <img
+                    src={order.product.image}
+                    alt={order.product.name}
+                    className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                  />
+                  <div>
+                    <p className="font-medium text-gray-900">{order.product.name}</p>
+                    <p className="text-sm text-gray-600 mt-1">Order ID: {order.orderId}</p>
+                    <p className="text-sm text-gray-600">Vendor: {order.vendor.name}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rating */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rating <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      onMouseEnter={() => setHoveredRating(star)}
+                      onMouseLeave={() => setHoveredRating(0)}
+                      className="focus:outline-none transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`h-8 w-8 ${
+                          star <= (hoveredRating || rating)
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  {rating > 0 && (
+                    <span className="ml-2 text-sm text-gray-600 self-center">
+                      {rating} out of 5
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Review */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Review <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={review}
+                  onChange={(e) => setReview(e.target.value)}
+                  placeholder="Describe the quality of the product received, packaging, condition, etc."
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
+                />
+              </div>
+
+              {/* Notice */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notice (Optional)
+                </label>
+                <textarea
+                  value={notice}
+                  onChange={(e) => setNotice(e.target.value)}
+                  placeholder="Any additional notes or issues to communicate to the vendor"
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitReview}
+                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+              >
+                Submit Review
               </button>
             </div>
           </div>

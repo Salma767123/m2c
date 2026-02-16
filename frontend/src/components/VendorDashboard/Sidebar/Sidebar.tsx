@@ -37,11 +37,6 @@ const navigation: NavigationItem[] = [
     href: "/vendor/dashboard",
   },
   {
-    title: "Orders",
-    icon: ShoppingCart,
-    href: "/vendor/dashboard/orders",
-  },
-  {
     title: "Inventory",
     icon: Warehouse,
     href: "/vendor/dashboard/inventory",
@@ -50,6 +45,11 @@ const navigation: NavigationItem[] = [
     title: "Products",
     icon: Package,
     href: "/vendor/dashboard/products",
+  },
+  {
+    title: "Orders",
+    icon: ShoppingCart,
+    href: "/vendor/dashboard/orders",
   },
   {
     title: "Earnings",

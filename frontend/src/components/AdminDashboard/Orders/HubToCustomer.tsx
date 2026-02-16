@@ -18,71 +18,55 @@ interface Order {
   orderId: string;
   product: string;
   sku: string;
-  orderDate: string;
-  status: "Pending" | "Assigned" | "Packed" | "Shipped" | "Received at Hub" | "Delivered";
   customer: string;
+  hub: string;
+  orderDate: string;
+  status: "At Hub" | "Out for Delivery" | "Delivered";
   amount: number;
 }
 
 const mockOrders: Order[] = [
   {
     id: "1",
-    orderId: "ORD-2024-001",
-    product: "Cotton Bedsheet Set",
-    sku: "CBS-001",
-    orderDate: "2024-02-10",
-    status: "Pending",
-    customer: "John Doe",
-    amount: 2500,
-  },
-  {
-    id: "2",
-    orderId: "ORD-2024-002",
-    product: "Silk Saree",
-    sku: "SS-045",
-    orderDate: "2024-02-11",
-    status: "Assigned",
-    customer: "Jane Smith",
-    amount: 5000,
-  },
-  {
-    id: "3",
-    orderId: "ORD-2024-003",
-    product: "Woolen Blanket",
-    sku: "WB-023",
-    orderDate: "2024-02-12",
-    status: "Packed",
-    customer: "Mike Johnson",
-    amount: 3500,
-  },
-  {
-    id: "4",
-    orderId: "ORD-2024-004",
-    product: "Cotton Towel Set",
-    sku: "CTS-012",
-    orderDate: "2024-02-13",
-    status: "Shipped",
-    customer: "Sarah Williams",
-    amount: 1500,
-  },
-  {
-    id: "5",
     orderId: "ORD-2024-005",
     product: "Linen Curtains",
     sku: "LC-089",
-    orderDate: "2024-02-14",
-    status: "Delivered",
     customer: "David Brown",
+    hub: "Mumbai Hub",
+    orderDate: "2024-02-14",
+    status: "At Hub",
     amount: 4000,
+  },
+  {
+    id: "2",
+    orderId: "ORD-2024-006",
+    product: "Silk Pillowcase",
+    sku: "SP-034",
+    customer: "Emma Wilson",
+    hub: "Delhi Hub",
+    orderDate: "2024-02-13",
+    status: "Out for Delivery",
+    amount: 2200,
+  },
+  {
+    id: "3",
+    orderId: "ORD-2024-007",
+    product: "Cotton Duvet",
+    sku: "CD-056",
+    customer: "Michael Chen",
+    hub: "Bangalore Hub",
+    orderDate: "2024-02-12",
+    status: "Delivered",
+    amount: 3800,
   },
 ];
 
-export default function OrderManagement() {
+export default function HubToCustomer() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  const statusOptions = ["All", "Pending", "Assigned", "Packed", "Shipped", "Received at Hub", "Delivered"];
+  const statusOptions = ["All", "At Hub", "Out for Delivery", "Delivered"];
 
   const filteredOrders = mockOrders.filter((order) => {
     const matchesSearch =
@@ -96,16 +80,10 @@ export default function OrderManagement() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "Assigned":
-        return "bg-blue-100 text-blue-800";
-      case "Packed":
-        return "bg-purple-100 text-purple-800";
-      case "Shipped":
-        return "bg-indigo-100 text-indigo-800";
-      case "Received at Hub":
+      case "At Hub":
         return "bg-teal-100 text-teal-800";
+      case "Out for Delivery":
+        return "bg-orange-100 text-orange-800";
       case "Delivered":
         return "bg-green-100 text-green-800";
       default:
@@ -114,39 +92,27 @@ export default function OrderManagement() {
   };
 
   const handleViewOrder = (orderId: string) => {
-    router.push(`/admin/dashboard/orders/view/${orderId}`);
+    router.push(`/admin/dashboard/orders/hub-to-customer/view/${orderId}`);
   };
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Orders</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{mockOrders.length}</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Pending</p>
-          <p className="text-2xl font-bold text-yellow-600 mt-1">
-            {mockOrders.filter((o) => o.status === "Pending").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Assigned</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">
-            {mockOrders.filter((o) => o.status === "Assigned").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Shipped</p>
-          <p className="text-2xl font-bold text-indigo-600 mt-1">
-            {mockOrders.filter((o) => o.status === "Shipped").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">At Hub</p>
           <p className="text-2xl font-bold text-teal-600 mt-1">
-            {mockOrders.filter((o) => o.status === "Received at Hub").length}
+            {mockOrders.filter((o) => o.status === "At Hub").length}
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <p className="text-sm text-gray-600">Out for Delivery</p>
+          <p className="text-2xl font-bold text-orange-600 mt-1">
+            {mockOrders.filter((o) => o.status === "Out for Delivery").length}
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -189,8 +155,9 @@ export default function OrderManagement() {
               <TableHead>Order ID</TableHead>
               <TableHead>Product</TableHead>
               <TableHead>SKU</TableHead>
-              <TableHead>Order Date</TableHead>
               <TableHead>Customer</TableHead>
+              <TableHead>Hub</TableHead>
+              <TableHead>Order Date</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Actions</TableHead>
@@ -199,7 +166,7 @@ export default function OrderManagement() {
           <TableBody>
             {filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                   No orders found
                 </TableCell>
               </TableRow>
@@ -209,8 +176,9 @@ export default function OrderManagement() {
                   <TableCell className="font-medium">{order.orderId}</TableCell>
                   <TableCell>{order.product}</TableCell>
                   <TableCell>{order.sku}</TableCell>
-                  <TableCell>{new Date(order.orderDate).toLocaleDateString()}</TableCell>
                   <TableCell>{order.customer}</TableCell>
+                  <TableCell>{order.hub}</TableCell>
+                  <TableCell>{new Date(order.orderDate).toLocaleDateString()}</TableCell>
                   <TableCell>₹{order.amount.toLocaleString()}</TableCell>
                   <TableCell>
                     <span
