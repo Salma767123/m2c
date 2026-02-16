@@ -827,3 +827,71 @@ enum OrderStatus {
   CANCELLED
   RETURNED
 }
+
+// ============================================
+// PAYMENT SETTINGS
+// ============================================
+
+model PaymentSettings {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Razorpay Settings
+  razorpayEnabled       Boolean   @default(false)
+  razorpayKeyId         String?
+  razorpayKeySecret     String?
+  razorpayWebhookSecret String?
+  
+  // PayU Settings
+  payuEnabled           Boolean   @default(false)
+  payuMerchantKey       String?
+  payuMerchantSalt      String?
+  
+  // Metadata
+  updatedBy             String?   @db.ObjectId
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("payment_settings")
+}
+
+// ============================================
+// COMPANY INFO SETTINGS
+// ============================================
+
+model CompanyInfo {
+  id                        String    @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Basic Company Information
+  companyName               String
+  companyLogo               String?
+  companyEmail              String?
+  companyPhone              String?
+  companyWebsite            String?
+  
+  // Legal & Tax Information
+  gstNumber                 String?
+  panNumber                 String?
+  cinNumber                 String?
+  businessRegistrationNumber String?
+  taxId                     String?
+  
+  // Registered Address
+  registeredAddress         String?
+  city                      String?
+  state                     String?
+  country                   String?
+  zipCode                   String?
+  
+  // Bank Details
+  bankName                  String?
+  bankAccountNumber         String?
+  bankIfscCode              String?
+  bankBranch                String?
+  
+  // Metadata
+  updatedBy                 String?   @db.ObjectId
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@map("company_info")
+}

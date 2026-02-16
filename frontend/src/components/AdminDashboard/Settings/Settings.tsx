@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { User, Mail, Phone, MapPin, Building2, Shield, Save, Camera, Globe, Users, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key } from "lucide-react";
+import { useState, useEffect } from "react";
+import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { paymentSettingsService } from "@/services/paymentSettingsService";
+import { adminProfileService } from "@/services/adminProfileService";
+import { companyInfoService } from "@/services/companyInfoService";
 
 type UserRole = "super_admin" | "admin" | "employee";
 
@@ -14,7 +17,6 @@ interface UserProfile {
   email: string;
   phone: string;
   role: UserRole;
-  department: string;
   avatar: string;
   address: string;
   city: string;
@@ -30,7 +32,6 @@ export default function Settings() {
     email: "john.admin@company.com",
     phone: "+1 234-567-8900",
     role: "super_admin", // Change to "admin" or "employee" to test different views
-    department: "Administration",
     avatar: "",
     address: "123 Admin Street",
     city: "New York",
@@ -38,29 +39,17 @@ export default function Settings() {
     zipCode: "10001",
   });
 
-  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "admin">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment">("profile");
 
   // Profile form state
   const [profileData, setProfileData] = useState({
     name: currentUser.name,
     email: currentUser.email,
     phone: currentUser.phone,
-    department: currentUser.department,
     address: currentUser.address,
     city: currentUser.city,
     state: currentUser.state,
     zipCode: currentUser.zipCode,
-  });
-
-  // Admin settings state (only for super_admin and admin)
-  const [adminSettings, setAdminSettings] = useState({
-    platformName: "M2C Marketplace",
-    platformEmail: "support@m2c.com",
-    platformPhone: "+1 800-123-4567",
-    allowVendorRegistration: true,
-    requireProductApproval: true,
-    enableNotifications: true,
-    maintenanceMode: false,
   });
 
   // Company info state (only for super_admin and admin)
@@ -88,95 +77,332 @@ export default function Settings() {
 
   // Razorpay settings state (only for super_admin)
   const [razorpaySettings, setRazorpaySettings] = useState({
-    enabled: true,
-    keyId: "rzp_test_1234567890",
-    keySecret: "••••••••••••••••••••",
-    webhookSecret: "••••••••••••••••••••",
-    accountId: "acc_1234567890",
-    testMode: true,
-    autoCapture: true,
-    paymentMethods: {
-      card: true,
-      netbanking: true,
-      upi: true,
-      wallet: true,
-      emi: false,
-    },
+    enabled: false,
+    keyId: "",
+    keySecret: "",
+    webhookSecret: ""
   });
 
   // PayU settings state (only for super_admin)
   const [payuSettings, setPayuSettings] = useState({
     enabled: false,
-    merchantKey: "gtKFFx",
-    merchantSalt: "••••••••••••••••••••",
-    testMode: true,
-    autoCapture: true,
-    paymentMethods: {
-      card: true,
-      netbanking: true,
-      upi: true,
-      wallet: true,
-      emi: false,
-    },
+    merchantKey: "",
+    merchantSalt: ""
   });
+
+  // Loading state for payment settings
+  const [loadingPaymentSettings, setLoadingPaymentSettings] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [loadingCompanyInfo, setLoadingCompanyInfo] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  // Password visibility states
+  const [showRazorpaySecret, setShowRazorpaySecret] = useState(false);
+  const [showRazorpayWebhook, setShowRazorpayWebhook] = useState(false);
+  const [showPayuSalt, setShowPayuSalt] = useState(false);
+
+  // Track if secrets are masked (from backend)
+  const isRazorpaySecretMasked = razorpaySettings.keySecret === '••••••••';
+  const isRazorpayWebhookMasked = razorpaySettings.webhookSecret === '••••••••';
+  const isPayuSaltMasked = payuSettings.merchantSalt === '••••••••';
+
+  // Access control
+  const canAccessAdminSettings = currentUser.role === "super_admin" || currentUser.role === "admin";
+  const isReadOnly = currentUser.role === "employee";
+
+  // Fetch data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      // Fetch admin profile
+      try {
+        setLoadingProfile(true);
+        const profileResponse = await adminProfileService.getProfile();
+        if (profileResponse.success && profileResponse.data) {
+          setProfileData({
+            name: profileResponse.data.name || "",
+            email: profileResponse.data.email || "",
+            phone: profileResponse.data.phoneNumber || "",
+            address: profileResponse.data.address || "",
+            city: profileResponse.data.city || "",
+            state: profileResponse.data.state || "",
+            zipCode: profileResponse.data.zipCode || "",
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile:', error);
+      } finally {
+        setLoadingProfile(false);
+      }
+
+      // Fetch company info (for admins)
+      if (canAccessAdminSettings) {
+        try {
+          setLoadingCompanyInfo(true);
+          const companyResponse = await companyInfoService.getCompanyInfo();
+          if (companyResponse.success && companyResponse.data) {
+            setCompanyInfo({
+              companyName: companyResponse.data.companyName || "",
+              companyLogo: companyResponse.data.companyLogo || "",
+              gstNumber: companyResponse.data.gstNumber || "",
+              panNumber: companyResponse.data.panNumber || "",
+              cinNumber: companyResponse.data.cinNumber || "",
+              businessRegistrationNumber: companyResponse.data.businessRegistrationNumber || "",
+              taxId: companyResponse.data.taxId || "",
+              companyEmail: companyResponse.data.companyEmail || "",
+              companyPhone: companyResponse.data.companyPhone || "",
+              companyWebsite: companyResponse.data.companyWebsite || "",
+              registeredAddress: companyResponse.data.registeredAddress || "",
+              city: companyResponse.data.city || "",
+              state: companyResponse.data.state || "",
+              country: companyResponse.data.country || "",
+              zipCode: companyResponse.data.zipCode || "",
+              bankName: companyResponse.data.bankName || "",
+              bankAccountNumber: companyResponse.data.bankAccountNumber || "",
+              bankIfscCode: companyResponse.data.bankIfscCode || "",
+              bankBranch: companyResponse.data.bankBranch || "",
+            });
+          }
+        } catch (error) {
+          console.error('Failed to fetch company info:', error);
+        } finally {
+          setLoadingCompanyInfo(false);
+        }
+      }
+
+      // Fetch payment settings (for super_admin)
+      if (currentUser.role === "super_admin") {
+        try {
+          setLoadingPaymentSettings(true);
+          const response = await paymentSettingsService.getPaymentSettings();
+          
+          if (response.success && response.data) {
+            setRazorpaySettings({
+              enabled: response.data.razorpayEnabled,
+              keyId: response.data.razorpayKeyId || "",
+              keySecret: response.data.razorpayKeySecret || "",
+              webhookSecret: response.data.razorpayWebhookSecret || ""
+            });
+            
+            setPayuSettings({
+              enabled: response.data.payuEnabled,
+              merchantKey: response.data.payuMerchantKey || "",
+              merchantSalt: response.data.payuMerchantSalt || ""
+            });
+          }
+        } catch (error) {
+          console.error('Failed to fetch payment settings:', error);
+        } finally {
+          setLoadingPaymentSettings(false);
+        }
+      }
+    };
+
+    fetchData();
+  }, [currentUser.role, canAccessAdminSettings]);
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      showSuccessToast("Profile Updated", "Your profile has been updated successfully.");
-    } catch (error) {
-      showErrorToast("Update Failed", "Failed to update profile. Please try again.");
-    }
-  };
-
-  const handleAdminSettingsUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      showSuccessToast("Settings Updated", "Admin settings have been updated successfully.");
-    } catch (error) {
-      showErrorToast("Update Failed", "Failed to update settings. Please try again.");
+      setLoadingProfile(true);
+      const response = await adminProfileService.updateProfile({
+        name: profileData.name,
+        phoneNumber: profileData.phone,
+        address: profileData.address,
+        city: profileData.city,
+        state: profileData.state,
+        zipCode: profileData.zipCode,
+        country: "India" // Default country
+      });
+      
+      if (response.success) {
+        showSuccessToast("Profile Updated", response.message || "Your profile has been updated successfully.");
+      }
+    } catch (error: any) {
+      showErrorToast("Update Failed", error.message || "Failed to update profile. Please try again.");
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
   const handleCompanyInfoUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      showSuccessToast("Company Info Updated", "Company information has been updated successfully.");
-    } catch (error) {
-      showErrorToast("Update Failed", "Failed to update company information. Please try again.");
+      setLoadingCompanyInfo(true);
+      
+      // Determine which section is being updated based on the form
+      const formId = (e.target as HTMLFormElement).id;
+      
+      let response;
+      if (formId === 'basic-info-form') {
+        response = await companyInfoService.updateBasicInfo({
+          companyName: companyInfo.companyName,
+          companyEmail: companyInfo.companyEmail,
+          companyPhone: companyInfo.companyPhone,
+          companyWebsite: companyInfo.companyWebsite
+        });
+      } else if (formId === 'legal-info-form') {
+        response = await companyInfoService.updateLegalInfo({
+          gstNumber: companyInfo.gstNumber,
+          panNumber: companyInfo.panNumber,
+          cinNumber: companyInfo.cinNumber,
+          businessRegistrationNumber: companyInfo.businessRegistrationNumber,
+          taxId: companyInfo.taxId
+        });
+      } else if (formId === 'address-form') {
+        response = await companyInfoService.updateAddress({
+          registeredAddress: companyInfo.registeredAddress,
+          city: companyInfo.city,
+          state: companyInfo.state,
+          country: companyInfo.country,
+          zipCode: companyInfo.zipCode
+        });
+      } else if (formId === 'bank-details-form') {
+        response = await companyInfoService.updateBankDetails({
+          bankName: companyInfo.bankName,
+          bankAccountNumber: companyInfo.bankAccountNumber,
+          bankIfscCode: companyInfo.bankIfscCode,
+          bankBranch: companyInfo.bankBranch
+        });
+      }
+      
+      if (response?.success) {
+        showSuccessToast("Company Info Updated", response.message || "Company information has been updated successfully.");
+      }
+    } catch (error: any) {
+      showErrorToast("Update Failed", error.message || "Failed to update company information. Please try again.");
+    } finally {
+      setLoadingCompanyInfo(false);
     }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showErrorToast("Invalid File", "Please upload an image file");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showErrorToast("File Too Large", "Please upload an image smaller than 5MB");
+      return;
+    }
+
+    // Convert to base64 for preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setLogoPreview(base64String);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveLogo = async () => {
+    if (!logoPreview) return;
+
+    try {
+      setUploadingLogo(true);
+      const response = await companyInfoService.updateLogo(logoPreview);
+      
+      if (response.success) {
+        setCompanyInfo(prev => ({
+          ...prev,
+          companyLogo: logoPreview
+        }));
+        setLogoPreview(null);
+        showSuccessToast("Logo Saved", "Company logo has been saved successfully");
+      }
+    } catch (error: any) {
+      showErrorToast("Save Failed", error.message || "Failed to save logo");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleCancelLogo = () => {
+    setLogoPreview(null);
+    // Reset file input
+    const fileInput = document.getElementById('logo-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   };
 
   const handleRazorpaySettingsUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      showSuccessToast("Razorpay Settings Updated", "Payment gateway settings have been updated successfully.");
-    } catch (error) {
-      showErrorToast("Update Failed", "Failed to update Razorpay settings. Please try again.");
+      setLoadingPaymentSettings(true);
+      const response = await paymentSettingsService.updateRazorpaySettings({
+        enabled: razorpaySettings.enabled,
+        keyId: razorpaySettings.keyId,
+        keySecret: razorpaySettings.keySecret,
+        webhookSecret: razorpaySettings.webhookSecret
+      });
+      
+      if (response.success) {
+        showSuccessToast("Razorpay Settings Updated", response.message || "Payment gateway settings have been updated successfully.");
+        
+        // Update state with sanitized data from response
+        if (response.data) {
+          setRazorpaySettings(prev => ({
+            ...prev,
+            keySecret: response.data.razorpayKeySecret || prev.keySecret,
+            webhookSecret: response.data.razorpayWebhookSecret || prev.webhookSecret
+          }));
+          
+          // If Razorpay was enabled, disable PayU
+          if (response.data.payuEnabled !== undefined) {
+            setPayuSettings(prev => ({
+              ...prev,
+              enabled: response.data.payuEnabled || false
+            }));
+          }
+        }
+      }
+    } catch (error: any) {
+      showErrorToast("Update Failed", error.message || "Failed to update Razorpay settings. Please try again.");
+    } finally {
+      setLoadingPaymentSettings(false);
     }
   };
 
   const handlePayUSettingsUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      showSuccessToast("PayU Settings Updated", "PayU payment gateway settings have been updated successfully.");
-    } catch (error) {
-      showErrorToast("Update Failed", "Failed to update PayU settings. Please try again.");
+      setLoadingPaymentSettings(true);
+      const response = await paymentSettingsService.updatePayUSettings({
+        enabled: payuSettings.enabled,
+        merchantKey: payuSettings.merchantKey,
+        merchantSalt: payuSettings.merchantSalt
+      });
+      
+      if (response.success) {
+        showSuccessToast("PayU Settings Updated", response.message || "PayU payment gateway settings have been updated successfully.");
+        
+        // Update state with sanitized data from response
+        if (response.data) {
+          setPayuSettings(prev => ({
+            ...prev,
+            merchantSalt: response.data.payuMerchantSalt || prev.merchantSalt
+          }));
+          
+          // If PayU was enabled, disable Razorpay
+          if (response.data.razorpayEnabled !== undefined) {
+            setRazorpaySettings(prev => ({
+              ...prev,
+              enabled: response.data.razorpayEnabled || false
+            }));
+          }
+        }
+      }
+    } catch (error: any) {
+      showErrorToast("Update Failed", error.message || "Failed to update PayU settings. Please try again.");
+    } finally {
+      setLoadingPaymentSettings(false);
     }
   };
-
-  const canAccessAdminSettings = currentUser.role === "super_admin" || currentUser.role === "admin";
-  const isReadOnly = currentUser.role === "employee";
 
   return (
     <div className="p-6">
@@ -225,17 +451,6 @@ export default function Settings() {
                 <DollarSign className="h-4 w-4 inline mr-2" />
                 Payment Settings
               </button>
-              <button
-                onClick={() => setActiveTab("admin")}
-                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${
-                  activeTab === "admin"
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                <Shield className="h-4 w-4 inline mr-2" />
-                Admin Settings
-              </button>
             </>
           )}
         </div>
@@ -247,44 +462,36 @@ export default function Settings() {
           {/* Role Badge */}
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
-                    {currentUser.avatar ? (
-                      <img src={currentUser.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      <User className="h-10 w-10 text-gray-400" />
-                    )}
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">{currentUser.name}</h2>
-                    <p className="text-gray-600">{currentUser.email}</p>
-                    <div className="mt-2">
-                      <span
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          currentUser.role === "super_admin"
-                            ? "bg-purple-100 text-purple-800"
-                            : currentUser.role === "admin"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-green-100 text-green-800"
-                        }`}
-                      >
-                        <Shield className="h-3 w-3 mr-1" />
-                        {currentUser.role === "super_admin"
-                          ? "Super Admin"
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
+                  {currentUser.avatar ? (
+                    <img src={currentUser.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    <User className="h-10 w-10 text-gray-400" />
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">{profileData.name || currentUser.name}</h2>
+                  <p className="text-gray-600">{profileData.email || currentUser.email}</p>
+                  <div className="mt-2">
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                        currentUser.role === "super_admin"
+                          ? "bg-purple-100 text-purple-800"
                           : currentUser.role === "admin"
-                          ? "Admin"
-                          : "Employee"}
-                      </span>
-                    </div>
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-green-100 text-green-800"
+                      }`}
+                    >
+                      <Shield className="h-3 w-3 mr-1" />
+                      {currentUser.role === "super_admin"
+                        ? "Super Admin"
+                        : currentUser.role === "admin"
+                        ? "Admin"
+                        : "Employee"}
+                    </span>
                   </div>
                 </div>
-                {!isReadOnly && (
-                  <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                    <Camera className="h-4 w-4" />
-                    Change Photo
-                  </button>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -343,20 +550,6 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={profileData.department}
-                        onChange={(e) => setProfileData({ ...profileData, department: e.target.value })}
-                        disabled={isReadOnly}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
-                      />
-                    </div>
-                  </div>
-
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
                     <div className="relative">
@@ -409,10 +602,11 @@ export default function Settings() {
                   <div className="mt-6">
                     <button
                       type="submit"
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                      disabled={loadingProfile}
+                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
-                      Save Changes
+                      {loadingProfile ? 'Saving...' : 'Save Changes'}
                     </button>
                   </div>
                 )}
@@ -444,8 +638,12 @@ export default function Settings() {
               </div>
               <div className="flex items-center gap-6">
                 <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
-                  {companyInfo.companyLogo ? (
-                    <img src={companyInfo.companyLogo} alt="Company Logo" className="w-full h-full object-contain rounded-lg" />
+                  {logoPreview || companyInfo.companyLogo ? (
+                    <img 
+                      src={logoPreview || companyInfo.companyLogo} 
+                      alt="Company Logo" 
+                      className="w-full h-full object-contain rounded-lg" 
+                    />
                   ) : (
                     <div className="text-center">
                       <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
@@ -455,13 +653,49 @@ export default function Settings() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-3">Upload your company logo. Recommended size: 512x512px</p>
-                  <button
-                    disabled={currentUser.role !== "super_admin"}
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload Logo
-                  </button>
+                  <input
+                    type="file"
+                    id="logo-upload"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    disabled={currentUser.role !== "super_admin" || uploadingLogo}
+                    className="hidden"
+                  />
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor="logo-upload"
+                      className={`flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${
+                        currentUser.role !== "super_admin" || uploadingLogo || logoPreview
+                          ? "opacity-50 cursor-not-allowed pointer-events-none"
+                          : ""
+                      }`}
+                    >
+                      <Upload className="h-4 w-4" />
+                      Choose Logo
+                    </label>
+                    {logoPreview && (
+                      <>
+                        <button
+                          onClick={handleSaveLogo}
+                          disabled={uploadingLogo}
+                          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Save className="h-4 w-4" />
+                          {uploadingLogo ? "Saving..." : "Save Logo"}
+                        </button>
+                        <button
+                          onClick={handleCancelLogo}
+                          disabled={uploadingLogo}
+                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {logoPreview && (
+                    <p className="text-xs text-blue-600 mt-2">Preview - Click "Save Logo" to upload</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -476,7 +710,7 @@ export default function Settings() {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
               </div>
-              <form onSubmit={handleCompanyInfoUpdate}>
+              <form id="basic-info-form" onSubmit={handleCompanyInfoUpdate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -536,10 +770,11 @@ export default function Settings() {
                   <div className="mt-6">
                     <button
                       type="submit"
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                      disabled={loadingCompanyInfo}
+                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
-                      Save Basic Information
+                      {loadingCompanyInfo ? 'Saving...' : 'Save Basic Information'}
                     </button>
                   </div>
                 )}
@@ -556,7 +791,7 @@ export default function Settings() {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900">Legal & Tax Information</h3>
               </div>
-              <form onSubmit={handleCompanyInfoUpdate}>
+              <form id="legal-info-form" onSubmit={handleCompanyInfoUpdate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -627,10 +862,11 @@ export default function Settings() {
                   <div className="mt-6">
                     <button
                       type="submit"
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                      disabled={loadingCompanyInfo}
+                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
-                      Save Legal Information
+                      {loadingCompanyInfo ? 'Saving...' : 'Save Legal Information'}
                     </button>
                   </div>
                 )}
@@ -647,7 +883,7 @@ export default function Settings() {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900">Registered Address</h3>
               </div>
-              <form onSubmit={handleCompanyInfoUpdate}>
+              <form id="address-form" onSubmit={handleCompanyInfoUpdate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -711,10 +947,11 @@ export default function Settings() {
                   <div className="mt-6">
                     <button
                       type="submit"
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                      disabled={loadingCompanyInfo}
+                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
-                      Save Address
+                      {loadingCompanyInfo ? 'Saving...' : 'Save Address'}
                     </button>
                   </div>
                 )}
@@ -731,7 +968,7 @@ export default function Settings() {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900">Bank Details</h3>
               </div>
-              <form onSubmit={handleCompanyInfoUpdate}>
+              <form id="bank-details-form" onSubmit={handleCompanyInfoUpdate}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
@@ -783,10 +1020,11 @@ export default function Settings() {
                   <div className="mt-6">
                     <button
                       type="submit"
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                      disabled={loadingCompanyInfo}
+                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
-                      Save Bank Details
+                      {loadingCompanyInfo ? 'Saving...' : 'Save Bank Details'}
                     </button>
                   </div>
                 )}
@@ -807,6 +1045,26 @@ export default function Settings() {
       {/* Payment Settings Tab */}
       {activeTab === "payment" && canAccessAdminSettings && (
         <div className="space-y-6">
+          {loadingPaymentSettings ? (
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading payment settings...</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+          {/* Info Box */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Important:</strong> Only one payment gateway can be active at a time. When you enable one gateway, the other will be automatically disabled.
+            </p>
+          </div>
+
           {/* Razorpay Payment Gateway */}
           <Card>
             <CardContent className="p-6">
@@ -841,6 +1099,9 @@ export default function Settings() {
                     <div>
                       <p className="font-medium text-gray-900">Enable Razorpay Payments</p>
                       <p className="text-sm text-gray-600">Allow customers to pay using Razorpay gateway</p>
+                      {razorpaySettings.enabled && payuSettings.enabled && (
+                        <p className="text-xs text-amber-600 mt-1">⚠ Enabling this will disable PayU</p>
+                      )}
                     </div>
                     <input
                       type="checkbox"
@@ -851,6 +1112,15 @@ export default function Settings() {
                     />
                   </div>
                 </div>
+
+                {/* Warning when enabling */}
+                {razorpaySettings.enabled && payuSettings.enabled && (
+                  <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800">
+                      <strong>Note:</strong> Only one payment gateway can be active at a time. Saving these settings will automatically disable PayU.
+                    </p>
+                  </div>
+                )}
 
                 {/* API Credentials */}
                 <div className="space-y-4 mb-6">
@@ -878,190 +1148,68 @@ export default function Settings() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Key Secret <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="password"
-                        value={razorpaySettings.keySecret}
-                        onChange={(e) => setRazorpaySettings({ ...razorpaySettings, keySecret: e.target.value })}
-                        disabled={currentUser.role !== "super_admin"}
-                        placeholder="Enter key secret"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm"
-                      />
+                      <div className="relative">
+                        <input
+                          type={!isRazorpaySecretMasked && showRazorpaySecret ? "text" : "password"}
+                          value={razorpaySettings.keySecret}
+                          onChange={(e) => {
+                            setRazorpaySettings({ ...razorpaySettings, keySecret: e.target.value });
+                            // Reset visibility when user starts typing on a masked field
+                            if (isRazorpaySecretMasked) {
+                              setShowRazorpaySecret(false);
+                            }
+                          }}
+                          disabled={currentUser.role !== "super_admin"}
+                          placeholder="Enter key secret"
+                          className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm ${!isRazorpaySecretMasked && razorpaySettings.keySecret ? 'pr-10' : ''}`}
+                        />
+                        {!isRazorpaySecretMasked && razorpaySettings.keySecret && (
+                          <button
+                            type="button"
+                            onClick={() => setShowRazorpaySecret(!showRazorpaySecret)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                            title={showRazorpaySecret ? "Hide secret" : "Show secret"}
+                          >
+                            {showRazorpaySecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        )}
+                      </div>
+                      {isRazorpaySecretMasked && (
+                        <p className="text-xs text-gray-500 mt-1">Secret is hidden. Enter a new value to update.</p>
+                      )}
                     </div>
 
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Webhook Secret</label>
-                      <input
-                        type="password"
-                        value={razorpaySettings.webhookSecret}
-                        onChange={(e) => setRazorpaySettings({ ...razorpaySettings, webhookSecret: e.target.value })}
-                        disabled={currentUser.role !== "super_admin"}
-                        placeholder="Enter webhook secret"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Account ID</label>
-                      <input
-                        type="text"
-                        value={razorpaySettings.accountId}
-                        onChange={(e) => setRazorpaySettings({ ...razorpaySettings, accountId: e.target.value })}
-                        disabled={currentUser.role !== "super_admin"}
-                        placeholder="acc_1234567890"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Settings */}
-                <div className="space-y-4 mb-6">
-                  <h4 className="font-semibold text-gray-900">Payment Settings</h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">Test Mode</p>
-                        <p className="text-sm text-gray-600">Use test credentials for testing</p>
+                      <div className="relative">
+                        <input
+                          type={!isRazorpayWebhookMasked && showRazorpayWebhook ? "text" : "password"}
+                          value={razorpaySettings.webhookSecret}
+                          onChange={(e) => {
+                            setRazorpaySettings({ ...razorpaySettings, webhookSecret: e.target.value });
+                            // Reset visibility when user starts typing on a masked field
+                            if (isRazorpayWebhookMasked) {
+                              setShowRazorpayWebhook(false);
+                            }
+                          }}
+                          disabled={currentUser.role !== "super_admin"}
+                          placeholder="Enter webhook secret"
+                          className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm ${!isRazorpayWebhookMasked && razorpaySettings.webhookSecret ? 'pr-10' : ''}`}
+                        />
+                        {!isRazorpayWebhookMasked && razorpaySettings.webhookSecret && (
+                          <button
+                            type="button"
+                            onClick={() => setShowRazorpayWebhook(!showRazorpayWebhook)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                            title={showRazorpayWebhook ? "Hide secret" : "Show secret"}
+                          >
+                            {showRazorpayWebhook ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        )}
                       </div>
-                      <input
-                        type="checkbox"
-                        checked={razorpaySettings.testMode}
-                        onChange={(e) => setRazorpaySettings({ ...razorpaySettings, testMode: e.target.checked })}
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">Auto Capture</p>
-                        <p className="text-sm text-gray-600">Automatically capture payments</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={razorpaySettings.autoCapture}
-                        onChange={(e) => setRazorpaySettings({ ...razorpaySettings, autoCapture: e.target.checked })}
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Methods */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-gray-900">Enabled Payment Methods</h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">Credit/Debit Cards</p>
-                          <p className="text-xs text-gray-600">Visa, Mastercard, Amex, Rupay</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={razorpaySettings.paymentMethods.card}
-                        onChange={(e) =>
-                          setRazorpaySettings({
-                            ...razorpaySettings,
-                            paymentMethods: { ...razorpaySettings.paymentMethods, card: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-600 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <Building2 className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">Net Banking</p>
-                          <p className="text-xs text-gray-600">All major banks</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={razorpaySettings.paymentMethods.netbanking}
-                        onChange={(e) =>
-                          setRazorpaySettings({
-                            ...razorpaySettings,
-                            paymentMethods: { ...razorpaySettings.paymentMethods, netbanking: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-600 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <Phone className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">UPI</p>
-                          <p className="text-xs text-gray-600">Google Pay, PhonePe, Paytm</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={razorpaySettings.paymentMethods.upi}
-                        onChange={(e) =>
-                          setRazorpaySettings({
-                            ...razorpaySettings,
-                            paymentMethods: { ...razorpaySettings.paymentMethods, upi: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-600 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <DollarSign className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">Wallets</p>
-                          <p className="text-xs text-gray-600">Paytm, PhonePe, Amazon Pay</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={razorpaySettings.paymentMethods.wallet}
-                        onChange={(e) =>
-                          setRazorpaySettings({
-                            ...razorpaySettings,
-                            paymentMethods: { ...razorpaySettings.paymentMethods, wallet: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-600 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">EMI</p>
-                          <p className="text-xs text-gray-600">Easy monthly installments</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={razorpaySettings.paymentMethods.emi}
-                        onChange={(e) =>
-                          setRazorpaySettings({
-                            ...razorpaySettings,
-                            paymentMethods: { ...razorpaySettings.paymentMethods, emi: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-600 disabled:opacity-50"
-                      />
+                      {isRazorpayWebhookMasked && (
+                        <p className="text-xs text-gray-500 mt-1">Secret is hidden. Enter a new value to update.</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1070,10 +1218,11 @@ export default function Settings() {
                   <div className="mt-6 flex items-center gap-3">
                     <button
                       type="submit"
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                      disabled={loadingPaymentSettings}
+                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
-                      Save Payment Settings
+                      {loadingPaymentSettings ? 'Saving...' : 'Save Payment Settings'}
                     </button>
                     <a
                       href="https://dashboard.razorpay.com"
@@ -1086,14 +1235,6 @@ export default function Settings() {
                   </div>
                 )}
               </form>
-
-              {razorpaySettings.testMode && (
-                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800">
-                    <strong>⚠ Test Mode Active:</strong> All transactions will use test credentials. Switch to live mode for production.
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -1131,6 +1272,9 @@ export default function Settings() {
                     <div>
                       <p className="font-medium text-gray-900">Enable PayU Payments</p>
                       <p className="text-sm text-gray-600">Allow customers to pay using PayU gateway</p>
+                      {payuSettings.enabled && razorpaySettings.enabled && (
+                        <p className="text-xs text-amber-600 mt-1">⚠ Enabling this will disable Razorpay</p>
+                      )}
                     </div>
                     <input
                       type="checkbox"
@@ -1141,6 +1285,15 @@ export default function Settings() {
                     />
                   </div>
                 </div>
+
+                {/* Warning when enabling */}
+                {payuSettings.enabled && razorpaySettings.enabled && (
+                  <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800">
+                      <strong>Note:</strong> Only one payment gateway can be active at a time. Saving these settings will automatically disable Razorpay.
+                    </p>
+                  </div>
+                )}
 
                 {/* API Credentials */}
                 <div className="space-y-4 mb-6">
@@ -1168,166 +1321,35 @@ export default function Settings() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Merchant Salt <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="password"
-                        value={payuSettings.merchantSalt}
-                        onChange={(e) => setPayuSettings({ ...payuSettings, merchantSalt: e.target.value })}
-                        disabled={currentUser.role !== "super_admin"}
-                        placeholder="Enter merchant salt"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Settings */}
-                <div className="space-y-4 mb-6">
-                  <h4 className="font-semibold text-gray-900">Payment Settings</h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">Test Mode</p>
-                        <p className="text-sm text-gray-600">Use test credentials for testing</p>
+                      <div className="relative">
+                        <input
+                          type={!isPayuSaltMasked && showPayuSalt ? "text" : "password"}
+                          value={payuSettings.merchantSalt}
+                          onChange={(e) => {
+                            setPayuSettings({ ...payuSettings, merchantSalt: e.target.value });
+                            // Reset visibility when user starts typing on a masked field
+                            if (isPayuSaltMasked) {
+                              setShowPayuSalt(false);
+                            }
+                          }}
+                          disabled={currentUser.role !== "super_admin"}
+                          placeholder="Enter merchant salt"
+                          className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100 font-mono text-sm ${!isPayuSaltMasked && payuSettings.merchantSalt ? 'pr-10' : ''}`}
+                        />
+                        {!isPayuSaltMasked && payuSettings.merchantSalt && (
+                          <button
+                            type="button"
+                            onClick={() => setShowPayuSalt(!showPayuSalt)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                            title={showPayuSalt ? "Hide salt" : "Show salt"}
+                          >
+                            {showPayuSalt ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        )}
                       </div>
-                      <input
-                        type="checkbox"
-                        checked={payuSettings.testMode}
-                        onChange={(e) => setPayuSettings({ ...payuSettings, testMode: e.target.checked })}
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">Auto Capture</p>
-                        <p className="text-sm text-gray-600">Automatically capture payments</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={payuSettings.autoCapture}
-                        onChange={(e) => setPayuSettings({ ...payuSettings, autoCapture: e.target.checked })}
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Methods */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-gray-900">Enabled Payment Methods</h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">Credit/Debit Cards</p>
-                          <p className="text-xs text-gray-600">Visa, Mastercard, Amex, Rupay</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={payuSettings.paymentMethods.card}
-                        onChange={(e) =>
-                          setPayuSettings({
-                            ...payuSettings,
-                            paymentMethods: { ...payuSettings.paymentMethods, card: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <Building2 className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">Net Banking</p>
-                          <p className="text-xs text-gray-600">All major banks</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={payuSettings.paymentMethods.netbanking}
-                        onChange={(e) =>
-                          setPayuSettings({
-                            ...payuSettings,
-                            paymentMethods: { ...payuSettings.paymentMethods, netbanking: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <Phone className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">UPI</p>
-                          <p className="text-xs text-gray-600">Google Pay, PhonePe, Paytm</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={payuSettings.paymentMethods.upi}
-                        onChange={(e) =>
-                          setPayuSettings({
-                            ...payuSettings,
-                            paymentMethods: { ...payuSettings.paymentMethods, upi: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <DollarSign className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">Wallets</p>
-                          <p className="text-xs text-gray-600">Paytm, PhonePe, Amazon Pay</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={payuSettings.paymentMethods.wallet}
-                        onChange={(e) =>
-                          setPayuSettings({
-                            ...payuSettings,
-                            paymentMethods: { ...payuSettings.paymentMethods, wallet: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="h-5 w-5 text-gray-600" />
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">EMI</p>
-                          <p className="text-xs text-gray-600">Easy monthly installments</p>
-                        </div>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={payuSettings.paymentMethods.emi}
-                        onChange={(e) =>
-                          setPayuSettings({
-                            ...payuSettings,
-                            paymentMethods: { ...payuSettings.paymentMethods, emi: e.target.checked },
-                          })
-                        }
-                        disabled={currentUser.role !== "super_admin"}
-                        className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                      />
+                      {isPayuSaltMasked && (
+                        <p className="text-xs text-gray-500 mt-1">Salt is hidden. Enter a new value to update.</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1336,10 +1358,11 @@ export default function Settings() {
                   <div className="mt-6 flex items-center gap-3">
                     <button
                       type="submit"
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                      disabled={loadingPaymentSettings}
+                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Save className="h-4 w-4" />
-                      Save PayU Settings
+                      {loadingPaymentSettings ? 'Saving...' : 'Save PayU Settings'}
                     </button>
                     <a
                       href="https://dashboard.payu.in"
@@ -1352,14 +1375,6 @@ export default function Settings() {
                   </div>
                 )}
               </form>
-
-              {payuSettings.testMode && (
-                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800">
-                    <strong>⚠ Test Mode Active:</strong> All transactions will use test credentials. Switch to live mode for production.
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -1370,154 +1385,11 @@ export default function Settings() {
               </p>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Admin Tab */}
-      {activeTab === "admin" && canAccessAdminSettings && (
-        <div className="space-y-6">
-          {/* Platform Settings */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Globe className="w-5 h-5 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900">Platform Settings</h3>
-              </div>
-              <form onSubmit={handleAdminSettingsUpdate}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Platform Name</label>
-                    <input
-                      type="text"
-                      value={adminSettings.platformName}
-                      onChange={(e) => setAdminSettings({ ...adminSettings, platformName: e.target.value })}
-                      disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Support Email</label>
-                    <input
-                      type="email"
-                      value={adminSettings.platformEmail}
-                      onChange={(e) => setAdminSettings({ ...adminSettings, platformEmail: e.target.value })}
-                      disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Support Phone</label>
-                    <input
-                      type="tel"
-                      value={adminSettings.platformPhone}
-                      onChange={(e) => setAdminSettings({ ...adminSettings, platformPhone: e.target.value })}
-                      disabled={currentUser.role !== "super_admin"}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
-                    />
-                  </div>
-                </div>
-
-                {currentUser.role === "super_admin" && (
-                  <div className="mt-6">
-                    <button
-                      type="submit"
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-                    >
-                      <Save className="h-4 w-4" />
-                      Save Platform Settings
-                    </button>
-                  </div>
-                )}
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* System Preferences */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Users className="w-5 h-5 text-purple-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900">System Preferences</h3>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900">Allow Vendor Registration</p>
-                    <p className="text-sm text-gray-600">Enable new vendors to register on the platform</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={adminSettings.allowVendorRegistration}
-                    onChange={(e) =>
-                      setAdminSettings({ ...adminSettings, allowVendorRegistration: e.target.checked })
-                    }
-                    disabled={currentUser.role !== "super_admin"}
-                    className="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900">Require Product Approval</p>
-                    <p className="text-sm text-gray-600">All new products must be approved before listing</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={adminSettings.requireProductApproval}
-                    onChange={(e) =>
-                      setAdminSettings({ ...adminSettings, requireProductApproval: e.target.checked })
-                    }
-                    disabled={currentUser.role !== "super_admin"}
-                    className="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900 disabled:opacity-50"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900">Enable Notifications</p>
-                    <p className="text-sm text-gray-600">Send email notifications for important events</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={adminSettings.enableNotifications}
-                    onChange={(e) => setAdminSettings({ ...adminSettings, enableNotifications: e.target.checked })}
-                    className="h-5 w-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                  />
-                </div>
-
-                {currentUser.role === "super_admin" && (
-                  <div className="flex items-center justify-between p-4 border border-red-200 bg-red-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-red-900">Maintenance Mode</p>
-                      <p className="text-sm text-red-700">Temporarily disable the platform for maintenance</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={adminSettings.maintenanceMode}
-                      onChange={(e) => setAdminSettings({ ...adminSettings, maintenanceMode: e.target.checked })}
-                      className="h-5 w-5 text-red-600 border-red-300 rounded focus:ring-red-600"
-                    />
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {currentUser.role === "admin" && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Some settings are restricted to Super Admin only. Contact your Super Admin for full access.
-              </p>
-            </div>
+            </>
           )}
         </div>
       )}
+
     </div>
   );
 }
