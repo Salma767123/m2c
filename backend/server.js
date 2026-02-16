@@ -89,6 +89,9 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const productRoutes = require('./routes/productRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
+const paymentSettingsRoutes = require('./routes/paymentSettingsRoutes');
+const adminProfileRoutes = require('./routes/adminProfileRoutes');
+const companyInfoRoutes = require('./routes/companyInfoRoutes');
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -127,6 +130,9 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/payment-settings', paymentSettingsRoutes);
+app.use('/api/admin/profile', adminProfileRoutes);
+app.use('/api/company-info', companyInfoRoutes);
 
 // 404 handler
 app.use((req, res) => {

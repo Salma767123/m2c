@@ -4,13 +4,22 @@ import ProductCard from '../ProductCard/ProductCard';
 import Category from '@/components/WebSite/CategoryCopy/Category';
 import { Search, Filter, Grid, List, ChevronDown, Star } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { productService, Product } from '@/services/productService';
+import { categoryService } from '@/services/categoryService';
 
 const Products = () => {
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams.get('category');
+  const subcategoryParam = searchParams.get('subcategory');
+  
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [categoryName, setCategoryName] = useState('');
+  const [subcategoryName, setSubcategoryName] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
@@ -31,6 +40,47 @@ const Products = () => {
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Fetch category and subcategory names from slugs
+  useEffect(() => {
+    const fetchCategoryNames = async () => {
+      if (categoryParam) {
+        try {
+          const categoriesResponse = await categoryService.getAllCategories({
+            status: 'ACTIVE',
+            showRootOnly: 'true',
+            includeSubcategories: 'true'
+          });
+          
+          if (categoriesResponse.success && categoriesResponse.data) {
+            const foundCategory = categoriesResponse.data.find(
+              (cat: any) => cat.slug === categoryParam
+            );
+            
+            if (foundCategory) {
+              setCategoryName(foundCategory.name);
+              setSelectedCategory(foundCategory.name);
+              
+              if (subcategoryParam && foundCategory.subcategories) {
+                const foundSubcategory = foundCategory.subcategories.find(
+                  (sub: any) => sub.slug === subcategoryParam
+                );
+                
+                if (foundSubcategory) {
+                  setSubcategoryName(foundSubcategory.name);
+                  setSelectedSubcategory(foundSubcategory.name);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch category names:', error);
+        }
+      }
+    };
+
+    fetchCategoryNames();
+  }, [categoryParam, subcategoryParam]);
+
   // Fetch products from API
   useEffect(() => {
     const fetchProducts = async () => {
@@ -41,6 +91,7 @@ const Products = () => {
           limit: 12,
           search: searchTerm || undefined,
           category: selectedCategory !== 'All' ? selectedCategory : undefined,
+          subCategory: selectedSubcategory || undefined,
           minPrice: priceRange.min > 0 ? priceRange.min : undefined,
           maxPrice: priceRange.max < 1000 ? priceRange.max : undefined,
           sortBy: sortBy === 'price-low' || sortBy === 'price-high' ? 'basePrice' : sortBy,
@@ -61,7 +112,7 @@ const Products = () => {
     };
 
     fetchProducts();
-  }, [currentPage, searchTerm, selectedCategory, priceRange, sortBy, inStockOnly]);
+  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -89,6 +140,7 @@ const Products = () => {
     setPriceRange({ min: 0, max: 1000 });
     setSelectedRating(0);
     setSelectedCategory('All');
+    setSelectedSubcategory('');
     setSearchTerm('');
     setInStockOnly(false);
     setCurrentPage(1);
@@ -250,7 +302,8 @@ const Products = () => {
           {/* Results Count */}
           <div className="mt-4 text-sm text-gray-600">
             Showing {filteredProducts.length} of {totalItems} products
-            {selectedCategory !== 'All' && ` in ${selectedCategory}`}
+            {categoryName && ` in ${categoryName}`}
+            {subcategoryName && ` > ${subcategoryName}`}
             {searchTerm && ` matching "${searchTerm}"`}
           </div>
         </div>

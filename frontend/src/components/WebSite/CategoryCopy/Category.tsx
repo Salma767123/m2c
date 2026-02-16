@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination } from 'swiper/modules';
 import type { Swiper as SwiperType } from 'swiper';
+import { categoryService } from '@/services/categoryService';
+import { Package } from 'lucide-react';
 
 // Import Swiper styles
 import 'swiper/css';
@@ -15,66 +17,40 @@ import 'swiper/css/pagination';
 interface Category {
   id: string;
   name: string;
-  image: string;
+  slug: string;
+  image?: string;
 }
 
-const categories: Category[] = [
-   {
-    id: 'towels',
-    name: 'Towels',
-    image: '/assets/images/categories/cs5.jpg'
-  },
-  {
-    id: 'kitchen-linen',
-    name: 'Kitchen Linen',
-    image: '/assets/images/categories/cs1.jpg'
-  },
-  {
-    id: 'bath-linen',
-    name: 'Bath Linen',
-    image: '/assets/images/categories/cs7.jpg'
-  },
-  {
-    id: 'table-linen',
-    name: 'Table Linen',
-    image: '/assets/images/categories/cs3.jpg'
-  },
-  {
-    id: 'cotton-jute-bags',
-    name: 'Cotton & Jute Bags',
-    image: '/assets/images/categories/cs9.webp'
-  },
-  {
-    id: 'pillow-covers',
-    name: 'Pillow & Covers',
-    image: '/assets/images/categories/cs4.jpg'
-  },
-  {
-    id: 'bed-linen',
-    name: 'Bed Linen',
-    image: '/assets/images/categories/cs12.webp'
-  },
-  {
-    id: 'shopping-bags',
-    name: 'Shopping Bags',
-    image: '/assets/images/categories/cs8.webp'
-  },
-  {
-    id: 'curtains',
-    name: 'Curtains',
-    image: '/assets/images/categories/cs11.webp'
-  },
-  {
-    id: 'home-decor',
-    name: 'Home Decor',
-    image: '/assets/images/categories/cs10.webp'
-  }
-];
-
 export default function Category() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [currentSlide, setCurrentSlide] = useState(0);
   const swiperRef = useRef<SwiperType | null>(null);
+
+  // Fetch categories from backend
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryService.getAllCategories({
+          status: 'ACTIVE',
+          showRootOnly: 'true',
+          sortBy: 'sortOrder',
+          sortOrder: 'asc'
+        });
+        
+        if (response.success && response.data) {
+          setCategories(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // Handle image load errors
   const handleImageError = (imageSrc: string) => {
@@ -115,6 +91,24 @@ export default function Category() {
         break;
     }
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <section className="py-8 sm:py-12 md:py-16 lg:py-20 bg-white font-sans">
+        <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="text-center">
+            <p className="text-gray-500">Loading categories...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Don't show section if no categories
+  if (categories.length === 0) {
+    return null;
+  }
 
   return (
     <section 
@@ -204,26 +198,26 @@ export default function Category() {
             {categories.map((category, index) => (
               <SwiperSlide key={`${category.id}-${index}`}>
                 <Link
-                  href={`/categories/${category.id}`}
+                  href={`/categories/${category.slug}`}
                   className="group text-center block w-full focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-2 rounded-xl"
                   aria-label={`Browse ${category.name} category`}
                 >
                   {/* Category Image */}
                   <div className="relative w-full aspect-square mb-3 sm:mb-4 overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-500 group-hover:shadow-2xl group-focus:shadow-2xl">
-                    {!imageErrors.has(category.image) ? (
+                    {category.image && !imageErrors.has(category.image) ? (
                       <Image
                         src={category.image}
                         alt={`${category.name} category image`}
                         fill
                         sizes="(max-width: 480px) 50vw, (max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, (max-width: 1280px) 16vw, (max-width: 1536px) 14vw, 12vw"
                         className="object-cover group-hover:scale-110 transition-transform duration-700"
-                        onError={() => handleImageError(category.image)}
+                        onError={() => handleImageError(category.image!)}
                         loading={index < 4 ? 'eager' : 'lazy'}
                         priority={index < 4}
                       />
                     ) : (
-                      <div className="w-full h-full bg-linear-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                        <span className="text-gray-500 text-sm font-medium">{category.name}</span>
+                      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                        <Package className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400" />
                       </div>
                     )}
                     
