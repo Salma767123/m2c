@@ -12,6 +12,7 @@ import { categories } from '@/components/mockData/products'
 import { useToast } from '@/hooks/use-toast'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 import { productService, type ProductFormData as ServiceProductFormData } from '@/services/productService'
+import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
 
 // Mock data for inventory items (these would come from API)
 const mockInventoryItems = [
@@ -89,7 +90,7 @@ const getColorName = (hex: string): string => {
     '#a52a2a': 'Brown',
     '#f5f5dc': 'Beige'
   }
-  
+
   return colorMap[hex.toLowerCase()] || `Custom (${hex})`
 }
 
@@ -132,62 +133,63 @@ interface ProductFormData {
   // Inventory Connection (NEW FLOW)
   inventoryItemId?: string // Link to inventory item
   isFromInventory: boolean // Whether this product is created from inventory
-  
+
   name: string
   description: string
   category: string
   subCategory: string
-  
+
   // Pricing Information (inherited from inventory)
   basePrice: number
   originalPrice?: number
   discount?: number
-  
+  gstPercentage?: number
+
   // Basic Product Info - Size & Color
   singleUnitSize?: string
   singleUnitColor?: string
   singleUnitColorHex?: string
-  
+
   // Product Rating & Reviews (for display/reference)
   rating?: number
   reviews?: number
-  
+
   // Fabric & Specifications
   fabricType: string
   material: string
   fabricSpecifications: FabricSpecification
-  
+
   // Variants Management
   variants: ProductVariant[]
   hasVariants: boolean
-  
+
   // Base Product Info (when no variants)
   baseSku: string
-  
+
   // Images
   images: ProductImage[]
-  
+
   // Pricing Configuration
   pricingTiers: PricingTier[]
   bulkPricingEnabled: boolean
   singleUnitPricingEnabled: boolean
-  
+
   // Stock Management (linked to inventory)
   totalStock: number
   lowStockThreshold: number
   trackInventory: boolean
-  
+
   // Order Configuration
   minimumOrderQuantity: number
   maximumOrderQuantity?: number
-  
+
   // Dispatch & Shipping
   dispatchTimeline: {
     processingDays: number
     shippingDays: number
     totalDays: number
   }
-  
+
   // Additional Info
   tags: string[]
   dimensions?: string
@@ -213,31 +215,32 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
   const [availableInventoryItems, setAvailableInventoryItems] = useState<any[]>([])
   const [isLoadingInventory, setIsLoadingInventory] = useState(false)
-  
+
   const [formData, setFormData] = useState<ProductFormData>({
     // Inventory Connection (NEW)
     inventoryItemId: inventoryId || '',
     isFromInventory: !!inventoryId,
-    
+
     name: '',
     description: '',
     category: '',
     subCategory: '',
-    
+
     // Pricing Information
     basePrice: 0,
     originalPrice: undefined,
     discount: undefined,
-    
+    gstPercentage: undefined,
+
     // Basic Product Info - Size & Color
     singleUnitSize: '',
     singleUnitColor: '',
     singleUnitColorHex: '#000000',
-    
+
     // Product Rating & Reviews
     rating: undefined,
     reviews: undefined,
-    
+
     // Fabric & Specifications
     fabricType: '',
     material: '',
@@ -249,38 +252,38 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       finish: '',
       careInstructions: []
     },
-    
+
     // Variants Management
     variants: [],
     hasVariants: false,
-    
+
     // Base Product Info
     baseSku: '',
-    
+
     // Images
     images: [],
-    
+
     // Pricing Configuration
     pricingTiers: [{ minQuantity: 1, price: 0 }],
     bulkPricingEnabled: false,
     singleUnitPricingEnabled: true,
-    
+
     // Stock Management
     totalStock: 0,
     lowStockThreshold: 10,
     trackInventory: true,
-    
+
     // Order Configuration
     minimumOrderQuantity: 1,
     maximumOrderQuantity: undefined,
-    
+
     // Dispatch & Shipping
     dispatchTimeline: {
       processingDays: 0,
       shippingDays: 0,
       totalDays: 0
     },
-    
+
     // Additional Info
     tags: [],
     dimensions: '',
@@ -292,7 +295,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [selectedTag, setSelectedTag] = useState('')
   const [newCareInstruction, setNewCareInstruction] = useState('')
   const [activeTab, setActiveTab] = useState('basic')
-  
+
   // Predefined tag options
   const tagOptions = [
     { value: 'Featured', label: 'Featured' },
@@ -300,6 +303,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     { value: 'Best Seller', label: 'Best Seller' }
   ]
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<any>(null)
+
+  // GST State
+  const [gstRates, setGstRates] = useState<GSTSetting[]>([])
+  const [isLoadingGst, setIsLoadingGst] = useState(false)
+
   // Auto-save functionality (optional)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
@@ -349,13 +357,29 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     }
 
     loadAvailableInventory()
+
+    // Load GST Rates
+    const loadGstRates = async () => {
+      setIsLoadingGst(true)
+      try {
+        const response = await gstSettingsService.getSettings()
+        if (response.success) {
+          setGstRates(response.data)
+        }
+      } catch (error) {
+        console.error('Error fetching GST settings:', error)
+      } finally {
+        setIsLoadingGst(false)
+      }
+    }
+    loadGstRates()
   }, [isEdit])
 
   // Load product data for editing
   useEffect(() => {
     if (isEdit && productId) {
       setIsLoadingData(true)
-      
+
       // Load product data from API
       const loadProductData = async () => {
         try {
@@ -365,26 +389,27 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
             setFormData({
               inventoryItemId: product.inventoryItemId || '',
               isFromInventory: product.isFromInventory || false,
-              
+
               name: product.name,
               description: product.description,
               category: product.category,
               subCategory: product.subCategory || '',
-              
+
               // Pricing Information
               basePrice: product.basePrice,
               originalPrice: product.originalPrice,
               discount: product.discount,
-              
+              gstPercentage: product.gstPercentage,
+
               // Basic Product Info - Size & Color
               singleUnitSize: (product as any).singleUnitSize || '',
               singleUnitColor: (product as any).singleUnitColor || '',
               singleUnitColorHex: (product as any).singleUnitColorHex || '#000000',
-              
+
               // Product Rating & Reviews
               rating: product.rating,
               reviews: product.reviews,
-              
+
               fabricType: product.fabricType || '',
               material: product.material || '',
               fabricSpecifications: product.fabricSpecifications || {
@@ -395,31 +420,31 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 finish: '',
                 careInstructions: []
               },
-              
+
               variants: product.variants || [],
               hasVariants: product.hasVariants,
-              
+
               baseSku: product.baseSku,
-              
+
               images: product.images || [],
-              
+
               pricingTiers: product.pricingTiers || [{ minQuantity: 1, price: product.basePrice }],
               bulkPricingEnabled: product.bulkPricingEnabled,
               singleUnitPricingEnabled: product.singleUnitPricingEnabled,
-              
+
               totalStock: product.totalStock,
               lowStockThreshold: product.lowStockThreshold,
               trackInventory: product.trackInventory,
-              
+
               minimumOrderQuantity: product.minimumOrderQuantity,
               maximumOrderQuantity: product.maximumOrderQuantity,
-              
+
               dispatchTimeline: product.dispatchTimeline || {
                 processingDays: 0,
                 shippingDays: 0,
                 totalDays: 0
               },
-              
+
               tags: product.tags || [],
               dimensions: product.dimensions || '',
               weight: product.weight || '',
@@ -474,7 +499,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    
+
     // Handle dispatchTimeline with auto-calculation FIRST (before generic dot notation)
     if (name.startsWith('dispatchTimeline.')) {
       const field = name.replace('dispatchTimeline.', '')
@@ -484,11 +509,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         dispatchTimeline: {
           ...prev.dispatchTimeline,
           [field]: numValue,
-          totalDays: field === 'processingDays' 
+          totalDays: field === 'processingDays'
             ? numValue + prev.dispatchTimeline.shippingDays
             : field === 'shippingDays'
-            ? prev.dispatchTimeline.processingDays + numValue
-            : prev.dispatchTimeline.totalDays
+              ? prev.dispatchTimeline.processingDays + numValue
+              : prev.dispatchTimeline.totalDays
         }
       }))
     } else if (name.includes('.')) {
@@ -504,8 +529,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     } else {
       setFormData(prev => ({
         ...prev,
-        [name]: type === 'number' ? parseFloat(value) || 0 : 
-                 type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+        [name]: type === 'number' ? parseFloat(value) || 0 :
+          type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
       }))
     }
   }
@@ -554,19 +579,19 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         stock: newVariant.stock || 0,
         images: []
       }
-      
+
       setFormData(prev => ({
         ...prev,
         variants: [...prev.variants, variant]
       }))
-      
+
       setNewVariant({ size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0 })
     }
   }
 
   const removeVariant = (variantId: string | undefined) => {
     if (!variantId) return; // Guard against undefined id
-    
+
     setFormData(prev => ({
       ...prev,
       variants: prev.variants.filter(v => v.id !== variantId)
@@ -575,15 +600,15 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   const updateVariant = (variantId: string | undefined, field: keyof ProductVariant, value: any) => {
     if (!variantId) return; // Guard against undefined id
-    
+
     setFormData(prev => ({
       ...prev,
       variants: prev.variants.map(v => {
         if (v.id === variantId) {
           // If updating colorHex, also update color name
           if (field === 'colorHex') {
-            return { 
-              ...v, 
+            return {
+              ...v,
               [field]: value,
               color: getColorName(value)
             }
@@ -598,13 +623,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   // Pricing Tier Functions
   const addPricingTier = () => {
     const newTier: PricingTier = {
-      minQuantity: formData.pricingTiers.length > 0 
-        ? (formData.pricingTiers[formData.pricingTiers.length - 1].maxQuantity || 0) + 1 
+      minQuantity: formData.pricingTiers.length > 0
+        ? (formData.pricingTiers[formData.pricingTiers.length - 1].maxQuantity || 0) + 1
         : 1,
       price: 0,
       discount: 0
     }
-    
+
     setFormData(prev => ({
       ...prev,
       pricingTiers: [...prev.pricingTiers, newTier]
@@ -621,7 +646,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const updatePricingTier = (index: number, field: keyof PricingTier, value: any) => {
     setFormData(prev => ({
       ...prev,
-      pricingTiers: prev.pricingTiers.map((tier, i) => 
+      pricingTiers: prev.pricingTiers.map((tier, i) =>
         i === index ? { ...tier, [field]: value } : tier
       )
     }))
@@ -693,13 +718,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (imageType === 'gallery') {
       const existingGalleryImages = formData.images.filter(img => img.imageType === 'gallery')
       const remainingSlots = 3 - existingGalleryImages.length
-      
+
       if (remainingSlots <= 0) {
         showWarningToast('Gallery Limit Reached', 'Maximum 3 gallery images allowed. Please remove some images first.')
         e.target.value = '' // Reset input
         return
       }
-      
+
       if (files.length > remainingSlots) {
         showWarningToast('Too Many Images', `You can only add ${remainingSlots} more gallery image${remainingSlots > 1 ? 's' : ''}.`)
         e.target.value = '' // Reset input
@@ -733,7 +758,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   const setCoverImage = (imageId: string | undefined) => {
     if (!imageId) return; // Guard against undefined id
-    
+
     setFormData(prev => ({
       ...prev,
       images: prev.images.map(img => ({
@@ -746,7 +771,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   const setImageType = (imageId: string | undefined, imageType: 'cover' | 'gallery') => {
     if (!imageId) return; // Guard against undefined id
-    
+
     // Check limits before changing type
     if (imageType === 'cover') {
       const existingCoverImages = formData.images.filter(img => img.imageType === 'cover' && img.id !== imageId)
@@ -789,7 +814,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   const removeImage = (imageId: string | undefined) => {
     if (!imageId) return; // Guard against undefined id
-    
+
     setFormData(prev => {
       const updatedImages = prev.images.filter(img => img.id !== imageId)
       // If we removed the cover image, make the first gallery image the cover if available
@@ -816,39 +841,39 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Basic validation
     if (!formData.name.trim()) {
       showErrorToast('Validation Error', 'Product name is required.')
       return
     }
-    
+
     if (!formData.category) {
       showErrorToast('Validation Error', 'Please select a category.')
       return
     }
-    
+
     // Pricing validation
     if (!formData.singleUnitPricingEnabled && !formData.bulkPricingEnabled) {
       showErrorToast('Validation Error', 'Please select at least one pricing strategy.')
       return
     }
-    
+
     if (formData.singleUnitPricingEnabled && formData.basePrice <= 0) {
       showErrorToast('Validation Error', 'Please enter a valid base price for single unit pricing.')
       return
     }
-    
+
     if (formData.bulkPricingEnabled && formData.pricingTiers.some(tier => tier.price <= 0)) {
       showErrorToast('Validation Error', 'Please enter valid prices for all bulk pricing tiers.')
       return
     }
-    
+
     if (!formData.hasVariants && formData.singleUnitPricingEnabled && formData.basePrice <= 0) {
       showErrorToast('Validation Error', 'Please enter a valid base price.')
       return
     }
-    
+
     if (formData.hasVariants && formData.variants.length === 0) {
       showErrorToast('Validation Error', 'Please add at least one variant or disable variants.')
       return
@@ -869,7 +894,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
           showSuccessToast('Product Created', 'Your product has been created successfully.')
         }
       }
-      
+
       // Redirect back to products list
       router.push('/vendor/dashboard/products')
       setHasUnsavedChanges(false)
@@ -937,11 +962,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-2 px-1 border-b-2 font-medium text-base ${
-                    activeTab === tab.id
-                      ? 'border-gray-700 text-white bg-gray-900 rounded-t-md p-2'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`py-2 px-1 border-b-2 font-medium text-base ${activeTab === tab.id
+                    ? 'border-gray-700 text-white bg-gray-900 rounded-t-md p-2'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -953,7 +977,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Basic Information Tab */}
             {activeTab === 'basic' && (
               <Card>
@@ -961,14 +985,14 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <CardTitle>Basic Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  
+
                   {/* Inventory Selection */}
                   <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
                     <h4 className="font-medium text-blue-900 mb-3">Select Inventory Item</h4>
                     <p className="text-sm text-blue-800 mb-4">
                       Choose an inventory item to create a detailed product with variants
                     </p>
-                    
+
                     {!selectedInventoryItem ? (
                       <div className="space-y-3">
                         <Dropdown
@@ -997,9 +1021,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             <p className="text-sm text-gray-600">SKU: {selectedInventoryItem.sku}</p>
                             <p className="text-sm text-gray-600">Category: {selectedInventoryItem.category}</p>
                           </div>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
+                          <Button
+                            type="button"
+                            variant="outline"
                             size="sm"
                             onClick={clearInventorySelection}
                           >
@@ -1103,12 +1127,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         label="Sub-Category *"
                         value={formData.subCategory}
                         options={
-                          formData.category 
+                          formData.category
                             ? (
-                                formData.isFromInventory && selectedInventoryItem?.subcategory && selectedInventoryItem.category === formData.category
-                                  ? [selectedInventoryItem.subcategory, ...(categorySubcategories[formData.category] || []).filter(sub => sub !== selectedInventoryItem.subcategory)]
-                                  : categorySubcategories[formData.category] || []
-                              )
+                              formData.isFromInventory && selectedInventoryItem?.subcategory && selectedInventoryItem.category === formData.category
+                                ? [selectedInventoryItem.subcategory, ...(categorySubcategories[formData.category] || []).filter(sub => sub !== selectedInventoryItem.subcategory)]
+                                : categorySubcategories[formData.category] || []
+                            )
                             : []
                         }
                         placeholder="Select Sub-Category"
@@ -1158,9 +1182,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         value={formData.baseSku}
                         onChange={handleInputChange}
                         disabled={formData.isFromInventory}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${
-                          formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
-                        }`}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
+                          }`}
                         placeholder="e.g., CS-001"
                       />
                       {formData.isFromInventory && (
@@ -1194,8 +1217,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             value={formData.singleUnitColorHex || '#000000'}
                             onChange={(e) => {
                               const hex = e.target.value
-                              setFormData(prev => ({ 
-                                ...prev, 
+                              setFormData(prev => ({
+                                ...prev,
                                 singleUnitColorHex: hex,
                                 singleUnitColor: getColorName(hex)
                               }))
@@ -1448,8 +1471,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                   value={newVariant.colorHex || '#000000'}
                                   onChange={(e) => {
                                     const hex = e.target.value
-                                    setNewVariant(prev => ({ 
-                                      ...prev, 
+                                    setNewVariant(prev => ({
+                                      ...prev,
                                       colorHex: hex,
                                       color: getColorName(hex)
                                     }))
@@ -1511,8 +1534,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
                           {/* Action Button */}
                           <div className="flex justify-end pt-4 border-t border-gray-200">
-                            <Button 
-                              type="button" 
+                            <Button
+                              type="button"
                               onClick={addVariant}
                               disabled={!newVariant.size || !newVariant.color || !newVariant.sku || !newVariant.price}
                               className="bg-gray-900 text-white hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed px-6 py-2.5 font-medium"
@@ -1575,11 +1598,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                     <TableCell className="text-gray-700 font-mono text-xs">{variant.sku}</TableCell>
                                     <TableCell className="text-gray-900 font-semibold">₹{variant.price.toFixed(2)}</TableCell>
                                     <TableCell>
-                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                        variant.stock > 20 ? 'bg-green-100 text-green-800' :
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${variant.stock > 20 ? 'bg-green-100 text-green-800' :
                                         variant.stock > 5 ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-red-100 text-red-800'
-                                      }`}>
+                                          'bg-red-100 text-red-800'
+                                        }`}>
                                         {variant.stock} units
                                       </span>
                                     </TableCell>
@@ -1686,27 +1708,55 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <p className="text-sm text-gray-600">Choose your pricing strategy - you can select one or both options</p>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  
+
+                  {/* GST Selection */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-900 mb-3">Tax Configuration</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Dropdown
+                          label="GST Rate"
+                          value={formData.gstPercentage?.toString() || ''}
+                          options={[
+                            { value: '', label: 'Select GST Rate' },
+                            ...gstRates.filter(rate => rate.isActive).map(rate => ({
+                              value: rate.percentage.toString(),
+                              label: `${rate.percentage}% - ${rate.description || 'GST'}`
+                            }))
+                          ]}
+                          onChange={(value) => setFormData(prev => ({
+                            ...prev,
+                            gstPercentage: value ? parseFloat(value as string) : undefined
+                          }))}
+                          placeholder={isLoadingGst ? "Loading rates..." : "Select GST Rate"}
+                          disabled={isLoadingGst}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Select the applicable GST rate for this product</p>
+                        {!formData.gstPercentage && (
+                          <p className="text-xs text-red-500 mt-1">GST Rate is required</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Pricing Strategy Selection */}
                   <div className="space-y-4">
                     <h4 className="font-medium text-gray-900">Select Pricing Strategy</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Single Unit Pricing Option */}
-                      <div 
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                          formData.singleUnitPricingEnabled 
-                            ? 'border-gray-800 bg-gray-100 shadow-sm' 
-                            : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
-                        }`}
+                      <div
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.singleUnitPricingEnabled
+                          ? 'border-gray-800 bg-gray-100 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                          }`}
                         onClick={() => setFormData(prev => ({ ...prev, singleUnitPricingEnabled: !prev.singleUnitPricingEnabled }))}
                       >
                         <div className="flex items-center space-x-3">
-                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                            formData.singleUnitPricingEnabled 
-                              ? 'border-gray-800 bg-gray-800' 
-                              : 'border-gray-300'
-                          }`}>
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${formData.singleUnitPricingEnabled
+                            ? 'border-gray-800 bg-gray-800'
+                            : 'border-gray-300'
+                            }`}>
                             {formData.singleUnitPricingEnabled && (
                               <div className="w-2 h-2 bg-white rounded-sm"></div>
                             )}
@@ -1719,20 +1769,18 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       </div>
 
                       {/* Bulk Pricing Option */}
-                      <div 
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                          formData.bulkPricingEnabled 
-                            ? 'border-gray-800 bg-gray-100 shadow-sm' 
-                            : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
-                        }`}
+                      <div
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.bulkPricingEnabled
+                          ? 'border-gray-800 bg-gray-100 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                          }`}
                         onClick={() => setFormData(prev => ({ ...prev, bulkPricingEnabled: !prev.bulkPricingEnabled }))}
                       >
                         <div className="flex items-center space-x-3">
-                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                            formData.bulkPricingEnabled 
-                              ? 'border-gray-800 bg-gray-800' 
-                              : 'border-gray-300'
-                          }`}>
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${formData.bulkPricingEnabled
+                            ? 'border-gray-800 bg-gray-800'
+                            : 'border-gray-300'
+                            }`}>
                             {formData.bulkPricingEnabled && (
                               <div className="w-2 h-2 bg-white rounded-sm"></div>
                             )}
@@ -1760,7 +1808,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
                         Single Unit Pricing
                       </h4>
-                      
+
                       {/* Pricing Configuration */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
@@ -1894,7 +1942,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                     // Update first tier as base price
                                     updatePricingTier(0, 'price', basePrice)
                                     updatePricingTier(0, 'discount', 0)
-                                    
+
                                     // Recalculate other tiers based on their discount percentages
                                     formData.pricingTiers.forEach((tier, idx) => {
                                       if (idx > 0 && tier.discount && tier.discount > 0) {
@@ -1944,10 +1992,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               {formData.pricingTiers.map((tier, index) => {
                                 const basePrice = formData.singleUnitPricingEnabled ? formData.basePrice : (formData.pricingTiers[0]?.price || 0)
                                 const savings = basePrice - tier.price
-                                const discountPercent = basePrice > 0 
+                                const discountPercent = basePrice > 0
                                   ? ((savings / basePrice) * 100).toFixed(1)
                                   : 0
-                                
+
                                 return (
                                   <TableRow key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100'}>
                                     <TableCell>
@@ -1979,12 +2027,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                           onChange={(e) => {
                                             const newPrice = parseFloat(e.target.value) || 0
                                             updatePricingTier(index, 'price', newPrice)
-                                            
+
                                             // Auto-calculate discount when price changes
-                                            const basePrice = formData.singleUnitPricingEnabled 
-                                              ? formData.basePrice 
+                                            const basePrice = formData.singleUnitPricingEnabled
+                                              ? formData.basePrice
                                               : (index === 0 ? newPrice : (formData.pricingTiers[0]?.price || 0))
-                                            
+
                                             if (basePrice > 0 && newPrice < basePrice) {
                                               const calculatedDiscount = ((basePrice - newPrice) / basePrice) * 100
                                               updatePricingTier(index, 'discount', Math.round(calculatedDiscount * 10) / 10)
@@ -2004,7 +2052,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                           onChange={(e) => {
                                             const discountValue = parseFloat(e.target.value) || 0
                                             updatePricingTier(index, 'discount', discountValue)
-                                            
+
                                             // Auto-calculate price based on discount when bulk pricing only
                                             if (!formData.singleUnitPricingEnabled && formData.bulkPricingEnabled) {
                                               // Use the first tier price as base if no single unit pricing
@@ -2021,9 +2069,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                           }}
                                           max="100"
                                           disabled={!formData.bulkPricingEnabled}
-                                          className={`w-full px-2 py-1 border border-gray-300 rounded text-sm ${
-                                            !formData.bulkPricingEnabled ? 'bg-gray-100 text-gray-500' : ''
-                                          }`}
+                                          className={`w-full px-2 py-1 border border-gray-300 rounded text-sm ${!formData.bulkPricingEnabled ? 'bg-gray-100 text-gray-500' : ''
+                                            }`}
                                           placeholder="0"
                                         />
                                         <span className="absolute right-2 top-2 text-gray-500 text-sm">%</span>
@@ -2049,8 +2096,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         </div>
 
                         {/* Add Tier Button */}
-                        <Button 
-                          type="button" 
+                        <Button
+                          type="button"
                           onClick={addPricingTier}
                           className="w-full bg-gray-900 text-white hover:bg-black"
                         >
@@ -2077,7 +2124,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               </div>
                             ))}
                           </div>
-                          
+
                           {!formData.singleUnitPricingEnabled && formData.bulkPricingEnabled && (
                             <div className="mt-3 pt-2 border-t border-gray-200">
                               <p className="text-xs text-blue-700">
@@ -2274,7 +2321,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h4 className="font-medium text-blue-900 mb-2">Delivery Timeline Summary</h4>
                     <p className="text-sm text-blue-800">
-                      Orders will be processed in <strong>{formData.dispatchTimeline.processingDays} day(s)</strong> and 
+                      Orders will be processed in <strong>{formData.dispatchTimeline.processingDays} day(s)</strong> and
                       delivered within <strong>{formData.dispatchTimeline.totalDays} day(s)</strong> from order confirmation.
                     </p>
                   </div>
@@ -2346,15 +2393,14 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Approval Status
                     </label>
-                    <div className={`px-3 py-2 rounded-lg border text-sm ${
-                      formData.approvalStatus === 'APPROVED' 
-                        ? 'bg-green-50 border-green-200 text-green-800' 
-                        : formData.approvalStatus === 'PENDING'
+                    <div className={`px-3 py-2 rounded-lg border text-sm ${formData.approvalStatus === 'APPROVED'
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : formData.approvalStatus === 'PENDING'
                         ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
                         : formData.approvalStatus === 'REJECTED'
-                        ? 'bg-red-50 border-red-200 text-red-800'
-                        : 'bg-gray-50 border-gray-200 text-gray-800'
-                    }`}>
+                          ? 'bg-red-50 border-red-200 text-red-800'
+                          : 'bg-gray-50 border-gray-200 text-gray-800'
+                      }`}>
                       {formData.approvalStatus?.toLowerCase() || 'pending'}
                       {formData.approvalStatus === 'REJECTED' && formData.rejectionReason && (
                         <div className="mt-1 text-xs">
@@ -2387,17 +2433,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  
+
                   {/* Cover Image Section */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h4 className="font-medium text-gray-900">Cover Image</h4>
                       <span className="text-xs text-gray-500">1 image only</span>
                     </div>
-                    
+
                     {/* Cover Image Upload */}
                     {formData.images.filter(img => img.imageType === 'cover').length === 0 ? (
-                      <div 
+                      <div
                         className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors cursor-pointer bg-gray-50"
                         onClick={() => document.getElementById('cover-image-upload')?.click()}
                       >
@@ -2418,7 +2464,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         <p className="text-xs text-green-600">Upload limit: 1/1</p>
                       </div>
                     )}
-                    
+
                     {/* Cover Image Preview */}
                     {formData.images.filter(img => img.imageType === 'cover').map((image) => (
                       <div key={image.id} className="relative group">
@@ -2441,7 +2487,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         </div>
                       </div>
                     ))}
-                    
+
                     {formData.images.filter(img => img.imageType === 'cover').length === 0 && (
                       <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <p className="text-xs text-yellow-800">⚠️ Cover image is recommended for better product visibility</p>
@@ -2457,10 +2503,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         {formData.images.filter(img => img.imageType === 'gallery').length}/3 images
                       </span>
                     </div>
-                    
+
                     {/* Gallery Images Upload */}
                     {formData.images.filter(img => img.imageType === 'gallery').length < 3 ? (
-                      <div 
+                      <div
                         className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors cursor-pointer"
                         onClick={() => document.getElementById('gallery-images-upload')?.click()}
                       >
@@ -2484,7 +2530,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         <p className="text-xs text-green-600">Upload limit: 3/3 reached</p>
                       </div>
                     )}
-                    
+
                     {/* Gallery Images Preview */}
                     {formData.images.filter(img => img.imageType === 'gallery').length > 0 && (
                       <div className="grid grid-cols-3 gap-2">
@@ -2518,7 +2564,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             </div>
                           </div>
                         ))}
-                        
+
                         {/* Empty slots visualization */}
                         {Array.from({ length: 3 - formData.images.filter(img => img.imageType === 'gallery').length }).map((_, index) => (
                           <div key={`empty-${index}`} className="w-full h-20 border-2 border-dashed border-gray-200 rounded flex items-center justify-center">
@@ -2527,7 +2573,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         ))}
                       </div>
                     )}
-                    
+
                     {formData.images.filter(img => img.imageType === 'gallery').length === 0 && (
                       <div className="grid grid-cols-3 gap-2">
                         {Array.from({ length: 3 }).map((_, index) => (
@@ -2591,7 +2637,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Total Stock:</span>
                   <span className="font-medium">
-                    {formData.hasVariants 
+                    {formData.hasVariants
                       ? formData.variants.reduce((sum, v) => sum + v.stock, 0)
                       : formData.totalStock
                     }
@@ -2631,13 +2677,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <Save className="h-4 w-4 mr-2" />
                   {isLoading ? 'Saving...' : (isEdit ? 'Update Product' : 'Create Product')}
                 </Button>
-                
+
                 <Link href="/vendor/dashboard/products" className="block">
                   <Button type="button" variant="outline" className="w-full">
                     Cancel
                   </Button>
                 </Link>
-                
+
                 {hasUnsavedChanges && (
                   <p className="text-xs text-amber-600 text-center">
                     You have unsaved changes

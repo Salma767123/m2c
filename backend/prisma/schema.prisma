@@ -568,6 +568,7 @@ model Product {
   basePrice             Float
   originalPrice         Float?
   discount              Float?
+  gstPercentage         Float?    // GST Percentage for the product
   
   // Single Unit Pricing Configuration
   singleUnitSize        String?

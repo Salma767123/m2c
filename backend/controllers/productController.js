@@ -9,55 +9,56 @@ const createProduct = async (req, res) => {
       // Inventory Connection
       inventoryItemId,
       isFromInventory,
-      
+
       // Basic Information
       name,
       description,
       category,
       subCategory,
-      
+
       // Pricing Information
       basePrice,
       originalPrice,
       discount,
-      
+      gstPercentage,
+
       // Single Unit Pricing Configuration
       singleUnitSize,
       singleUnitColor,
       singleUnitColorHex,
-      
+
       // Fabric & Specifications
       fabricType,
       material,
       fabricSpecifications,
-      
+
       // Variants Management
       variants,
       hasVariants,
-      
+
       // Base Product Info
       baseSku,
-      
+
       // Images
       images,
-      
+
       // Pricing Configuration
       pricingTiers,
       bulkPricingEnabled,
       singleUnitPricingEnabled,
-      
+
       // Stock Management
       totalStock,
       lowStockThreshold,
       trackInventory,
-      
+
       // Order Configuration
       minimumOrderQuantity,
       maximumOrderQuantity,
-      
+
       // Dispatch & Shipping
       dispatchTimeline,
-      
+
       // Additional Info
       tags,
       dimensions,
@@ -131,7 +132,7 @@ const createProduct = async (req, res) => {
     if (hasVariants && variants && variants.length > 0) {
       const variantSkus = variants.map(v => v.sku);
       const duplicateSkus = variantSkus.filter((sku, index) => variantSkus.indexOf(sku) !== index);
-      
+
       if (duplicateSkus.length > 0) {
         return res.status(400).json({
           success: false,
@@ -157,8 +158,8 @@ const createProduct = async (req, res) => {
     // Start transaction
     const result = await prisma.$transaction(async (tx) => {
       // Determine the stock to use - if from inventory, use inventory's currentStock
-      const productStock = (isFromInventory && inventoryItem) 
-        ? inventoryItem.currentStock 
+      const productStock = (isFromInventory && inventoryItem)
+        ? inventoryItem.currentStock
         : (parseInt(totalStock) || 0);
 
       // Create product
@@ -174,7 +175,8 @@ const createProduct = async (req, res) => {
           basePrice: parseFloat(basePrice) || 0,
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discount: discount ? parseFloat(discount) : null,
-          
+          gstPercentage: gstPercentage ? parseFloat(gstPercentage) : null,
+
           // Single Unit Pricing Configuration
           singleUnitSize: singleUnitSize || null,
           singleUnitColor: singleUnitColor || null,
@@ -297,12 +299,12 @@ const createProduct = async (req, res) => {
 const getVendorProducts = async (req, res) => {
   try {
     const vendorId = req.user.vendorId || req.user.id;
-    const { 
-      page = 1, 
-      limit = 10, 
-      search, 
-      category, 
-      status, 
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      category,
+      status,
       hasVariants,
       sortBy = 'createdAt',
       sortOrder = 'desc'
@@ -471,7 +473,7 @@ const updateProduct = async (req, res) => {
     // Check if base SKU is being changed and if new SKU already exists
     if (updateData.baseSku && updateData.baseSku !== existingProduct.baseSku) {
       const existingSku = await prisma.product.findFirst({
-        where: { 
+        where: {
           baseSku: updateData.baseSku,
           id: { not: id }
         }
@@ -489,7 +491,7 @@ const updateProduct = async (req, res) => {
     if (updateData.variants && updateData.variants.length > 0) {
       const variantSkus = updateData.variants.map(v => v.sku);
       const duplicateSkus = variantSkus.filter((sku, index) => variantSkus.indexOf(sku) !== index);
-      
+
       if (duplicateSkus.length > 0) {
         return res.status(400).json({
           success: false,
@@ -524,43 +526,46 @@ const updateProduct = async (req, res) => {
           ...(updateData.category && { category: updateData.category }),
           ...(updateData.subCategory !== undefined && { subCategory: updateData.subCategory }),
           ...(updateData.basePrice !== undefined && { basePrice: parseFloat(updateData.basePrice) }),
-          ...(updateData.originalPrice !== undefined && { 
-            originalPrice: updateData.originalPrice ? parseFloat(updateData.originalPrice) : null 
+          ...(updateData.originalPrice !== undefined && {
+            originalPrice: updateData.originalPrice ? parseFloat(updateData.originalPrice) : null
           }),
-          ...(updateData.discount !== undefined && { 
-            discount: updateData.discount ? parseFloat(updateData.discount) : null 
+          ...(updateData.discount !== undefined && {
+            discount: updateData.discount ? parseFloat(updateData.discount) : null
           }),
-          
+          ...(updateData.gstPercentage !== undefined && {
+            gstPercentage: updateData.gstPercentage ? parseFloat(updateData.gstPercentage) : null
+          }),
+
           // Single Unit Pricing Configuration
           ...(updateData.singleUnitSize !== undefined && { singleUnitSize: updateData.singleUnitSize }),
           ...(updateData.singleUnitColor !== undefined && { singleUnitColor: updateData.singleUnitColor }),
           ...(updateData.singleUnitColorHex !== undefined && { singleUnitColorHex: updateData.singleUnitColorHex }),
           ...(updateData.fabricType !== undefined && { fabricType: updateData.fabricType }),
           ...(updateData.material !== undefined && { material: updateData.material }),
-          ...(updateData.fabricSpecifications !== undefined && { 
-            fabricSpecifications: updateData.fabricSpecifications 
+          ...(updateData.fabricSpecifications !== undefined && {
+            fabricSpecifications: updateData.fabricSpecifications
           }),
           ...(updateData.hasVariants !== undefined && { hasVariants: updateData.hasVariants }),
           ...(updateData.baseSku && { baseSku: updateData.baseSku }),
           ...(updateData.pricingTiers !== undefined && { pricingTiers: updateData.pricingTiers }),
-          ...(updateData.bulkPricingEnabled !== undefined && { 
-            bulkPricingEnabled: updateData.bulkPricingEnabled 
+          ...(updateData.bulkPricingEnabled !== undefined && {
+            bulkPricingEnabled: updateData.bulkPricingEnabled
           }),
-          ...(updateData.singleUnitPricingEnabled !== undefined && { 
-            singleUnitPricingEnabled: updateData.singleUnitPricingEnabled 
+          ...(updateData.singleUnitPricingEnabled !== undefined && {
+            singleUnitPricingEnabled: updateData.singleUnitPricingEnabled
           }),
           ...(updateData.totalStock !== undefined && { totalStock: parseInt(updateData.totalStock) }),
-          ...(updateData.lowStockThreshold !== undefined && { 
-            lowStockThreshold: parseInt(updateData.lowStockThreshold) 
+          ...(updateData.lowStockThreshold !== undefined && {
+            lowStockThreshold: parseInt(updateData.lowStockThreshold)
           }),
           ...(updateData.trackInventory !== undefined && { trackInventory: updateData.trackInventory }),
-          ...(updateData.minimumOrderQuantity !== undefined && { 
-            minimumOrderQuantity: parseInt(updateData.minimumOrderQuantity) 
+          ...(updateData.minimumOrderQuantity !== undefined && {
+            minimumOrderQuantity: parseInt(updateData.minimumOrderQuantity)
           }),
-          ...(updateData.maximumOrderQuantity !== undefined && { 
-            maximumOrderQuantity: updateData.maximumOrderQuantity ? parseInt(updateData.maximumOrderQuantity) : null 
+          ...(updateData.maximumOrderQuantity !== undefined && {
+            maximumOrderQuantity: updateData.maximumOrderQuantity ? parseInt(updateData.maximumOrderQuantity) : null
           }),
-          ...(updateData.dispatchTimeline !== undefined && { 
+          ...(updateData.dispatchTimeline !== undefined && {
             dispatchTimeline: updateData.dispatchTimeline ? {
               processingDays: parseInt(updateData.dispatchTimeline.processingDays) || 1,
               shippingDays: parseInt(updateData.dispatchTimeline.shippingDays) || 3,
@@ -1072,60 +1077,60 @@ const createProductByAdmin = async (req, res) => {
     const {
       // Vendor Information (REQUIRED for admin)
       vendorId,
-      
+
       // Inventory Connection
       inventoryItemId,
       isFromInventory,
-      
+
       // Basic Information
       name,
       description,
       category,
       subCategory,
-      
+
       // Pricing Information
       basePrice,
       originalPrice,
       discount,
       adminFixedPrice, // Admin can set their own price
-      
+
       // Single Unit Pricing Configuration
       singleUnitSize,
       singleUnitColor,
       singleUnitColorHex,
-      
+
       // Fabric & Specifications
       fabricType,
       material,
       fabricSpecifications,
-      
+
       // Variants Management
       variants,
       hasVariants,
-      
+
       // Base Product Info
       baseSku,
-      
+
       // Images
       images,
-      
+
       // Pricing Configuration
       pricingTiers,
       bulkPricingEnabled,
       singleUnitPricingEnabled,
-      
+
       // Stock Management
       totalStock,
       lowStockThreshold,
       trackInventory,
-      
+
       // Order Configuration
       minimumOrderQuantity,
       maximumOrderQuantity,
-      
+
       // Dispatch & Shipping
       dispatchTimeline,
-      
+
       // Additional Info
       tags,
       dimensions,
@@ -1219,7 +1224,7 @@ const createProductByAdmin = async (req, res) => {
     if (hasVariants && variants && variants.length > 0) {
       const variantSkus = variants.map(v => v.sku);
       const duplicateSkus = variantSkus.filter((sku, index) => variantSkus.indexOf(sku) !== index);
-      
+
       if (duplicateSkus.length > 0) {
         return res.status(400).json({
           success: false,
@@ -1245,8 +1250,8 @@ const createProductByAdmin = async (req, res) => {
     // Start transaction
     const result = await prisma.$transaction(async (tx) => {
       // Determine the stock to use - if from inventory, use inventory's currentStock
-      const productStock = (isFromInventory && inventoryItem) 
-        ? inventoryItem.currentStock 
+      const productStock = (isFromInventory && inventoryItem)
+        ? inventoryItem.currentStock
         : (parseInt(totalStock) || 0);
 
       // Create product
@@ -1263,7 +1268,7 @@ const createProductByAdmin = async (req, res) => {
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discount: discount ? parseFloat(discount) : null,
           adminFixedPrice: adminFixedPrice ? parseFloat(adminFixedPrice) : null,
-          
+
           // Single Unit Pricing Configuration
           singleUnitSize: singleUnitSize || null,
           singleUnitColor: singleUnitColor || null,
@@ -1419,7 +1424,7 @@ const updateProductByAdmin = async (req, res) => {
     // Check if base SKU is being changed and if new SKU already exists
     if (updateData.baseSku && updateData.baseSku !== existingProduct.baseSku) {
       const existingSku = await prisma.product.findFirst({
-        where: { 
+        where: {
           baseSku: updateData.baseSku,
           id: { not: id }
         }
@@ -1437,7 +1442,7 @@ const updateProductByAdmin = async (req, res) => {
     if (updateData.variants && updateData.variants.length > 0) {
       const variantSkus = updateData.variants.map(v => v.sku);
       const duplicateSkus = variantSkus.filter((sku, index) => variantSkus.indexOf(sku) !== index);
-      
+
       if (duplicateSkus.length > 0) {
         return res.status(400).json({
           success: false,
@@ -1470,46 +1475,46 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.category && { category: updateData.category }),
         ...(updateData.subCategory !== undefined && { subCategory: updateData.subCategory }),
         ...(updateData.basePrice !== undefined && { basePrice: parseFloat(updateData.basePrice) }),
-        ...(updateData.originalPrice !== undefined && { 
-          originalPrice: updateData.originalPrice ? parseFloat(updateData.originalPrice) : null 
+        ...(updateData.originalPrice !== undefined && {
+          originalPrice: updateData.originalPrice ? parseFloat(updateData.originalPrice) : null
         }),
-        ...(updateData.discount !== undefined && { 
-          discount: updateData.discount ? parseFloat(updateData.discount) : null 
+        ...(updateData.discount !== undefined && {
+          discount: updateData.discount ? parseFloat(updateData.discount) : null
         }),
-        ...(updateData.adminFixedPrice !== undefined && { 
-          adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null 
+        ...(updateData.adminFixedPrice !== undefined && {
+          adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null
         }),
-        
+
         // Single Unit Pricing Configuration
         ...(updateData.singleUnitSize !== undefined && { singleUnitSize: updateData.singleUnitSize }),
         ...(updateData.singleUnitColor !== undefined && { singleUnitColor: updateData.singleUnitColor }),
         ...(updateData.singleUnitColorHex !== undefined && { singleUnitColorHex: updateData.singleUnitColorHex }),
         ...(updateData.fabricType !== undefined && { fabricType: updateData.fabricType }),
         ...(updateData.material !== undefined && { material: updateData.material }),
-        ...(updateData.fabricSpecifications !== undefined && { 
-          fabricSpecifications: updateData.fabricSpecifications 
+        ...(updateData.fabricSpecifications !== undefined && {
+          fabricSpecifications: updateData.fabricSpecifications
         }),
         ...(updateData.hasVariants !== undefined && { hasVariants: updateData.hasVariants }),
         ...(updateData.baseSku && { baseSku: updateData.baseSku }),
         ...(updateData.pricingTiers !== undefined && { pricingTiers: updateData.pricingTiers }),
-        ...(updateData.bulkPricingEnabled !== undefined && { 
-          bulkPricingEnabled: updateData.bulkPricingEnabled 
+        ...(updateData.bulkPricingEnabled !== undefined && {
+          bulkPricingEnabled: updateData.bulkPricingEnabled
         }),
-        ...(updateData.singleUnitPricingEnabled !== undefined && { 
-          singleUnitPricingEnabled: updateData.singleUnitPricingEnabled 
+        ...(updateData.singleUnitPricingEnabled !== undefined && {
+          singleUnitPricingEnabled: updateData.singleUnitPricingEnabled
         }),
         ...(updateData.totalStock !== undefined && { totalStock: parseInt(updateData.totalStock) }),
-        ...(updateData.lowStockThreshold !== undefined && { 
-          lowStockThreshold: parseInt(updateData.lowStockThreshold) 
+        ...(updateData.lowStockThreshold !== undefined && {
+          lowStockThreshold: parseInt(updateData.lowStockThreshold)
         }),
         ...(updateData.trackInventory !== undefined && { trackInventory: updateData.trackInventory }),
-        ...(updateData.minimumOrderQuantity !== undefined && { 
-          minimumOrderQuantity: parseInt(updateData.minimumOrderQuantity) 
+        ...(updateData.minimumOrderQuantity !== undefined && {
+          minimumOrderQuantity: parseInt(updateData.minimumOrderQuantity)
         }),
-        ...(updateData.maximumOrderQuantity !== undefined && { 
-          maximumOrderQuantity: updateData.maximumOrderQuantity ? parseInt(updateData.maximumOrderQuantity) : null 
+        ...(updateData.maximumOrderQuantity !== undefined && {
+          maximumOrderQuantity: updateData.maximumOrderQuantity ? parseInt(updateData.maximumOrderQuantity) : null
         }),
-        ...(updateData.dispatchTimeline !== undefined && { 
+        ...(updateData.dispatchTimeline !== undefined && {
           dispatchTimeline: updateData.dispatchTimeline ? {
             processingDays: parseInt(updateData.dispatchTimeline.processingDays) || 1,
             shippingDays: parseInt(updateData.dispatchTimeline.shippingDays) || 3,
@@ -1521,7 +1526,7 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.weight !== undefined && { weight: updateData.weight }),
         ...(updateData.inStock !== undefined && { inStock: updateData.inStock }),
         ...(updateData.status && { status: updateData.status.toUpperCase() }),
-        ...(updateData.approvalStatus && { 
+        ...(updateData.approvalStatus && {
           approvalStatus: updateData.approvalStatus.toUpperCase(),
           ...(updateData.approvalStatus.toUpperCase() === 'APPROVED' && {
             approvedAt: new Date(),
@@ -1716,26 +1721,26 @@ const getAllProductsForAdmin = async (req, res) => {
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     // Build where clause
     const where = {};
-    
+
     if (approvalStatus) {
       where.approvalStatus = approvalStatus.toUpperCase();
     }
-    
+
     if (status) {
       where.status = status.toUpperCase();
     }
-    
+
     if (vendorId) {
       where.vendorId = vendorId;
     }
-    
+
     if (category) {
       where.category = { contains: category, mode: 'insensitive' };
     }
-    
+
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -1822,7 +1827,7 @@ const getPublicProducts = async (req, res) => {
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     // Build where clause
     const where = {
       status: 'ACTIVE',
@@ -1849,7 +1854,7 @@ const getPublicProducts = async (req, res) => {
     if (minPrice || maxPrice) {
       where.OR = where.OR || [];
       const priceConditions = [];
-      
+
       if (minPrice && maxPrice) {
         priceConditions.push({
           adminFixedPrice: { gte: parseFloat(minPrice), lte: parseFloat(maxPrice) }
@@ -1877,7 +1882,7 @@ const getPublicProducts = async (req, res) => {
           ]
         });
       }
-      
+
       where.OR = [...(where.OR || []), ...priceConditions];
     }
 

@@ -4,23 +4,24 @@ export interface ProductFormData {
   // Inventory Connection
   inventoryItemId?: string;
   isFromInventory: boolean;
-  
+
   // Basic Information
   name: string;
   description: string;
   category: string;
   subCategory?: string;
-  
+
   // Pricing Information
   basePrice: number;
   adminFixedPrice?: number; // Admin's fixed price (overrides basePrice for display)
   originalPrice?: number;
   discount?: number;
-  
+  gstPercentage?: number;
+
   // Product Rating & Reviews
   rating?: number;
   reviews?: number;
-  
+
   // Fabric & Specifications
   fabricType?: string;
   material?: string;
@@ -32,38 +33,38 @@ export interface ProductFormData {
     finish: string;
     careInstructions: string[];
   };
-  
+
   // Variants Management
   variants?: ProductVariant[];
   hasVariants: boolean;
-  
+
   // Base Product Info
   baseSku: string;
-  
+
   // Images
   images?: ProductImage[];
-  
+
   // Pricing Configuration
   pricingTiers?: PricingTier[];
   bulkPricingEnabled: boolean;
   singleUnitPricingEnabled: boolean;
-  
+
   // Stock Management
   totalStock: number;
   lowStockThreshold: number;
   trackInventory: boolean;
-  
+
   // Order Configuration
   minimumOrderQuantity: number;
   maximumOrderQuantity?: number;
-  
+
   // Dispatch & Shipping
   dispatchTimeline: {
     processingDays: number;
     shippingDays: number;
     totalDays: number;
   };
-  
+
   // Additional Info
   tags: string[];
   dimensions?: string;
