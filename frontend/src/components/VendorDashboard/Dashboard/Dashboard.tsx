@@ -1,10 +1,10 @@
 'use client';
 
-import { Package, DollarSign, TrendingUp, Users } from 'lucide-react';
+import { Package, DollarSign, TrendingUp, ShoppingCart } from 'lucide-react';
 import StatsGrid from './components/StatsGrid';
 import AnalyticsOverview from './components/AnalyticsOverview';
-import TopProducts from './components/TopProducts';
-import PerformanceOverview from './components/PerformanceOverview';
+import RecentProducts from './components/RecentProducts';
+import RecentOrders from './components/RecentOrders';
 
 export default function Dashboard() {
   const stats = [
@@ -13,36 +13,42 @@ export default function Dashboard() {
       value: '45',
       change: '+12%',
       icon: Package,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50 border-purple-200',
+      iconBg: 'bg-purple-100',
     },
     {
       title: 'Revenue',
-      value: '$45,230',
+      value: '₹45,230',
       change: '+18%',
       icon: DollarSign,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50 border-green-200',
+      iconBg: 'bg-green-100',
+    },
+    {
+      title: 'Total Orders',
+      value: '156',
+      change: '+8%',
+      icon: ShoppingCart,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50 border-blue-200',
+      iconBg: 'bg-blue-100',
     },
     {
       title: 'Growth Rate',
       value: '12.5%',
       change: '+2.1%',
       icon: TrendingUp,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-50 border-orange-200',
+      iconBg: 'bg-orange-100',
     }
   ];
 
   const analytics = {
     revenue: { current: 12450, change: 22.1 },
-    customers: { current: 89, change: 17.1 },
-  };
-
-  const topProducts = [
-    { name: 'Handwoven Cotton Towel Set', sales: 45, rating: 4.8, revenue: 584.55 },
-    { name: 'Organic Bath Towel Set', sales: 32, rating: 4.9, revenue: 799.68 },
-    { name: 'Heritage Tea Towel Collection', sales: 28, rating: 4.7, revenue: 531.72 },
-  ];
-
-  const performance = {
-    rating: '4.8',
-    satisfaction: '92%',
-    fulfillmentTime: '2.3 days',
+    orders: { current: 156, change: 17.1 },
   };
 
   return (
@@ -59,13 +65,11 @@ export default function Dashboard() {
       {/* Analytics Section */}
       <AnalyticsOverview analytics={analytics} />
 
-      {/* Top Products */}
-      <div className="grid grid-cols-1 gap-4 sm:gap-6">
-        <TopProducts products={topProducts} />
+      {/* Recent Products & Orders */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <RecentProducts />
+        <RecentOrders />
       </div>
-
-      {/* Performance Overview */}
-      <PerformanceOverview performance={performance} />
     </div>
   );
 }

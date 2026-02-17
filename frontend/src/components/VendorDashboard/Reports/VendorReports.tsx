@@ -10,7 +10,6 @@ import {
   Download,
   TrendingUp,
   DollarSign,
-  Users,
   Package,
   ShoppingCart,
   Clock,
@@ -25,6 +24,21 @@ import {
   Calendar,
   PieChart,
 } from 'lucide-react';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Legend,
+  BarChart as RechartsBarChart,
+  Bar,
+} from 'recharts';
 
 interface ReportData {
   period: string;
@@ -68,15 +82,26 @@ const topProducts: ProductPerformance[] = [
 ];
 
 const orderMetrics: OrderMetrics[] = [
-  { status: 'Delivered', count: 106, percentage: 68, color: 'bg-gray-700' },
-  { status: 'Processing', count: 30, percentage: 19, color: 'bg-gray-500' },
-  { status: 'Pending', count: 15, percentage: 10, color: 'bg-gray-400' },
-  { status: 'Cancelled', count: 5, percentage: 3, color: 'bg-gray-300' },
+  { status: 'Delivered', count: 106, percentage: 68, color: 'bg-green-500' },
+  { status: 'Processing', count: 30, percentage: 19, color: 'bg-blue-500' },
+  { status: 'Pending', count: 15, percentage: 10, color: 'bg-yellow-500' },
+  { status: 'Cancelled', count: 5, percentage: 3, color: 'bg-red-500' },
 ];
+
+const COLORS = ['#10b981', '#3b82f6', '#eab308', '#ef4444'];
+
+const orderValueDistribution = [
+  { range: '$0-$50', count: 45, percentage: 29 },
+  { range: '$51-$100', count: 58, percentage: 37 },
+  { range: '$101-$200', count: 38, percentage: 24 },
+  { range: '$200+', count: 15, percentage: 10 },
+];
+
+const VALUE_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
 
 export default function VendorReports() {
   const [selectedPeriod, setSelectedPeriod] = useState('Last 30 Days');
-  const [reportType, setReportType] = useState<'overview' | 'sales' | 'products' | 'customers' | 'performance'>('overview');
+  const [reportType, setReportType] = useState<'overview' | 'sales' | 'orders' | 'products' | 'performance'>('overview');
   const [exportFormat, setExportFormat] = useState('pdf');
 
   const currentData = mockReportData[0];
@@ -111,32 +136,36 @@ export default function VendorReports() {
       value: `$${currentData.revenue.toLocaleString()}`,
       change: calculateChange(currentData.revenue, previousData.revenue),
       icon: DollarSign,
-      color: 'text-gray-700',
-      bgColor: 'bg-white border-gray-200',
+      color: 'text-green-600',
+      bgColor: 'bg-green-50 border-green-200',
+      iconBg: 'bg-green-100',
     },
     {
       label: 'Total Orders',
       value: currentData.orders.toLocaleString(),
       change: calculateChange(currentData.orders, previousData.orders),
       icon: ShoppingCart,
-      color: 'text-gray-700',
-      bgColor: 'bg-white border-gray-200',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50 border-blue-200',
+      iconBg: 'bg-blue-100',
     },
     {
-      label: 'Customers',
-      value: currentData.customers.toLocaleString(),
-      change: calculateChange(currentData.customers, previousData.customers),
-      icon: Users,
-      color: 'text-gray-700',
-      bgColor: 'bg-white border-gray-200',
+      label: 'Products Listed',
+      value: currentData.productsListed.toLocaleString(),
+      change: calculateChange(currentData.productsListed, previousData.productsListed),
+      icon: Package,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50 border-purple-200',
+      iconBg: 'bg-purple-100',
     },
     {
       label: 'Avg Order Value',
       value: `$${currentData.avgOrderValue.toFixed(2)}`,
       change: calculateChange(currentData.avgOrderValue, previousData.avgOrderValue),
       icon: TrendingUp,
-      color: 'text-gray-700',
-      bgColor: 'bg-gray-900',
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-50 border-orange-200',
+      iconBg: 'bg-orange-100',
     },
   ];
 
@@ -199,8 +228,8 @@ export default function VendorReports() {
             {[
               { id: 'overview', label: 'Overview', icon: BarChart3 },
               { id: 'sales', label: 'Sales', icon: DollarSign },
+              { id: 'orders', label: 'Orders', icon: ShoppingCart },
               { id: 'products', label: 'Products', icon: Package },
-              { id: 'customers', label: 'Customers', icon: Users },
               { id: 'performance', label: 'Performance', icon: TrendingUp },
             ].map((type) => {
               const Icon = type.icon;
@@ -242,7 +271,7 @@ export default function VendorReports() {
                       <span className="text-gray-500 text-xs ml-1">vs last period</span>
                     </div>
                   </div>
-                  <div className={`p-3 rounded-lg ${metric.bgColor}`}>
+                  <div className={`p-3 rounded-lg ${metric.iconBg || metric.bgColor}`}>
                     <Icon className={`w-6 h-6 ${metric.color}`} />
                   </div>
                 </div>
@@ -265,13 +294,48 @@ export default function VendorReports() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80 flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200">
-                  <div className="text-center">
-                    <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-600 font-medium">Revenue Chart</p>
-                    <p className="text-sm text-gray-500 mt-1">Chart visualization will be displayed here</p>
-                  </div>
-                </div>
+                <ResponsiveContainer width="100%" height={320}>
+                  <AreaChart data={mockReportData.slice().reverse()}>
+                    <defs>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis 
+                      dataKey="period" 
+                      stroke="#6b7280"
+                      style={{ fontSize: '12px' }}
+                    />
+                    <YAxis 
+                      stroke="#6b7280"
+                      style={{ fontSize: '12px' }}
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#fff', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                      formatter={(value: number | string | undefined) => {
+                        if (value === undefined) return ['$0', 'Revenue'];
+                        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+                        return [`$${numValue.toLocaleString()}`, 'Revenue'];
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="revenue" 
+                      stroke="#3b82f6" 
+                      strokeWidth={3}
+                      fillOpacity={1} 
+                      fill="url(#colorRevenue)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
@@ -283,28 +347,43 @@ export default function VendorReports() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {orderMetrics.map((item) => (
-                    <div key={item.status} className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${item.color}`} />
-                          <span className="font-medium text-gray-700">{item.status}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-gray-600">{item.count} orders</span>
-                          <span className="font-semibold text-gray-900">{item.percentage}%</span>
-                        </div>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${item.color}`}
-                          style={{ width: `${item.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={320}>
+                  <RechartsPieChart>
+                    <Pie
+                      data={orderMetrics}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry: any) => `${entry.status}: ${entry.percentage}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {orderMetrics.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#fff', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                      formatter={(value: any, name: any, props: any) => {
+                        if (value === undefined) return ['0 orders', ''];
+                        const status = props.payload?.status || '';
+                        const percentage = props.payload?.percentage || 0;
+                        return [`${value} orders (${percentage}%)`, status];
+                      }}
+                    />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value: any, entry: any) => entry.payload?.status || value}
+                    />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
@@ -459,6 +538,239 @@ export default function VendorReports() {
       )}
 
       {/* Products Report */}
+      {reportType === 'orders' && (
+        <div className="space-y-6">
+          {/* Order Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card className="bg-blue-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Total Orders</p>
+                    <p className="text-3xl font-bold text-gray-900">{currentData.orders}</p>
+                  </div>
+                  <ShoppingCart className="w-10 h-10 text-blue-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-green-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Completed</p>
+                    <p className="text-3xl font-bold text-gray-900">106</p>
+                  </div>
+                  <CheckCircle className="w-10 h-10 text-green-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-yellow-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Processing</p>
+                    <p className="text-3xl font-bold text-gray-900">30</p>
+                  </div>
+                  <Clock className="w-10 h-10 text-yellow-600" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-purple-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Avg Order Value</p>
+                    <p className="text-3xl font-bold text-gray-900">${currentData.avgOrderValue.toFixed(2)}</p>
+                  </div>
+                  <DollarSign className="w-10 h-10 text-purple-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Order Status Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PieChart className="w-5 h-5 text-gray-600" />
+                Order Status Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {orderMetrics.map((item) => (
+                  <div key={item.status} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${item.color}`} />
+                        <span className="font-medium text-gray-700">{item.status}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-600">{item.count} orders</span>
+                        <span className="font-semibold text-gray-900">{item.percentage}%</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${item.color}`}
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Order History Table - WITHOUT CUSTOMER DETAILS */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Order History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[
+                    { orderId: 'ORD-2024-001', product: 'Premium Cotton Kitchen Towel Set', quantity: 2, amount: 50, date: '2024-02-10', status: 'Delivered' },
+                    { orderId: 'ORD-2024-002', product: 'Handwoven Bath Towel Collection', quantity: 1, amount: 75, date: '2024-02-11', status: 'Delivered' },
+                    { orderId: 'ORD-2024-003', product: 'Artisan Linen Apron', quantity: 3, amount: 90, date: '2024-02-12', status: 'Processing' },
+                    { orderId: 'ORD-2024-004', product: 'Heritage Table Runner', quantity: 1, amount: 45, date: '2024-02-13', status: 'Processing' },
+                    { orderId: 'ORD-2024-005', product: 'Organic Tea Towel Set', quantity: 2, amount: 60, date: '2024-02-14', status: 'Pending' },
+                  ].map((order, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium text-gray-900">{order.orderId}</TableCell>
+                      <TableCell className="text-gray-600">{order.product}</TableCell>
+                      <TableCell className="text-gray-600">{order.quantity}</TableCell>
+                      <TableCell className="text-gray-600">${order.amount.toLocaleString()}</TableCell>
+                      <TableCell className="text-gray-600">{new Date(order.date).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {order.status === 'Delivered' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <CheckCircle className="w-3 h-3" />
+                            {order.status}
+                          </span>
+                        ) : order.status === 'Processing' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <Clock className="w-3 h-3" />
+                            {order.status}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <AlertCircle className="w-3 h-3" />
+                            {order.status}
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Order Trends */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Volume Trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={256}>
+                  <RechartsBarChart data={mockReportData.slice().reverse()}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis 
+                      dataKey="period" 
+                      stroke="#6b7280"
+                      style={{ fontSize: '12px' }}
+                    />
+                    <YAxis 
+                      stroke="#6b7280"
+                      style={{ fontSize: '12px' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#fff', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                      formatter={(value: any) => {
+                        if (value === undefined) return ['0', 'Orders'];
+                        return [`${value} orders`, 'Total'];
+                      }}
+                    />
+                    <Bar 
+                      dataKey="orders" 
+                      fill="#3b82f6" 
+                      radius={[8, 8, 0, 0]}
+                    />
+                  </RechartsBarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Value Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={256}>
+                  <RechartsPieChart>
+                    <Pie
+                      data={orderValueDistribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry: any) => `${entry.range}: ${entry.percentage}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {orderValueDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={VALUE_COLORS[index % VALUE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#fff', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                      formatter={(value: any, name: any, props: any) => {
+                        if (value === undefined) return ['0 orders', ''];
+                        const range = props.payload?.range || '';
+                        const percentage = props.payload?.percentage || 0;
+                        return [`${value} orders (${percentage}%)`, range];
+                      }}
+                    />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value: any, entry: any) => entry.payload?.range || value}
+                    />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Products Report */}
       {reportType === 'products' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -563,112 +875,6 @@ export default function VendorReports() {
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                             <XCircle className="w-3 h-3" />
                             Critical
-                          </span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Customers Report */}
-      {reportType === 'customers' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card className="bg-indigo-50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Total Customers</p>
-                    <p className="text-3xl font-bold text-gray-900">{currentData.customers}</p>
-                  </div>
-                  <Users className="w-10 h-10 text-indigo-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-green-50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Repeat Customers</p>
-                    <p className="text-3xl font-bold text-gray-900">34</p>
-                  </div>
-                  <CheckCircle className="w-10 h-10 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-blue-50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">New Customers</p>
-                    <p className="text-3xl font-bold text-gray-900">55</p>
-                  </div>
-                  <Users className="w-10 h-10 text-blue-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-purple-50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Retention Rate</p>
-                    <p className="text-3xl font-bold text-gray-900">38%</p>
-                  </div>
-                  <TrendingUp className="w-10 h-10 text-purple-600" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Customer Insights Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Customers</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer Name</TableHead>
-                    <TableHead>Total Orders</TableHead>
-                    <TableHead>Total Spent</TableHead>
-                    <TableHead>Avg Order Value</TableHead>
-                    <TableHead>Last Order</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[
-                    { name: 'John Smith', orders: 12, spent: 1245, avg: 103.75, lastOrder: '2 days ago', status: 'active' },
-                    { name: 'Sarah Johnson', orders: 10, spent: 980, avg: 98.00, lastOrder: '5 days ago', status: 'active' },
-                    { name: 'Michael Brown', orders: 8, spent: 756, avg: 94.50, lastOrder: '1 week ago', status: 'active' },
-                    { name: 'Emily Davis', orders: 7, spent: 623, avg: 89.00, lastOrder: '3 days ago', status: 'active' },
-                    { name: 'David Wilson', orders: 6, spent: 534, avg: 89.00, lastOrder: '2 weeks ago', status: 'inactive' },
-                  ].map((customer, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium text-gray-900">{customer.name}</TableCell>
-                      <TableCell className="text-gray-600">{customer.orders}</TableCell>
-                      <TableCell className="text-gray-600">${customer.spent.toLocaleString()}</TableCell>
-                      <TableCell className="text-gray-600">${customer.avg.toFixed(2)}</TableCell>
-                      <TableCell className="text-gray-600">{customer.lastOrder}</TableCell>
-                      <TableCell>
-                        {customer.status === 'active' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <CheckCircle className="w-3 h-3" />
-                            Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            <AlertCircle className="w-3 h-3" />
-                            Inactive
                           </span>
                         )}
                       </TableCell>

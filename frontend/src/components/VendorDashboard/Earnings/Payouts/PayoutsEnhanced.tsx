@@ -244,60 +244,68 @@ export default function PayoutsEnhanced() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-gray-200 hover:shadow-md transition-shadow">
+        <Card className="bg-green-50 border-green-200 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Total Completed</p>
                 <p className="text-2xl font-bold text-gray-900">₹{totalCompleted.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-600 mt-1">
                   {mockPayouts.filter((p) => p.status === 'completed').length} payouts
                 </p>
               </div>
-              <CheckCircle className="w-10 h-10 text-gray-300" />
+              <div className="p-3 rounded-lg bg-green-100">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-gray-200 hover:shadow-md transition-shadow">
+        <Card className="bg-blue-50 border-blue-200 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">This Month</p>
                 <p className="text-2xl font-bold text-gray-900">₹{thisMonthPayouts.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-gray-500 mt-1">Current month payouts</p>
+                <p className="text-xs text-gray-600 mt-1">Current month payouts</p>
               </div>
-              <Calendar className="w-10 h-10 text-gray-300" />
+              <div className="p-3 rounded-lg bg-blue-100">
+                <Calendar className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-gray-200 hover:shadow-md transition-shadow">
+        <Card className="bg-yellow-50 border-yellow-200 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Pending</p>
                 <p className="text-2xl font-bold text-gray-900">₹{totalPending.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-600 mt-1">
                   {mockPayouts.filter((p) => p.status === 'pending' || p.status === 'processing').length} payouts
                 </p>
               </div>
-              <Clock className="w-10 h-10 text-gray-300" />
+              <div className="p-3 rounded-lg bg-yellow-100">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 border-gray-900 hover:shadow-md transition-shadow">
+        <Card className="bg-red-50 border-red-200 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300 mb-1">Failed</p>
-                <p className="text-2xl font-bold text-white">₹{totalFailed.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-sm text-gray-600 mb-1">Failed</p>
+                <p className="text-2xl font-bold text-gray-900">₹{totalFailed.toLocaleString('en-IN')}</p>
+                <p className="text-xs text-gray-600 mt-1">
                   {mockPayouts.filter((p) => p.status === 'failed').length} payouts
                 </p>
               </div>
-              <AlertCircle className="w-10 h-10 text-gray-700" />
+              <div className="p-3 rounded-lg bg-red-100">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+              </div>
             </div>
           </CardContent>
         </Card>

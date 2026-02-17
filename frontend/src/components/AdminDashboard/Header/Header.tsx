@@ -38,7 +38,6 @@ interface HeaderProps {
 export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [currentUser, setCurrentUser] = useState<any>(null)
   const pathname = usePathname()
   const notificationsRef = useRef<HTMLDivElement>(null)
@@ -100,74 +99,113 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
     const pageMap: Record<string, { title: string; icon: React.ComponentType<any> }> = {
       '/admin/dashboard': { title: 'Dashboard', icon: LayoutDashboard },
       '/admin/dashboard/vendors': { title: 'All Vendors', icon: Store },
-      '/admin/dashboard/vendors/add': { title: 'All Vendors', icon: Store },
-      '/admin/dashboard/vendors/edit': { title: 'All Vendors', icon: Store },
-      '/admin/dashboard/vendors/view': { title: 'All Vendors', icon: Store },
-      '/admin/dashboard/vendors/assign-qc-checker': { title: 'Assign QC Checker', icon: Store },
-      '/admin/dashboard/vendors/assign-qc-checker/add': { title: 'Create Assignment', icon: Store },
-      '/admin/dashboard/qc-checker': { title: 'All Checkers', icon: Shield },
-      '/admin/dashboard/qc-checker/create': { title: 'Create Checker', icon: Shield },
+      '/admin/dashboard/vendors/assign-qc': { title: 'Assign QC Checker', icon: Store },
+      '/admin/dashboard/qc-checker': { title: 'QC Checker', icon: Shield },
       '/admin/dashboard/products': { title: 'All Products', icon: Package },
-      '/admin/dashboard/products/add': { title: 'All Products', icon: Package },
-      '/admin/dashboard/products/edit': { title: 'All Products', icon: Package },
       '/admin/dashboard/products/vendor-requests': { title: 'Vendor Requests', icon: Package },
       '/admin/dashboard/inventory': { title: 'Inventory', icon: Warehouse },
-      '/admin/dashboard/inventory/add': { title: 'Inventory', icon: Warehouse },
-      '/admin/dashboard/inventory/edit': { title: 'Inventory', icon: Warehouse },
-      '/admin/dashboard/orders': { title: 'Orders', icon: Receipt },
-      '/admin/dashboard/billing': { title: 'Invoice & Billing', icon: Receipt },
+      '/admin/dashboard/orders/vendor-to-hub': { title: 'Vendor to Hub Orders', icon: Receipt },
+      '/admin/dashboard/orders/hub-to-customer': { title: 'Hub to Customer Orders', icon: Receipt },
       '/admin/dashboard/billing/invoices': { title: 'Invoices', icon: Receipt },
       '/admin/dashboard/billing/billings': { title: 'Billings', icon: Receipt },
       '/admin/dashboard/billing/settlement': { title: 'Settlement', icon: Receipt },
       '/admin/dashboard/categories': { title: 'Categories', icon: Tags },
-      '/admin/dashboard/categories/add': { title: 'Categories', icon: Tags },
-      '/admin/dashboard/categories/edit': { title: 'Categories', icon: Tags },
-      '/admin/dashboard/categories/view': { title: 'Categories', icon: Tags },
-      '/admin/dashboard/users': { title: 'Users', icon: Users },
       '/admin/dashboard/users/customer-management': { title: 'Customer Management', icon: Users },
       '/admin/dashboard/users/user-management': { title: 'User Management', icon: Users },
+      '/admin/dashboard/general/enquiry-form': { title: 'Enquiry Form', icon: Edit3 },
       '/admin/dashboard/cms': { title: 'Content Management', icon: Edit3 },
-      '/admin/dashboard/reviews': { title: 'Reviews', icon: MessageSquare },
       '/admin/dashboard/reviews/customer': { title: 'Customer Reviews', icon: MessageSquare },
       '/admin/dashboard/reviews/vendor-products': { title: 'Vendor Product Reviews', icon: MessageSquare },
       '/admin/dashboard/reports': { title: 'Reports', icon: FileText },
       '/admin/dashboard/support': { title: 'Support', icon: HelpCircle },
-      '/admin/dashboard/roles-permissions': { title: 'All Roles', icon: Shield },
-      '/admin/dashboard/roles-permissions/add': { title: 'Create Role', icon: Shield },
-      '/admin/dashboard/roles-permissions/edit': { title: 'All Roles', icon: Shield },
+      '/admin/dashboard/roles-permissions': { title: 'Roles & Permissions', icon: Shield },
+      '/admin/dashboard/coupons': { title: 'Coupons', icon: Tags },
       '/admin/dashboard/settings': { title: 'Settings', icon: Settings },
     }
 
-    // Handle dynamic routes like /admin/dashboard/orders/[id], /admin/dashboard/support/[id], etc.
-    if (pathname.startsWith('/admin/dashboard/orders/') && pathname !== '/admin/dashboard/orders') {
-      return { title: 'Orders', icon: Receipt }
-    }
-    if (pathname.startsWith('/admin/dashboard/support/') && pathname !== '/admin/dashboard/support') {
-      return { title: 'Support', icon: HelpCircle }
-    }
+    // Handle dynamic routes with actions (add/edit/view)
+    // Vendors
     if (pathname.startsWith('/admin/dashboard/vendors/view/')) {
-      return { title: 'All Vendors', icon: Store }
+      return { title: 'View Vendor', icon: Store }
     }
     if (pathname.startsWith('/admin/dashboard/vendors/inspection/')) {
-      return { title: 'All Vendors', icon: Store }
+      return { title: 'Vendor Inspection', icon: Store }
     }
     if (pathname.startsWith('/admin/dashboard/vendors/edit/')) {
-      return { title: 'All Vendors', icon: Store }
+      return { title: 'Edit Vendor', icon: Store }
+    }
+    if (pathname === '/admin/dashboard/vendors/add') {
+      return { title: 'Add Vendor', icon: Store }
+    }
+    if (pathname.startsWith('/admin/dashboard/vendors/assign-qc/')) {
+      return { title: 'Create Assignment', icon: Store }
+    }
+    
+    // QC Checker
+    if (pathname === '/admin/dashboard/qc-checker/create') {
+      return { title: 'Create QC Checker', icon: Shield }
+    }
+    if (pathname.startsWith('/admin/dashboard/qc-checker/edit/')) {
+      return { title: 'Edit QC Checker', icon: Shield }
+    }
+    
+    // Products
+    if (pathname === '/admin/dashboard/products/add') {
+      return { title: 'Add Product', icon: Package }
     }
     if (pathname.startsWith('/admin/dashboard/products/edit/')) {
-      return { title: 'All Products', icon: Package }
+      return { title: 'Edit Product', icon: Package }
+    }
+    if (pathname.startsWith('/admin/dashboard/products/view/')) {
+      return { title: 'View Product', icon: Package }
+    }
+    
+    // Inventory
+    if (pathname === '/admin/dashboard/inventory/add') {
+      return { title: 'Add Inventory', icon: Warehouse }
     }
     if (pathname.startsWith('/admin/dashboard/inventory/edit/')) {
-      return { title: 'Inventory', icon: Warehouse }
+      return { title: 'Edit Inventory', icon: Warehouse }
+    }
+    
+    // Categories
+    if (pathname === '/admin/dashboard/categories/add') {
+      return { title: 'Add Category', icon: Tags }
     }
     if (pathname.startsWith('/admin/dashboard/categories/edit/')) {
-      return { title: 'Categories', icon: Tags }
+      return { title: 'Edit Category', icon: Tags }
     }
     if (pathname.startsWith('/admin/dashboard/categories/view/')) {
-      return { title: 'Categories', icon: Tags }
+      return { title: 'View Category', icon: Tags }
+    }
+    
+    // Coupons
+    if (pathname === '/admin/dashboard/coupons/add') {
+      return { title: 'Add Coupon', icon: Tags }
+    }
+    if (pathname.startsWith('/admin/dashboard/coupons/edit/')) {
+      return { title: 'Edit Coupon', icon: Tags }
+    }
+    
+    // Roles & Permissions
+    if (pathname === '/admin/dashboard/roles-permissions/add') {
+      return { title: 'Create Role', icon: Shield }
     }
     if (pathname.startsWith('/admin/dashboard/roles-permissions/edit/')) {
-      return { title: 'All Roles', icon: Shield }
+      return { title: 'Edit Role', icon: Shield }
+    }
+    
+    // Orders - Detail views
+    if (pathname.startsWith('/admin/dashboard/orders/vendor-to-hub/view/')) {
+      return { title: 'Vendor to Hub Order Details', icon: Receipt }
+    }
+    if (pathname.startsWith('/admin/dashboard/orders/hub-to-customer/view/')) {
+      return { title: 'Hub to Customer Order Details', icon: Receipt }
+    }
+    
+    // Support - Ticket details
+    if (pathname.startsWith('/admin/dashboard/support/') && pathname !== '/admin/dashboard/support') {
+      return { title: 'Support Ticket Details', icon: HelpCircle }
     }
 
     return pageMap[pathname] || { title: 'Dashboard', icon: LayoutDashboard }

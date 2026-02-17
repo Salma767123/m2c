@@ -5,6 +5,8 @@ import Header from '@/components/AdminDashboard/Header/Header'
 import Sidebar from '@/components/AdminDashboard/Sidebar/Sidebar'
 import Footer from '@/components/AdminDashboard/Footer/Footer'
 import ProtectedRoute from '@/components/AdminDashboard/ProtectedRoute'
+import { useStorageSync } from '@/hooks/useStorageSync'
+import { clearAuth } from '@/lib/auth'
 
 export default function DashboardLayout({
   children,
@@ -12,6 +14,11 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+
+  // Multi-tab logout synchronization
+  useStorageSync('adminToken', () => {
+    clearAuth()
+  })
 
   return (
     <ProtectedRoute>

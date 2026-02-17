@@ -15,16 +15,15 @@ import {
   FileText,
   LogOut,
   Warehouse,
-  Receipt,
   ChevronDown,
   ChevronRight,
   Shield,
   Headphones,
   ClipboardCheck,
-  UserCheck,
   Layers,
   Ticket,
   ShoppingCart,
+  FileBarChart,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -119,7 +118,7 @@ const navigation: NavigationItem[] = [
   },
     {
     title: "Invoice & Billing",
-    icon: Receipt,
+    icon: FileBarChart,
     subItems: [
       { title: "Invoices", href: "/admin/dashboard/billing/invoices" },
       { title: "Billings", href: "/admin/dashboard/billing/billings" },

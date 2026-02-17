@@ -1,0 +1,80 @@
+/* Print styles for invoices */
+@media print {
+  /* Hide non-printable elements */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 1cm;
+  }
+
+  /* Reset body */
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Invoice container */
+  .invoice-container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    border: none;
+  }
+
+  /* Prevent page breaks inside elements */
+  .no-break {
+    page-break-inside: avoid;
+  }
+
+  /* Table styles */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+}
+
+/* Thermal print styles (80mm width) */
+@media print and (max-width: 80mm) {
+  @page {
+    size: 80mm auto;
+    margin: 5mm;
+  }
+
+  body {
+    font-size: 10px;
+  }
+
+  .thermal-hide {
+    display: none !important;
+  }
+
+  table {
+    font-size: 9px;
+  }
+
+  h1, h2, h3 {
+    font-size: 14px;
+  }
+
+  .text-sm {
+    font-size: 8px;
+  }
+}

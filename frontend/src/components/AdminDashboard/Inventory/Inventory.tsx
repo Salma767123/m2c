@@ -17,8 +17,6 @@ import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter,
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import axiosInstance from '@/lib/axios'
-import StockUpdateModal from '@/components/Shared/StockUpdateModal'
-import StockHistoryModal from '@/components/Shared/StockHistoryModal'
 import inventoryService from '@/services/inventoryService'
 
 interface InventoryItem {

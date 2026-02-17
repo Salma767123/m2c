@@ -232,20 +232,20 @@ export default function EarningsOverview() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 border-gray-900 hover:shadow-md transition-shadow">
+        <Card className="bg-green-50 border-green-200 hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-300 mb-1">Available for Payout</p>
-                <p className="text-2xl font-bold text-white mb-2">
+                <p className="text-sm font-medium text-gray-600 mb-1">Available for Payout</p>
+                <p className="text-2xl font-bold text-gray-900 mb-2">
                   ₹{earnings.availableForPayout.toLocaleString('en-IN')}
                 </p>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-gray-600">
                   Ready to withdraw
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-gray-800">
-                <DollarSign className="w-6 h-6 text-white" />
+              <div className="p-3 rounded-lg bg-green-100">
+                <DollarSign className="w-6 h-6 text-green-600" />
               </div>
             </div>
           </CardContent>
