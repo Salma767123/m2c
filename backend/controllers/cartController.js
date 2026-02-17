@@ -155,12 +155,13 @@ const getCart = async (req, res) => {
             discount: true,
             inStock: true,
             totalStock: true,
+            gstPercentage: true,
             category: true,
             material: true,
             rating: true,
             reviews: true,
             images: {
-              select: { 
+              select: {
                 url: true,
                 isPrimary: true
               },
@@ -183,6 +184,7 @@ const getCart = async (req, res) => {
             discount: product.discount,
             inStock: product.inStock,
             availableStock: product.totalStock,
+            gstPercentage: product.gstPercentage,
             category: product.category,
             material: product.material,
             rating: product.rating,

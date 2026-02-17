@@ -18,6 +18,11 @@ export interface ProductFormData {
   discount?: number;
   gstPercentage?: number;
 
+  // Single Unit Configuration
+  singleUnitSize?: string;
+  singleUnitColor?: string;
+  singleUnitColorHex?: string;
+
   // Product Rating & Reviews
   rating?: number;
   reviews?: number;

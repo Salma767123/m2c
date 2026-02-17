@@ -10,6 +10,7 @@ export interface PublicProduct {
   adminFixedPrice?: number; // Admin's fixed price (overrides basePrice for display)
   originalPrice?: number;
   discount?: number;
+  gstPercentage?: number;
   rating?: number;
   reviews?: number;
   images: Array<{

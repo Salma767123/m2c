@@ -1910,6 +1910,9 @@ const getPublicProducts = async (req, res) => {
         adminFixedPrice: true, // Include admin fixed price
         originalPrice: true,
         discount: true,
+        singleUnitSize: true,
+        singleUnitColor: true,
+        singleUnitColorHex: true,
         rating: true,
         reviews: true,
         images: true,
@@ -1983,6 +1986,9 @@ const getPublicProduct = async (req, res) => {
         adminFixedPrice: true, // Include admin fixed price
         originalPrice: true,
         discount: true,
+        singleUnitSize: true,
+        singleUnitColor: true,
+        singleUnitColorHex: true,
         rating: true,
         reviews: true,
         images: {

@@ -38,6 +38,7 @@ interface OrderItem {
   description?: string
   material?: string
   discount?: number
+  gstPercentage?: number
 }
 
 interface OrderSummary {
@@ -83,7 +84,8 @@ export default function Order() {
                   quantity: item.quantity,
                   description: product.description,
                   material: product.material,
-                  discount: product.discount
+                  discount: product.discount,
+                  gstPercentage: product.gstPercentage
                 }
               }
             } catch (err) {
@@ -113,7 +115,8 @@ export default function Order() {
               quantity: item.quantity,
               description: item.product?.description,
               material: item.product?.material,
-              discount: item.product?.discount
+              discount: item.product?.discount,
+              gstPercentage: item.product?.gstPercentage
             }))
             setCartItems(items)
           }
@@ -213,7 +216,14 @@ export default function Order() {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     const shipping = subtotal > 100 ? 0 : 9.99
     const discount = appliedPromo === "SAVE10" ? subtotal * 0.1 : 0
-    const tax = (subtotal - discount) * 0.08
+
+    // Calculate tax based on individual product GST percentages
+    const tax = cartItems.reduce((sum, item) => {
+      const itemSubtotal = item.price * item.quantity
+      const gstRate = item.gstPercentage ? item.gstPercentage / 100 : 0
+      return sum + (itemSubtotal * gstRate)
+    }, 0)
+
     const total = subtotal + shipping + tax - discount
 
     return { subtotal, shipping, tax, discount, total }

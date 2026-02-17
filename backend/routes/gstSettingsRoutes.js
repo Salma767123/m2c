@@ -12,7 +12,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 router.use(authenticateToken);
 
 // Get GST settings - accessible by admins
-router.get('/', requireRole(['admin', 'super_admin']), getGSTSettings);
+router.get('/', requireRole(['admin', 'super_admin', 'vendor']), getGSTSettings);
 
 // Create GST setting - accessible by admins
 router.post('/', requireRole(['admin', 'super_admin']), createGSTSetting);
