@@ -27,10 +27,10 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -52,12 +52,12 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   }
-  
+
   // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-  
+
   next();
 });
 // app.use(morgan('combined')); // Commented out to reduce console logs
@@ -92,10 +92,11 @@ const wishlistRoutes = require('./routes/wishlistRoutes');
 const paymentSettingsRoutes = require('./routes/paymentSettingsRoutes');
 const adminProfileRoutes = require('./routes/adminProfileRoutes');
 const companyInfoRoutes = require('./routes/companyInfoRoutes');
+const gstSettingsRoutes = require('./routes/gstSettingsRoutes');
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.status(200).json({ 
+  res.status(200).json({
     message: 'M2C API Server',
     version: '1.0.0',
     status: 'running',
@@ -114,8 +115,8 @@ app.get('/', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+  res.status(200).json({
+    status: 'OK',
     message: 'Server is running',
     timestamp: new Date().toISOString()
   });
@@ -133,22 +134,23 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/payment-settings', paymentSettingsRoutes);
 app.use('/api/admin/profile', adminProfileRoutes);
 app.use('/api/company-info', companyInfoRoutes);
+app.use('/api/gst-settings', gstSettingsRoutes);
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ 
+  res.status(404).json({
     error: 'Route not found',
-    path: req.originalUrl 
+    path: req.originalUrl
   });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  
+
   res.status(err.status || 500).json({
-    error: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
       : err.message,
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
@@ -159,10 +161,10 @@ let isInitialized = false;
 
 const initializeApp = async () => {
   if (isInitialized) return;
-  
+
   try {
     await connectDB();
-    
+
     // Initialize admin user
     const adminResult = await initializeAdmin();
     if (adminResult.success) {
@@ -170,10 +172,10 @@ const initializeApp = async () => {
     } else {
       console.log('⚠️ Admin initialization skipped:', adminResult.message);
     }
-    
+
     // Clean expired sessions
     await sessionManager.cleanExpiredSessions();
-    
+
     isInitialized = true;
   } catch (error) {
     console.error('❌ Initialization error:', error);
@@ -188,7 +190,7 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   const server = app.listen(PORT, async () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
-    
+
     // Set up periodic session cleanup (every 6 hours) - only for local dev
     setInterval(async () => {
       try {

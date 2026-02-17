@@ -205,7 +205,8 @@ const getVendorBankDetails = async (req, res) => {
     });
 
     if (!bankDetails) {
-      return res.status(404).json({ error: 'Bank details not found' });
+      // Return null instead of 404 - no bank details yet is a valid state
+      return res.json({ bankDetails: null });
     }
 
     res.json({

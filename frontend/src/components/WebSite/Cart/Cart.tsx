@@ -3,16 +3,17 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { cartService } from "@/services/cartService"
+import { publicProductService, PublicProduct } from "@/services/publicProductService"
 import { userAuthService } from "@/services/userAuthService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
-import { 
-  ShoppingCart, 
-  Plus, 
-  Minus, 
-  Trash2, 
-  CreditCard, 
-  Truck, 
-  Shield, 
+import {
+  ShoppingCart,
+  Plus,
+  Minus,
+  Trash2,
+  CreditCard,
+  Truck,
+  Shield,
   Star,
   Heart,
   Share2,
@@ -61,34 +62,61 @@ export default function Order() {
         setIsAuthenticated(authenticated)
 
         if (!authenticated) {
-          // Not authenticated - redirect to login
-          showErrorToast('Login Required', 'Please login to view your cart')
-          setTimeout(() => {
-            window.location.href = '/login'
-          }, 1500)
-          return
-        }
+          // Fetch from local storage for guest users
+          const localCart = cartService.getLocalCart()
+          const itemsPromises = localCart.map(async (item) => {
+            try {
+              const productRes = await publicProductService.getProduct(item.productId)
+              if (productRes.success && productRes.data) {
+                const product = productRes.data
+                return {
+                  id: item.id, // Use local cart item ID
+                  productId: item.productId,
+                  name: product.name,
+                  price: product.adminFixedPrice || product.basePrice,
+                  originalPrice: product.originalPrice,
+                  images: product.images.map(img => img.url),
+                  category: product.category,
+                  rating: product.rating,
+                  reviews: product.reviews,
+                  inStock: product.inStock,
+                  quantity: item.quantity,
+                  description: product.description,
+                  material: product.material,
+                  discount: product.discount
+                }
+              }
+            } catch (err) {
+              console.error(`Failed to fetch product ${item.productId}`, err)
+            }
+            return null
+          })
 
-        // Fetch from backend for authenticated users
-        const response = await cartService.getCart()
-        if (response.success && response.data) {
-          const items = response.data.items.map((item: any) => ({
-            id: item.id,
-            productId: item.productId,
-            name: item.product?.name || 'Unknown Product',
-            price: item.price,
-            originalPrice: item.product?.originalPrice,
-            images: item.product?.images?.map((img: any) => img.url) || [],
-            category: item.product?.category || '',
-            rating: item.product?.rating,
-            reviews: item.product?.reviews,
-            inStock: item.product?.inStock ?? true,
-            quantity: item.quantity,
-            description: item.product?.description,
-            material: item.product?.material,
-            discount: item.product?.discount
-          }))
+          const resolvedItems = await Promise.all(itemsPromises)
+          const items = resolvedItems.filter((item) => item !== null) as OrderItem[]
           setCartItems(items)
+        } else {
+          // Fetch from backend for authenticated users
+          const response = await cartService.getCart()
+          if (response.success && response.data) {
+            const items = response.data.items.map((item: any) => ({
+              id: item.id,
+              productId: item.productId,
+              name: item.product?.name || 'Unknown Product',
+              price: item.price,
+              originalPrice: item.product?.originalPrice,
+              images: item.product?.images?.map((img: any) => img.url) || [],
+              category: item.product?.category || '',
+              rating: item.product?.rating,
+              reviews: item.product?.reviews,
+              inStock: item.product?.inStock ?? true,
+              quantity: item.quantity,
+              description: item.product?.description,
+              material: item.product?.material,
+              discount: item.product?.discount
+            }))
+            setCartItems(items)
+          }
         }
       } catch (error) {
         console.error('Failed to fetch cart:', error)
@@ -130,10 +158,21 @@ export default function Order() {
     }
 
     try {
+      if (!isAuthenticated) {
+        cartService.updateLocalCartItem(productId, newQuantity)
+        setCartItems(items =>
+          items.map(item =>
+            item.productId === productId ? { ...item, quantity: newQuantity } : item
+          )
+        )
+        showSuccessToast('Updated', 'Cart item quantity updated')
+        return
+      }
+
       // Update via API
       await cartService.updateCartItem(id, newQuantity)
-      setCartItems(items => 
-        items.map(item => 
+      setCartItems(items =>
+        items.map(item =>
           item.id === id ? { ...item, quantity: newQuantity } : item
         )
       )
@@ -146,6 +185,13 @@ export default function Order() {
 
   const removeItem = async (id: string, productId: string) => {
     try {
+      if (!isAuthenticated) {
+        cartService.removeFromLocalCart(productId)
+        setCartItems(items => items.filter(item => item.productId !== productId))
+        showSuccessToast('Removed', 'Item removed from cart')
+        return
+      }
+
       // Remove via API
       await cartService.removeFromCart(id)
       setCartItems(items => items.filter(item => item.id !== id))
@@ -169,7 +215,7 @@ export default function Order() {
     const discount = appliedPromo === "SAVE10" ? subtotal * 0.1 : 0
     const tax = (subtotal - discount) * 0.08
     const total = subtotal + shipping + tax - discount
-    
+
     return { subtotal, shipping, tax, discount, total }
   }
 

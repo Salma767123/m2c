@@ -895,3 +895,18 @@ model CompanyInfo {
 
   @@map("company_info")
 }
+
+// ============================================
+// GST SETTINGS
+// ============================================
+
+model GSTSetting {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  percentage  Float    @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("gst_settings")
+}

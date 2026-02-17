@@ -683,10 +683,6 @@ class VendorService {
 
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 404) {
-        // Return null for bank details if not found, don't throw error
-        return { bankDetails: null };
-      }
       console.error('Get vendor bank details error:', error);
       throw error;
     }

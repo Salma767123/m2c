@@ -6,13 +6,13 @@ import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
 import { LoadingSpinner } from '@/components/UI/LoadingSpinner'
-import { 
-  ArrowLeft, 
-  Building2, 
-  Globe, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  ArrowLeft,
+  Building2,
+  Globe,
+  Mail,
+  Phone,
+  MapPin,
   User,
   Package,
   Factory,
@@ -25,7 +25,8 @@ import {
   AlertTriangle,
   FileText,
   Download,
-  Eye
+  Eye,
+  CreditCard
 } from 'lucide-react'
 import VendorService, { VendorProfile } from '@/services/vendorService'
 import { toast } from '@/hooks/use-toast'
@@ -69,11 +70,11 @@ export default function VendorView({ vendorId }: VendorViewProps) {
 
   const handleApprove = async () => {
     if (!vendor) return
-    
+
     try {
       setActionLoading('approve')
       await VendorService.approveVendor(vendor.id)
-      
+
       setVendor({ ...vendor, status: 'APPROVED', approvedAt: new Date().toISOString() })
       toast({
         title: 'Success',
@@ -97,11 +98,11 @@ export default function VendorView({ vendorId }: VendorViewProps) {
 
   const handleRejectConfirm = async (reason: string) => {
     if (!vendor) return
-    
+
     try {
       setActionLoading('reject')
       await VendorService.rejectVendor(vendor.id, reason)
-      
+
       setVendor({ ...vendor, status: 'REJECTED', rejectedAt: new Date().toISOString(), rejectionReason: reason })
       toast({
         title: 'Success',
@@ -126,11 +127,11 @@ export default function VendorView({ vendorId }: VendorViewProps) {
 
   const handleSuspendConfirm = async (reason: string) => {
     if (!vendor) return
-    
+
     try {
       setActionLoading('suspend')
       await VendorService.suspendVendor(vendor.id, reason)
-      
+
       setVendor({ ...vendor, status: 'SUSPENDED', suspendedAt: new Date().toISOString(), rejectionReason: reason })
       toast({
         title: 'Success',
@@ -196,6 +197,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
     { id: 'products', label: 'Products & Services', icon: Package },
     { id: 'facilities', label: 'Facilities', icon: Factory },
     { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'bank-details', label: 'Bank Details', icon: CreditCard },
     { id: 'performance', label: 'Performance', icon: Star }
   ]
 
@@ -219,10 +221,10 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 <p className="text-gray-600">Vendor ID: {vendor.id}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-3">
               {getStatusBadge(vendor.status)}
-              
+
               {/* Action Buttons */}
               {vendor.status === 'PENDING' && (
                 <>
@@ -257,7 +259,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                   </Button>
                 </>
               )}
-              
+
               {vendor.status === 'APPROVED' && (
                 <Button
                   onClick={handleSuspend}
@@ -275,7 +277,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                   )}
                 </Button>
               )}
-              
+
               <Button
                 onClick={() => router.push(`/admin/dashboard/vendors/edit/${vendor.id}`)}
                 className="bg-[#313131] text-white hover:bg-[#222222]"
@@ -285,7 +287,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
               </Button>
             </div>
           </div>
-          
+
           {/* Tabs */}
           <div className="flex space-x-8">
             {tabs.map((tab) => {
@@ -294,11 +296,10 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
+                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
                       ? 'border-[#313131] text-[#313131]'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <Icon className="h-4 w-4" />
                   <span>{tab.label}</span>
@@ -317,6 +318,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
         {activeTab === 'facilities' && <FacilitiesTab vendor={vendor} />}
         {activeTab === 'documents' && <DocumentsTab vendor={vendor} />}
         {activeTab === 'performance' && <PerformanceTab vendor={vendor} />}
+        {activeTab === 'bank-details' && <BankDetailsTab vendor={vendor} />}
       </div>
 
       {/* Rejection Modal */}
@@ -374,7 +376,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{vendor.businessEmail || vendor.email}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-3">
                   <Phone className="h-4 w-4 text-gray-400" />
                   <div>
@@ -382,7 +384,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{vendor.businessPhone}</p>
                   </div>
                 </div>
-                
+
                 {vendor.website && (
                   <div className="flex items-center space-x-3">
                     <Globe className="h-4 w-4 text-gray-400" />
@@ -395,7 +397,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   </div>
                 )}
               </div>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
                   <MapPin className="h-4 w-4 text-gray-400" />
@@ -404,7 +406,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{vendor.businessCity}, {vendor.businessState}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-3">
                   <Calendar className="h-4 w-4 text-gray-400" />
                   <div>
@@ -412,7 +414,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{new Date(vendor.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
-                
+
                 {vendor.establishedYear && (
                   <div className="flex items-center space-x-3">
                     <Building2 className="h-4 w-4 text-gray-400" />
@@ -494,28 +496,28 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
               <span className="text-sm text-gray-600">Current Status</span>
               <span className="font-semibold capitalize">{vendor.status.toLowerCase()}</span>
             </div>
-            
+
             {vendor.approvedAt && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Approved Date</span>
                 <span className="font-semibold">{new Date(vendor.approvedAt).toLocaleDateString()}</span>
               </div>
             )}
-            
+
             {vendor.rejectedAt && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Rejected Date</span>
                 <span className="font-semibold">{new Date(vendor.rejectedAt).toLocaleDateString()}</span>
               </div>
             )}
-            
+
             {vendor.suspendedAt && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Suspended Date</span>
                 <span className="font-semibold">{new Date(vendor.suspendedAt).toLocaleDateString()}</span>
               </div>
             )}
-            
+
             {vendor.rejectionReason && (
               <div>
                 <p className="text-sm text-gray-600">Reason</p>
@@ -765,14 +767,14 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                 ))}
               </div>
             </div>
-            
+
             {vendor.deliveryTime && (
               <div className="mt-4">
                 <p className="text-sm text-gray-600">Delivery Time</p>
                 <p className="font-medium">{vendor.deliveryTime}</p>
               </div>
             )}
-            
+
             {vendor.minimumOrderQuantity && (
               <div className="mt-4">
                 <p className="text-sm text-gray-600">Minimum Order Quantity</p>
@@ -825,15 +827,110 @@ function DocumentsTab({ vendor }: { vendor: VendorProfile }) {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
-            No documents uploaded yet.
-          </div>
+          <p className="text-gray-500 text-center py-8">No documents uploaded yet.</p>
         )}
       </CardContent>
     </Card>
   )
 }
 
+function BankDetailsTab({ vendor }: { vendor: VendorProfile }) {
+  // Check if bank details strictly exist either as an object or as a nested object
+  // Based on the VendorProfile interface, it's bankDetails?: any
+  // But often it might be nested or direct properties
+
+  const bankDetails = vendor.bankDetails
+
+  if (!bankDetails) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <CreditCard className="h-5 w-5" />
+            <span>Bank Information</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-gray-500">
+            <CreditCard className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+            <p>No bank details available for this vendor.</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <CreditCard className="h-5 w-5" />
+          <span>Bank Information</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600">Account Holder Name</p>
+              <p className="font-medium text-lg">{bankDetails.accountHolderName || 'N/A'}</p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-600">Bank Name</p>
+              <p className="font-medium">{bankDetails.bankName || 'N/A'}</p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-600">Account Number</p>
+              <p className="font-medium font-mono">{bankDetails.accountNumber || 'N/A'}</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600">IFSC / Swift Code</p>
+              <p className="font-medium">{bankDetails.ifscCode || bankDetails.swiftCode || 'N/A'}</p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-600">Account Type</p>
+              <p className="font-medium capitalize">{bankDetails.accountType || 'N/A'}</p>
+            </div>
+
+            {(bankDetails.branchName || bankDetails.branchAddress) && (
+              <div>
+                <p className="text-sm text-gray-600">Branch Details</p>
+                {bankDetails.branchName && <p className="font-medium">{bankDetails.branchName}</p>}
+                {bankDetails.branchAddress && <p className="text-sm text-gray-800">{bankDetails.branchAddress}</p>}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {bankDetails.isVerified !== undefined && (
+          <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Verification Status:</span>
+              {bankDetails.isVerified ? (
+                <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3" /> Verified
+                </Badge>
+              ) : (
+                <Badge className="bg-yellow-100 text-yellow-800">Pending Verification</Badge>
+              )}
+            </div>
+            {bankDetails.verifiedAt && (
+              <p className="text-xs text-gray-500">
+                Verified on {new Date(bankDetails.verifiedAt).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 function PerformanceTab({ vendor }: { vendor: VendorProfile }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -849,14 +946,14 @@ function PerformanceTab({ vendor }: { vendor: VendorProfile }) {
                 <span className="font-semibold">{vendor.annualTurnover}</span>
               </div>
             )}
-            
+
             {vendor.exportExperience !== undefined && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Export Experience</span>
                 <span className="font-semibold">{vendor.exportExperience ? 'Yes' : 'No'}</span>
               </div>
             )}
-            
+
             {vendor.paymentTerms && vendor.paymentTerms.length > 0 && (
               <div>
                 <span className="text-sm text-gray-600">Payment Terms</span>
@@ -891,7 +988,7 @@ function PerformanceTab({ vendor }: { vendor: VendorProfile }) {
                 </div>
               </div>
             )}
-            
+
             {vendor.exportCountries && vendor.exportCountries.length > 0 && (
               <div>
                 <p className="text-sm text-gray-600">Export Countries</p>

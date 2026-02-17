@@ -98,7 +98,7 @@ class CartService {
   addToLocalCart(productId: string, quantity: number = 1): void {
     const cart = this.getLocalCart();
     const existingItem = cart.find(item => item.productId === productId);
-    
+
     if (existingItem) {
       existingItem.quantity += quantity;
     } else {
@@ -109,7 +109,7 @@ class CartService {
         price: 0 // Will be updated when fetching product details
       });
     }
-    
+
     this.saveLocalCart(cart);
   }
 
@@ -117,6 +117,16 @@ class CartService {
     const cart = this.getLocalCart();
     const updatedCart = cart.filter(item => item.productId !== productId);
     this.saveLocalCart(updatedCart);
+  }
+
+  updateLocalCartItem(productId: string, quantity: number): void {
+    const cart = this.getLocalCart();
+    const existingItem = cart.find(item => item.productId === productId);
+
+    if (existingItem) {
+      existingItem.quantity = quantity;
+      this.saveLocalCart(cart);
+    }
   }
 
   clearLocalCart(): void {
