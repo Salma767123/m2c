@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Save, AlertCircle, CheckCircle, Eye, EyeOff, Upload, FileText, File, Image } from 'lucide-react'
 import VendorService, { VendorBankDetails, VendorDocument } from '@/services/vendorService'
+import Dropdown from '@/components/UI/Dropdown'
+import { Button } from '@/components/UI/Button'
 
 interface BankDetailsForm {
   accountHolderName: string
@@ -294,18 +296,20 @@ export default function BankDetails() {
                 required
                 disabled={bankDetails?.isVerified}
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => setShowAccountNumber(!showAccountNumber)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
                 disabled={bankDetails?.isVerified}
               >
                 {showAccountNumber ? (
-                  <EyeOff className="w-5 h-5" />
+                  <EyeOff className="w-4 h-4" />
                 ) : (
-                  <Eye className="w-5 h-5" />
+                  <Eye className="w-4 h-4" />
                 )}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -328,20 +332,20 @@ export default function BankDetails() {
 
           {/* Account Type */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Account Type <span className="text-red-500">*</span>
             </label>
-            <select
-              name="accountType"
+            <Dropdown
+              id="accountType"
               value={formData.accountType}
-              onChange={handleChange}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed"
-              required
+              options={[
+                { value: 'savings', label: 'Savings Account' },
+                { value: 'current', label: 'Current Account' }
+              ]}
+              placeholder="Select account type"
+              onChange={(value) => handleChange({ target: { name: 'accountType', value } } as any)}
               disabled={bankDetails?.isVerified}
-            >
-              <option value="savings">Savings Account</option>
-              <option value="current">Current Account</option>
-            </select>
+            />
           </div>
 
           {/* Branch Name */}
@@ -381,14 +385,15 @@ export default function BankDetails() {
         {/* Submit Button */}
         {(!bankDetails || !bankDetails.isVerified) && (
           <div className="flex gap-3 pt-4 border-t">
-            <button
+            <Button
               type="submit"
               disabled={isSaving}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2.5 px-6 rounded-lg transition-all duration-200 transform hover:scale-105"
+              className="bg-blue-600 text-white hover:bg-blue-700"
+              size="lg"
             >
-              <Save className="w-4 h-4" />
+              <Save className="w-4 h-4 mr-2" />
               {isSaving ? 'Saving...' : bankDetails ? 'Update Bank Details' : 'Save Bank Details'}
-            </button>
+            </Button>
           </div>
         )}
       </form>
@@ -481,27 +486,37 @@ export default function BankDetails() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <a
-                        href={documents.find(d => d.type === type)?.documentUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      <Button
+                        variant="link"
+                        size="sm"
+                        asChild
+                        className="h-auto p-0 text-blue-600 hover:text-blue-700"
                       >
-                        View
-                      </a>
-                      <button
+                        <a
+                          href={documents.find(d => d.type === type)?.documentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View
+                        </a>
+                      </Button>
+                      <Button
+                        variant="link"
+                        size="sm"
                         onClick={() => document.getElementById(`file-${type}`)?.click()}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        className="h-auto p-0 text-blue-600 hover:text-blue-700"
                       >
                         Replace
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="link"
+                        size="sm"
                         onClick={() => handleDocumentDelete(documents.find(d => d.type === type)?.id || '')}
-                        className="text-sm text-red-600 hover:text-red-700 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
                         disabled={uploadingDoc === 'deleting'}
+                        className="h-auto p-0 text-red-600 hover:text-red-700 disabled:text-gray-400"
                       >
                         {uploadingDoc === 'deleting' ? 'Deleting...' : 'Delete'}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -515,13 +530,14 @@ export default function BankDetails() {
                       <div className="space-y-2">
                         <Upload className="mx-auto h-12 w-12 text-gray-400" />
                         <div className="text-sm text-gray-600">
-                          <button 
+                          <Button
                             type="button"
+                            variant="link"
                             onClick={() => document.getElementById(`file-${type}`)?.click()}
-                            className="font-medium text-blue-600 hover:text-blue-500"
+                            className="h-auto p-0 font-medium text-blue-600 hover:text-blue-500"
                           >
                             Upload a file
-                          </button>
+                          </Button>
                           <span> or drag and drop</span>
                         </div>
                         <p className="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>

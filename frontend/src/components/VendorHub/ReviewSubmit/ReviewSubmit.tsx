@@ -223,7 +223,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
   const SectionHeader = ({ title, step }: { title: string; step: number }) => (
     <div className="flex items-center justify-between mb-4">
       <h3 className="font-bold text-lg">{title}</h3>
-      <button type="button" onClick={() => onGoToStep(step)} className="text-white bg-gray-400 p-2 rounded-md flex items-center gap-1 text-base">
+      <button type="button" onClick={() => onGoToStep(step)} className="text-white bg-gray-900 p-2 rounded-md flex items-center gap-1 text-base">
         <SquarePen className="w-4 h-4" />
         Edit
       </button>
@@ -377,6 +377,8 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
           <div className="space-y-1">
             <InfoRow label="Business Type" value={getBusinessTypeLabel(data.businessType)} />
             <InfoRow label="Company Name" value={data.companyName} />
+            <InfoRow label="GST Number" value={data.gstNumber || 'Not provided'} />
+            <InfoRow label="GST Document" value={data.gstFile ? 'Uploaded' : 'Not uploaded'} />
             <InfoRow label="Email" value={data.email} />
             <InfoRow label="Phone" value={data.phone} />
             <InfoRow label="Website" value={data.website} />

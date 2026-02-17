@@ -211,7 +211,7 @@ export default function VendorReports() {
               />
             </div>
             <Button 
-              className="bg-gray-900 hover:bg-gray-700 gap-2"
+              className="bg-gray-900 text-white hover:bg-gray-700 gap-2"
               onClick={() => handleExport(exportFormat as 'pdf' | 'excel' | 'csv')}
             >
               <Download className="w-4 h-4" />

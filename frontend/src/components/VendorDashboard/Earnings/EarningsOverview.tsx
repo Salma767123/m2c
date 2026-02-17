@@ -165,7 +165,7 @@ export default function EarningsOverview() {
               placeholder="Select Period"
             />
           </div>
-          <Button className="bg-gray-900 hover:bg-gray-700 gap-2">
+          <Button className="bg-gray-900 text-white hover:bg-gray-700 gap-2">
             <Download className="w-4 h-4" />
             Export
           </Button>
