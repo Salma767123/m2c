@@ -9,6 +9,7 @@ import Dropdown from '@/components/UI/Dropdown'
 import { ArrowLeft, Save, X, Upload, Package } from 'lucide-react'
 import Link from 'next/link'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
+import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
 
 interface InventoryItem {
   id: string
@@ -46,7 +47,7 @@ const getColorName = (hex: string): string => {
     '#a52a2a': 'Brown',
     '#f5f5dc': 'Beige'
   }
-  
+
   return colorMap[hex.toLowerCase()] || `Custom (${hex})`
 }
 const categorySubcategories: Record<string, string[]> = {
@@ -103,66 +104,67 @@ interface ProductFormData {
   // Inventory Connection (NEW FLOW)
   inventoryItemId?: string // Link to inventory item
   isFromInventory: boolean // Whether this product is created from inventory
-  
+
   // Vendor Information (NEW)
   vendorId?: string // Link to vendor
   vendorName?: string // Vendor name for display
-  
+
   name: string
   description: string
   category: string
   subCategory: string
-  
+
   // Pricing Information
   basePrice: number
   originalPrice?: number
   discount?: number // Discount percentage (e.g., 25 for 25% off)
-  
+  gstPercentage?: number // GST Percentage for the product
+
   // Basic Product Info - Size & Color
   singleUnitSize?: string
   singleUnitColor?: string
   singleUnitColorHex?: string
-  
+
   // Product Rating & Reviews (for display/reference)
   rating?: number
   reviews?: number
-  
+
   // Fabric & Specifications
   fabricType: string
   material: string // Main material description (e.g., "100% Organic Cotton")
   fabricSpecifications: FabricSpecification
-  
+
   // Variants Management
   variants: ProductVariant[]
   hasVariants: boolean
-  
+
   // Base Product Info (when no variants)
   baseSku: string
-  
+
   // Images
   images: ProductImage[]
-  
+
   // Pricing Configuration
   pricingTiers: PricingTier[]
   bulkPricingEnabled: boolean
   singleUnitPricingEnabled: boolean // New field for flexible pricing
-  
+
   // Stock Management
   totalStock: number
   lowStockThreshold: number
   trackInventory: boolean
-  
+
   // Order Configuration
   minimumOrderQuantity: number
   maximumOrderQuantity?: number
-  
+
   // Dispatch & Shipping
   dispatchTimeline: {
     processingDays: number
     shippingDays: number
     totalDays: number
   }
-  
+
   // Additional Info
   tags: string[]
   dimensions?: string
@@ -181,7 +183,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
-  
+
   // State for dynamic data
   const [vendors, setVendors] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [categories, setCategories] = useState<string[]>([])
@@ -190,35 +192,40 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [isLoadingVendors, setIsLoadingVendors] = useState(true)
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
   const [isLoadingInventory, setIsLoadingInventory] = useState(false)
-  
+
+  // GST State
+  const [gstRates, setGstRates] = useState<GSTSetting[]>([])
+  const [isLoadingGst, setIsLoadingGst] = useState(false)
+
   const [formData, setFormData] = useState<ProductFormData>({
     // Inventory Connection (NEW)
     inventoryItemId: inventoryId || '',
     isFromInventory: !!inventoryId,
-    
+
     // Vendor Information (NEW)
     vendorId: '',
     vendorName: '',
-    
+
     name: '',
     description: '',
     category: '',
     subCategory: '',
-    
+
     // Pricing Information
     basePrice: 0,
     originalPrice: undefined,
     discount: undefined,
-    
+    gstPercentage: undefined,
+
     // Basic Product Info - Size & Color
     singleUnitSize: '',
     singleUnitColor: '',
     singleUnitColorHex: '#000000',
-    
+
     // Product Rating & Reviews
     rating: undefined,
     reviews: undefined,
-    
+
     // Fabric & Specifications
     fabricType: '',
     material: '',
@@ -230,38 +237,38 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       finish: '',
       careInstructions: []
     },
-    
+
     // Variants Management
     variants: [],
     hasVariants: false,
-    
+
     // Base Product Info
     baseSku: '',
-    
+
     // Images
     images: [],
-    
+
     // Pricing Configuration
     pricingTiers: [{ minQuantity: 1, price: 0 }],
     bulkPricingEnabled: false,
     singleUnitPricingEnabled: true,
-    
+
     // Stock Management
     totalStock: 0,
     lowStockThreshold: 10,
     trackInventory: true,
-    
+
     // Order Configuration
     minimumOrderQuantity: 1,
     maximumOrderQuantity: undefined,
-    
+
     // Dispatch & Shipping
     dispatchTimeline: {
       processingDays: 0,
       shippingDays: 0,
       totalDays: 0
     },
-    
+
     // Additional Info
     tags: [],
     dimensions: '',
@@ -273,14 +280,14 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [selectedTag, setSelectedTag] = useState('')
   const [newCareInstruction, setNewCareInstruction] = useState('')
   const [activeTab, setActiveTab] = useState('basic')
-  
+
   // Debug: Log category and subcategory changes
   useEffect(() => {
     console.log('=== FORM DATA CATEGORY/SUBCATEGORY CHANGED ===')
     console.log('Category:', formData.category)
     console.log('SubCategory:', formData.subCategory)
   }, [formData.category, formData.subCategory])
-  
+
   // Debug: Log when categories are loaded
   useEffect(() => {
     console.log('=== CATEGORIES STATE CHANGED ===')
@@ -288,7 +295,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     console.log('Categories length:', categories.length)
     console.log('Subcategories map:', vendorSubcategories)
   }, [categories, vendorSubcategories])
-  
+
   // Load vendors on mount (categories loaded per vendor)
   useEffect(() => {
     const loadVendors = async () => {
@@ -297,7 +304,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         setIsLoadingVendors(true)
         const { default: VendorService } = await import('@/services/vendorService')
         const vendorsResponse = await VendorService.getAllVendors({ status: 'APPROVED' })
-        
+
         if (vendorsResponse.vendors) {
           setVendors(vendorsResponse.vendors.map(v => ({
             id: v.id,
@@ -314,8 +321,25 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     }
 
     loadVendors()
+    loadVendors()
+
+    // Load GST Rates
+    const loadGstRates = async () => {
+      setIsLoadingGst(true)
+      try {
+        const response = await gstSettingsService.getSettings()
+        if (response.success) {
+          setGstRates(response.data)
+        }
+      } catch (error) {
+        console.error('Error fetching GST settings:', error)
+      } finally {
+        setIsLoadingGst(false)
+      }
+    }
+    loadGstRates()
   }, [])
-  
+
   // Predefined tag options
   const tagOptions = [
     { value: 'Featured', label: 'Featured' },
@@ -356,39 +380,40 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   useEffect(() => {
     if (isEdit && productId) {
       setIsLoadingData(true)
-      
+
       // Fetch actual product data from API
       const loadProductData = async () => {
         try {
           const { adminProductService } = await import('@/services/adminProductService')
           const response = await adminProductService.getProduct(productId)
-          
+
           if (response.success && response.data) {
             const product = response.data
-            
+
             // Map API response to form data
             setFormData({
               inventoryItemId: product.inventory?.id || '',
               isFromInventory: !!product.inventory,
-              
+
               // Vendor Information
               vendorId: product.vendorId,
               vendorName: product.vendor?.companyName || '',
-              
+
               name: product.name,
               description: product.description,
               category: product.category,
               subCategory: product.subCategory || '',
-              
+
               // Pricing Information
               basePrice: product.basePrice,
               originalPrice: product.originalPrice,
               discount: product.discount,
-              
+              gstPercentage: product.gstPercentage,
+
               // Product Rating & Reviews
               rating: undefined,
               reviews: undefined,
-              
+
               fabricType: product.fabricType || '',
               material: product.material || '',
               fabricSpecifications: product.fabricSpecifications || {
@@ -399,7 +424,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 finish: '',
                 careInstructions: []
               },
-              
+
               variants: product.variants?.map(v => ({
                 id: v.id,
                 size: v.size,
@@ -411,9 +436,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 images: []
               })) || [],
               hasVariants: product.hasVariants,
-              
+
               baseSku: product.baseSku,
-              
+
               // Map actual product images
               images: product.images?.map(img => ({
                 id: img.id,
@@ -422,31 +447,31 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 isPrimary: img.isPrimary,
                 imageType: img.imageType as 'cover' | 'gallery'
               })) || [],
-              
+
               pricingTiers: product.pricingTiers || [{ minQuantity: 1, price: product.basePrice }],
               bulkPricingEnabled: product.bulkPricingEnabled,
               singleUnitPricingEnabled: product.singleUnitPricingEnabled,
-              
+
               totalStock: product.totalStock,
               lowStockThreshold: product.lowStockThreshold,
               trackInventory: product.trackInventory,
-              
+
               minimumOrderQuantity: product.minimumOrderQuantity,
               maximumOrderQuantity: product.maximumOrderQuantity,
-              
+
               dispatchTimeline: product.dispatchTimeline || {
                 processingDays: 0,
                 shippingDays: 0,
                 totalDays: 0
               },
-              
+
               tags: product.tags || [],
               dimensions: product.dimensions,
               weight: product.weight,
               inStock: product.inStock,
               status: product.status || 'ACTIVE'
             })
-            
+
             // Set selected inventory item if exists
             if (product.inventory) {
               setSelectedInventoryItem({
@@ -478,13 +503,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 // Use axios instance instead of fetch for proper authentication
                 const axiosInstance = (await import('@/lib/axios')).default
                 const response = await axiosInstance.get(`/inventory/admin/vendor/${product.vendorId}/categories`)
-                
+
                 const vendorCategories = response.data.data.categories || []
                 const vendorSubcats = response.data.data.subcategories || []
-                
+
                 // Set categories as names
                 setCategories(vendorCategories.map((c: any) => c.name))
-                
+
                 // Build subcategories map by category name
                 const subcatsMap: Record<string, string[]> = {}
                 vendorCategories.forEach((cat: any) => {
@@ -493,7 +518,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     subcatsMap[cat.name] = catSubcats
                   }
                 })
-                
+
                 setVendorSubcategories(subcatsMap)
               } catch (error) {
                 console.error('Error loading vendor categories:', error)
@@ -526,37 +551,37 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     console.log('Inventory category:', inventoryItem.category)
     console.log('Inventory subcategory:', inventoryItem.subcategory)
     console.log('Is loading categories?', isLoadingCategories)
-    
+
     // Warn if categories aren't loaded yet (shouldn't happen with disabled dropdown)
     if (categories.length === 0) {
       console.warn('⚠️ WARNING: Categories array is empty! This should not happen.')
       showWarningToast('Please Wait', 'Categories are still loading. Please try again in a moment.')
       return
     }
-    
+
     // Find the matching category with case-insensitive comparison
     const matchedCategory = categories.find(
       cat => cat.toLowerCase() === inventoryItem.category.toLowerCase()
     )
-    
+
     console.log('Matched category (case-corrected):', matchedCategory)
-    
+
     if (!matchedCategory) {
       console.warn('⚠️ WARNING: Inventory category not found in loaded categories!')
       console.warn('Inventory category:', inventoryItem.category)
       console.warn('Available categories:', categories)
       showWarningToast('Category Mismatch', `Category "${inventoryItem.category}" not found in vendor's categories.`)
     }
-    
+
     // Find matching subcategory with case-insensitive comparison
     const categorySubcats = matchedCategory ? vendorSubcategories[matchedCategory] || [] : []
-    const matchedSubcategory = inventoryItem.subcategory 
+    const matchedSubcategory = inventoryItem.subcategory
       ? categorySubcats.find(sub => sub.toLowerCase() === inventoryItem.subcategory?.toLowerCase())
       : ''
-    
+
     console.log('Available subcategories for category:', categorySubcats)
     console.log('Matched subcategory (case-corrected):', matchedSubcategory)
-    
+
     setSelectedInventoryItem(inventoryItem)
     setFormData(prev => {
       const newData = {
@@ -571,7 +596,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         baseSku: inventoryItem.sku,
         totalStock: inventoryItem.currentStock
       }
-      
+
       console.log('New form data after inventory selection:', newData)
       console.log('Setting category to:', newData.category)
       console.log('Setting subCategory to:', newData.subCategory)
@@ -611,24 +636,24 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       try {
         console.log('=== FETCHING VENDOR CATEGORIES ===')
         console.log('Vendor ID:', vendorId)
-        
+
         // Use axios instance instead of fetch for proper authentication
         const { default: axiosInstance } = await import('@/lib/axios')
         const response = await axiosInstance.get(`/inventory/admin/vendor/${vendorId}/categories`)
-        
+
         console.log('Response data:', response.data)
-        
+
         const vendorCategories = response.data.data.categories || []
         const vendorSubcats = response.data.data.subcategories || []
-        
+
         console.log('=== LOADED VENDOR CATEGORIES ===')
         console.log('Categories:', vendorCategories)
         console.log('Subcategories:', vendorSubcats)
-        
+
         // Set categories as names
         const categoryNames = vendorCategories.map((c: any) => c.name)
         setCategories(categoryNames)
-        
+
         // Build subcategories map by category name
         const subcatsMap: Record<string, string[]> = {}
         vendorCategories.forEach((cat: any) => {
@@ -639,12 +664,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               return true // For now, we'll need to check the actual data structure
             })
             .map((sub: any) => sub.name)
-          
+
           if (catSubcats.length > 0) {
             subcatsMap[cat.name] = catSubcats
           }
         })
-        
+
         setVendorSubcategories(subcatsMap)
         console.log('Loaded vendor categories:', categoryNames)
         console.log('Loaded vendor subcategories map:', subcatsMap)
@@ -678,7 +703,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    
+
     // Handle dispatchTimeline with auto-calculation FIRST (before generic dot notation)
     if (name.startsWith('dispatchTimeline.')) {
       const field = name.replace('dispatchTimeline.', '')
@@ -688,11 +713,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         dispatchTimeline: {
           ...prev.dispatchTimeline,
           [field]: numValue,
-          totalDays: field === 'processingDays' 
+          totalDays: field === 'processingDays'
             ? numValue + prev.dispatchTimeline.shippingDays
             : field === 'shippingDays'
-            ? prev.dispatchTimeline.processingDays + numValue
-            : prev.dispatchTimeline.totalDays
+              ? prev.dispatchTimeline.processingDays + numValue
+              : prev.dispatchTimeline.totalDays
         }
       }))
     } else if (name.includes('.')) {
@@ -709,22 +734,22 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       setFormData(prev => {
         const updated = {
           ...prev,
-          [name]: type === 'number' ? parseFloat(value) || 0 : 
-                   type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+          [name]: type === 'number' ? parseFloat(value) || 0 :
+            type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
         }
-        
+
         // Auto-calculate discount percentage when originalPrice or basePrice changes
         if ((name === 'originalPrice' || name === 'basePrice') && updated.originalPrice && updated.basePrice) {
           const original = parseFloat(String(updated.originalPrice)) || 0
           const base = parseFloat(String(updated.basePrice)) || 0
-          
+
           if (original > base && base > 0) {
             updated.discount = Math.round(((original - base) / original) * 100)
           } else {
             updated.discount = undefined
           }
         }
-        
+
         return updated
       })
     }
@@ -742,12 +767,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         stock: newVariant.stock || 0,
         images: []
       }
-      
+
       setFormData(prev => ({
         ...prev,
         variants: [...prev.variants, variant]
       }))
-      
+
       setNewVariant({ size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0 })
     }
   }
@@ -766,8 +791,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         if (v.id === variantId) {
           // If updating colorHex, also update color name
           if (field === 'colorHex') {
-            return { 
-              ...v, 
+            return {
+              ...v,
               [field]: value,
               color: getColorName(value)
             }
@@ -797,7 +822,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const updatePricingTier = (index: number, field: keyof PricingTier, value: any) => {
     setFormData(prev => ({
       ...prev,
-      pricingTiers: prev.pricingTiers.map((tier, i) => 
+      pricingTiers: prev.pricingTiers.map((tier, i) =>
         i === index ? { ...tier, [field]: value } : tier
       )
     }))
@@ -869,13 +894,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (imageType === 'gallery') {
       const existingGalleryImages = formData.images.filter(img => img.imageType === 'gallery')
       const remainingSlots = 3 - existingGalleryImages.length
-      
+
       if (remainingSlots <= 0) {
         showWarningToast('Gallery Limit Reached', 'Maximum 3 gallery images allowed. Please remove some images first.')
         e.target.value = '' // Reset input
         return
       }
-      
+
       if (files.length > remainingSlots) {
         showWarningToast('Too Many Images', `You can only add ${remainingSlots} more gallery image${remainingSlots > 1 ? 's' : ''}.`)
         e.target.value = '' // Reset input
@@ -1000,13 +1025,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Basic validation
     if (!formData.name.trim()) {
       showErrorToast('Validation Error', 'Product name is required.')
       return
     }
-    
+
     if (!formData.category) {
       showErrorToast('Validation Error', 'Please select a category.')
       return
@@ -1016,23 +1041,23 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       showErrorToast('Validation Error', 'Please select a vendor.')
       return
     }
-    
+
     // Pricing validation
     if (!formData.singleUnitPricingEnabled && !formData.bulkPricingEnabled) {
       showErrorToast('Validation Error', 'Please select at least one pricing strategy.')
       return
     }
-    
+
     if (formData.singleUnitPricingEnabled && formData.basePrice <= 0) {
       showErrorToast('Validation Error', 'Please enter a valid base price for single unit pricing.')
       return
     }
-    
+
     if (formData.bulkPricingEnabled && formData.pricingTiers.some(tier => tier.price <= 0)) {
       showErrorToast('Validation Error', 'Please enter valid prices for all bulk pricing tiers.')
       return
     }
-    
+
     if (formData.hasVariants && formData.variants.length === 0) {
       showErrorToast('Validation Error', 'Please add at least one variant or disable variants.')
       return
@@ -1042,11 +1067,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
     try {
       const { adminProductService } = await import('@/services/adminProductService')
-      
+
       if (isEdit && productId) {
         // Update existing product
         const response = await adminProductService.updateProduct(productId, formData)
-        
+
         if (response.success) {
           showSuccessToast('Product Updated', 'Product has been updated successfully.')
           setHasUnsavedChanges(false)
@@ -1055,7 +1080,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       } else {
         // Create new product
         const response = await adminProductService.createProduct(formData)
-        
+
         if (response.success) {
           showSuccessToast('Product Created', 'Product has been created successfully.')
           setHasUnsavedChanges(false)
@@ -1126,11 +1151,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-gray-700 text-gray-900'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
+                    ? 'border-gray-700 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -1142,7 +1166,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Basic Information Tab */}
             {activeTab === 'basic' && (
               <Card>
@@ -1171,14 +1195,14 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       <p className="text-xs text-blue-600 mt-1">ℹ️ Vendor cannot be changed when editing</p>
                     )}
                   </div>
-                  
+
                   {/* Inventory Selection */}
                   <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
                     <h4 className="font-medium text-blue-900 mb-3">Select Inventory Item</h4>
                     <p className="text-sm text-blue-800 mb-4">
                       Choose an inventory item to create a detailed product with variants
                     </p>
-                    
+
                     {!formData.vendorId ? (
                       <p className="text-sm text-gray-600 italic">
                         Please select a vendor first to view their inventory items
@@ -1237,9 +1261,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             <p className="text-sm text-gray-600">SKU: {selectedInventoryItem.sku}</p>
                             <p className="text-sm text-gray-600">Category: {selectedInventoryItem.category}</p>
                           </div>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
+                          <Button
+                            type="button"
+                            variant="outline"
                             size="sm"
                             onClick={clearInventorySelection}
                           >
@@ -1323,13 +1347,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         value={formData.category}
                         options={categories}
                         placeholder={
-                          !formData.vendorId 
-                            ? "Select vendor first" 
-                            : isLoadingCategories 
-                            ? "Loading categories..." 
-                            : categories.length === 0 
-                            ? "No categories available" 
-                            : "Select Category"
+                          !formData.vendorId
+                            ? "Select vendor first"
+                            : isLoadingCategories
+                              ? "Loading categories..."
+                              : categories.length === 0
+                                ? "No categories available"
+                                : "Select Category"
                         }
                         onChange={(value) => setFormData(prev => ({ ...prev, category: value as string, subCategory: '' }))}
                         disabled={!formData.vendorId || isLoadingCategories}
@@ -1353,7 +1377,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     </div>
                   </div>
 
-                  
+
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -1392,9 +1416,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         value={formData.baseSku}
                         onChange={handleInputChange}
                         disabled={formData.isFromInventory}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${
-                          formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
-                        }`}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
+                          }`}
                         placeholder="e.g., CS-001"
                       />
                       {formData.isFromInventory && (
@@ -1635,8 +1658,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                   value={newVariant.colorHex || '#000000'}
                                   onChange={(e) => {
                                     const hex = e.target.value
-                                    setNewVariant(prev => ({ 
-                                      ...prev, 
+                                    setNewVariant(prev => ({
+                                      ...prev,
                                       colorHex: hex,
                                       color: getColorName(hex)
                                     }))
@@ -1698,8 +1721,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
                           {/* Action Button */}
                           <div className="flex justify-end pt-4 border-t border-gray-200">
-                            <Button 
-                              type="button" 
+                            <Button
+                              type="button"
                               onClick={addVariant}
                               disabled={!newVariant.size || !newVariant.color || !newVariant.sku || !newVariant.price}
                               className="bg-gray-900 text-white hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed px-6 py-2.5 font-medium"
@@ -1762,11 +1785,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                     <TableCell className="text-gray-700 font-mono text-xs">{variant.sku}</TableCell>
                                     <TableCell className="text-gray-900 font-semibold">₹{variant.price.toFixed(2)}</TableCell>
                                     <TableCell>
-                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                        variant.stock > 20 ? 'bg-green-100 text-green-800' :
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${variant.stock > 20 ? 'bg-green-100 text-green-800' :
                                         variant.stock > 5 ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-red-100 text-red-800'
-                                      }`}>
+                                          'bg-red-100 text-red-800'
+                                        }`}>
                                         {variant.stock} units
                                       </span>
                                     </TableCell>
@@ -1875,6 +1897,35 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <CardTitle>Pricing Configuration</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {/* GST Selection */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-900 mb-3">Tax Configuration</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Dropdown
+                          label="GST Rate"
+                          value={formData.gstPercentage?.toString() || ''}
+                          options={[
+                            { value: '', label: 'Select GST Rate' },
+                            ...gstRates.filter(rate => rate.isActive).map(rate => ({
+                              value: rate.percentage.toString(),
+                              label: `${rate.percentage}% - ${rate.description || 'GST'}`
+                            }))
+                          ]}
+                          onChange={(value) => setFormData(prev => ({
+                            ...prev,
+                            gstPercentage: value ? parseFloat(value as string) : undefined
+                          }))}
+                          placeholder={isLoadingGst ? "Loading rates..." : "Select GST Rate"}
+                          disabled={isLoadingGst}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Select the applicable GST rate for this product</p>
+                        {!formData.gstPercentage && (
+                          <p className="text-xs text-red-500 mt-1">GST Rate is required</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                   {/* Single Price Section */}
                   <div className="border-2 border-gray-300 rounded-lg p-6">
                     <h4 className="font-semibold text-gray-900 mb-4">Single Unit Pricing</h4>
@@ -1997,10 +2048,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             <TableBody>
                               {formData.pricingTiers.map((tier, index) => {
                                 const savings = formData.basePrice - tier.price
-                                const discountPercent = formData.basePrice > 0 
+                                const discountPercent = formData.basePrice > 0
                                   ? ((savings / formData.basePrice) * 100).toFixed(1)
                                   : 0
-                                
+
                                 return (
                                   <TableRow key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100'}>
                                     <TableCell>
@@ -2057,8 +2108,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         </div>
 
                         {/* Add Tier Button */}
-                        <Button 
-                          type="button" 
+                        <Button
+                          type="button"
                           onClick={addPricingTier}
                           className="w-full bg-gray-900 text-white hover:bg-black"
                         >
@@ -2246,7 +2297,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h4 className="font-medium text-blue-900 mb-2">Delivery Timeline Summary</h4>
                     <p className="text-sm text-blue-800">
-                      Orders will be processed in <strong>{formData.dispatchTimeline.processingDays} day(s)</strong> and 
+                      Orders will be processed in <strong>{formData.dispatchTimeline.processingDays} day(s)</strong> and
                       delivered within <strong>{formData.dispatchTimeline.totalDays} day(s)</strong> from order confirmation.
                     </p>
                   </div>
@@ -2299,7 +2350,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   {/* Cover Image Upload */}
                   <div>
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Cover Image (1 image only)</h4>
-                    <div 
+                    <div
                       className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer bg-blue-50"
                       onClick={() => document.getElementById('cover-image-upload')?.click()}
                     >
@@ -2319,7 +2370,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   {/* Gallery Images Upload */}
                   <div>
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Gallery Images (Max 3 images)</h4>
-                    <div 
+                    <div
                       className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-400 transition-colors cursor-pointer bg-green-50"
                       onClick={() => document.getElementById('gallery-image-upload')?.click()}
                     >
@@ -2336,7 +2387,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       />
                     </div>
                   </div>
-                  
+
                   {/* Image Preview Grid */}
                   {formData.images.length > 0 && (
                     <div>
@@ -2400,7 +2451,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Total Stock:</span>
                   <span className="font-medium">
-                    {formData.hasVariants 
+                    {formData.hasVariants
                       ? formData.variants.reduce((sum, v) => sum + v.stock, 0)
                       : formData.totalStock
                     }
@@ -2440,7 +2491,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <Save className="h-4 w-4 mr-2" />
                   {isLoading ? 'Saving...' : (isEdit ? 'Update Product' : 'Create Product')}
                 </Button>
-                
+
                 {!isEdit && (
                   <Button
                     type="button"
@@ -2452,13 +2503,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     Save as Draft
                   </Button>
                 )}
-                
+
                 <Link href="/admin/dashboard/products" className="block">
                   <Button type="button" variant="outline" className="w-full">
                     Cancel
                   </Button>
                 </Link>
-                
+
                 {hasUnsavedChanges && (
                   <p className="text-xs text-amber-600 text-center">
                     You have unsaved changes

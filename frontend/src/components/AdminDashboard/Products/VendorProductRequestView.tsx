@@ -6,14 +6,14 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
-import { 
-  ArrowLeft, 
-  Check, 
-  X, 
-  Calendar, 
-  Package, 
-  User, 
-  Tag, 
+import {
+  ArrowLeft,
+  Check,
+  X,
+  Calendar,
+  Package,
+  User,
+  Tag,
   DollarSign,
   FileText,
   Image as ImageIcon,
@@ -73,14 +73,14 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
     try {
       setActionLoading(true)
       const response = await adminProductService.approveProduct(product.id, parseFloat(adminPrice))
-      
+
       if (response.success) {
         showSuccessToast('Product Approved', 'The vendor product has been approved and is now live.')
         setShowApprovalModal(false)
         // Update local state
-        setProduct(prev => prev ? { 
-          ...prev, 
-          approvalStatus: 'APPROVED', 
+        setProduct(prev => prev ? {
+          ...prev,
+          approvalStatus: 'APPROVED',
           approvedAt: new Date().toISOString(),
           adminFixedPrice: parseFloat(adminPrice) // Store in adminFixedPrice field
         } : null)
@@ -103,16 +103,16 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
     try {
       setActionLoading(true)
       const response = await adminProductService.rejectProduct(product.id, rejectionReason.trim())
-      
+
       if (response.success) {
         showSuccessToast('Product Rejected', 'The vendor has been notified of the rejection.')
         setShowRejectionModal(false)
         // Update local state
-        setProduct(prev => prev ? { 
-          ...prev, 
-          approvalStatus: 'REJECTED', 
+        setProduct(prev => prev ? {
+          ...prev,
+          approvalStatus: 'REJECTED',
           rejectionReason: rejectionReason.trim(),
-          approvedAt: undefined 
+          approvedAt: undefined
         } : null)
         // Optionally redirect back to requests list
         setTimeout(() => {
@@ -156,7 +156,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500 font-medium">Product not found</p>
           <p className="text-sm text-gray-400">The requested vendor product could not be found.</p>
-          <Button 
+          <Button
             onClick={() => router.push('/admin/dashboard/products/vendor-requests')}
             className="mt-4"
           >
@@ -340,7 +340,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-500">Dispatch Timeline</span>
                   <span className="text-gray-900">
-                    {product.dispatchTimeline.totalDays} days 
+                    {product.dispatchTimeline.totalDays} days
                     ({product.dispatchTimeline.processingDays} processing + {product.dispatchTimeline.shippingDays} shipping)
                   </span>
                 </div>
@@ -389,6 +389,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   <p className="text-sm text-gray-600">Vendor Price: ₹{product.basePrice}</p>
                   {product.adminFixedPrice && (
                     <p className="text-sm text-green-600 font-medium">Admin Price: ₹{product.adminFixedPrice}</p>
+                  )}
+                  {product.gstPercentage && (
+                    <p className="text-sm text-gray-600">GST: {product.gstPercentage}%</p>
                   )}
                 </div>
               </div>
