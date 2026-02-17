@@ -174,7 +174,7 @@ export default function VendorSettings() {
         <Button 
           onClick={() => isEditing ? handleSave() : setIsEditing(true)}
           disabled={isSaving}
-          className="bg-[#222222] hover:bg-[#313131]"
+          className="bg-[#222222] text-[#ffffff] hover:bg-[#313131]"
         >
           {isSaving ? (
             <>
