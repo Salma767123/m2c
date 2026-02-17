@@ -11,6 +11,9 @@ export interface AdminProduct {
   discount?: number;
   gstPercentage?: number;
   adminFixedPrice?: number; // Admin's fixed price (separate from basePrice)
+  singleUnitSize?: string;
+  singleUnitColor?: string;
+  singleUnitColorHex?: string;
   fabricType?: string;
   material?: string;
   fabricSpecifications?: any;

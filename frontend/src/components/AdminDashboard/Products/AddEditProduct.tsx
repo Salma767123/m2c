@@ -410,6 +410,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               discount: product.discount,
               gstPercentage: product.gstPercentage,
 
+              // Basic Product Info - Size & Color
+              singleUnitSize: product.singleUnitSize || '',
+              singleUnitColor: product.singleUnitColor || '',
+              singleUnitColorHex: product.singleUnitColorHex || '#000000',
+
               // Product Rating & Reviews
               rating: undefined,
               reviews: undefined,
@@ -1426,6 +1431,53 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     </div>
                   </div>
 
+                  {/* Size and Color */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Default Size
+                      </label>
+                      <Dropdown
+                        value={formData.singleUnitSize || ''}
+                        options={standardSizes}
+                        placeholder="Select Size"
+                        onChange={(value) => setFormData(prev => ({ ...prev, singleUnitSize: value as string }))}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Primary size for this product</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Default Color
+                      </label>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={formData.singleUnitColorHex || '#000000'}
+                            onChange={(e) => {
+                              const hex = e.target.value
+                              setFormData(prev => ({
+                                ...prev,
+                                singleUnitColorHex: hex,
+                                singleUnitColor: getColorName(hex)
+                              }))
+                            }}
+                            className="w-10 h-10 border border-gray-300 rounded-md cursor-pointer"
+                            title="Pick a color"
+                          />
+                          <input
+                            type="text"
+                            value={formData.singleUnitColor || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, singleUnitColor: e.target.value }))}
+                            placeholder="Color name"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500">Primary color for this product</p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Tags */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1929,54 +1981,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   {/* Single Price Section */}
                   <div className="border-2 border-gray-300 rounded-lg p-6">
                     <h4 className="font-semibold text-gray-900 mb-4">Single Unit Pricing</h4>
-
-                    {/* Size and Color Configuration */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Default Size
-                        </label>
-                        <select
-                          name="singleUnitSize"
-                          value={formData.singleUnitSize || ''}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                        >
-                          <option value="">Select Size</option>
-                          {standardSizes.map(size => (
-                            <option key={size} value={size}>{size}</option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-gray-600 mt-1">Optional: Default size for single unit</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Default Color
-                        </label>
-                        <div className="flex gap-2">
-                          <select
-                            name="singleUnitColor"
-                            value={formData.singleUnitColor || ''}
-                            onChange={handleInputChange}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          >
-                            <option value="">Select Color</option>
-                            {standardColors.map(color => (
-                              <option key={color} value={color}>{color}</option>
-                            ))}
-                          </select>
-                          <input
-                            type="color"
-                            name="singleUnitColorHex"
-                            value={formData.singleUnitColorHex || '#000000'}
-                            onChange={handleInputChange}
-                            className="w-12 h-10 border border-gray-300 rounded-md cursor-pointer"
-                            title="Pick color"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1">Optional: Default color for single unit</p>
-                      </div>
-                    </div>
 
                     {/* Pricing Fields */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">

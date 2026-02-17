@@ -1809,54 +1809,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         Single Unit Pricing
                       </h4>
 
-                      {/* Size and Color Configuration */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Default Size
-                          </label>
-                          <select
-                            name="singleUnitSize"
-                            value={formData.singleUnitSize || ''}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          >
-                            <option value="">Select Size</option>
-                            {standardSizes.map(size => (
-                              <option key={size} value={size}>{size}</option>
-                            ))}
-                          </select>
-                          <p className="text-xs text-gray-600 mt-1">Optional: Default size for single unit</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Default Color
-                          </label>
-                          <div className="flex gap-2">
-                            <select
-                              name="singleUnitColor"
-                              value={formData.singleUnitColor || ''}
-                              onChange={handleInputChange}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            >
-                              <option value="">Select Color</option>
-                              {standardColors.map(color => (
-                                <option key={color} value={color}>{color}</option>
-                              ))}
-                            </select>
-                            <input
-                              type="color"
-                              name="singleUnitColorHex"
-                              value={formData.singleUnitColorHex || '#000000'}
-                              onChange={handleInputChange}
-                              className="w-12 h-10 border border-gray-300 rounded-md cursor-pointer"
-                              title="Pick color"
-                            />
-                          </div>
-                          <p className="text-xs text-gray-600 mt-1">Optional: Default color for single unit</p>
-                        </div>
-                      </div>
-
                       {/* Pricing Configuration */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
