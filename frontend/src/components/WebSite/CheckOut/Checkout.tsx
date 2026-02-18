@@ -17,8 +17,16 @@ import PaymentForm from "./CheckoutProcess/PaymentForm"
 import ReviewOrder from "./CheckoutProcess/ReviewOrder"
 import cartService, { CartItem } from "@/services/cartService"
 import orderService from "@/services/orderService"
+import paymentService from "@/services/paymentService"
 import { userProfileService } from "@/services/userProfileService"
 import { paymentSettingsService, PublicPaymentSettings } from "@/services/paymentSettingsService"
+
+// Declare Razorpay type for TypeScript
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 export interface CheckoutFormData {
   // Shipping Information
@@ -94,6 +102,7 @@ export default function Checkout() {
     fetchCart()
     fetchUserProfile()
     fetchPaymentSettings()
+    loadRazorpayScript()
   }, [])
 
   useEffect(() => {
@@ -169,6 +178,22 @@ export default function Checkout() {
     }
   }
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      // Check if script already loaded
+      if (window.Razorpay) {
+        resolve(true)
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      script.onload = () => resolve(true)
+      script.onerror = () => resolve(false)
+      document.body.appendChild(script)
+    })
+  }
+
   const calculateTotals = () => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     const shipping = 0
@@ -208,16 +233,112 @@ export default function Checkout() {
         lastName: formData.lastName,
         email: formData.email,
         phone: formData.phone,
-        street: formData.address, // Map address to street
+        street: formData.address,
         city: formData.city,
         state: formData.state,
         zipCode: formData.zipCode,
         country: formData.country,
       }
 
-      // Mock payment ID for now
-      const paymentId = `PAY-${Date.now()}`
+      // Handle Razorpay payment
+      if (formData.paymentMethod === 'razorpay') {
+        await handleRazorpayPayment(shippingAddress)
+      } else if (formData.paymentMethod === 'payu') {
+        await handlePayUPayment(shippingAddress)
+      } else {
+        setError('Invalid payment method selected')
+        setPlacingOrder(false)
+      }
 
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || "An error occurred while processing payment")
+      setPlacingOrder(false)
+    }
+  }
+
+  const handleRazorpayPayment = async (shippingAddress: any) => {
+    try {
+      // Check if Razorpay script is loaded
+      if (!window.Razorpay) {
+        const loaded = await loadRazorpayScript()
+        if (!loaded) {
+          throw new Error('Failed to load Razorpay SDK. Please check your internet connection.')
+        }
+      }
+
+      // Create Razorpay order
+      const orderResponse = await paymentService.createRazorpayOrder(
+        orderSummary.total,
+        'INR'
+      )
+
+      if (!orderResponse.success) {
+        throw new Error('Failed to initialize payment')
+      }
+
+      const { orderId, amount, currency, keyId } = orderResponse.data
+
+      // Razorpay options
+      const options = {
+        key: keyId,
+        amount: amount,
+        currency: currency,
+        name: 'M2C Marketplace',
+        description: 'Order Payment',
+        order_id: orderId,
+        prefill: {
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          contact: formData.phone
+        },
+        theme: {
+          color: '#222222'
+        },
+        handler: async function (response: any) {
+          try {
+            // Verify payment
+            const verifyResponse = await paymentService.verifyRazorpayPayment(
+              response.razorpay_order_id,
+              response.razorpay_payment_id,
+              response.razorpay_signature
+            )
+
+            if (verifyResponse.success) {
+              // Create order after successful payment
+              await createOrderAfterPayment(shippingAddress, response.razorpay_payment_id)
+            } else {
+              throw new Error('Payment verification failed')
+            }
+          } catch (error: any) {
+            setError(error.message || 'Payment verification failed')
+            setPlacingOrder(false)
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setPlacingOrder(false)
+            setError('Payment cancelled by user')
+          }
+        }
+      }
+
+      const razorpay = new window.Razorpay(options)
+      razorpay.open()
+
+    } catch (error: any) {
+      throw error
+    }
+  }
+
+  const handlePayUPayment = async (shippingAddress: any) => {
+    // PayU integration - to be implemented
+    setError('PayU payment is not yet implemented')
+    setPlacingOrder(false)
+  }
+
+  const createOrderAfterPayment = async (shippingAddress: any, paymentId: string) => {
+    try {
       const response = await orderService.createOrder({
         shippingAddress,
         paymentMethod: formData.paymentMethod,
@@ -230,12 +351,10 @@ export default function Checkout() {
       if (response.success && response.data) {
         router.push(`/order-confirmation?id=${response.data.id}`)
       } else {
-        router.push("/order-confirmation") // Fallback
+        router.push("/order-confirmation")
       }
-
-    } catch (err: any) {
-      console.error(err)
-      setError(err.message || "An error occurred while placing the order")
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to create order')
     } finally {
       setPlacingOrder(false)
     }

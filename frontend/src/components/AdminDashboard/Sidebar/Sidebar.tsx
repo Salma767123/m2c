@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { getStoredAuth, logout } from "@/lib/auth";
 import {
   LayoutDashboard,
   Users,
@@ -145,6 +146,17 @@ const navigation: NavigationItem[] = [
 export default function AdminSidebar() {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [adminEmail, setAdminEmail] = useState<string>("admin@example.com");
+  const [adminName, setAdminName] = useState<string>("Super Admin");
+
+  // Load admin data from storage
+  useEffect(() => {
+    const auth = getStoredAuth();
+    if (auth && auth.user) {
+      setAdminEmail(auth.user.email || "admin@example.com");
+      setAdminName(auth.user.name || "Super Admin");
+    }
+  }, []);
 
   // Simple active check functions
   const isMainItemActive = (href: string) => {
@@ -339,14 +351,19 @@ export default function AdminSidebar() {
       <div className="border-t border-gray-200 p-4">
         <div className="flex items-center">
           <div className="h-10 w-10 rounded-full bg-linear-to-br from-[#222222] to-[#444444] flex items-center justify-center shadow-md">
-            <span className="text-sm font-semibold text-white">SA</span>
+            <span className="text-sm font-semibold text-white">
+              {adminName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+            </span>
           </div>
           <div className="ml-3 flex-1">
-            <p className="text-sm font-semibold text-[#222222]">Super Admin</p>
-            <p className="text-xs text-slate-500">admin@example.com</p>
+            <p className="text-sm font-semibold text-[#222222]">{adminName}</p>
+            <p className="text-xs text-slate-500 truncate" title={adminEmail}>{adminEmail}</p>
           </div>
         </div>
-        <button className="mt-3 flex w-full items-center px-3 py-2 text-sm font-medium text-[#222222] rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors">
+        <button 
+          onClick={() => logout()}
+          className="mt-3 flex w-full items-center px-3 py-2 text-sm font-medium text-[#222222] rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors"
+        >
           <LogOut className="mr-3 h-4 w-4" />
           Sign out
         </button>

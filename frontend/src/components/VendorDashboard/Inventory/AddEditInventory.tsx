@@ -56,8 +56,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit && !!inventoryId)
   const [vendorCategories, setVendorCategories] = useState<Array<{id?: string; name: string; slug?: string}>>([])
-  const [vendorSubcategories, setVendorSubcategories] = useState<Array<{id: string; name: string; slug: string}>>([])
-  const [filteredSubcategories, setFilteredSubcategories] = useState<Array<{id: string; name: string; slug: string}>>([])
+  const [vendorSubcategories, setVendorSubcategories] = useState<Array<{id: string; name: string; slug: string; parentId?: string}>>([])
+  const [filteredSubcategories, setFilteredSubcategories] = useState<Array<{id: string; name: string; slug: string; parentId?: string}>>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
   
   // Track original stock for edit mode
@@ -109,8 +109,32 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         
         const categoriesData = await inventoryService.getVendorCategories()
         console.log('Loaded vendor categories:', categoriesData.categories)
+        
+        // Store categories with their subcategories
         setVendorCategories(categoriesData.categories)
-        setVendorSubcategories(categoriesData.subcategories)
+        
+        // Store all subcategories with parent reference
+        // We need to map subcategories to their parent categories
+        const allSubcategoriesWithParent: Array<{id: string; name: string; slug: string; parentId?: string}> = []
+        
+        // If categories have subcategories nested, extract them
+        categoriesData.categories.forEach((cat: any) => {
+          if (cat.subcategories && Array.isArray(cat.subcategories)) {
+            cat.subcategories.forEach((sub: any) => {
+              allSubcategoriesWithParent.push({
+                ...sub,
+                parentId: cat.id
+              })
+            })
+          }
+        })
+        
+        // If subcategories are provided separately, use them
+        if (categoriesData.subcategories && categoriesData.subcategories.length > 0) {
+          setVendorSubcategories(categoriesData.subcategories)
+        } else {
+          setVendorSubcategories(allSubcategoriesWithParent as any)
+        }
       } catch (error: any) {
         console.error('Error loading vendor categories:', error)
         if (error.response?.status === 401) {
@@ -135,16 +159,25 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     loadVendorCategories()
   }, [router])
 
-  // Update filtered subcategories when vendor subcategories change
+  // Update filtered subcategories when category changes
   useEffect(() => {
     if (formData.category) {
-      // For now, show all subcategories since we don't have parent-child relationship data
-      // In a real implementation, you'd filter based on the selected category
-      setFilteredSubcategories(vendorSubcategories)
+      // Find the selected category
+      const selectedCategory = vendorCategories.find(cat => cat.name === formData.category)
+      
+      if (selectedCategory && selectedCategory.id) {
+        // Filter subcategories that belong to this category
+        const filtered = vendorSubcategories.filter((sub: any) => sub.parentId === selectedCategory.id)
+        setFilteredSubcategories(filtered)
+        console.log(`Filtered ${filtered.length} subcategories for category: ${formData.category}`)
+      } else {
+        // If category doesn't have an ID, show all subcategories (fallback for legacy data)
+        setFilteredSubcategories(vendorSubcategories)
+      }
     } else {
       setFilteredSubcategories([])
     }
-  }, [vendorSubcategories, formData.category])
+  }, [vendorSubcategories, formData.category, vendorCategories])
 
   // Debug: Log when formData.category or vendorCategories change
   useEffect(() => {
@@ -247,9 +280,17 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     
     // Filter subcategories when category changes
     if (name === 'category') {
-      // For now, show all subcategories since we don't have parent-child relationship data
-      // In a real implementation, you'd filter based on the selected category
-      setFilteredSubcategories(vendorSubcategories)
+      const selectedCategory = vendorCategories.find(cat => cat.name === value)
+      
+      if (selectedCategory && selectedCategory.id) {
+        // Filter subcategories that belong to this category
+        const filtered = vendorSubcategories.filter((sub: any) => sub.parentId === selectedCategory.id)
+        setFilteredSubcategories(filtered)
+        console.log(`Filtered ${filtered.length} subcategories for category: ${value}`)
+      } else {
+        // If category doesn't have an ID, show all subcategories (fallback for legacy data)
+        setFilteredSubcategories(vendorSubcategories)
+      }
     }
   }
 

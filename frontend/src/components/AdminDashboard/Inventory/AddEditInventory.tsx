@@ -166,7 +166,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 id: cat.id,
                 name: cat.name,
                 slug: cat.slug || '',
-                subcategories: vendorSubcategories
+                subcategories: vendorSubcategories.filter((sub: any) => sub.parentId === cat.id)
               }))
               
               setCategories(transformedCategories)
@@ -394,8 +394,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           slug: cat.slug || '',
           subcategories: vendorSubcategories.filter((sub: any) => 
             // Filter subcategories that belong to this category
-            // This assumes subcategories have a parentId or similar field
-            true // For now, include all subcategories
+            sub.parentId === cat.id
           )
         }))
         

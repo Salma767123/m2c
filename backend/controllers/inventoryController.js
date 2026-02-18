@@ -687,7 +687,8 @@ const getVendorCategories = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                slug: true
+                slug: true,
+                parentId: true
               }
             }
           }
@@ -982,7 +983,8 @@ const getVendorCategoriesByVendorId = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                slug: true
+                slug: true,
+                parentId: true
               }
             }
           }
