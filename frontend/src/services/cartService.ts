@@ -8,8 +8,10 @@ export interface CartItem {
   product?: {
     id: string;
     name: string;
-    image: string;
+    images: { url: string; isPrimary: boolean }[];
     basePrice: number;
+    description?: string;
+    gstPercentage?: number;
   };
 }
 

@@ -214,7 +214,7 @@ export default function Order() {
 
   const calculateSummary = (): OrderSummary => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    const shipping = subtotal > 100 ? 0 : 9.99
+    const shipping = 0
     const discount = appliedPromo === "SAVE10" ? subtotal * 0.1 : 0
 
     // Calculate tax based on individual product GST percentages
@@ -409,9 +409,25 @@ export default function Order() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-600">Tax</span>
+                      <span className="text-slate-600">Tax (GST)</span>
                       <span className="font-medium">${summary.tax.toFixed(2)}</span>
                     </div>
+                    {/* GST Breakdown by Product */}
+                    {cartItems.some(item => item.gstPercentage) && (
+                      <div className="pl-4 space-y-1">
+                        {cartItems.map((item) => {
+                          if (!item.gstPercentage) return null
+                          const itemSubtotal = item.price * item.quantity
+                          const itemTax = itemSubtotal * (item.gstPercentage / 100)
+                          return (
+                            <div key={item.id} className="flex justify-between text-xs text-slate-500">
+                              <span className="truncate max-w-[150px]">{item.name} ({item.gstPercentage}%)</span>
+                              <span>${itemTax.toFixed(2)}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                     {summary.discount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>Discount</span>

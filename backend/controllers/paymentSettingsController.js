@@ -43,6 +43,44 @@ const getPaymentSettings = async (req, res) => {
   }
 };
 
+// Get public payment settings (no authentication required)
+const getPublicPaymentSettings = async (req, res) => {
+  try {
+    // Get the first (and only) payment settings document
+    let settings = await prisma.paymentSettings.findFirst();
+    
+    // If no settings exist, return default disabled settings
+    if (!settings) {
+      return res.json({
+        success: true,
+        data: {
+          razorpayEnabled: false,
+          payuEnabled: false
+        }
+      });
+    }
+    
+    // Only send enabled status and public keys (no secrets)
+    const publicSettings = {
+      razorpayEnabled: settings.razorpayEnabled,
+      razorpayKeyId: settings.razorpayEnabled ? settings.razorpayKeyId : null,
+      payuEnabled: settings.payuEnabled,
+      payuMerchantKey: settings.payuEnabled ? settings.payuMerchantKey : null
+    };
+    
+    res.json({
+      success: true,
+      data: publicSettings
+    });
+  } catch (error) {
+    console.error('Get public payment settings error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch payment settings'
+    });
+  }
+};
+
 // Update Razorpay settings
 const updateRazorpaySettings = async (req, res) => {
   try {
@@ -204,6 +242,7 @@ const updatePayUSettings = async (req, res) => {
 
 module.exports = {
   getPaymentSettings,
+  getPublicPaymentSettings,
   updateRazorpaySettings,
   updatePayUSettings
 };

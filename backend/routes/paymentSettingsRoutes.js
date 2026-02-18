@@ -2,12 +2,16 @@ const express = require('express');
 const router = express.Router();
 const {
   getPaymentSettings,
+  getPublicPaymentSettings,
   updateRazorpaySettings,
   updatePayUSettings
 } = require('../controllers/paymentSettingsController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
-// All routes require authentication
+// Public route - no authentication required
+router.get('/public', getPublicPaymentSettings);
+
+// All other routes require authentication
 router.use(authenticateToken);
 
 // Get payment settings - accessible by admins

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
-import Notifications from '@/components/WebSite/Profile/Notifications';
+// import Notifications from '@/components/WebSite/Profile/Notifications';
 import type { UserProfile } from '@/components/WebSite/Profile/types';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { userProfileService } from '@/services/userProfileService';
@@ -165,16 +165,16 @@ const Profile = () => {
   const tabs = [
     { id: 'profile', label: 'Profile Information', icon: User },
     { id: 'orders', label: 'Order History', icon: Package },
-    { id: 'notifications', label: 'Notifications', icon: Bell }
+    // { id: 'notifications', label: 'Notifications', icon: Bell }
   ];
 
   const renderProfileTab = () => (
     <ProfileTab editedProfile={editedProfile} setEditedProfile={setEditedProfile} isEditing={isEditing} />
   );
 
-  const renderNotificationsTab = () => (
-    <Notifications editedProfile={editedProfile} setEditedProfile={setEditedProfile} />
-  );
+  // const renderNotificationsTab = () => (
+  //   <Notifications editedProfile={editedProfile} setEditedProfile={setEditedProfile} />
+  // );
 
   if (isLoading) {
     return (
@@ -275,7 +275,7 @@ const Profile = () => {
           {/* Main Content */}
           <div className="flex-1">
             {activeTab === 'profile' && renderProfileTab()}
-            {activeTab === 'notifications' && renderNotificationsTab()}
+            {/* {activeTab === 'notifications' && renderNotificationsTab()} */}
             {activeTab === 'orders' && <OrderHistory />}
           </div>
         </div>

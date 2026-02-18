@@ -283,17 +283,31 @@ const login = async (req, res) => {
 
     console.log(`🔍 Login attempt with ${searchField}:`, email);
 
-    // Find user in both collections by email or phone
-    let user = isEmail
-      ? await prisma.user.findUnique({ where: { email } })
-      : await prisma.user.findFirst({ where: { phoneNumber: email } });
-    let userType = "user";
+    // Determine if this should be an admin based on email
+    const adminEmails = [process.env.ADMIN_EMAIL];
+    const isAdminEmail = isEmail && adminEmails.includes(email.toLowerCase());
 
-    if (!user) {
-      user = isEmail
-        ? await prisma.admin.findUnique({ where: { email } })
-        : await prisma.admin.findFirst({ where: { phoneNumber: email } });
+    let user;
+    let userType;
+
+    // Check admin collection first if it's an admin email
+    if (isAdminEmail) {
+      user = await prisma.admin.findUnique({ where: { email } });
       userType = "admin";
+      console.log(`🔍 Checking admin collection for admin email: ${email}`);
+    } else {
+      // For non-admin emails, check user collection first, then admin
+      user = isEmail
+        ? await prisma.user.findUnique({ where: { email } })
+        : await prisma.user.findFirst({ where: { phoneNumber: email } });
+      userType = "user";
+
+      if (!user) {
+        user = isEmail
+          ? await prisma.admin.findUnique({ where: { email } })
+          : await prisma.admin.findFirst({ where: { phoneNumber: email } });
+        userType = "admin";
+      }
     }
 
     if (!user) {
@@ -701,7 +715,10 @@ const verifyEmail = async (req, res) => {
 // Forgot password
 const forgotPassword = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, userType: requestedUserType } = req.body;
+
+    console.log("📧 Forgot password request for:", email);
+    console.log("👤 Requested user type:", requestedUserType || "auto-detect");
 
     if (!email) {
       return res.status(400).json({
@@ -711,37 +728,66 @@ const forgotPassword = async (req, res) => {
     }
 
     // Find user in all collections (User, Admin, Vendor)
-    let user = await prisma.user.findUnique({
-      where: { email },
-    });
-    let userType = "user";
+    // If userType is specified, check that collection first
+    console.log("🔍 Searching for user in all collections...");
+    let user;
+    let userType;
 
-    if (!user) {
-      user = await prisma.admin.findUnique({
-        where: { email },
-      });
-      userType = "admin";
-    }
-
-    if (!user) {
+    if (requestedUserType === "vendor") {
+      // Vendor-specific request - check vendor collection first
       user = await prisma.vendor.findUnique({
         where: { email },
       });
       userType = "vendor";
+      console.log("🔍 Checking vendor collection first (vendor-specific request)");
+    } else if (requestedUserType === "admin") {
+      // Admin-specific request - check admin collection first
+      user = await prisma.admin.findUnique({
+        where: { email },
+      });
+      userType = "admin";
+      console.log("🔍 Checking admin collection first (admin-specific request)");
+    } else {
+      // Regular user or auto-detect - check in order: user → admin → vendor
+      user = await prisma.user.findUnique({
+        where: { email },
+      });
+      userType = "user";
+
+      if (!user) {
+        user = await prisma.admin.findUnique({
+          where: { email },
+        });
+        userType = "admin";
+      }
+
+      if (!user) {
+        user = await prisma.vendor.findUnique({
+          where: { email },
+        });
+        userType = "vendor";
+      }
     }
 
     if (!user) {
+      console.log("❌ User not found with email:", email);
       return res.status(404).json({
         success: false,
         error: "User not found with this email",
       });
     }
 
+    console.log(`✅ User found: ${userType} - ${email}`);
+
     // Generate reset token
     const resetToken = generateRandomToken();
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
 
+    console.log("🔑 Generated reset token");
+    console.log("⏰ Token expires at:", resetTokenExpiry);
+
     // Update user with reset token in appropriate collection
+    console.log(`💾 Saving reset token to ${userType} collection...`);
     if (userType === "admin") {
       await prisma.admin.update({
         where: { id: user.id },
@@ -758,6 +804,7 @@ const forgotPassword = async (req, res) => {
           resetTokenExpiry,
         },
       });
+      console.log("✅ Vendor reset token saved");
     } else {
       await prisma.user.update({
         where: { id: user.id },
@@ -777,6 +824,7 @@ const forgotPassword = async (req, res) => {
       resetUrl = `${process.env.FRONTEND_URL}/vendor/reset-password?token=${resetToken}`;
       userName = user.ownerName || user.companyName;
       emailSubject = "Reset Your Vendor Account Password";
+      console.log("🔗 Vendor reset URL:", resetUrl);
     } else if (userType === "admin") {
       resetUrl = `${process.env.FRONTEND_URL}/admin/reset-password?token=${resetToken}`;
       userName = user.name;
@@ -810,6 +858,7 @@ const forgotPassword = async (req, res) => {
     };
 
     // Send password reset email
+    console.log("📧 Sending password reset email...");
     try {
       const emailResult = await sendEmail(emailData);
       if (!emailResult.success) {
@@ -835,7 +884,8 @@ const forgotPassword = async (req, res) => {
       message: "Password reset email sent successfully",
     });
   } catch (error) {
-    console.error("Forgot password error:", error);
+    console.error("❌ Forgot password error:", error);
+    console.error("Error details:", error.message);
     res.status(500).json({
       success: false,
       error: "Failed to send password reset email",
@@ -848,7 +898,12 @@ const resetPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
 
+    console.log("🔄 Password reset request received");
+    console.log("📝 Token:", token ? `${token.substring(0, 10)}...` : "missing");
+    console.log("📝 Password length:", password ? password.length : 0);
+
     if (!token || !password) {
+      console.log("❌ Missing token or password");
       return res.status(400).json({
         success: false,
         error: "Token and password are required",
@@ -856,6 +911,7 @@ const resetPassword = async (req, res) => {
     }
 
     // Find user with valid reset token in all collections
+    console.log("🔍 Searching for user with reset token...");
     let user = await prisma.user.findFirst({
       where: {
         resetToken: token,
@@ -891,17 +947,33 @@ const resetPassword = async (req, res) => {
     }
 
     if (!user) {
+      console.log("❌ No user found with valid reset token");
+      // Check if token exists but is expired
+      const expiredUser = await prisma.vendor.findFirst({
+        where: { resetToken: token },
+      });
+      if (expiredUser) {
+        console.log("⏰ Token found but expired");
+        console.log("Token expiry:", expiredUser.resetTokenExpiry);
+        console.log("Current time:", new Date());
+      }
       return res.status(400).json({
         success: false,
         error: "Invalid or expired reset token",
       });
     }
 
+    console.log(`✅ User found: ${userType} - ${user.email || user.ownerEmail}`);
+    console.log("📧 User ID:", user.id);
+
     // Hash new password
+    console.log("🔐 Hashing new password...");
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
+    console.log("✅ Password hashed successfully");
 
     // Update user password in appropriate collection
+    console.log(`💾 Updating ${userType} password in database...`);
     if (userType === "admin") {
       await prisma.admin.update({
         where: { id: user.id },
@@ -912,7 +984,7 @@ const resetPassword = async (req, res) => {
         },
       });
     } else if (userType === "vendor") {
-      await prisma.vendor.update({
+      const updatedVendor = await prisma.vendor.update({
         where: { id: user.id },
         data: {
           password: hashedPassword,
@@ -920,6 +992,9 @@ const resetPassword = async (req, res) => {
           resetTokenExpiry: null,
         },
       });
+      console.log("✅ Vendor password updated successfully");
+      console.log("📧 Vendor email:", updatedVendor.email);
+      console.log("🏢 Company:", updatedVendor.companyName);
     } else {
       await prisma.user.update({
         where: { id: user.id },
@@ -931,12 +1006,15 @@ const resetPassword = async (req, res) => {
       });
     }
 
+    console.log("✅ Password reset completed successfully");
     res.json({
       success: true,
       message: "Password reset successfully",
     });
   } catch (error) {
-    console.error("Reset password error:", error);
+    console.error("❌ Reset password error:", error);
+    console.error("Error details:", error.message);
+    console.error("Stack trace:", error.stack);
     res.status(500).json({
       success: false,
       error: "Password reset failed",

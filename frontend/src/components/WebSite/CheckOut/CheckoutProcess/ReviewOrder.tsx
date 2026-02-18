@@ -13,19 +13,39 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
       <div className="bg-slate-50 rounded-xl p-6">
         <h3 className="font-semibold text-slate-900 mb-4">Shipping Information</h3>
         <div className="text-sm text-slate-600 space-y-1">
-          <p>{formData.firstName} {formData.lastName}</p>
+          <p className="font-medium text-gray-900">{formData.firstName} {formData.lastName}</p>
           <p>{formData.address}</p>
           <p>{formData.city}, {formData.state} {formData.zipCode}</p>
-          <p>{formData.email}</p>
-          <p>{formData.phone}</p>
+          <p>{formData.country}</p>
+          <div className="mt-2 pt-2 border-t border-gray-200">
+            <p>{formData.email}</p>
+            <p>{formData.phone}</p>
+          </div>
         </div>
       </div>
 
       <div className="bg-slate-50 rounded-xl p-6">
         <h3 className="font-semibold text-slate-900 mb-4">Payment Method</h3>
         <div className="text-sm text-slate-600">
-          <p>**** **** **** {formData.cardNumber.slice(-4)}</p>
-          <p>{formData.cardName}</p>
+          {formData.paymentMethod === "card" && (
+            <>
+              <p className="font-medium">Credit/Debit Card</p>
+              <p>**** **** **** {formData.cardNumber.slice(-4) || "xxxx"}</p>
+              <p>{formData.cardName}</p>
+            </>
+          )}
+          {formData.paymentMethod === "upi" && (
+            <>
+              <p className="font-medium">UPI</p>
+              <p>{formData.upiId || "No ID provided"}</p>
+            </>
+          )}
+          {formData.paymentMethod === "COD" && (
+            <>
+              <p className="font-medium">Cash on Delivery</p>
+              <p>Pay upon receipt</p>
+            </>
+          )}
         </div>
       </div>
 
@@ -35,9 +55,7 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
           <div>
             <h4 className="font-medium text-blue-900">Estimated Delivery</h4>
             <p className="text-sm text-blue-700">
-              {formData.shippingMethod === "standard" && "January 20-22, 2024"}
-              {formData.shippingMethod === "express" && "January 17-18, 2024"}
-              {formData.shippingMethod === "overnight" && "January 16, 2024"}
+              5-7 business days
             </p>
           </div>
         </div>

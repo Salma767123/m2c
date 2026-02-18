@@ -175,7 +175,7 @@ const createProduct = async (req, res) => {
           basePrice: parseFloat(basePrice) || 0,
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discount: discount ? parseFloat(discount) : null,
-          gstPercentage: gstPercentage ? parseFloat(gstPercentage) : null,
+          gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
 
           // Single Unit Pricing Configuration
           singleUnitSize: singleUnitSize || null,
@@ -533,7 +533,7 @@ const updateProduct = async (req, res) => {
             discount: updateData.discount ? parseFloat(updateData.discount) : null
           }),
           ...(updateData.gstPercentage !== undefined && {
-            gstPercentage: updateData.gstPercentage ? parseFloat(updateData.gstPercentage) : null
+            gstPercentage: updateData.gstPercentage !== null && updateData.gstPercentage !== '' ? parseFloat(updateData.gstPercentage) : null
           }),
 
           // Single Unit Pricing Configuration
@@ -1092,6 +1092,7 @@ const createProductByAdmin = async (req, res) => {
       basePrice,
       originalPrice,
       discount,
+      gstPercentage,
       adminFixedPrice, // Admin can set their own price
 
       // Single Unit Pricing Configuration
@@ -1267,6 +1268,7 @@ const createProductByAdmin = async (req, res) => {
           basePrice: parseFloat(basePrice) || 0,
           originalPrice: originalPrice ? parseFloat(originalPrice) : null,
           discount: discount ? parseFloat(discount) : null,
+          gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
           adminFixedPrice: adminFixedPrice ? parseFloat(adminFixedPrice) : null,
 
           // Single Unit Pricing Configuration
@@ -1480,6 +1482,9 @@ const updateProductByAdmin = async (req, res) => {
         }),
         ...(updateData.discount !== undefined && {
           discount: updateData.discount ? parseFloat(updateData.discount) : null
+        }),
+        ...(updateData.gstPercentage !== undefined && {
+          gstPercentage: updateData.gstPercentage !== null && updateData.gstPercentage !== '' ? parseFloat(updateData.gstPercentage) : null
         }),
         ...(updateData.adminFixedPrice !== undefined && {
           adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null

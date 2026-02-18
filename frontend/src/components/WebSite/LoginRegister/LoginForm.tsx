@@ -111,15 +111,36 @@ export default function LoginForm({ onGoogleAuth }: LoginFormProps) {
       })
       
       if (response.success) {
-        // Store auth data
-        userAuthService.storeAuthData(response.data.token, response.data.user, loginData.rememberMe)
+        // Check if user is admin
+        const isAdmin = response.data.user.role === 'admin'
         
-        showSuccessToast('Login Successful', `Welcome back, ${response.data.user.name}!`)
-        
-        // Redirect to home page
-        setTimeout(() => {
-          window.location.href = '/'
-        }, 1000)
+        if (isAdmin) {
+          // Store admin auth data in admin storage keys
+          if (loginData.rememberMe) {
+            localStorage.setItem('adminToken', response.data.token)
+            localStorage.setItem('adminUser', JSON.stringify(response.data.user))
+          } else {
+            sessionStorage.setItem('adminToken', response.data.token)
+            sessionStorage.setItem('adminUser', JSON.stringify(response.data.user))
+          }
+          
+          showSuccessToast('Login Successful', `Welcome back, ${response.data.user.name}!`)
+          
+          // Redirect to admin dashboard
+          setTimeout(() => {
+            window.location.href = '/admin/dashboard'
+          }, 1000)
+        } else {
+          // Store regular user auth data
+          userAuthService.storeAuthData(response.data.token, response.data.user, loginData.rememberMe)
+          
+          showSuccessToast('Login Successful', `Welcome back, ${response.data.user.name}!`)
+          
+          // Redirect to home page
+          setTimeout(() => {
+            window.location.href = '/'
+          }, 1000)
+        }
       } else {
         showErrorToast('Login Failed', response.message || 'Invalid credentials. Please try again.')
       }

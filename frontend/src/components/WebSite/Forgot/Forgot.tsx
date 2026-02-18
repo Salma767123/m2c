@@ -68,7 +68,8 @@ export default function Forgot() {
 
     try {
       const response = await axios.post('/auth/forgot-password', { 
-        email: formData.email 
+        email: formData.email,
+        userType: 'user' // Specify this is a regular user request
       })
 
       if (response.data.success) {

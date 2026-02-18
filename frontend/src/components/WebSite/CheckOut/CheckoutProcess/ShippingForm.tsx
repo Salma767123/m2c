@@ -8,8 +8,23 @@ interface ShippingFormProps {
 }
 
 export default function ShippingForm({ formData, updateFormData }: ShippingFormProps) {
+  // Check if form has been pre-filled
+  const isPreFilled = formData.firstName || formData.email || formData.address
+  
   return (
     <div className="space-y-6">
+      {isPreFilled && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+          <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="text-sm text-blue-800">
+            <p className="font-medium">Address auto-filled from your profile</p>
+            <p className="text-blue-600 mt-0.5">You can edit any field if needed</p>
+          </div>
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">First Name</label>
@@ -103,35 +118,7 @@ export default function ShippingForm({ formData, updateFormData }: ShippingFormP
         </div>
       </div>
 
-      {/* Shipping Method */}
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-4">Shipping Method</label>
-        <div className="space-y-3">
-          {[
-            { id: "standard", name: "Standard Shipping", time: "5-7 business days", price: "Free" },
-            { id: "express", name: "Express Shipping", time: "2-3 business days", price: "$9.99" },
-            { id: "overnight", name: "Overnight Shipping", time: "1 business day", price: "$24.99" }
-          ].map((method) => (
-            <label key={method.id} className="flex items-center p-4 border border-slate-300 rounded-xl cursor-pointer hover:bg-slate-50">
-              <input
-                type="radio"
-                name="shippingMethod"
-                value={method.id}
-                checked={formData.shippingMethod === method.id}
-                onChange={(e) => updateFormData("shippingMethod", e.target.value)}
-                className="mr-3"
-              />
-              <div className="flex-1">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-slate-900">{method.name}</span>
-                  <span className="font-semibold text-blue-600">{method.price}</span>
-                </div>
-                <p className="text-sm text-slate-600">{method.time}</p>
-              </div>
-            </label>
-          ))}
-        </div>
-      </div>
+
     </div>
   )
 }

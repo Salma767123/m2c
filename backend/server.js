@@ -81,19 +81,6 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Import routes
-const authRoutes = require('./routes/auth/authRoutes');
-const vendorRoutes = require('./routes/vendorRoutes');
-const vendorSettingsRoutes = require('./routes/vendorSettingsRoutes');
-const categoryRoutes = require('./routes/categoryRoutes');
-const inventoryRoutes = require('./routes/inventoryRoutes');
-const productRoutes = require('./routes/productRoutes');
-const cartRoutes = require('./routes/cartRoutes');
-const wishlistRoutes = require('./routes/wishlistRoutes');
-const paymentSettingsRoutes = require('./routes/paymentSettingsRoutes');
-const adminProfileRoutes = require('./routes/adminProfileRoutes');
-const companyInfoRoutes = require('./routes/companyInfoRoutes');
-const gstSettingsRoutes = require('./routes/gstSettingsRoutes');
-
 // Root endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
@@ -122,6 +109,22 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Import routes
+const authRoutes = require('./routes/auth/authRoutes');
+const vendorRoutes = require('./routes/vendorRoutes');
+const vendorSettingsRoutes = require('./routes/vendorSettingsRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
+const productRoutes = require('./routes/productRoutes');
+const cartRoutes = require('./routes/cartRoutes');
+const wishlistRoutes = require('./routes/wishlistRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const paymentSettingsRoutes = require('./routes/paymentSettingsRoutes');
+const adminProfileRoutes = require('./routes/adminProfileRoutes');
+const companyInfoRoutes = require('./routes/companyInfoRoutes');
+const gstSettingsRoutes = require('./routes/gstSettingsRoutes');
+
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
@@ -131,6 +134,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/orders', orderRoutes);
 app.use('/api/payment-settings', paymentSettingsRoutes);
 app.use('/api/admin/profile', adminProfileRoutes);
 app.use('/api/company-info', companyInfoRoutes);

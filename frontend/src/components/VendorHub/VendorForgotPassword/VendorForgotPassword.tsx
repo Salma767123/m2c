@@ -73,7 +73,8 @@ export default function VendorForgotPassword() {
       console.log('Axios baseURL:', axios.defaults.baseURL)
       
       const response = await axios.post('/auth/forgot-password', { 
-        email: formData.email 
+        email: formData.email,
+        userType: 'vendor' // Specify this is a vendor request
       })
 
       if (response.data.success) {

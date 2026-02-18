@@ -13,6 +13,13 @@ export interface PayUSettings {
   merchantSalt: string;
 }
 
+export interface PublicPaymentSettings {
+  razorpayEnabled: boolean;
+  razorpayKeyId: string | null;
+  payuEnabled: boolean;
+  payuMerchantKey: string | null;
+}
+
 export interface PaymentSettings {
   id: string;
   razorpayEnabled: boolean;
@@ -26,7 +33,17 @@ export interface PaymentSettings {
 }
 
 class PaymentSettingsService {
-  // Get payment settings
+  // Get public payment settings (no authentication required)
+  async getPublicPaymentSettings(): Promise<{ success: boolean; data: PublicPaymentSettings }> {
+    try {
+      const response = await axiosInstance.get('/payment-settings/public');
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch payment settings');
+    }
+  }
+
+  // Get payment settings (admin only)
   async getPaymentSettings(): Promise<{ success: boolean; data: PaymentSettings }> {
     try {
       const response = await axiosInstance.get('/payment-settings');
