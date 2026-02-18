@@ -122,13 +122,6 @@ interface FabricSpecification {
   careInstructions: string[]
 }
 
-interface PricingTier {
-  minQuantity: number
-  maxQuantity?: number
-  price: number
-  discount?: number
-}
-
 interface ProductFormData {
   // Inventory Connection (NEW FLOW)
   inventoryItemId?: string // Link to inventory item
@@ -595,37 +588,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     }))
   }
 
-  // Pricing Tier Functions
-  const addPricingTier = () => {
-    const newTier: PricingTier = {
-      minQuantity: formData.pricingTiers.length > 0
-        ? (formData.pricingTiers[formData.pricingTiers.length - 1].maxQuantity || 0) + 1
-        : 1,
-      price: 0,
-      discount: 0
-    }
 
-    setFormData(prev => ({
-      ...prev,
-      pricingTiers: [...prev.pricingTiers, newTier]
-    }))
-  }
-
-  const removePricingTier = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      pricingTiers: prev.pricingTiers.filter((_, i) => i !== index)
-    }))
-  }
-
-  const updatePricingTier = (index: number, field: keyof PricingTier, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      pricingTiers: prev.pricingTiers.map((tier, i) =>
-        i === index ? { ...tier, [field]: value } : tier
-      )
-    }))
-  }
 
   // Care Instructions Functions
   const addCareInstruction = () => {
@@ -829,22 +792,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     }
 
     // Pricing validation
-    if (!formData.singleUnitPricingEnabled && !formData.bulkPricingEnabled) {
-      showErrorToast('Validation Error', 'Please select at least one pricing strategy.')
-      return
-    }
-
-    if (formData.singleUnitPricingEnabled && formData.basePrice <= 0) {
-      showErrorToast('Validation Error', 'Please enter a valid base price for single unit pricing.')
-      return
-    }
-
-    if (formData.bulkPricingEnabled && formData.pricingTiers.some(tier => tier.price <= 0)) {
-      showErrorToast('Validation Error', 'Please enter valid prices for all bulk pricing tiers.')
-      return
-    }
-
-    if (!formData.hasVariants && formData.singleUnitPricingEnabled && formData.basePrice <= 0) {
+    if (!formData.hasVariants && formData.basePrice <= 0) {
       showErrorToast('Validation Error', 'Please enter a valid base price.')
       return
     }
@@ -1733,7 +1681,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               name="basePrice"
                               value={formData.basePrice}
                               onChange={handleInputChange}
-                              required={formData.singleUnitPricingEnabled}
+                              required
                               className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                               placeholder="0"
                             />
