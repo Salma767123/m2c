@@ -1680,7 +1680,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               <Card>
                 <CardHeader>
                   <CardTitle>Pricing Configuration</CardTitle>
-                  <p className="text-sm text-gray-600">Choose your pricing strategy - you can select one or both options</p>
                 </CardHeader>
                 <CardContent className="space-y-6">
 
@@ -1711,36 +1710,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           <p className="text-xs text-red-500 mt-1">GST Rate is required</p>
                         )}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Pricing Strategy Selection */}
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-gray-900">Select Pricing Strategy</h4>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Single Unit Pricing Option */}
-                      <div
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.singleUnitPricingEnabled
-                          ? 'border-gray-800 bg-gray-100 shadow-sm'
-                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
-                          }`}
-                        onClick={() => setFormData(prev => ({ ...prev, singleUnitPricingEnabled: !prev.singleUnitPricingEnabled }))}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${formData.singleUnitPricingEnabled
-                            ? 'border-gray-800 bg-gray-800'
-                            : 'border-gray-300'
-                            }`}>
-                            {formData.singleUnitPricingEnabled && (
-                              <div className="w-2 h-2 bg-white rounded-sm"></div>
-                            )}
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-slate-900">Single Unit Pricing</h4>
-                            <p className="text-sm text-slate-600">Fixed price for all quantities</p>
-                          </div>
-                        </div>
                     </div>
                   </div>
 
@@ -1853,7 +1822,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             )}
                           </div>
                         </div>
-                    </div>
+                      )}
                   </div>
                 </CardContent>
               </Card>
