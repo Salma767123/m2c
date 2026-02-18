@@ -328,16 +328,6 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </div>
                 )}
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium text-gray-500">Minimum Order Quantity</span>
-                  <span className="text-gray-900">{product.minimumOrderQuantity}</span>
-                </div>
-                {product.maximumOrderQuantity && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Maximum Order Quantity</span>
-                    <span className="text-gray-900">{product.maximumOrderQuantity}</span>
-                  </div>
-                )}
-                <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-500">Dispatch Timeline</span>
                   <span className="text-gray-900">
                     {product.dispatchTimeline.totalDays} days

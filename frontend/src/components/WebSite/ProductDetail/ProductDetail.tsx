@@ -376,11 +376,6 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                           )}
                         </div>
                         <p className="text-sm text-gray-600">Price includes all taxes</p>
-                        {product.minimumOrderQuantity && product.minimumOrderQuantity > 1 && (
-                          <p className="text-sm text-amber-600 mt-2">
-                            Minimum order: {product.minimumOrderQuantity} units
-                          </p>
-                        )}
                       </div>
                     </div>
 
@@ -594,24 +589,6 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                       <div className="flex justify-between py-3 border-b border-gray-100">
                         <span className="font-semibold text-gray-700">Available Variants</span>
                         <span className="text-gray-600">{product.variants?.length || 0}</span>
-                      </div>
-                    )}
-                    {product.bulkPricingEnabled && (
-                      <div className="flex justify-between py-3 border-b border-gray-100">
-                        <span className="font-semibold text-gray-700">Bulk Pricing</span>
-                        <span className="text-green-600 font-semibold">Available</span>
-                      </div>
-                    )}
-                    {product.minimumOrderQuantity && (
-                      <div className="flex justify-between py-3 border-b border-gray-100">
-                        <span className="font-semibold text-gray-700">Min Order Quantity</span>
-                        <span className="text-gray-600">{product.minimumOrderQuantity} units</span>
-                      </div>
-                    )}
-                    {product.maximumOrderQuantity && (
-                      <div className="flex justify-between py-3 border-b border-gray-100">
-                        <span className="font-semibold text-gray-700">Max Order Quantity</span>
-                        <span className="text-gray-600">{product.maximumOrderQuantity} units</span>
                       </div>
                     )}
                   </>

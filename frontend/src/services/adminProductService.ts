@@ -19,14 +19,9 @@ export interface AdminProduct {
   fabricSpecifications?: any;
   hasVariants: boolean;
   baseSku: string;
-  pricingTiers: any[];
-  bulkPricingEnabled: boolean;
-  singleUnitPricingEnabled: boolean;
   totalStock: number;
   lowStockThreshold: number;
   trackInventory: boolean;
-  minimumOrderQuantity: number;
-  maximumOrderQuantity?: number;
   dispatchTimeline: {
     processingDays: number;
     shippingDays: number;

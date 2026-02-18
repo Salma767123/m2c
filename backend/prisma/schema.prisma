@@ -602,19 +602,10 @@ model Product {
   // Images
   images                ProductImage[]
   
-  // Pricing Configuration
-  pricingTiers          Json[]    @default([]) // Array of PricingTier objects
-  bulkPricingEnabled    Boolean   @default(false)
-  singleUnitPricingEnabled Boolean @default(true)
-  
   // Stock Management
   totalStock            Int       @default(0)
   lowStockThreshold     Int       @default(10)
   trackInventory        Boolean   @default(true)
-  
-  // Order Configuration
-  minimumOrderQuantity  Int       @default(1)
-  maximumOrderQuantity  Int?
   
   // Dispatch & Shipping
   dispatchTimeline      Json      // DispatchTimeline object
