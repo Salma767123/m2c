@@ -572,7 +572,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push('/dashboard/vendors')}
+                onClick={() => router.push('/admin/dashboard/vendors')}
                 className="p-2"
               >
                 <ArrowLeft className="h-4 w-4" />

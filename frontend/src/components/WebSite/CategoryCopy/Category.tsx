@@ -216,7 +216,7 @@ export default function Category() {
                         priority={index < 4}
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                      <div className="w-full h-full bg-linear-to-br from-gray-100 to-gray-200 flex items-center justify-center">
                         <Package className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400" />
                       </div>
                     )}

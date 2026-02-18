@@ -67,33 +67,33 @@ function DashboardContent() {
         <SalesReportChart />
       </div>
 
-      {/* Main Content Grid - Row 1 */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* Main Content Grid - Row 1: Recent Orders & Top Selling Products */}
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent Orders */}
-        <div className="lg:col-span-1">
+        <div>
           <RecentOrders />
         </div>
 
         {/* Top Selling Products */}
-        <div className="lg:col-span-1">
+        <div>
           <TopSellingProducts />
+        </div>
+      </div>
+
+      {/* Main Content Grid - Row 2: Vendors, Products & Inventory */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Recently Added Vendors */}
+        <div className="lg:col-span-1">
+          <RecentVendors />
         </div>
 
         {/* Vendor Recent Products */}
         <div className="lg:col-span-1">
           <VendorRecentProducts />
         </div>
-      </div>
-
-      {/* Main Content Grid - Row 2 */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recently Added Vendors */}
-        <div>
-          <RecentVendors />
-        </div>
 
         {/* Recent Inventory Restocks */}
-        <div>
+        <div className="lg:col-span-1">
           <VendorInventoryRestock />
         </div>
       </div>
