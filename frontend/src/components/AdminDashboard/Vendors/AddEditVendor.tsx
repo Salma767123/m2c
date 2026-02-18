@@ -811,6 +811,10 @@ function AdminReviewSubmitStep({
                 <span className="ml-2 font-medium">{formData.companyName || 'Not provided'}</span>
               </div>
               <div>
+                <span className="text-gray-600">GST Number:</span>
+                <span className="ml-2 font-medium">{formData.gstNumber || 'Not provided'}</span>
+              </div>
+              <div>
                 <span className="text-gray-600">Email:</span>
                 <span className="ml-2 font-medium">{formData.email || 'Not provided'}</span>
               </div>

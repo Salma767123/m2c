@@ -294,6 +294,13 @@ const registerVendor = async (req, res) => {
         minimumOrderQuantity: '100 pieces', // Default
         paymentTerms: ['30 days', 'LC'], // Default
         
+        // Contact & Trade Information
+        mainContact: parsedMainContact || null,
+        alternateContacts: parsedAlternateContacts || [],
+        tradeLicenseNumber: tradeLicenseNumber || null,
+        businessRegistrationNumber: businessRegistrationNumber || null,
+        taxIdentificationNumber: taxIdentificationNumber || null,
+        
         // System fields
         applicationStep: 8, // Completed all steps
         completedSteps: [1, 2, 3, 4, 5, 6, 7, 8],
@@ -651,6 +658,7 @@ const updateVendorById = async (req, res) => {
       businessAddress: updateData.address,
       businessCity: updateData.city,
       businessState: updateData.state,
+      businessZipCode: updateData.zipCode || null,
       businessCountry: updateData.country || 'India',
       
       // Owner Profile
@@ -681,6 +689,13 @@ const updateVendorById = async (req, res) => {
       // Trade Info
       exportExperience: updateData.hasImportExport === 'yes',
       exportCountries: parsedExportCountries || [],
+      
+      // Contact & Trade Information
+      mainContact: updateData.mainContact ? (typeof updateData.mainContact === 'string' ? JSON.parse(updateData.mainContact) : updateData.mainContact) : null,
+      alternateContacts: updateData.alternateContacts ? (typeof updateData.alternateContacts === 'string' ? JSON.parse(updateData.alternateContacts) : updateData.alternateContacts) : [],
+      tradeLicenseNumber: updateData.tradeLicenseNumber || null,
+      businessRegistrationNumber: updateData.businessRegistrationNumber || null,
+      taxIdentificationNumber: updateData.taxIdentificationNumber || null,
       
       // Status (admin can update these)
       status: updateData.status?.toUpperCase() || existingVendor.status

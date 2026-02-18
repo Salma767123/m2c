@@ -233,6 +233,7 @@ model Vendor {
   establishedYear       Int
   companyDescription    String?
   companyLogo           String?   // Cloudinary URL
+  gstNumber             String?   // GST/Tax identification number
   
   // Contact & Trade Information
   businessPhone         String
@@ -285,6 +286,13 @@ model Vendor {
   deliveryTime          String?   // e.g., "7-15 days"
   minimumOrderQuantity  String?
   paymentTerms          String[]  @default([])
+  
+  // Contact & Trade Information
+  mainContact           Json?     // Main contact person details
+  alternateContacts     Json[]    @default([]) // Array of alternate contacts
+  tradeLicenseNumber    String?
+  businessRegistrationNumber String?
+  taxIdentificationNumber String?
   
   // Additional Information
   bankDetails           VendorBankDetails?

@@ -194,6 +194,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Building2 },
     { id: 'details', label: 'Company Details', icon: FileText },
+    { id: 'contact-trade', label: 'Contact & Trade', icon: Phone },
     { id: 'products', label: 'Products & Services', icon: Package },
     { id: 'facilities', label: 'Facilities', icon: Factory },
     { id: 'documents', label: 'Documents', icon: FileText },
@@ -314,6 +315,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
       <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'overview' && <OverviewTab vendor={vendor} />}
         {activeTab === 'details' && <DetailsTab vendor={vendor} />}
+        {activeTab === 'contact-trade' && <ContactTradeTab vendor={vendor} />}
         {activeTab === 'products' && <ProductsTab vendor={vendor} />}
         {activeTab === 'facilities' && <FacilitiesTab vendor={vendor} />}
         {activeTab === 'documents' && <DocumentsTab vendor={vendor} />}
@@ -959,6 +961,139 @@ function BankDetailsTab({ vendor }: { vendor: VendorProfile }) {
     </Card>
   )
 }
+
+function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
+  return (
+    <div className="space-y-6">
+      {/* Main Contact */}
+      {vendor.mainContact && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <User className="h-5 w-5" />
+              <span>Main Contact Person</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-gray-600">Name</p>
+                <p className="font-medium">{vendor.mainContact.name || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Designation</p>
+                <p className="font-medium">{vendor.mainContact.designation || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Email 1</p>
+                <p className="font-medium">{vendor.mainContact.email1 || vendor.mainContact.email || 'N/A'}</p>
+              </div>
+              {vendor.mainContact.email2 && (
+                <div>
+                  <p className="text-sm text-gray-600">Email 2</p>
+                  <p className="font-medium">{vendor.mainContact.email2}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-sm text-gray-600">Phone 1</p>
+                <p className="font-medium">{vendor.mainContact.phone1 || vendor.mainContact.phone || 'N/A'}</p>
+              </div>
+              {vendor.mainContact.phone2 && (
+                <div>
+                  <p className="text-sm text-gray-600">Phone 2</p>
+                  <p className="font-medium">{vendor.mainContact.phone2}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-sm text-gray-600">Department</p>
+                <p className="font-medium capitalize">{vendor.mainContact.department || 'N/A'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Alternate Contacts */}
+      {vendor.alternateContacts && vendor.alternateContacts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Mail className="h-5 w-5" />
+              <span>Alternate Contacts</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {vendor.alternateContacts.map((contact: any, index: number) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-4">Contact {index + 1}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Name</p>
+                      <p className="font-medium">{contact.name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Designation</p>
+                      <p className="font-medium">{contact.designation || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="font-medium">{contact.email1 || contact.email || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Phone</p>
+                      <p className="font-medium">{contact.phone1 || contact.phone || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Department</p>
+                      <p className="font-medium capitalize">{contact.department || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Trade Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Globe className="h-5 w-5" />
+            <span>Trade Information</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {vendor.tradeLicenseNumber && (
+              <div>
+                <p className="text-sm text-gray-600">Trade License Number</p>
+                <p className="font-medium">{vendor.tradeLicenseNumber}</p>
+              </div>
+            )}
+            {vendor.businessRegistrationNumber && (
+              <div>
+                <p className="text-sm text-gray-600">Business Registration Number</p>
+                <p className="font-medium">{vendor.businessRegistrationNumber}</p>
+              </div>
+            )}
+            {vendor.taxIdentificationNumber && (
+              <div>
+                <p className="text-sm text-gray-600">Tax Identification Number</p>
+                <p className="font-medium">{vendor.taxIdentificationNumber}</p>
+              </div>
+            )}
+          </div>
+          {!vendor.tradeLicenseNumber && !vendor.businessRegistrationNumber && !vendor.taxIdentificationNumber && (
+            <p className="text-gray-500 text-center py-4">No trade information available</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function PerformanceTab({ vendor }: { vendor: VendorProfile }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

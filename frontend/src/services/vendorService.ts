@@ -142,6 +142,11 @@ export interface VendorProfile {
   deliveryTime?: string;
   minimumOrderQuantity?: string;
   paymentTerms?: string[];
+  mainContact?: any;
+  alternateContacts?: any[];
+  tradeLicenseNumber?: string;
+  businessRegistrationNumber?: string;
+  taxIdentificationNumber?: string;
   createdAt: string;
   updatedAt: string;
   approvedAt?: string;
