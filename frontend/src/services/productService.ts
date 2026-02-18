@@ -49,19 +49,10 @@ export interface ProductFormData {
   // Images
   images?: ProductImage[];
 
-  // Pricing Configuration
-  pricingTiers?: PricingTier[];
-  bulkPricingEnabled: boolean;
-  singleUnitPricingEnabled: boolean;
-
   // Stock Management
   totalStock: number;
   lowStockThreshold: number;
   trackInventory: boolean;
-
-  // Order Configuration
-  minimumOrderQuantity: number;
-  maximumOrderQuantity?: number;
 
   // Dispatch & Shipping
   dispatchTimeline: {

@@ -42,19 +42,10 @@ const createProduct = async (req, res) => {
       // Images
       images,
 
-      // Pricing Configuration
-      pricingTiers,
-      bulkPricingEnabled,
-      singleUnitPricingEnabled,
-
       // Stock Management
       totalStock,
       lowStockThreshold,
       trackInventory,
-
-      // Order Configuration
-      minimumOrderQuantity,
-      maximumOrderQuantity,
 
       // Dispatch & Shipping
       dispatchTimeline,
@@ -72,21 +63,6 @@ const createProduct = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Name, description, category, and base SKU are required'
-      });
-    }
-
-    // Validate pricing strategy
-    if (!singleUnitPricingEnabled && !bulkPricingEnabled) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one pricing strategy must be enabled'
-      });
-    }
-
-    if (singleUnitPricingEnabled && (!basePrice || basePrice <= 0)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid base price is required for single unit pricing'
       });
     }
 
@@ -186,14 +162,9 @@ const createProduct = async (req, res) => {
           fabricSpecifications: fabricSpecifications || {},
           hasVariants: hasVariants || false,
           baseSku,
-          pricingTiers: pricingTiers || [],
-          bulkPricingEnabled: bulkPricingEnabled || false,
-          singleUnitPricingEnabled: singleUnitPricingEnabled !== false,
           totalStock: productStock,
           lowStockThreshold: parseInt(lowStockThreshold) || 10,
           trackInventory: trackInventory !== false,
-          minimumOrderQuantity: parseInt(minimumOrderQuantity) || 1,
-          maximumOrderQuantity: maximumOrderQuantity ? parseInt(maximumOrderQuantity) : null,
           dispatchTimeline: dispatchTimeline ? {
             processingDays: parseInt(dispatchTimeline.processingDays) || 1,
             shippingDays: parseInt(dispatchTimeline.shippingDays) || 3,
@@ -547,24 +518,11 @@ const updateProduct = async (req, res) => {
           }),
           ...(updateData.hasVariants !== undefined && { hasVariants: updateData.hasVariants }),
           ...(updateData.baseSku && { baseSku: updateData.baseSku }),
-          ...(updateData.pricingTiers !== undefined && { pricingTiers: updateData.pricingTiers }),
-          ...(updateData.bulkPricingEnabled !== undefined && {
-            bulkPricingEnabled: updateData.bulkPricingEnabled
-          }),
-          ...(updateData.singleUnitPricingEnabled !== undefined && {
-            singleUnitPricingEnabled: updateData.singleUnitPricingEnabled
-          }),
           ...(updateData.totalStock !== undefined && { totalStock: parseInt(updateData.totalStock) }),
           ...(updateData.lowStockThreshold !== undefined && {
             lowStockThreshold: parseInt(updateData.lowStockThreshold)
           }),
           ...(updateData.trackInventory !== undefined && { trackInventory: updateData.trackInventory }),
-          ...(updateData.minimumOrderQuantity !== undefined && {
-            minimumOrderQuantity: parseInt(updateData.minimumOrderQuantity)
-          }),
-          ...(updateData.maximumOrderQuantity !== undefined && {
-            maximumOrderQuantity: updateData.maximumOrderQuantity ? parseInt(updateData.maximumOrderQuantity) : null
-          }),
           ...(updateData.dispatchTimeline !== undefined && {
             dispatchTimeline: updateData.dispatchTimeline ? {
               processingDays: parseInt(updateData.dispatchTimeline.processingDays) || 1,
@@ -1115,19 +1073,10 @@ const createProductByAdmin = async (req, res) => {
       // Images
       images,
 
-      // Pricing Configuration
-      pricingTiers,
-      bulkPricingEnabled,
-      singleUnitPricingEnabled,
-
       // Stock Management
       totalStock,
       lowStockThreshold,
       trackInventory,
-
-      // Order Configuration
-      minimumOrderQuantity,
-      maximumOrderQuantity,
 
       // Dispatch & Shipping
       dispatchTimeline,
@@ -1165,21 +1114,6 @@ const createProductByAdmin = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Vendor not found'
-      });
-    }
-
-    // Validate pricing strategy
-    if (!singleUnitPricingEnabled && !bulkPricingEnabled) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one pricing strategy must be enabled'
-      });
-    }
-
-    if (singleUnitPricingEnabled && (!basePrice || basePrice <= 0)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid base price is required for single unit pricing'
       });
     }
 
@@ -1280,14 +1214,9 @@ const createProductByAdmin = async (req, res) => {
           fabricSpecifications: fabricSpecifications || {},
           hasVariants: hasVariants || false,
           baseSku,
-          pricingTiers: pricingTiers || [],
-          bulkPricingEnabled: bulkPricingEnabled || false,
-          singleUnitPricingEnabled: singleUnitPricingEnabled !== false,
           totalStock: productStock,
           lowStockThreshold: parseInt(lowStockThreshold) || 10,
           trackInventory: trackInventory !== false,
-          minimumOrderQuantity: parseInt(minimumOrderQuantity) || 1,
-          maximumOrderQuantity: maximumOrderQuantity ? parseInt(maximumOrderQuantity) : null,
           dispatchTimeline: dispatchTimeline ? {
             processingDays: parseInt(dispatchTimeline.processingDays) || 1,
             shippingDays: parseInt(dispatchTimeline.shippingDays) || 3,
@@ -1501,24 +1430,11 @@ const updateProductByAdmin = async (req, res) => {
         }),
         ...(updateData.hasVariants !== undefined && { hasVariants: updateData.hasVariants }),
         ...(updateData.baseSku && { baseSku: updateData.baseSku }),
-        ...(updateData.pricingTiers !== undefined && { pricingTiers: updateData.pricingTiers }),
-        ...(updateData.bulkPricingEnabled !== undefined && {
-          bulkPricingEnabled: updateData.bulkPricingEnabled
-        }),
-        ...(updateData.singleUnitPricingEnabled !== undefined && {
-          singleUnitPricingEnabled: updateData.singleUnitPricingEnabled
-        }),
         ...(updateData.totalStock !== undefined && { totalStock: parseInt(updateData.totalStock) }),
         ...(updateData.lowStockThreshold !== undefined && {
           lowStockThreshold: parseInt(updateData.lowStockThreshold)
         }),
         ...(updateData.trackInventory !== undefined && { trackInventory: updateData.trackInventory }),
-        ...(updateData.minimumOrderQuantity !== undefined && {
-          minimumOrderQuantity: parseInt(updateData.minimumOrderQuantity)
-        }),
-        ...(updateData.maximumOrderQuantity !== undefined && {
-          maximumOrderQuantity: updateData.maximumOrderQuantity ? parseInt(updateData.maximumOrderQuantity) : null
-        }),
         ...(updateData.dispatchTimeline !== undefined && {
           dispatchTimeline: updateData.dispatchTimeline ? {
             processingDays: parseInt(updateData.dispatchTimeline.processingDays) || 1,
@@ -2021,11 +1937,6 @@ const getPublicProduct = async (req, res) => {
         fabricSpecifications: true,
         dimensions: true,
         weight: true,
-        pricingTiers: true,
-        bulkPricingEnabled: true,
-        singleUnitPricingEnabled: true,
-        minimumOrderQuantity: true,
-        maximumOrderQuantity: true,
         dispatchTimeline: true,
         createdAt: true,
         updatedAt: true

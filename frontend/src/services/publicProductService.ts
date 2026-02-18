@@ -43,12 +43,8 @@ export interface PublicProduct {
   vendorId: string;
   isFromInventory: boolean;
   baseSku: string;
-  bulkPricingEnabled: boolean;
-  singleUnitPricingEnabled: boolean;
   lowStockThreshold: number;
   trackInventory: boolean;
-  minimumOrderQuantity: number;
-  maximumOrderQuantity?: number;
   dispatchTimeline: {
     processingDays: number;
     shippingDays: number;

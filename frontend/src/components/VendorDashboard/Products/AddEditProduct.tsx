@@ -169,19 +169,10 @@ interface ProductFormData {
   // Images
   images: ProductImage[]
 
-  // Pricing Configuration
-  pricingTiers: PricingTier[]
-  bulkPricingEnabled: boolean
-  singleUnitPricingEnabled: boolean
-
   // Stock Management (linked to inventory)
   totalStock: number
   lowStockThreshold: number
   trackInventory: boolean
-
-  // Order Configuration
-  minimumOrderQuantity: number
-  maximumOrderQuantity?: number
 
   // Dispatch & Shipping
   dispatchTimeline: {
@@ -263,19 +254,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     // Images
     images: [],
 
-    // Pricing Configuration
-    pricingTiers: [{ minQuantity: 1, price: 0 }],
-    bulkPricingEnabled: false,
-    singleUnitPricingEnabled: true,
-
     // Stock Management
     totalStock: 0,
     lowStockThreshold: 10,
     trackInventory: true,
-
-    // Order Configuration
-    minimumOrderQuantity: 1,
-    maximumOrderQuantity: undefined,
 
     // Dispatch & Shipping
     dispatchTimeline: {
@@ -428,16 +410,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
               images: product.images || [],
 
-              pricingTiers: product.pricingTiers || [{ minQuantity: 1, price: product.basePrice }],
-              bulkPricingEnabled: product.bulkPricingEnabled,
-              singleUnitPricingEnabled: product.singleUnitPricingEnabled,
-
               totalStock: product.totalStock,
               lowStockThreshold: product.lowStockThreshold,
               trackInventory: product.trackInventory,
-
-              minimumOrderQuantity: product.minimumOrderQuantity,
-              maximumOrderQuantity: product.maximumOrderQuantity,
 
               dispatchTimeline: product.dispatchTimeline || {
                 processingDays: 0,
@@ -1766,48 +1741,15 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             <p className="text-sm text-slate-600">Fixed price for all quantities</p>
                           </div>
                         </div>
-                      </div>
-
-                      {/* Bulk Pricing Option */}
-                      <div
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.bulkPricingEnabled
-                          ? 'border-gray-800 bg-gray-100 shadow-sm'
-                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
-                          }`}
-                        onClick={() => setFormData(prev => ({ ...prev, bulkPricingEnabled: !prev.bulkPricingEnabled }))}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${formData.bulkPricingEnabled
-                            ? 'border-gray-800 bg-gray-800'
-                            : 'border-gray-300'
-                            }`}>
-                            {formData.bulkPricingEnabled && (
-                              <div className="w-2 h-2 bg-white rounded-sm"></div>
-                            )}
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-slate-900">Bulk Pricing Tiers</h4>
-                            <p className="text-sm text-slate-600">Discounted prices for larger orders</p>
-                          </div>
-                        </div>
-                      </div>
                     </div>
-
-                    {/* Validation Message */}
-                    {!formData.singleUnitPricingEnabled && !formData.bulkPricingEnabled && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm text-red-700">⚠️ Please select at least one pricing strategy</p>
-                      </div>
-                    )}
                   </div>
 
                   {/* Single Unit Pricing Section */}
-                  {formData.singleUnitPricingEnabled && (
-                    <div className="border-2 border-gray-300 rounded-lg p-6 animate-in slide-in-from-top-2 duration-300">
-                      <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
-                        <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
-                        Single Unit Pricing
-                      </h4>
+                  <div className="border-2 border-gray-300 rounded-lg p-6">
+                    <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                      <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
+                      Product Pricing
+                    </h4>
 
                       {/* Pricing Configuration */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -1911,272 +1853,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             )}
                           </div>
                         </div>
-                      )}
                     </div>
-                  )}
-
-                  {/* Bulk Pricing Section */}
-                  {formData.bulkPricingEnabled && (
-                    <div className="border-2 border-gray-300 rounded-lg p-6 animate-in slide-in-from-top-2 duration-300">
-                      <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
-                        <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
-                        Bulk Pricing Tiers
-                      </h4>
-
-                      {/* Base Price for Bulk Pricing Only */}
-                      {!formData.singleUnitPricingEnabled && formData.bulkPricingEnabled && (
-                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <h5 className="font-medium text-blue-900 mb-3">Set Base Price for Discount Calculations</h5>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-blue-800 mb-2">
-                                Base Price (Before Discounts) *
-                              </label>
-                              <div className="relative">
-                                <span className="absolute left-3 top-2 text-blue-600">₹</span>
-                                <input
-                                  type="number"
-                                  value={formData.pricingTiers[0]?.price || 0}
-                                  onChange={(e) => {
-                                    const basePrice = parseFloat(e.target.value) || 0
-                                    // Update first tier as base price
-                                    updatePricingTier(0, 'price', basePrice)
-                                    updatePricingTier(0, 'discount', 0)
-
-                                    // Recalculate other tiers based on their discount percentages
-                                    formData.pricingTiers.forEach((tier, idx) => {
-                                      if (idx > 0 && tier.discount && tier.discount > 0) {
-                                        const discountedPrice = basePrice * (1 - tier.discount / 100)
-                                        updatePricingTier(idx, 'price', Math.max(0, discountedPrice))
-                                      }
-                                    })
-                                  }}
-                                  className="w-full pl-7 pr-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  placeholder="0"
-                                />
-                              </div>
-                              <p className="text-xs text-blue-700 mt-1">This will be your first tier price</p>
-                            </div>
-                            <div className="flex items-end">
-                              <div className="p-3 bg-white border border-blue-300 rounded-lg w-full">
-                                <p className="text-xs text-blue-700 mb-1">Pricing Strategy</p>
-                                <p className="text-sm font-medium text-blue-900">Bulk Pricing Only</p>
-                                <p className="text-xs text-blue-600">Discounts calculated from base price</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-4">
-                        {/* Pricing Tiers Table */}
-                        <div className="overflow-x-auto border border-gray-300 rounded-lg">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Quantity Range</TableHead>
-                                <TableHead>Price per Unit</TableHead>
-                                <TableHead>
-                                  Discount %
-                                  {formData.bulkPricingEnabled && (
-                                    <span className="block text-xs font-normal text-gray-500">
-                                      {!formData.singleUnitPricingEnabled ? 'Enter discount' : 'Auto-calculated'}
-                                    </span>
-                                  )}
-                                </TableHead>
-                                <TableHead>Savings per Unit</TableHead>
-                                <TableHead className="text-center">Action</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {formData.pricingTiers.map((tier, index) => {
-                                const basePrice = formData.singleUnitPricingEnabled ? formData.basePrice : (formData.pricingTiers[0]?.price || 0)
-                                const savings = basePrice - tier.price
-                                const discountPercent = basePrice > 0
-                                  ? ((savings / basePrice) * 100).toFixed(1)
-                                  : 0
-
-                                return (
-                                  <TableRow key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100'}>
-                                    <TableCell>
-                                      <div className="flex items-center gap-2">
-                                        <input
-                                          type="number"
-                                          value={tier.minQuantity}
-                                          onChange={(e) => updatePricingTier(index, 'minQuantity', parseInt(e.target.value) || 1)}
-                                          min="1"
-                                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                                        />
-                                        <span className="text-gray-600 text-sm">to</span>
-                                        <input
-                                          type="number"
-                                          value={tier.maxQuantity || ''}
-                                          onChange={(e) => updatePricingTier(index, 'maxQuantity', e.target.value ? parseInt(e.target.value) : undefined)}
-                                          min="1"
-                                          placeholder="100"
-                                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                                        />
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="relative">
-                                        <span className="absolute left-2 top-2 text-gray-500 text-sm">₹</span>
-                                        <input
-                                          type="number"
-                                          value={tier.price}
-                                          onChange={(e) => {
-                                            const newPrice = parseFloat(e.target.value) || 0
-                                            updatePricingTier(index, 'price', newPrice)
-
-                                            // Auto-calculate discount when price changes
-                                            const basePrice = formData.singleUnitPricingEnabled
-                                              ? formData.basePrice
-                                              : (index === 0 ? newPrice : (formData.pricingTiers[0]?.price || 0))
-
-                                            if (basePrice > 0 && newPrice < basePrice) {
-                                              const calculatedDiscount = ((basePrice - newPrice) / basePrice) * 100
-                                              updatePricingTier(index, 'discount', Math.round(calculatedDiscount * 10) / 10)
-                                            } else {
-                                              updatePricingTier(index, 'discount', 0)
-                                            }
-                                          }}
-                                          className="w-full pl-6 pr-2 py-1 border border-gray-300 rounded text-sm"
-                                        />
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="relative">
-                                        <input
-                                          type="number"
-                                          value={tier.discount || ''}
-                                          onChange={(e) => {
-                                            const discountValue = parseFloat(e.target.value) || 0
-                                            updatePricingTier(index, 'discount', discountValue)
-
-                                            // Auto-calculate price based on discount when bulk pricing only
-                                            if (!formData.singleUnitPricingEnabled && formData.bulkPricingEnabled) {
-                                              // Use the first tier price as base if no single unit pricing
-                                              const basePrice = index === 0 ? tier.price : (formData.pricingTiers[0]?.price || 0)
-                                              if (basePrice > 0) {
-                                                const newPrice = basePrice * (1 - discountValue / 100)
-                                                updatePricingTier(index, 'price', Math.max(0, newPrice))
-                                              }
-                                            } else if (formData.singleUnitPricingEnabled && formData.basePrice > 0) {
-                                              // Calculate price based on single unit base price
-                                              const newPrice = formData.basePrice * (1 - discountValue / 100)
-                                              updatePricingTier(index, 'price', Math.max(0, newPrice))
-                                            }
-                                          }}
-                                          max="100"
-                                          disabled={!formData.bulkPricingEnabled}
-                                          className={`w-full px-2 py-1 border border-gray-300 rounded text-sm ${!formData.bulkPricingEnabled ? 'bg-gray-100 text-gray-500' : ''
-                                            }`}
-                                          placeholder="0"
-                                        />
-                                        <span className="absolute right-2 top-2 text-gray-500 text-sm">%</span>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-gray-900 font-semibold">₹{savings.toFixed(2)}</TableCell>
-                                    <TableCell className="text-center">
-                                      {formData.pricingTiers.length > 1 && (
-                                        <button
-                                          type="button"
-                                          onClick={() => removePricingTier(index)}
-                                          className="text-gray-600 hover:text-red-600 p-1 inline-block"
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </button>
-                                      )}
-                                    </TableCell>
-                                  </TableRow>
-                                )
-                              })}
-                            </TableBody>
-                          </Table>
-                        </div>
-
-                        {/* Add Tier Button */}
-                        <Button
-                          type="button"
-                          onClick={addPricingTier}
-                          className="w-full bg-gray-900 text-white hover:bg-black"
-                        >
-                          + Add Pricing Tier
-                        </Button>
-
-                        {/* Bulk Pricing Example */}
-                        <div className="p-4 bg-white border border-gray-300 rounded-lg">
-                          <p className="text-xs font-medium text-gray-700 mb-2">
-                            {!formData.singleUnitPricingEnabled ? 'Bulk Pricing Structure:' : 'Bulk Pricing Example:'}
-                          </p>
-                          <div className="space-y-1 text-xs text-gray-600">
-                            {formData.pricingTiers.map((tier, idx) => (
-                              <div key={idx} className="flex justify-between">
-                                <span>
-                                  {tier.minQuantity} - {tier.maxQuantity ? tier.maxQuantity : '∞'} units:
-                                </span>
-                                <span className="font-medium text-gray-900">
-                                  ₹{tier.price.toFixed(2)} each
-                                  {tier.discount && tier.discount > 0 && (
-                                    <span className="text-green-600 ml-1">({tier.discount}% off)</span>
-                                  )}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-
-                          {!formData.singleUnitPricingEnabled && formData.bulkPricingEnabled && (
-                            <div className="mt-3 pt-2 border-t border-gray-200">
-                              <p className="text-xs text-blue-700">
-                                💡 <strong>Bulk Pricing Only:</strong> Enter discount percentages to automatically calculate tier prices
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Combined Pricing Summary */}
-                  {(formData.singleUnitPricingEnabled || formData.bulkPricingEnabled) && (
-                    <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
-                      <h4 className="font-medium text-gray-900 mb-3">Pricing Summary</h4>
-                      <div className="space-y-2 text-sm">
-                        {formData.singleUnitPricingEnabled && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Single Unit Price:</span>
-                            <span className="font-medium text-gray-900">₹{formData.basePrice.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {formData.bulkPricingEnabled && formData.pricingTiers.length > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Bulk Price Range:</span>
-                            <span className="font-medium text-gray-900">
-                              ₹{Math.min(...formData.pricingTiers.map(t => t.price)).toFixed(2)} - ₹{Math.max(...formData.pricingTiers.map(t => t.price)).toFixed(2)}
-                            </span>
-                          </div>
-                        )}
-                        {formData.singleUnitPricingEnabled && formData.bulkPricingEnabled && (
-                          <div className="pt-2 border-t border-gray-300">
-                            <p className="text-xs text-gray-600">
-                              💡 Customers will see both single unit pricing and bulk discounts
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Pricing Strategy Tips */}
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <h4 className="font-medium text-amber-900 mb-2">💡 Pricing Strategy Tips</h4>
-                    <ul className="text-sm text-amber-800 space-y-1">
-                      <li>• <strong>Single Unit Only:</strong> Best for products with consistent pricing</li>
-                      <li>• <strong>Bulk Pricing Only:</strong> Ideal for wholesale or B2B sales</li>
-                      <li>• <strong>Both Options:</strong> Attracts both retail and bulk customers</li>
-                      <li>• Typical bulk discounts: 5-10% for 10+ units, 10-15% for 50+ units</li>
-                      <li>• Ensure all prices maintain healthy profit margins</li>
-                    </ul>
                   </div>
                 </CardContent>
               </Card>
@@ -2232,36 +1909,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Minimum Order Quantity *
-                          </label>
-                          <input
-                            type="number"
-                            name="minimumOrderQuantity"
-                            value={formData.minimumOrderQuantity}
-                            onChange={handleInputChange}
-                            required
-                            min="1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Maximum Order Quantity
-                          </label>
-                          <input
-                            type="number"
-                            name="maximumOrderQuantity"
-                            value={formData.maximumOrderQuantity || ''}
-                            onChange={handleInputChange}
-                            min="1"
-                            placeholder="No limit"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
                     </>
                   )}
                 </CardContent>
@@ -2651,10 +2298,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       : `$${formData.basePrice}`
                     }
                   </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Min Order Qty:</span>
-                  <span className="font-medium">{formData.minimumOrderQuantity}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Dispatch Time:</span>
