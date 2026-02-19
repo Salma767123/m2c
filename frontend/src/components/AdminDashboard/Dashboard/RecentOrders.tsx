@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import { Eye } from 'lucide-react'
 import Link from 'next/link'
 
@@ -64,30 +65,28 @@ export default function RecentOrders() {
         <CardTitle>Recent Orders</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-2 text-xs font-semibold text-gray-600 uppercase">Order ID</th>
-                <th className="text-left py-3 px-2 text-xs font-semibold text-gray-600 uppercase">Customer</th>
-                <th className="text-left py-3 px-2 text-xs font-semibold text-gray-600 uppercase">Amount</th>
-                <th className="text-left py-3 px-2 text-xs font-semibold text-gray-600 uppercase">Status</th>
-                <th className="text-left py-3 px-2 text-xs font-semibold text-gray-600 uppercase">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentOrders.map((order) => (
-                <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                  <td className="py-3 px-2 text-sm font-medium text-gray-900">{order.id}</td>
-                  <td className="py-3 px-2 text-sm text-gray-700">{order.customer}</td>
-                  <td className="py-3 px-2 text-sm font-semibold text-gray-900">{order.amount}</td>
-                  <td className="py-3 px-2">{getStatusBadge(order.status)}</td>
-                  <td className="py-3 px-2 text-sm text-gray-500">{order.date}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs font-semibold text-white uppercase">Order ID</TableHead>
+              <TableHead className="text-xs font-semibold text-white uppercase">Customer</TableHead>
+              <TableHead className="text-xs font-semibold text-white uppercase">Amount</TableHead>
+              <TableHead className="text-xs font-semibold text-white uppercase">Status</TableHead>
+              <TableHead className="text-xs font-semibold text-white uppercase">Date</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {recentOrders.map((order) => (
+              <TableRow key={order.id} className="hover:bg-gray-50 transition-colors">
+                <TableCell className="font-medium text-gray-900">{order.id}</TableCell>
+                <TableCell className="text-gray-700">{order.customer}</TableCell>
+                <TableCell className="font-semibold text-gray-900">{order.amount}</TableCell>
+                <TableCell>{getStatusBadge(order.status)}</TableCell>
+                <TableCell className="text-gray-500">{order.date}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   )

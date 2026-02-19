@@ -40,15 +40,7 @@ const topProducts = [
     trend: '+10%',
     image: '/assets/images/categories/cs4.jpg'
   },
-  {
-    id: '5',
-    name: 'Bath Towel Set',
-    category: 'Towels',
-    sales: 692,
-    revenue: '$27,680',
-    trend: '+6%',
-    image: '/assets/images/categories/cs5.jpg'
-  }
+
 ]
 
 export default function TopSellingProducts() {
@@ -61,13 +53,10 @@ export default function TopSellingProducts() {
         <div className="space-y-3">
           {topProducts.map((product, index) => (
             <div key={product.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-              {/* Rank Badge */}
-              <div className="flex items-center justify-center w-8 h-8 bg-gray-900 text-white rounded-full font-bold text-sm shrink-0">
-                {index + 1}
-              </div>
+
               
               {/* Product Image */}
-              <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-200 shrink-0">
+              <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-gray-200 shrink-0">
                 <Image
                   src={product.image}
                   alt={product.name}
