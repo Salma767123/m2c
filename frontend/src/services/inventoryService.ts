@@ -60,7 +60,7 @@ export interface CreateInventoryData {
   notes?: string;
 }
 
-export interface UpdateInventoryData extends Partial<CreateInventoryData> {}
+export interface UpdateInventoryData extends Partial<CreateInventoryData> { }
 
 export interface UpdateStockData {
   currentStock: number;
@@ -140,7 +140,7 @@ class InventoryService {
   // Get all inventory items with filters
   async getItems(filters: InventoryFilters = {}): Promise<InventoryListResponse> {
     const params = new URLSearchParams();
-    
+
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
     if (filters.search) params.append('search', filters.search);

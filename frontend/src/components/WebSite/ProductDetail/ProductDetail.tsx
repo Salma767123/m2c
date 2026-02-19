@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Breadcrumb from '../Navigation/Breadcrumb';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
-import { productService, Product } from '@/services/productService';
+import { productService, Product, ProductVariant } from '@/services/productService';
 import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
 import { Star, Heart, Truck, Shield, RotateCcw, Package } from 'lucide-react';
@@ -18,7 +18,7 @@ interface ProductDetailProps {
 const ProductDetail = ({ productId }: ProductDetailProps) => {
   const [product, setProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAllDetails, setShowAllDetails] = useState(false);
@@ -35,10 +35,7 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
 
         if (response.success && response.data) {
           setProduct(response.data);
-          // Set first variant as default if product has variants
-          if (response.data.hasVariants && response.data.variants && response.data.variants.length > 0) {
-            setSelectedVariant(response.data.variants[0]);
-          }
+          // Auto-select removed to show basic product info first
         }
       } catch (error) {
         console.error('Failed to fetch product:', error);
@@ -195,10 +192,10 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
       <Star
         key={i}
         className={`w-5 h-5 ${i < Math.floor(rating)
-            ? 'text-yellow-400 fill-current'
-            : i < rating
-              ? 'text-yellow-400 fill-current opacity-50'
-              : 'text-gray-300'
+          ? 'text-yellow-400 fill-current'
+          : i < rating
+            ? 'text-yellow-400 fill-current opacity-50'
+            : 'text-gray-300'
           }`}
       />
     ));
@@ -290,8 +287,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                           onClick={() => setSelectedImage(index)}
                           onMouseEnter={() => setSelectedImage(index)}
                           className={`w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all duration-300 transform hover:scale-105 ${selectedImage === index
-                              ? 'border-blue-500 ring-4 ring-blue-200 shadow-lg'
-                              : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                            ? 'border-blue-500 ring-4 ring-blue-200 shadow-lg'
+                            : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                             }`}
                         >
                           {image.url ? (
@@ -388,32 +385,98 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                             Select Variant: {selectedVariant ? `${selectedVariant.size} - ${selectedVariant.color}` : 'Choose one'}
                           </h3>
                           <div className="grid grid-cols-2 gap-2">
+                            {/* Default Variant Option */}
+                            <button
+                              onClick={() => {
+                                setSelectedVariant(null);
+                                setSelectedImage(0);
+                              }}
+                              className={`p-3 border-2 rounded-lg transition-all duration-300 text-left transform hover:scale-105 ${!selectedVariant
+                                ? 'border-blue-500 shadow-lg ring-2 ring-blue-200'
+                                : 'border-gray-200 hover:border-gray-300 hover:shadow-md bg-white'
+                                }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                {/* Product Main Image Preview */}
+                                {product.images && product.images.length > 0 && (
+                                  <div className="w-12 h-12 rounded-md overflow-hidden border border-gray-200 shrink-0">
+                                    <Image
+                                      src={product.images.find(img => img.isPrimary)?.url || product.images[0].url}
+                                      alt="Default"
+                                      width={48}
+                                      height={48}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-semibold text-gray-900 text-sm">Default</div>
+                                  <div className="flex items-center flex-wrap gap-2 mt-1">
+                                    {product.singleUnitSize && (
+                                      <span className="text-xs text-gray-600 font-medium">{product.singleUnitSize}</span>
+                                    )}
+                                    {product.singleUnitColorHex && (
+                                      <div
+                                        className="w-4 h-4 rounded-full border border-gray-300 shrink-0"
+                                        style={{ backgroundColor: product.singleUnitColorHex }}
+                                        title={product.singleUnitColor}
+                                      />
+                                    )}
+                                    {product.singleUnitColor && (
+                                      <span className="text-xs text-gray-600">{product.singleUnitColor}</span>
+                                    )}
+                                    {!product.singleUnitSize && !product.singleUnitColor && (
+                                      <span className="text-xs text-gray-600">Base Product</span>
+                                    )}
+                                  </div>
+                                  <div className="text-lg font-bold text-gray-900 mt-1">${(product.adminFixedPrice || product.basePrice).toFixed(2)}</div>
+                                </div>
+                              </div>
+                            </button>
                             {product.variants.map((variant) => (
                               <button
                                 key={variant.id}
                                 onClick={() => {
-                                  setSelectedVariant(variant);
-                                  setSelectedImage(0); // Reset to first image when variant changes
+                                  if (selectedVariant?.id === variant.id) {
+                                    setSelectedVariant(null); // Deselect if already selected
+                                  } else {
+                                    setSelectedVariant(variant);
+                                  }
+                                  setSelectedImage(0); // Reset to first image
                                 }}
                                 className={`p-3 border-2 rounded-lg transition-all duration-300 text-left transform hover:scale-105 ${selectedVariant?.id === variant.id
-                                    ? 'border-blue-500 shadow-lg ring-2 ring-blue-200'
-                                    : 'border-gray-200 hover:border-gray-300 hover:shadow-md bg-white'
+                                  ? 'border-blue-500 shadow-lg ring-2 ring-blue-200'
+                                  : 'border-gray-200 hover:border-gray-300 hover:shadow-md bg-white'
                                   }`}
                               >
-                                <div>
-                                  <div className="font-semibold text-gray-900 text-sm">{variant.size}</div>
-                                  <div className="flex items-center space-x-2 mt-1">
-                                    {variant.colorHex && (
-                                      <div
-                                        className="w-4 h-4 rounded-full border border-gray-300"
-                                        style={{ backgroundColor: variant.colorHex }}
+                                <div className="flex items-start gap-3">
+                                  {/* Variant Image Preview in Selector */}
+                                  {variant.images && variant.images.length > 0 && (
+                                    <div className="w-12 h-12 rounded-md overflow-hidden border border-gray-200 shrink-0">
+                                      <Image
+                                        src={variant.images[0]}
+                                        alt={`${variant.size} ${variant.color}`}
+                                        width={48}
+                                        height={48}
+                                        className="w-full h-full object-cover"
                                       />
-                                    )}
-                                    <span className="text-xs text-gray-600">{variant.color}</span>
-                                  </div>
-                                  <div className="text-lg font-bold text-gray-900 mt-1">${variant.price.toFixed(2)}</div>
-                                  <div className="text-xs text-gray-500">
-                                    {variant.stock > 0 ? `${variant.stock} in stock` : 'Out of stock'}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="font-semibold text-gray-900 text-sm">{variant.size}</div>
+                                    <div className="flex items-center space-x-2 mt-1">
+                                      {variant.colorHex && (
+                                        <div
+                                          className="w-4 h-4 rounded-full border border-gray-300"
+                                          style={{ backgroundColor: variant.colorHex }}
+                                        />
+                                      )}
+                                      <span className="text-xs text-gray-600">{variant.color}</span>
+                                    </div>
+                                    <div className="text-lg font-bold text-gray-900 mt-1">${variant.price.toFixed(2)}</div>
+                                    <div className="text-xs text-gray-500">
+                                      {variant.stock > 0 ? `${variant.stock} in stock` : 'Out of stock'}
+                                    </div>
                                   </div>
                                 </div>
                               </button>
@@ -466,6 +529,9 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                               {selectedVariant && (
                                 <span className="text-gray-600 text-sm">({selectedVariant.stock} available)</span>
                               )}
+                              {!selectedVariant && (
+                                <span className="text-gray-600 text-sm">({product.totalStock} available)</span>
+                              )}
                             </div>
                           ) : (
                             <div className="flex items-center space-x-2">
@@ -513,23 +579,18 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                             <div className="flex space-x-2">
                               <button
                                 onClick={handleAddToCart}
-                                disabled={product.hasVariants && !selectedVariant}
                                 className="flex-1 bg-white text-black border-2 border-gray-700 py-2.5 px-3 rounded-lg hover:bg-gray-700 hover:text-white transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Add to cart
                               </button>
                               <button
                                 onClick={handleBuyNow}
-                                disabled={product.hasVariants && !selectedVariant}
                                 className="flex-1 bg-[#1d1d1d] text-white py-2.5 px-3 rounded-lg hover:from-orange-600 hover:to-gray-600 transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Buy Now
                               </button>
                             </div>
                           </>
-                        )}
-                        {product.hasVariants && !selectedVariant && (
-                          <p className="text-xs text-amber-600 mt-2 text-center">Please select a variant</p>
                         )}
                       </div>
                     </div>

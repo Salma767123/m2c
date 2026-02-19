@@ -355,7 +355,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     colorHex: '#000000',
     sku: '',
     price: 0,
-    stock: 0
+    stock: 0,
+    images: [] // New field for variant images
   })
 
   // Load product data for editing
@@ -416,11 +417,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 id: v.id,
                 size: v.size,
                 color: v.color,
-                colorHex: '#000000', // Default, can be enhanced
-                sku: `${product.baseSku}-${v.size}-${v.color}`,
+                colorHex: v.colorHex || '#000000',
+                sku: v.sku, // Use stored SKU
                 price: v.price,
                 stock: v.stock,
-                images: []
+                images: v.images || []
               })) || [],
               hasVariants: product.hasVariants,
 
@@ -745,7 +746,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         sku: newVariant.sku!,
         price: newVariant.price || 0,
         stock: newVariant.stock || 0,
-        images: []
+        images: newVariant.images || []
       }
 
       setFormData(prev => ({
@@ -753,7 +754,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         variants: [...prev.variants, variant]
       }))
 
-      setNewVariant({ size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0 })
+      setNewVariant({ size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, images: [] })
     }
   }
 
@@ -782,6 +783,30 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         return v
       })
     }))
+  }
+
+  const handleVariantImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const file = files[0]
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      showWarningToast('File Too Large', 'Please select an image under 5MB.')
+      e.target.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setNewVariant(prev => ({
+          ...prev,
+          images: [event.target?.result as string] // Overwrite with new single image
+        }))
+      }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
   }
 
   // Care Instructions Functions
@@ -1682,8 +1707,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             </div>
                           </div>
 
-                          {/* Second Row: Pricing & Inventory */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Second Row: Pricing & Inventory & Image */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <label className="block text-sm font-medium text-gray-700">Price *</label>
                               <div className="relative">
@@ -1709,6 +1734,49 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 min="0"
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
                               />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Variant Image</label>
+                              <div className="flex items-center gap-3">
+                                <div className="relative w-12 h-12 bg-gray-100 rounded-lg border border-gray-300 overflow-hidden flex-shrink-0">
+                                  {newVariant.images && newVariant.images.length > 0 ? (
+                                    <img
+                                      src={newVariant.images[0]}
+                                      alt="Variant"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full text-gray-400">
+                                      <Upload className="w-5 h-5" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <input
+                                    type="file"
+                                    id="variant-image-upload"
+                                    accept="image/*"
+                                    onChange={handleVariantImageUpload}
+                                    className="hidden"
+                                  />
+                                  <label
+                                    htmlFor="variant-image-upload"
+                                    className="inline-block px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+                                  >
+                                    Choose Image
+                                  </label>
+                                  {newVariant.images && newVariant.images.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewVariant(prev => ({ ...prev, images: [] }))}
+                                      className="ml-2 text-xs text-red-600 hover:text-red-800"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
 
@@ -1742,6 +1810,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             <Table>
                               <TableHeader>
                                 <TableRow>
+                                  <TableHead>Image</TableHead>
                                   <TableHead>Size</TableHead>
                                   <TableHead>Color</TableHead>
                                   <TableHead>SKU</TableHead>
@@ -1753,6 +1822,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               <TableBody>
                                 {formData.variants.map((variant, idx) => (
                                   <TableRow key={variant.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100'}>
+                                    <TableCell>
+                                      <div className="w-10 h-10 bg-gray-100 rounded border border-gray-200 overflow-hidden">
+                                        {variant.images && variant.images.length > 0 ? (
+                                          <img src={variant.images[0]} alt={variant.sku} className="w-full h-full object-cover" />
+                                        ) : (
+                                          <div className="flex items-center justify-center h-full text-gray-300">
+                                            <Package className="w-4 h-4" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    </TableCell>
                                     <TableCell className="text-gray-900 font-medium">{variant.size}</TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">

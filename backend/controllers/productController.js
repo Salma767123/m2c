@@ -133,10 +133,19 @@ const createProduct = async (req, res) => {
 
     // Start transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Determine the stock to use - if from inventory, use inventory's currentStock
-      const productStock = (isFromInventory && inventoryItem)
-        ? inventoryItem.currentStock
-        : (parseInt(totalStock) || 0);
+      // Determine the stock to use
+      let productStock = 0;
+
+      if (hasVariants && variants && variants.length > 0) {
+        // If has variants, total stock is sum of variant stocks
+        productStock = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+      } else if (isFromInventory && inventoryItem) {
+        // If from inventory (and no variants), use inventory stock
+        productStock = inventoryItem.currentStock;
+      } else {
+        // Otherwise use provided total stock
+        productStock = parseInt(totalStock) || 0;
+      }
 
       // Create product
       const product = await tx.product.create({
@@ -219,12 +228,19 @@ const createProduct = async (req, res) => {
 
       // Update inventory item if connected
       if (isFromInventory && inventoryItemId) {
+        let inventoryUpdateData = {
+          hasProductCreated: true,
+          productId: product.id
+        };
+
+        // If has variants, sync calculated stock to inventory
+        if (hasVariants && variants && variants.length > 0) {
+          inventoryUpdateData.currentStock = productStock;
+        }
+
         await tx.inventory.update({
           where: { id: inventoryItemId },
-          data: {
-            hasProductCreated: true,
-            productId: product.id
-          }
+          data: inventoryUpdateData
         });
       }
 
@@ -488,6 +504,15 @@ const updateProduct = async (req, res) => {
 
     // Start transaction for update
     const result = await prisma.$transaction(async (tx) => {
+      // Calculate total stock from variants if we are updating variants
+      let newTotalStock = undefined;
+
+      if ((updateData.hasVariants === true || (existingProduct.hasVariants && updateData.hasVariants !== false)) && updateData.variants && updateData.variants.length > 0) {
+        newTotalStock = updateData.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+      } else if (updateData.totalStock !== undefined) {
+        newTotalStock = parseInt(updateData.totalStock);
+      }
+
       // Update product
       const updatedProduct = await tx.product.update({
         where: { id },
@@ -518,7 +543,10 @@ const updateProduct = async (req, res) => {
           }),
           ...(updateData.hasVariants !== undefined && { hasVariants: updateData.hasVariants }),
           ...(updateData.baseSku && { baseSku: updateData.baseSku }),
-          ...(updateData.totalStock !== undefined && { totalStock: parseInt(updateData.totalStock) }),
+
+          // Use calculated stock if available, otherwise just update if provided
+          ...(newTotalStock !== undefined && { totalStock: newTotalStock }),
+
           ...(updateData.lowStockThreshold !== undefined && {
             lowStockThreshold: parseInt(updateData.lowStockThreshold)
           }),
@@ -610,13 +638,55 @@ const updateProduct = async (req, res) => {
       }
     });
 
-    // Sync stock with linked inventory if totalStock was updated (outside transaction)
-    if (updateData.totalStock !== undefined && existingProduct.inventoryItemId) {
-      await prisma.inventory.update({
-        where: { id: existingProduct.inventoryItemId },
-        data: { currentStock: parseInt(updateData.totalStock) }
-      });
-      console.log('✅ Synced stock with inventory:', existingProduct.inventoryItemId);
+    // Sync stock with linked inventory (outside transaction)
+    // If has variants, use calculated total stock. If not, use provided totalStock
+    let finalStock = 0;
+    if (updateData.hasVariants && updateData.variants && updateData.variants.length > 0) {
+      finalStock = updateData.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+    } else if (existingProduct.hasVariants && (!updateData.variants || updateData.variants.length === 0)) {
+      // Using existing variants (if not updated) - we need to fetch them if not in existingProduct include
+      // But for now, let's assume if variants aren't in updateData, stock isn't changing via variants
+      // This might be an edge case, but typically updates include variants if they are being changed.
+      // Better approach: calculate final stock trigger.
+      finalStock = parseInt(updateData.totalStock) || existingProduct.totalStock; // Fallback
+    } else {
+      finalStock = parseInt(updateData.totalStock);
+    }
+
+    // Special case: If we just calculated stock from variants, we should verify/update the product's totalStock too if it wasn't done in transaction
+    // Actually, we should have done it IN the transaction.
+    // Let's refactor the update logic above to be safer.
+
+    // RE-FETCH the finalized product to get the true stock
+    const finalizedProduct = await prisma.product.findUnique({
+      where: { id },
+      include: { variants: true }
+    });
+
+    if (finalizedProduct) {
+      let trueTotalStock = finalizedProduct.totalStock;
+
+      // If it has variants, strictly enforce sum
+      if (finalizedProduct.hasVariants && finalizedProduct.variants.length > 0) {
+        trueTotalStock = finalizedProduct.variants.reduce((sum, v) => sum + v.stock, 0);
+
+        // If the stored totalStock doesn't match sum of variants, update it
+        if (trueTotalStock !== finalizedProduct.totalStock) {
+          await prisma.product.update({
+            where: { id },
+            data: { totalStock: trueTotalStock }
+          });
+        }
+      }
+
+      // Now sync with Inventory
+      if (existingProduct.inventoryItemId) {
+        await prisma.inventory.update({
+          where: { id: existingProduct.inventoryItemId },
+          data: { currentStock: trueTotalStock }
+        });
+        console.log('✅ Synced stock with inventory:', existingProduct.inventoryItemId, 'New Stock:', trueTotalStock);
+      }
     }
 
     res.json({
@@ -1184,10 +1254,19 @@ const createProductByAdmin = async (req, res) => {
 
     // Start transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Determine the stock to use - if from inventory, use inventory's currentStock
-      const productStock = (isFromInventory && inventoryItem)
-        ? inventoryItem.currentStock
-        : (parseInt(totalStock) || 0);
+      // Determine the stock to use
+      let productStock = 0;
+
+      if (hasVariants && variants && variants.length > 0) {
+        // If has variants, total stock is sum of variant stocks
+        productStock = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+      } else if (isFromInventory && inventoryItem) {
+        // If from inventory (and no variants), use inventory stock
+        productStock = inventoryItem.currentStock;
+      } else {
+        // Otherwise use provided total stock
+        productStock = parseInt(totalStock) || 0;
+      }
 
       // Create product
       const product = await tx.product.create({
@@ -1273,12 +1352,19 @@ const createProductByAdmin = async (req, res) => {
 
       // Update inventory item if connected
       if (isFromInventory && inventoryItemId) {
+        let inventoryUpdateData = {
+          hasProductCreated: true,
+          productId: product.id
+        };
+
+        // If has variants, sync calculated stock to inventory
+        if (hasVariants && variants && variants.length > 0) {
+          inventoryUpdateData.currentStock = productStock;
+        }
+
         await tx.inventory.update({
           where: { id: inventoryItemId },
-          data: {
-            hasProductCreated: true,
-            productId: product.id
-          }
+          data: inventoryUpdateData
         });
       }
 
@@ -1430,7 +1516,11 @@ const updateProductByAdmin = async (req, res) => {
         }),
         ...(updateData.hasVariants !== undefined && { hasVariants: updateData.hasVariants }),
         ...(updateData.baseSku && { baseSku: updateData.baseSku }),
-        ...(updateData.totalStock !== undefined && { totalStock: parseInt(updateData.totalStock) }),
+
+        // Use calculated stock if available, otherwise just update if provided
+        ...(newTotalStock !== undefined && { totalStock: newTotalStock }),
+
+
         ...(updateData.lowStockThreshold !== undefined && {
           lowStockThreshold: parseInt(updateData.lowStockThreshold)
         }),
@@ -1463,11 +1553,16 @@ const updateProductByAdmin = async (req, res) => {
         data: productUpdateData
       });
 
-      // Sync stock with linked inventory if totalStock was updated
-      if (updateData.totalStock !== undefined && existingProduct.inventoryItemId) {
+      // Sync stock with linked inventory (outside transaction logic but here we do it inside if needed, or trigger it)
+      // Note: we can't easily access the updated totalStock if we rely on DB return, but we have newTotalStock
+
+      // If we calculated newTotalStock, usage that.
+      const stockToSync = newTotalStock !== undefined ? newTotalStock : (updateData.totalStock !== undefined ? parseInt(updateData.totalStock) : undefined);
+
+      if (stockToSync !== undefined && existingProduct.inventoryItemId) {
         await tx.inventory.update({
           where: { id: existingProduct.inventoryItemId },
-          data: { currentStock: parseInt(updateData.totalStock) }
+          data: { currentStock: stockToSync }
         });
         console.log('✅ Synced stock with inventory:', existingProduct.inventoryItemId);
       }
