@@ -124,6 +124,8 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const adminProfileRoutes = require('./routes/adminProfileRoutes');
 const companyInfoRoutes = require('./routes/companyInfoRoutes');
 const gstSettingsRoutes = require('./routes/gstSettingsRoutes');
+const hubRoutes = require('./routes/hubRoutes');
+const enquiryRoutes = require('./routes/enquiryRoutes');
 
 
 // Routes
@@ -141,6 +143,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/admin/profile', adminProfileRoutes);
 app.use('/api/company-info', companyInfoRoutes);
 app.use('/api/gst-settings', gstSettingsRoutes);
+app.use('/api/hubs', hubRoutes);
+app.use('/api/enquiries', enquiryRoutes);
 
 // 404 handler
 app.use((req, res) => {

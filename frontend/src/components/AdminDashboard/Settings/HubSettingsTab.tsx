@@ -1,63 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, Plus, Edit, Trash2, Save, X } from "lucide-react";
+import { MapPin, Plus, Edit, Trash2, Save, X, Loader2 } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
-
-interface Hub {
-  id: string;
-  name: string;
-  location: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  phone: string;
-  email: string;
-  isActive: boolean;
-}
+import hubService, { Hub } from "@/services/hubService";
 
 export default function HubSettingsTab() {
-  const [hubs, setHubs] = useState<Hub[]>([
-    {
-      id: "1",
-      name: "Mumbai Hub",
-      location: "Mumbai, Maharashtra",
-      address: "123 Hub Street, Andheri",
-      city: "Mumbai",
-      state: "Maharashtra",
-      zipCode: "400053",
-      phone: "+91 22-1234-5678",
-      email: "mumbai@hub.com",
-      isActive: true,
-    },
-    {
-      id: "2",
-      name: "Delhi Hub",
-      location: "New Delhi, Delhi",
-      address: "456 Hub Road, Connaught Place",
-      city: "New Delhi",
-      state: "Delhi",
-      zipCode: "110001",
-      phone: "+91 11-1234-5678",
-      email: "delhi@hub.com",
-      isActive: true,
-    },
-    {
-      id: "3",
-      name: "Bangalore Hub",
-      location: "Bangalore, Karnataka",
-      address: "789 Hub Avenue, Koramangala",
-      city: "Bangalore",
-      state: "Karnataka",
-      zipCode: "560034",
-      phone: "+91 80-1234-5678",
-      email: "bangalore@hub.com",
-      isActive: true,
-    },
-  ]);
-
+  const [hubs, setHubs] = useState<Hub[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingHub, setEditingHub] = useState<Hub | null>(null);
   const [formData, setFormData] = useState<Partial<Hub>>({
@@ -71,6 +22,25 @@ export default function HubSettingsTab() {
     isActive: true,
   });
   const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch hubs on mount
+  useEffect(() => {
+    fetchHubs();
+  }, []);
+
+  const fetchHubs = async () => {
+    try {
+      setLoading(true);
+      const response = await hubService.getHubs();
+      if (response.success) {
+        setHubs(response.data);
+      }
+    } catch (error: any) {
+      showErrorToast("Error", error.message || "Failed to fetch hubs");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddHub = () => {
     setEditingHub(null);
@@ -89,14 +59,28 @@ export default function HubSettingsTab() {
 
   const handleEditHub = (hub: Hub) => {
     setEditingHub(hub);
-    setFormData(hub);
+    setFormData({
+      name: hub.name,
+      address: hub.address,
+      city: hub.city,
+      state: hub.state,
+      zipCode: hub.zipCode,
+      phone: hub.phone,
+      email: hub.email,
+      isActive: hub.isActive,
+    });
     setShowModal(true);
   };
 
-  const handleDeleteHub = (hubId: string) => {
+  const handleDeleteHub = async (hubId: string) => {
     if (confirm("Are you sure you want to delete this hub?")) {
-      setHubs(hubs.filter((h) => h.id !== hubId));
-      showSuccessToast("Hub Deleted", "Hub has been deleted successfully");
+      try {
+        await hubService.deleteHub(hubId);
+        setHubs(hubs.filter((h) => h.id !== hubId));
+        showSuccessToast("Hub Deleted", "Hub has been deleted successfully");
+      } catch (error: any) {
+        showErrorToast("Error", error.message || "Failed to delete hub");
+      }
     }
   };
 
@@ -112,39 +96,35 @@ export default function HubSettingsTab() {
     setIsSaving(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const hubData = {
+        name: formData.name!,
+        address: formData.address || "",
+        city: formData.city!,
+        state: formData.state!,
+        zipCode: formData.zipCode || "",
+        phone: formData.phone || "",
+        email: formData.email || "",
+        isActive: formData.isActive ?? true,
+      };
 
       if (editingHub) {
         // Update existing hub
-        setHubs(
-          hubs.map((h) =>
-            h.id === editingHub.id
-              ? {
-                  ...h,
-                  ...formData,
-                  location: `${formData.city}, ${formData.state}`,
-                }
-              : h
-          )
-        );
-        showSuccessToast("Hub Updated", "Hub has been updated successfully");
+        const response = await hubService.updateHub(editingHub.id, hubData);
+        if (response.success) {
+          setHubs(
+            hubs.map((h) =>
+              h.id === editingHub.id ? response.data : h
+            )
+          );
+          showSuccessToast("Hub Updated", "Hub has been updated successfully");
+        }
       } else {
         // Add new hub
-        const newHub: Hub = {
-          id: Date.now().toString(),
-          name: formData.name!,
-          location: `${formData.city}, ${formData.state}`,
-          address: formData.address || "",
-          city: formData.city!,
-          state: formData.state!,
-          zipCode: formData.zipCode || "",
-          phone: formData.phone || "",
-          email: formData.email || "",
-          isActive: formData.isActive ?? true,
-        };
-        setHubs([...hubs, newHub]);
-        showSuccessToast("Hub Added", "New hub has been added successfully");
+        const response = await hubService.createHub(hubData);
+        if (response.success) {
+          setHubs([...hubs, response.data]);
+          showSuccessToast("Hub Added", "New hub has been added successfully");
+        }
       }
 
       setShowModal(false);
@@ -159,8 +139,8 @@ export default function HubSettingsTab() {
         email: "",
         isActive: true,
       });
-    } catch (error) {
-      showErrorToast("Error", "Failed to save hub. Please try again.");
+    } catch (error: any) {
+      showErrorToast("Error", error.message || "Failed to save hub. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -180,6 +160,14 @@ export default function HubSettingsTab() {
       isActive: true,
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[300px]">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -212,15 +200,14 @@ export default function HubSettingsTab() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">{hub.name}</h3>
-                    <p className="text-sm text-gray-600">{hub.location}</p>
+                    <p className="text-sm text-gray-600">{hub.city}, {hub.state}</p>
                   </div>
                 </div>
                 <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    hub.isActive
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${hub.isActive
                       ? "bg-green-100 text-green-800"
                       : "bg-gray-100 text-gray-800"
-                  }`}
+                    }`}
                 >
                   {hub.isActive ? "Active" : "Inactive"}
                 </span>
@@ -229,21 +216,21 @@ export default function HubSettingsTab() {
               <div className="space-y-2 mb-4">
                 <div>
                   <p className="text-xs text-gray-500">Address</p>
-                  <p className="text-sm text-gray-900">{hub.address}</p>
+                  <p className="text-sm text-gray-900">{hub.address || "—"}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <p className="text-xs text-gray-500">Phone</p>
-                    <p className="text-sm text-gray-900">{hub.phone}</p>
+                    <p className="text-sm text-gray-900">{hub.phone || "—"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">ZIP Code</p>
-                    <p className="text-sm text-gray-900">{hub.zipCode}</p>
+                    <p className="text-sm text-gray-900">{hub.zipCode || "—"}</p>
                   </div>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Email</p>
-                  <p className="text-sm text-gray-900">{hub.email}</p>
+                  <p className="text-sm text-gray-900">{hub.email || "—"}</p>
                 </div>
               </div>
 
@@ -455,7 +442,11 @@ export default function HubSettingsTab() {
                   disabled={isSaving}
                   className="flex-1 flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save className="h-4 w-4" />
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
                   {isSaving ? "Saving..." : editingHub ? "Update Hub" : "Add Hub"}
                 </button>
               </div>

@@ -1485,6 +1485,14 @@ const updateProductByAdmin = async (req, res) => {
 
     // Start transaction for update
     const result = await prisma.$transaction(async (tx) => {
+      // Calculate newTotalStock based on variants or direct totalStock
+      let newTotalStock = undefined;
+      if (updateData.hasVariants && updateData.variants && updateData.variants.length > 0) {
+        newTotalStock = updateData.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+      } else if (updateData.totalStock !== undefined) {
+        newTotalStock = parseInt(updateData.totalStock);
+      }
+
       // Prepare update data
       const productUpdateData = {
         ...(updateData.name && { name: updateData.name }),
@@ -2118,7 +2126,7 @@ const updateVariantStocks = async (req, res) => {
     // Check authorization
     const isAdmin = req.user.role?.toUpperCase() === 'ADMIN';
     const vendorId = req.user.vendorId || req.user.id;
-    
+
     if (!isAdmin && product.vendorId !== vendorId) {
       return res.status(403).json({
         success: false,

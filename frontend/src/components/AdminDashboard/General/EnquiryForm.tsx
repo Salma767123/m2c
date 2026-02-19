@@ -1,19 +1,22 @@
 'use client';
 
-import { useState } from 'react';
-import { 
-  Search, 
-  Eye, 
-  Mail, 
-  Phone, 
-  Building2, 
-  FileText, 
-  Globe, 
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Search,
+  Eye,
+  Mail,
+  Phone,
+  Building2,
+  FileText,
+  Globe,
   Calendar,
   CheckCircle,
   XCircle,
   Clock,
-  X
+  X,
+  Loader2,
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
 import {
@@ -24,62 +27,39 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/UI/Table';
-
-interface VendorEnquiry {
-  id: string;
-  name: string;
-  companyName: string;
-  gstNumber: string;
-  email: string;
-  phone: string;
-  website: string;
-  submittedAt: string;
-  status: 'pending' | 'approved' | 'rejected';
-}
-
-// Mock data - replace with actual API call
-const mockEnquiries: VendorEnquiry[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    companyName: 'ABC Textiles Pvt Ltd',
-    gstNumber: '29ABCDE1234F1Z5',
-    email: 'john@abctextiles.com',
-    phone: '+91 98765 43210',
-    website: 'https://www.abctextiles.com',
-    submittedAt: '2024-02-10T10:30:00',
-    status: 'pending'
-  },
-  {
-    id: '2',
-    name: 'Jane Smith',
-    companyName: 'XYZ Fabrics Ltd',
-    gstNumber: '27XYZAB5678G2H6',
-    email: 'jane@xyzfabrics.com',
-    phone: '+91 87654 32109',
-    website: 'https://www.xyzfabrics.com',
-    submittedAt: '2024-02-09T14:20:00',
-    status: 'approved'
-  },
-  {
-    id: '3',
-    name: 'Robert Johnson',
-    companyName: 'Premium Textiles Inc',
-    gstNumber: '19PQRST9012K3L4',
-    email: 'robert@premiumtextiles.com',
-    phone: '+91 76543 21098',
-    website: '',
-    submittedAt: '2024-02-08T09:15:00',
-    status: 'rejected'
-  }
-];
+import { enquiryService, type VendorEnquiry } from '@/services/enquiryService';
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
 const EnquiryForm = () => {
-  const [enquiries, setEnquiries] = useState<VendorEnquiry[]>(mockEnquiries);
+  const [enquiries, setEnquiries] = useState<VendorEnquiry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [selectedEnquiry, setSelectedEnquiry] = useState<VendorEnquiry | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchEnquiries = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await enquiryService.getAllEnquiries({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: searchTerm || undefined
+      });
+      setEnquiries(res.data);
+    } catch (err: any) {
+      showErrorToast('Error', err.message || 'Failed to load enquiries');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [statusFilter, searchTerm]);
+
+  useEffect(() => {
+    const timer = setTimeout(fetchEnquiries, 300);
+    return () => clearTimeout(timer);
+  }, [fetchEnquiries]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -120,30 +100,59 @@ const EnquiryForm = () => {
     });
   };
 
-  const filteredEnquiries = enquiries.filter(enquiry => {
-    const matchesSearch = 
-      enquiry.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      enquiry.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      enquiry.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      enquiry.gstNumber.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || enquiry.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
-
   const handleViewDetails = (enquiry: VendorEnquiry) => {
     setSelectedEnquiry(enquiry);
     setShowDetailModal(true);
   };
 
-  const handleStatusChange = (id: string, newStatus: 'approved' | 'rejected') => {
-    setEnquiries(prev => 
-      prev.map(enq => 
-        enq.id === id ? { ...enq, status: newStatus } : enq
-      )
-    );
-    setShowDetailModal(false);
+  const handleApprove = async (id: string) => {
+    setApprovingId(id);
+    try {
+      const res = await enquiryService.approveEnquiry(id);
+      // Update local state
+      setEnquiries(prev => prev.map(e => e.id === id ? { ...e, status: 'approved' as const } : e));
+      if (selectedEnquiry?.id === id) {
+        setSelectedEnquiry(prev => prev ? { ...prev, status: 'approved' } : null);
+      }
+      showSuccessToast('Email Sent!', res.message || 'Approval email sent with registration link.');
+      setShowDetailModal(false);
+    } catch (err: any) {
+      showErrorToast('Approval Failed', err.message || 'Failed to approve. Check SMTP configuration.');
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    setRejectingId(id);
+    try {
+      const res = await enquiryService.rejectEnquiry(id);
+      setEnquiries(prev => prev.map(e => e.id === id ? { ...e, status: 'rejected' as const } : e));
+      if (selectedEnquiry?.id === id) {
+        setSelectedEnquiry(prev => prev ? { ...prev, status: 'rejected' } : null);
+      }
+      showSuccessToast('Rejected', res.message || 'Enquiry has been rejected.');
+      setShowDetailModal(false);
+    } catch (err: any) {
+      showErrorToast('Rejection Failed', err.message || 'Failed to reject enquiry.');
+    } finally {
+      setRejectingId(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this enquiry?')) return;
+    setDeletingId(id);
+    try {
+      await enquiryService.deleteEnquiry(id);
+      setEnquiries(prev => prev.filter(e => e.id !== id));
+      showSuccessToast('Deleted', 'Enquiry deleted successfully.');
+      setShowDetailModal(false);
+    } catch (err: any) {
+      showErrorToast('Delete Failed', err.message || 'Failed to delete enquiry.');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const stats = {
@@ -156,9 +165,19 @@ const EnquiryForm = () => {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Vendor Enquiry Forms</h1>
-        <p className="text-gray-600">Manage vendor applications submitted through the website</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Vendor Enquiry Forms</h1>
+          <p className="text-gray-600">Manage vendor applications submitted through the website</p>
+        </div>
+        <button
+          onClick={fetchEnquiries}
+          disabled={isLoading}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors text-sm font-medium"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -174,7 +193,6 @@ const EnquiryForm = () => {
             </div>
           </div>
         </div>
-
         <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -186,7 +204,6 @@ const EnquiryForm = () => {
             </div>
           </div>
         </div>
-
         <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -198,7 +215,6 @@ const EnquiryForm = () => {
             </div>
           </div>
         </div>
-
         <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -215,7 +231,6 @@ const EnquiryForm = () => {
       {/* Filters and Search */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -226,8 +241,6 @@ const EnquiryForm = () => {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             />
           </div>
-
-          {/* Status Filter */}
           <div className="w-full md:w-48">
             <Dropdown
               value={statusFilter}
@@ -246,70 +259,73 @@ const EnquiryForm = () => {
 
       {/* Enquiries Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Vendor Details</TableHead>
-              <TableHead>Company Info</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Submitted</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredEnquiries.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            <span className="ml-3 text-gray-500">Loading enquiries...</span>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-gray-500">
-                  No enquiries found
-                </TableCell>
+                <TableHead>Vendor Details</TableHead>
+                <TableHead>Company Info</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Submitted</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ) : (
-              filteredEnquiries.map((enquiry) => (
-                <TableRow key={enquiry.id}>
-                  <TableCell>
-                    <div className="font-medium text-gray-900">{enquiry.name}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="font-medium text-gray-900">{enquiry.companyName}</div>
-                      <div className="text-gray-500 text-xs mt-1">GST: {enquiry.gstNumber}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="flex items-center gap-1 text-gray-700">
-                        <Mail className="w-3 h-3" />
-                        <span className="text-xs">{enquiry.email}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-700 mt-1">
-                        <Phone className="w-3 h-3" />
-                        <span className="text-xs">{enquiry.phone}</span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-gray-600">
-                      {formatDate(enquiry.submittedAt)}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(enquiry.status)}
-                  </TableCell>
-                  <TableCell>
-                    <button
-                      onClick={() => handleViewDetails(enquiry)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                    >
-                      <Eye className="w-4 h-4" />
-                      View
-                    </button>
+            </TableHeader>
+            <TableBody>
+              {enquiries.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-12 text-gray-500">
+                    No enquiries found
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                enquiries.map((enquiry) => (
+                  <TableRow key={enquiry.id}>
+                    <TableCell>
+                      <div className="font-medium text-gray-900">{enquiry.name}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="font-medium text-gray-900">{enquiry.companyName}</div>
+                        <div className="text-gray-500 text-xs mt-1">GST: {enquiry.gstNumber}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="flex items-center gap-1 text-gray-700">
+                          <Mail className="w-3 h-3" />
+                          <span className="text-xs">{enquiry.email}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-gray-700 mt-1">
+                          <Phone className="w-3 h-3" />
+                          <span className="text-xs">{enquiry.phone}</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-600">{formatDate(enquiry.createdAt)}</div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(enquiry.status)}</TableCell>
+                    <TableCell>
+                      <button
+                        onClick={() => handleViewDetails(enquiry)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        <Eye className="w-4 h-4" />
+                        View
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* Detail Modal */}
@@ -384,9 +400,9 @@ const EnquiryForm = () => {
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Website</label>
                     {selectedEnquiry.website ? (
-                      <a 
-                        href={selectedEnquiry.website} 
-                        target="_blank" 
+                      <a
+                        href={selectedEnquiry.website}
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
                       >
@@ -404,38 +420,80 @@ const EnquiryForm = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Submitted On</label>
                   <div className="flex items-center gap-2 text-gray-900">
                     <Calendar className="w-4 h-4 text-gray-500" />
-                    {formatDate(selectedEnquiry.submittedAt)}
+                    {formatDate(selectedEnquiry.createdAt)}
                   </div>
                 </div>
+
+                {/* Approval info box */}
+                {selectedEnquiry.status === 'pending' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>📧 On Approve:</strong> A registration link will be sent to{' '}
+                      <strong>{selectedEnquiry.email}</strong>, allowing them to create their vendor account.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+              {/* Delete button on left */}
               <button
-                onClick={() => setShowDetailModal(false)}
-                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                onClick={() => handleDelete(selectedEnquiry.id)}
+                disabled={!!deletingId}
+                className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
               >
-                Close
+                {deletingId === selectedEnquiry.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Delete
               </button>
-              {selectedEnquiry.status === 'pending' && (
-                <>
-                  <button
-                    onClick={() => handleStatusChange(selectedEnquiry.id, 'rejected')}
-                    className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    Reject
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(selectedEnquiry.id, 'approved')}
-                    className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Approve
-                  </button>
-                </>
-              )}
+
+              {/* Action buttons on right */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                >
+                  Close
+                </button>
+                {selectedEnquiry.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => handleReject(selectedEnquiry.id)}
+                      disabled={!!rejectingId || !!approvingId}
+                      className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {rejectingId === selectedEnquiry.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <XCircle className="w-4 h-4" />
+                      )}
+                      {rejectingId === selectedEnquiry.id ? 'Rejecting...' : 'Reject'}
+                    </button>
+                    <button
+                      onClick={() => handleApprove(selectedEnquiry.id)}
+                      disabled={!!approvingId || !!rejectingId}
+                      className="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {approvingId === selectedEnquiry.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Sending Mail...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-4 h-4" />
+                          Approve & Send Link
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

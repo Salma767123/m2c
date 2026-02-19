@@ -3,6 +3,7 @@
 import { Mail, Phone, MapPin, Clock, Send, Store, X, Building2, FileText, Globe } from 'lucide-react';
 import { useState } from 'react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { enquiryService } from '@/services/enquiryService';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -21,6 +22,7 @@ const Contact = () => {
     phone: '',
     website: ''
   });
+  const [isSubmittingVendor, setIsSubmittingVendor] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,24 +51,25 @@ const Contact = () => {
     });
   };
 
-  const handleVendorSubmit = (e: React.FormEvent) => {
+  const handleVendorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmittingVendor(true);
     try {
-      // Handle vendor form submission here
-      console.log('Vendor form submitted:', vendorFormData);
-      // Reset form
-      setVendorFormData({
-        name: '',
-        companyName: '',
-        gstNumber: '',
-        email: '',
-        phone: '',
-        website: ''
+      await enquiryService.submitEnquiry({
+        name: vendorFormData.name,
+        companyName: vendorFormData.companyName,
+        gstNumber: vendorFormData.gstNumber,
+        email: vendorFormData.email,
+        phone: vendorFormData.phone,
+        website: vendorFormData.website || undefined
       });
+      setVendorFormData({ name: '', companyName: '', gstNumber: '', email: '', phone: '', website: '' });
       setShowVendorModal(false);
       showSuccessToast('Application Submitted!', 'Thank you for your interest! We will review your application and get back to you soon.');
-    } catch (error) {
-      showErrorToast('Submission Failed', 'Unable to submit application. Please try again.');
+    } catch (error: any) {
+      showErrorToast('Submission Failed', error.message || 'Unable to submit application. Please try again.');
+    } finally {
+      setIsSubmittingVendor(false);
     }
   };
 
@@ -80,7 +83,7 @@ const Contact = () => {
               Get in Touch
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Have questions about our products or want to learn more about our artisans? 
+              Have questions about our products or want to learn more about our artisans?
               We'd love to hear from you.
             </p>
           </div>
@@ -93,7 +96,7 @@ const Contact = () => {
             {/* Contact Information */}
             <div>
               <h2 className="text-3xl font-bold text-gray-900 mb-8">Contact Information</h2>
-              
+
               <div className="space-y-6 font-medium">
                 <div className="flex items-start">
                   <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center mr-4 shrink-0">
@@ -146,7 +149,7 @@ const Contact = () => {
               <div className="mt-8 p-6 bg-gray-50 rounded-lg font-medium">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">For Artisan Partnerships</h3>
                 <p className="text-gray-600 mb-2">
-                  Are you a skilled artisan interested in joining our marketplace? 
+                  Are you a skilled artisan interested in joining our marketplace?
                   We'd love to learn about your craft and explore partnership opportunities.
                 </p>
                 <p className="text-gray-600">
@@ -158,7 +161,7 @@ const Contact = () => {
             {/* Contact Form */}
             <div>
               <h2 className="text-3xl font-bold text-gray-900 mb-8">Send us a Message</h2>
-              
+
               <form onSubmit={handleSubmit} className="bg-gray-50 p-6 border border-white rounded-xl space-y-6 font-medium">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -248,10 +251,10 @@ const Contact = () => {
               Become a Vendor Partner
             </h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
-              Join our marketplace and showcase your products to thousands of customers. 
+              Join our marketplace and showcase your products to thousands of customers.
               We're looking for quality vendors who share our commitment to excellence.
             </p>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-10">
               <div className="bg-white/10 backdrop-blur-sm p-6 rounded-lg">
                 <div className="text-3xl font-bold text-white mb-2">10K+</div>
@@ -433,16 +436,30 @@ const Contact = () => {
                   <button
                     type="button"
                     onClick={() => setShowVendorModal(false)}
-                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+                    disabled={isSubmittingVendor}
+                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-semibold flex items-center justify-center gap-2"
+                    disabled={isSubmittingVendor}
+                    className="flex-1 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    <Send className="w-5 h-5" />
-                    Submit Application
+                    {isSubmittingVendor ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5" />
+                        Submit Application
+                      </>
+                    )}
                   </button>
                 </div>
               </form>

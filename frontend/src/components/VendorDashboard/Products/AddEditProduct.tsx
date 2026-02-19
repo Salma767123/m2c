@@ -1496,7 +1496,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               <TableBody>
                                 {formData.variants.map((variant, idx) => (
                                   <TableRow key={variant.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100'}>
-                                    <TableCell className="text-gray-900 font-medium">{variant.size}</TableCell>
+                                    <TableCell>
+                                      <select
+                                        value={variant.size}
+                                        onChange={(e) => updateVariant(variant.id, 'size', e.target.value)}
+                                        className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
+                                      >
+                                        {standardSizes.map(s => (
+                                          <option key={s} value={s}>{s}</option>
+                                        ))}
+                                      </select>
+                                    </TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
                                         <input
@@ -1518,21 +1528,46 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         </div>
                                       </div>
                                     </TableCell>
-                                    <TableCell className="text-gray-700 font-mono text-xs">{variant.sku}</TableCell>
-                                    <TableCell className="text-gray-900 font-semibold">₹{variant.price.toFixed(2)}</TableCell>
                                     <TableCell>
-                                      <span className={`px-2 py-1 rounded text-xs font-medium ${variant.stock > 20 ? 'bg-green-100 text-green-800' :
-                                        variant.stock > 5 ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-red-100 text-red-800'
-                                        }`}>
-                                        {variant.stock} units
-                                      </span>
+                                      <input
+                                        type="text"
+                                        value={variant.sku}
+                                        onChange={(e) => updateVariant(variant.id, 'sku', e.target.value)}
+                                        className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
+                                        placeholder="SKU"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="relative">
+                                        <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">₹</span>
+                                        <input
+                                          type="number"
+                                          value={variant.price}
+                                          onChange={(e) => updateVariant(variant.id, 'price', parseFloat(e.target.value) || 0)}
+                                          className="w-full pl-5 pr-2 py-1.5 border border-gray-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
+                                          step="0.01"
+                                          min="0"
+                                        />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <input
+                                        type="number"
+                                        value={variant.stock}
+                                        onChange={(e) => updateVariant(variant.id, 'stock', parseInt(e.target.value) || 0)}
+                                        className={`w-20 px-2 py-1.5 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white ${variant.stock > 20 ? 'border-green-300 text-green-800' :
+                                          variant.stock > 5 ? 'border-yellow-300 text-yellow-800' :
+                                            'border-red-300 text-red-800'
+                                          }`}
+                                        min="0"
+                                      />
                                     </TableCell>
                                     <TableCell className="text-center">
                                       <button
                                         type="button"
                                         onClick={() => removeVariant(variant.id)}
                                         className="text-gray-600 hover:text-red-600 p-1 inline-block"
+                                        title="Remove variant"
                                       >
                                         <X className="h-4 w-4" />
                                       </button>
@@ -1668,109 +1703,109 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       Product Pricing
                     </h4>
 
-                      {/* Pricing Configuration */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Base Price *
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-2 text-gray-500">₹</span>
-                            <input
-                              type="number"
-                              name="basePrice"
-                              value={formData.basePrice}
-                              onChange={handleInputChange}
-                              required
-                              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                              placeholder="0"
-                            />
-                          </div>
-                          <p className="text-xs text-gray-600 mt-1">Price for single unit</p>
+                    {/* Pricing Configuration */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Base Price *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-500">₹</span>
+                          <input
+                            type="number"
+                            name="basePrice"
+                            value={formData.basePrice}
+                            onChange={handleInputChange}
+                            required
+                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            placeholder="0"
+                          />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Original Price (Optional)
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-2 text-gray-500">₹</span>
-                            <input
-                              type="number"
-                              name="originalPrice"
-                              value={formData.originalPrice || ''}
-                              onChange={handleInputChange}
-                              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                              placeholder="0"
-                            />
-                          </div>
-                          <p className="text-xs text-gray-600 mt-1">For showing discount</p>
+                        <p className="text-xs text-gray-600 mt-1">Price for single unit</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Original Price (Optional)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-500">₹</span>
+                          <input
+                            type="number"
+                            name="originalPrice"
+                            value={formData.originalPrice || ''}
+                            onChange={handleInputChange}
+                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            placeholder="0"
+                          />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Discount %
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              name="discount"
-                              value={formData.discount || ''}
-                              onChange={handleInputChange}
-                              max="100"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                              placeholder="0"
-                            />
-                            <span className="absolute right-3 top-2 text-gray-500">%</span>
+                        <p className="text-xs text-gray-600 mt-1">For showing discount</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Discount %
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            name="discount"
+                            value={formData.discount || ''}
+                            onChange={handleInputChange}
+                            max="100"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            placeholder="0"
+                          />
+                          <span className="absolute right-3 top-2 text-gray-500">%</span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">Auto-calculated if original price set</p>
+                      </div>
+                    </div>
+
+                    {/* Single Unit Summary */}
+                    {formData.basePrice > 0 && (
+                      <div className="p-4 bg-white border border-gray-300 rounded-lg mb-4">
+                        <h5 className="font-medium text-gray-900 mb-3">Single Unit Configuration</h5>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600">Base Price:</span>
+                            <span className="font-medium ml-2">₹{formData.basePrice.toFixed(2)}</span>
                           </div>
-                          <p className="text-xs text-gray-600 mt-1">Auto-calculated if original price set</p>
+                          {formData.originalPrice && formData.originalPrice > formData.basePrice && (
+                            <div>
+                              <span className="text-gray-600">Discount:</span>
+                              <span className="font-medium text-green-600 ml-2">
+                                {Math.round(((formData.originalPrice - formData.basePrice) / formData.originalPrice) * 100)}% off
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
+                    )}
 
-                      {/* Single Unit Summary */}
-                      {formData.basePrice > 0 && (
-                        <div className="p-4 bg-white border border-gray-300 rounded-lg mb-4">
-                          <h5 className="font-medium text-gray-900 mb-3">Single Unit Configuration</h5>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <span className="text-gray-600">Base Price:</span>
-                              <span className="font-medium ml-2">₹{formData.basePrice.toFixed(2)}</span>
-                            </div>
-                            {formData.originalPrice && formData.originalPrice > formData.basePrice && (
+                    {/* Price Summary */}
+                    {formData.basePrice > 0 && (
+                      <div className="p-4 bg-white border border-gray-300 rounded-lg">
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1">Selling Price</p>
+                            <p className="text-2xl font-bold text-gray-900">₹{formData.basePrice.toFixed(2)}</p>
+                          </div>
+                          {formData.originalPrice && formData.originalPrice > formData.basePrice && (
+                            <>
                               <div>
-                                <span className="text-gray-600">Discount:</span>
-                                <span className="font-medium text-green-600 ml-2">
-                                  {Math.round(((formData.originalPrice - formData.basePrice) / formData.originalPrice) * 100)}% off
-                                </span>
+                                <p className="text-xs text-gray-600 mb-1">Original Price</p>
+                                <p className="text-2xl font-bold text-gray-400 line-through">₹{formData.originalPrice.toFixed(2)}</p>
                               </div>
-                            )}
-                          </div>
+                              <div>
+                                <p className="text-xs text-gray-600 mb-1">You Save</p>
+                                <p className="text-2xl font-bold text-green-600">
+                                  ₹{(formData.originalPrice - formData.basePrice).toFixed(2)}
+                                </p>
+                              </div>
+                            </>
+                          )}
                         </div>
-                      )}
-
-                      {/* Price Summary */}
-                      {formData.basePrice > 0 && (
-                        <div className="p-4 bg-white border border-gray-300 rounded-lg">
-                          <div className="grid grid-cols-3 gap-4 text-center">
-                            <div>
-                              <p className="text-xs text-gray-600 mb-1">Selling Price</p>
-                              <p className="text-2xl font-bold text-gray-900">₹{formData.basePrice.toFixed(2)}</p>
-                            </div>
-                            {formData.originalPrice && formData.originalPrice > formData.basePrice && (
-                              <>
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">Original Price</p>
-                                  <p className="text-2xl font-bold text-gray-400 line-through">₹{formData.originalPrice.toFixed(2)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-600 mb-1">You Save</p>
-                                  <p className="text-2xl font-bold text-green-600">
-                                    ₹{(formData.originalPrice - formData.basePrice).toFixed(2)}
-                                  </p>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

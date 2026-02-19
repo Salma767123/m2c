@@ -1833,7 +1833,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         )}
                                       </div>
                                     </TableCell>
-                                    <TableCell className="text-gray-900 font-medium">{variant.size}</TableCell>
+                                    <TableCell>
+                                      <select
+                                        value={variant.size}
+                                        onChange={(e) => updateVariant(variant.id, 'size', e.target.value)}
+                                        className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
+                                      >
+                                        {standardSizes.map(s => (
+                                          <option key={s} value={s}>{s}</option>
+                                        ))}
+                                      </select>
+                                    </TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
                                         <input
@@ -1855,21 +1865,46 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         </div>
                                       </div>
                                     </TableCell>
-                                    <TableCell className="text-gray-700 font-mono text-xs">{variant.sku}</TableCell>
-                                    <TableCell className="text-gray-900 font-semibold">₹{variant.price.toFixed(2)}</TableCell>
                                     <TableCell>
-                                      <span className={`px-2 py-1 rounded text-xs font-medium ${variant.stock > 20 ? 'bg-green-100 text-green-800' :
-                                        variant.stock > 5 ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-red-100 text-red-800'
-                                        }`}>
-                                        {variant.stock} units
-                                      </span>
+                                      <input
+                                        type="text"
+                                        value={variant.sku}
+                                        onChange={(e) => updateVariant(variant.id, 'sku', e.target.value)}
+                                        className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
+                                        placeholder="SKU"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="relative">
+                                        <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">₹</span>
+                                        <input
+                                          type="number"
+                                          value={variant.price}
+                                          onChange={(e) => updateVariant(variant.id, 'price', parseFloat(e.target.value) || 0)}
+                                          className="w-full pl-5 pr-2 py-1.5 border border-gray-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
+                                          step="0.01"
+                                          min="0"
+                                        />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <input
+                                        type="number"
+                                        value={variant.stock}
+                                        onChange={(e) => updateVariant(variant.id, 'stock', parseInt(e.target.value) || 0)}
+                                        className={`w-20 px-2 py-1.5 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white ${variant.stock > 20 ? 'border-green-300 text-green-800' :
+                                          variant.stock > 5 ? 'border-yellow-300 text-yellow-800' :
+                                            'border-red-300 text-red-800'
+                                          }`}
+                                        min="0"
+                                      />
                                     </TableCell>
                                     <TableCell className="text-center">
                                       <button
                                         type="button"
                                         onClick={() => removeVariant(variant.id)}
                                         className="text-gray-600 hover:text-red-600 p-1 inline-block"
+                                        title="Remove variant"
                                       >
                                         <X className="h-4 w-4" />
                                       </button>
