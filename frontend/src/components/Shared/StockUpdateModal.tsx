@@ -65,24 +65,30 @@ export default function StockUpdateModal({
 
     try {
       await onConfirm(parseInt(newStock), reason.trim(), notes.trim() || undefined)
-      
+
       // Reset form
       setNewStock(currentStock.toString())
       setReason('')
       setNotes('')
       setErrors({})
-      
+
       toast({
         title: 'Success',
         description: 'Stock updated successfully'
       })
-      
+
       onClose()
-    } catch (error) {
-      console.error('Error updating stock:', error)
+    } catch (error: any) {
+      // Axios interceptor returns { message, status, data } object
+      // or standard Axios error with response.data
+      const errorMessage = error.message ||
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Failed to update stock';
+
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update stock',
+        description: errorMessage,
         variant: 'destructive'
       })
     }
@@ -145,9 +151,8 @@ export default function StockUpdateModal({
                 setNewStock(e.target.value)
                 setErrors({ ...errors, newStock: undefined })
               }}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                errors.newStock ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.newStock ? 'border-red-500' : 'border-gray-300'
+                }`}
               placeholder="Enter new stock quantity"
               min="0"
               disabled={isLoading}
@@ -159,9 +164,8 @@ export default function StockUpdateModal({
 
           {/* Stock Change Indicator */}
           {stockDifference !== 0 && !isNaN(stockDifference) && (
-            <div className={`flex items-center space-x-2 p-3 rounded-lg ${
-              isIncrease ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-            }`}>
+            <div className={`flex items-center space-x-2 p-3 rounded-lg ${isIncrease ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              }`}>
               {isIncrease ? (
                 <TrendingUp className="h-5 w-5" />
               ) : (
@@ -187,9 +191,8 @@ export default function StockUpdateModal({
                 setReason(e.target.value)
                 setErrors({ ...errors, reason: undefined })
               }}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                errors.reason ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${errors.reason ? 'border-red-500' : 'border-gray-300'
+                }`}
               placeholder="e.g., New shipment received, Damaged items removed, Inventory correction"
               rows={3}
               disabled={isLoading}

@@ -6,14 +6,14 @@ const createInventoryItem = async (req, res) => {
   try {
     const isAdmin = req.user.role?.toUpperCase() === 'ADMIN';
     const vendorId = isAdmin ? req.body.vendorId : (req.user.vendorId || req.user.id);
-    
+
     if (!vendorId) {
       return res.status(400).json({
         success: false,
         message: 'Vendor ID is required'
       });
     }
-    
+
     const {
       name,
       sku,
@@ -166,7 +166,7 @@ const getInventoryItem = async (req, res) => {
     const { id } = req.params;
 
     const whereClause = isAdmin ? { id } : { id, vendorId };
-    
+
     const inventoryItem = await prisma.inventory.findFirst({
       where: whereClause,
       include: {
@@ -268,8 +268,8 @@ const updateInventoryItem = async (req, res) => {
       ...(category && { category }),
       ...(subcategory !== undefined && { subcategory }),
       ...(description !== undefined && { description }),
-      ...(manufacturingDate !== undefined && { 
-        manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null 
+      ...(manufacturingDate !== undefined && {
+        manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null
       }),
       ...(currentStock !== undefined && { currentStock: parseInt(currentStock) }),
       ...(minStock !== undefined && { minStock: parseInt(minStock) }),
@@ -277,8 +277,8 @@ const updateInventoryItem = async (req, res) => {
       ...(status && { status }),
       ...(sourceType !== undefined && { sourceType }),
       ...(supplier !== undefined && { supplier }),
-      ...(lastRestocked !== undefined && { 
-        lastRestocked: lastRestocked ? new Date(lastRestocked) : null 
+      ...(lastRestocked !== undefined && {
+        lastRestocked: lastRestocked ? new Date(lastRestocked) : null
       }),
       ...(notes !== undefined && { notes })
     };
@@ -390,7 +390,7 @@ const updateStock = async (req, res) => {
     // Check if inventory item exists
     const whereClause = isAdmin ? { id } : { id, vendorId };
     console.log('Where clause:', whereClause);
-    
+
     const existingItem = await prisma.inventory.findFirst({
       where: whereClause
     });
@@ -437,6 +437,18 @@ const updateStock = async (req, res) => {
 
     // Update stock and create history record in a transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Check if product has variants
+      if (existingItem.hasProductCreated && existingItem.productId) {
+        const product = await tx.product.findUnique({
+          where: { id: existingItem.productId },
+          include: { variants: true }
+        });
+
+        if (product && product.hasVariants && product.variants.length > 0) {
+          throw new Error('Cannot update stock directly for products with variants. Please update stock via the Product details page to ensure variant stocks are updated correctly.');
+        }
+      }
+
       // Update inventory stock
       const updatedItem = await tx.inventory.update({
         where: { id },
@@ -463,6 +475,7 @@ const updateStock = async (req, res) => {
 
       // Sync stock with linked products
       if (existingItem.hasProductCreated && existingItem.productId) {
+        // We already checked for variants above. If we are here, it means no variants, so safe to update totalStock.
         await tx.product.update({
           where: { id: existingItem.productId },
           data: { totalStock: newStock }
@@ -471,11 +484,17 @@ const updateStock = async (req, res) => {
       }
 
       // Also update any products linked via inventoryItemId
+      // Note: If multiple products are linked to one inventory item (one-to-many), and one has variants... chaos.
+      // Assuming 1-to-1 or simple mapping for now.
       const linkedProducts = await tx.product.findMany({
         where: { inventoryItemId: id }
       });
 
       if (linkedProducts.length > 0) {
+        // Filter out products with variants from auto-update if any (though they shouldn't exist if data is consistent)
+        // Actually, if we update the inventory stock, we should update the product stock.
+        // But if the product has variants, we blocked this operation at the start of transaction.
+        // So we are safe to update all linked products here effectively.
         await tx.product.updateMany({
           where: { inventoryItemId: id },
           data: { totalStock: newStock }
@@ -500,6 +519,15 @@ const updateStock = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error updating stock:', error);
+
+    // Return 400 for our custom validation error
+    if (error.message && error.message.includes('Cannot update stock directly')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Internal server error',

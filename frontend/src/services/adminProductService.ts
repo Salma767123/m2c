@@ -64,8 +64,11 @@ export interface AdminProduct {
     id: string;
     size: string;
     color: string;
+    colorHex?: string;
+    sku: string;
     price: number;
     stock: number;
+    images?: string[];
   }>;
 }
 

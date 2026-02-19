@@ -13,11 +13,13 @@ import {
   TableRow,
 } from '@/components/UI/Table'
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
-import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit } from 'lucide-react'
+import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import axiosInstance from '@/lib/axios'
 import inventoryService from '@/services/inventoryService'
+import StockUpdateModal from '@/components/Shared/StockUpdateModal'
+import StockHistoryModal from '@/components/Shared/StockHistoryModal'
 
 interface InventoryItem {
   id: string
@@ -36,6 +38,7 @@ interface InventoryItem {
   }
   createdAt: string
   updatedAt: string
+  hasProductCreated: boolean
 }
 
 const getStatusBadge = (currentStock: number, minStock: number) => {
@@ -57,7 +60,7 @@ export default function Inventory() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
-  
+
   // Stats
   const [stats, setStats] = useState({
     totalItems: 0,
@@ -72,7 +75,7 @@ export default function Inventory() {
     item: InventoryItem | null
   }>({ isOpen: false, item: null })
   const [isUpdatingStock, setIsUpdatingStock] = useState(false)
-  
+
   // Stock history modal state
   const [stockHistoryModal, setStockHistoryModal] = useState<{
     isOpen: boolean
@@ -109,7 +112,7 @@ export default function Inventory() {
         if (categoryFilter !== 'all') params.category = categoryFilter
 
         const response = await axiosInstance.get('/inventory/admin/all', { params })
-        
+
         if (response.data.success) {
           setInventoryItems(response.data.data.items)
           setTotalPages(response.data.data.pagination.totalPages)
@@ -180,6 +183,45 @@ export default function Inventory() {
       throw error
     } finally {
       setIsUpdatingStock(false)
+    }
+  }
+
+  const handleDelete = async (item: InventoryItem) => {
+    if (item.hasProductCreated) {
+      alert('Cannot delete this inventory item because it has been used to create a product.')
+      return
+    }
+
+    if (!confirm('Are you sure you want to delete this inventory item? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await inventoryService.adminDeleteItem(item.id)
+
+      // Reload data
+      const params: any = {
+        page: currentPage,
+        limit: 10
+      }
+      if (searchTerm) params.search = searchTerm
+      if (categoryFilter !== 'all') params.category = categoryFilter
+
+      const [inventoryResponse, statsResponse] = await Promise.all([
+        axiosInstance.get('/inventory/admin/all', { params }),
+        axiosInstance.get('/inventory/admin/stats')
+      ])
+
+      if (inventoryResponse.data.success) {
+        setInventoryItems(inventoryResponse.data.data.items)
+      }
+      if (statsResponse.data.success) {
+        setStats(statsResponse.data.data)
+      }
+    } catch (error: any) {
+      console.error('Error deleting item:', error)
+      const errorMessage = error.message || error.response?.data?.message || 'Failed to delete item'
+      alert(errorMessage)
     }
   }
 
@@ -282,9 +324,9 @@ export default function Inventory() {
               <Dropdown
                 id="categoryFilter"
                 value={categoryFilter}
-                options={categories.map(cat => ({ 
-                  value: cat, 
-                  label: cat === 'all' ? 'All Categories' : cat 
+                options={categories.map(cat => ({
+                  value: cat,
+                  label: cat === 'all' ? 'All Categories' : cat
                 }))}
                 onChange={(value) => setCategoryFilter(value as string)}
               />
@@ -361,15 +403,15 @@ export default function Inventory() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => handleUpdateStock(item)}
                             >
                               Update Stock
                             </Button>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => handleViewHistory(item)}
                             >
@@ -380,6 +422,15 @@ export default function Inventory() {
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </Link>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={`${item.hasProductCreated ? 'opacity-50 cursor-not-allowed' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
+                              onClick={() => handleDelete(item)}
+                              title={item.hasProductCreated ? "Cannot delete: Product created from this item" : "Delete item"}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
