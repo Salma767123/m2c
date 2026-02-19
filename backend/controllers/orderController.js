@@ -213,19 +213,38 @@ const getUserOrders = async (req, res) => {
     }
 };
 
-// Get single order by ID
+// Get single order by ID (supports both MongoDB id and human-readable orderId)
 const getOrderById = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.userId;
 
-        const order = await prisma.order.findUnique({
-            where: { id },
-            include: {
-                items: true,
-                statusHistory: true
-            }
-        });
+        // Try to find by MongoDB id first, then by human-readable orderId
+        let order = null;
+
+        // Check if id looks like a MongoDB ObjectId (24 hex characters)
+        const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+
+        if (isObjectId) {
+            order = await prisma.order.findUnique({
+                where: { id },
+                include: {
+                    items: true,
+                    statusHistory: true
+                }
+            });
+        }
+
+        // If not found by id, try finding by orderId (human-readable)
+        if (!order) {
+            order = await prisma.order.findUnique({
+                where: { orderId: id },
+                include: {
+                    items: true,
+                    statusHistory: true
+                }
+            });
+        }
 
         if (!order) {
             return res.status(404).json({
@@ -234,15 +253,8 @@ const getOrderById = async (req, res) => {
             });
         }
 
-        // Ensure user owns the order (or is admin - add admin check if needed)
-        // For now, strict check for customer
-        // Check if user is admin (req.user.role === 'admin' maybe?) - assuming separate admin route usually
-        // But if userId matches customerId, it's allowed.
+        // Ensure user owns the order
         if (order.customerId !== userId) {
-            // Allow if admin (requires checking user role, assuming middleware sets it)
-            // Check auth middleware for role attachment
-            // req.user might have role. But req.userId is what we used. 
-            // Let's stick to customer check.
             return res.status(403).json({
                 success: false,
                 error: 'Unauthorized access to order'

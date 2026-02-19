@@ -1,10 +1,10 @@
 "use client"
 
 // OrderDetail component for displaying individual order information
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { 
+import {
   ArrowLeft,
   Package,
   Truck,
@@ -19,111 +19,16 @@ import {
   Plus,
   Minus,
   Download,
-  MessageCircle
+  MessageCircle,
+  AlertCircle,
+  Clock
 } from "lucide-react"
 import { products } from "@/components/mockData/products"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/UI/Card"
+import orderService, { Order as APIOrder } from "@/services/orderService"
 
 interface OrderDetailProps {
   orderId: string
-}
-
-// Mock function to get order data by ID using actual product data
-const getOrderById = (id: string) => {
-  const orders = {
-    "ORD-2024-001234": {
-      id: "ORD-2024-001234",
-      date: "January 15, 2024",
-      status: "Processing",
-      statusColor: "yellow",
-      estimatedDelivery: "January 22-24, 2024",
-      shippingAddress: {
-        name: "John Doe",
-        address: "123 Main Street",
-        city: "New York, NY 10001",
-        phone: "+1 (555) 123-4567"
-      },
-      paymentMethod: "•••• •••• •••• 1234",
-      subtotal: 465.96,
-      shipping: 0,
-      tax: 37.28,
-      total: 503.24,
-      items: [
-        {
-          id: 1,
-          name: products[0].name,
-          image: products[0].images[0],
-          price: products[0].price,
-          quantity: 2,
-          size: products[0].dimensions || "Standard",
-          color: "Natural",
-          category: products[0].category
-        },
-        {
-          id: 2,
-          name: products[1].name,
-          image: products[1].images[0],
-          price: products[1].price,
-          quantity: 1,
-          size: products[1].dimensions || "One Size",
-          color: "Natural Linen",
-          category: products[1].category
-        },
-        {
-          id: 3,
-          name: products[2].name,
-          image: products[2].images[0],
-          price: products[2].price,
-          quantity: 3,
-          size: products[2].dimensions || "Standard",
-          color: "Natural",
-          category: products[2].category
-        }
-      ]
-    },
-    "ORD-2024-001233": {
-      id: "ORD-2024-001233",
-      date: "January 10, 2024",
-      status: "Delivered",
-      statusColor: "green",
-      estimatedDelivery: "Delivered on January 12, 2024",
-      shippingAddress: {
-        name: "John Doe",
-        address: "123 Main Street",
-        city: "New York, NY 10001",
-        phone: "+1 (555) 123-4567"
-      },
-      paymentMethod: "•••• •••• •••• 1234",
-      subtotal: 251.97,
-      shipping: 0,
-      tax: 20.16,
-      total: 272.13,
-      items: [
-        {
-          id: 3,
-          name: products[2].name,
-          image: products[2].images[0],
-          price: products[2].price,
-          quantity: 3,
-          size: products[2].dimensions || "Standard",
-          color: "Natural",
-          category: products[2].category
-        },
-        {
-          id: 4,
-          name: products[5].name,
-          image: products[5].images[0],
-          price: products[5].price,
-          quantity: 1,
-          size: products[5].dimensions || "Bath Size",
-          color: "White",
-          category: products[5].category
-        }
-      ]
-    }
-  }
-  
-  return orders[id as keyof typeof orders] || null
 }
 
 // Related products using actual product data
@@ -170,9 +75,72 @@ const relatedProducts = [
   }
 ]
 
+// Helper to normalize status for display
+const formatStatus = (status: string) => {
+  return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
+}
+
+// Helper to get normalized status for comparison
+const getNormalizedStatus = (status: string) => {
+  const s = status.toLowerCase()
+  if (['order_created', 'confirmed', 'pending'].includes(s)) return 'processing'
+  if (['dispatched'].includes(s)) return 'shipped'
+  if (['completed'].includes(s)) return 'delivered'
+  if (['failed'].includes(s)) return 'cancelled'
+  return s
+}
+
+// Helper to get status color class
+const getStatusColorClass = (status: string) => {
+  const normalized = getNormalizedStatus(status)
+  switch (normalized) {
+    case 'delivered': return 'bg-green-100 text-green-800'
+    case 'shipped': return 'bg-blue-100 text-blue-800'
+    case 'processing': return 'bg-yellow-100 text-yellow-800'
+    case 'cancelled': return 'bg-red-100 text-red-800'
+    default: return 'bg-slate-100 text-slate-800'
+  }
+}
+
+// Helper to check status timeline steps
+const isStatusReached = (orderStatus: string, step: string) => {
+  const statusOrder = ['processing', 'shipped', 'delivered']
+  const normalized = getNormalizedStatus(orderStatus)
+  const currentIndex = statusOrder.indexOf(normalized)
+  const stepIndex = statusOrder.indexOf(step)
+  return currentIndex >= stepIndex
+}
+
+const isStatusCurrent = (orderStatus: string, step: string) => {
+  return getNormalizedStatus(orderStatus) === step
+}
+
 export default function OrderDetail({ orderId }: OrderDetailProps) {
-  const [quantities, setQuantities] = useState<{[key: number]: number}>({})
-  const orderDetails = getOrderById(orderId)
+  const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
+  const [orderDetails, setOrderDetails] = useState<APIOrder | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchOrder()
+  }, [orderId])
+
+  const fetchOrder = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await orderService.getOrderById(orderId)
+      if (response.success) {
+        setOrderDetails(response.data)
+      } else {
+        setError('Order not found')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch order details')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const updateQuantity = (productId: number, change: number) => {
     setQuantities(prev => ({
@@ -183,20 +151,57 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
 
   const getQuantity = (productId: number) => quantities[productId] || 1
 
-  if (!orderDetails) {
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 py-8 font-sans">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error || !orderDetails) {
     return (
       <div className="min-h-screen bg-slate-50 py-8 font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card className="border p-12 text-center">
             <CardContent>
-              <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-slate-900 mb-2">Order Not Found</h3>
-              <p className="text-slate-600 mb-6">The order you're looking for doesn't exist or has been removed.</p>
-              <Link href="/order">
-                <button className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors">
-                  Back to Orders
-                </button>
-              </Link>
+              {error ? (
+                <>
+                  <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-slate-900 mb-2">Error Loading Order</h3>
+                  <p className="text-slate-600 mb-6">{error}</p>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={fetchOrder}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors"
+                    >
+                      Try Again
+                    </button>
+                    <Link href="/order">
+                      <button className="border border-slate-300 text-slate-700 px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors">
+                        Back to Orders
+                      </button>
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-slate-900 mb-2">Order Not Found</h3>
+                  <p className="text-slate-600 mb-6">The order you&apos;re looking for doesn&apos;t exist or has been removed.</p>
+                  <Link href="/order">
+                    <button className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors">
+                      Back to Orders
+                    </button>
+                  </Link>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -204,40 +209,38 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
     )
   }
 
+  const normalizedStatus = getNormalizedStatus(orderDetails.status)
+  const shippingAddr = orderDetails.shippingAddress || {}
+
   return (
     <div className="min-h-screen bg-white py-8 font-sans">
       <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
         <Link href="/order">
-            <button className="flex items-center gap-2 text-white bg-[#222222] p-3 rounded-md mb-4 transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              Back to Orders
-            </button>
-          </Link>
-       
+          <button className="flex items-center gap-2 text-white bg-[#222222] p-3 rounded-md mb-4 transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Orders
+          </button>
+        </Link>
+
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Order Items */}
           <div className="lg:col-span-2 space-y-6">
-             {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-slate-900 mb-2">Order Details</h1>
-              <p className="text-slate-600">Order #{orderDetails.id}</p>
-            </div>
-            <div className="text-right">
-              <div className={`inline-flex items-center px-3 py-2 rounded-full p-2 text-base font-medium ${
-                orderDetails.statusColor === "green" ? "bg-green-100 text-green-800" :
-                orderDetails.statusColor === "yellow" ? "bg-yellow-100 text-yellow-800" :
-                orderDetails.statusColor === "blue" ? "bg-blue-100 text-blue-800" :
-                "bg-red-100 text-red-800"
-              }`}>
-                <Package className="w-4 h-4 mr-1" />
-                {orderDetails.status}
+            {/* Header */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Order Details</h1>
+                  <p className="text-slate-600">Order #{orderDetails.orderId}</p>
+                </div>
+                <div className="text-right">
+                  <div className={`inline-flex items-center px-3 py-2 rounded-full p-2 text-base font-medium ${getStatusColorClass(orderDetails.status)}`}>
+                    <Package className="w-4 h-4 mr-1" />
+                    {formatStatus(orderDetails.status)}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
             {/* Order Status Timeline */}
             <Card className="border">
               <CardHeader>
@@ -250,60 +253,45 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       <CheckCircle className="w-5 h-5 text-white" />
                     </div>
                     <span className="text-sm font-medium text-green-600">Confirmed</span>
-                    <span className="text-xs text-slate-500">Jan 15</span>
+                    <span className="text-xs text-slate-500">{new Date(orderDetails.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                   </div>
-                  <div className={`flex-1 h-0.5 mx-4 ${
-                    orderDetails.status === "Processing" || orderDetails.status === "Shipped" || orderDetails.status === "Delivered" 
-                      ? "bg-yellow-300" : "bg-slate-300"
-                  }`}></div>
+                  <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'processing') ? "bg-yellow-300" : "bg-slate-300"
+                    }`}></div>
                   <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                      orderDetails.status === "Processing" || orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
-                        ? "bg-yellow-500" : "bg-slate-300"
-                    }`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'processing') ? "bg-yellow-500" : "bg-slate-300"
+                      }`}>
                       <Package className="w-5 h-5 text-white" />
                     </div>
-                    <span className={`text-sm font-medium ${
-                      orderDetails.status === "Processing" || orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
-                        ? "text-yellow-600" : "text-slate-500"
-                    }`}>Processing</span>
+                    <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'processing') ? "text-yellow-600" : "text-slate-500"
+                      }`}>Processing</span>
                     <span className="text-xs text-slate-500">
-                      {orderDetails.status === "Processing" ? "Current" : orderDetails.status === "Shipped" || orderDetails.status === "Delivered" ? "Complete" : "Pending"}
+                      {isStatusCurrent(orderDetails.status, 'processing') ? "Current" : isStatusReached(orderDetails.status, 'shipped') ? "Complete" : "Pending"}
                     </span>
                   </div>
-                  <div className={`flex-1 h-0.5 mx-4 ${
-                    orderDetails.status === "Shipped" || orderDetails.status === "Delivered" 
-                      ? "bg-blue-300" : "bg-slate-300"
-                  }`}></div>
+                  <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-300" : "bg-slate-300"
+                    }`}></div>
                   <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                      orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
-                        ? "bg-blue-500" : "bg-slate-300"
-                    }`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-500" : "bg-slate-300"
+                      }`}>
                       <Truck className="w-5 h-5 text-white" />
                     </div>
-                    <span className={`text-sm font-medium ${
-                      orderDetails.status === "Shipped" || orderDetails.status === "Delivered"
-                        ? "text-blue-600" : "text-slate-500"
-                    }`}>Shipped</span>
+                    <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'shipped') ? "text-blue-600" : "text-slate-500"
+                      }`}>Shipped</span>
                     <span className="text-xs text-slate-500">
-                      {orderDetails.status === "Shipped" ? "Current" : orderDetails.status === "Delivered" ? "Complete" : "Pending"}
+                      {isStatusCurrent(orderDetails.status, 'shipped') ? "Current" : isStatusReached(orderDetails.status, 'delivered') ? "Complete" : "Pending"}
                     </span>
                   </div>
-                  <div className={`flex-1 h-0.5 mx-4 ${
-                    orderDetails.status === "Delivered" ? "bg-green-300" : "bg-slate-300"
-                  }`}></div>
+                  <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'delivered') ? "bg-green-300" : "bg-slate-300"
+                    }`}></div>
                   <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                      orderDetails.status === "Delivered" ? "bg-green-500" : "bg-slate-300"
-                    }`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'delivered') ? "bg-green-500" : "bg-slate-300"
+                      }`}>
                       <CheckCircle className="w-5 h-5 text-white" />
                     </div>
-                    <span className={`text-sm font-medium ${
-                      orderDetails.status === "Delivered" ? "text-green-600" : "text-slate-500"
-                    }`}>Delivered</span>
+                    <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'delivered') ? "text-green-600" : "text-slate-500"
+                      }`}>Delivered</span>
                     <span className="text-xs text-slate-500">
-                      {orderDetails.status === "Delivered" ? "Complete" : "Pending"}
+                      {isStatusCurrent(orderDetails.status, 'delivered') ? "Complete" : "Pending"}
                     </span>
                   </div>
                 </div>
@@ -319,27 +307,29 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 <div className="space-y-6">
                   {orderDetails.items.map((item) => (
                     <div key={item.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:shadow-md transition-shadow">
-                      <div className="relative w-20 h-20 bg-slate-100 rounded-lg overflow-hidden">
-                        <Image
-                          src={item.image}
-                          alt={item.name}
-                          fill
-                          className="object-cover"
-                        />
+                      <div className="relative w-20 h-20 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center">
+                        {item.productImage ? (
+                          <Image
+                            src={item.productImage}
+                            alt={item.productName}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <Package className="w-10 h-10 text-slate-400" />
+                        )}
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold text-slate-900 mb-1">{item.name}</h3>
+                        <h3 className="font-semibold text-slate-900 mb-1">{item.productName}</h3>
                         <div className="flex items-center gap-4 text-sm text-slate-600 mb-2">
-                          <span>Size: {item.size}</span>
-                          <span>Color: {item.color}</span>
                           <span>Qty: {item.quantity}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-lg font-bold text-slate-900">
-                            ${(item.price * item.quantity).toFixed(2)}
+                            ₹{item.totalPrice.toFixed(2)}
                           </span>
                           <span className="text-sm text-slate-500">
-                            ${item.price.toFixed(2)} each
+                            ₹{item.unitPrice.toFixed(2)} each
                           </span>
                         </div>
                       </div>
@@ -350,7 +340,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 {/* Action Buttons */}
                 <div className="mt-6 pt-6 border-t border-slate-200">
                   <div className="flex flex-wrap gap-3">
-                    {orderDetails.status !== "Delivered" && orderDetails.status !== "Cancelled" && (
+                    {normalizedStatus !== "delivered" && normalizedStatus !== "cancelled" && (
                       <button className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">
                         <Eye className="w-4 h-4" />
                         Track Order
@@ -364,7 +354,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       <MessageCircle className="w-4 h-4" />
                       Contact Support
                     </button>
-                    {orderDetails.status === "Delivered" && (
+                    {normalizedStatus === "delivered" && (
                       <Link href="/checkout">
                         <button className="flex items-center gap-2 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors">
                           <Package className="w-4 h-4" />
@@ -388,20 +378,28 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
               <CardContent className="p-6 space-y-4">
                 <div className="flex justify-between">
                   <span className="text-slate-600">Subtotal</span>
-                  <span className="font-medium">${orderDetails.subtotal.toFixed(2)}</span>
+                  <span className="font-medium">₹{orderDetails.subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Shipping</span>
-                  <span className="font-medium text-green-600">Free</span>
+                  <span className="font-medium text-green-600">
+                    {orderDetails.shippingCost > 0 ? `₹${orderDetails.shippingCost.toFixed(2)}` : 'Free'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Tax</span>
-                  <span className="font-medium">${orderDetails.tax.toFixed(2)}</span>
+                  <span className="font-medium">₹{orderDetails.tax.toFixed(2)}</span>
                 </div>
+                {orderDetails.discount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Discount</span>
+                    <span className="font-medium text-green-600">-₹{orderDetails.discount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="border-t border-slate-200 pt-4">
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span>${orderDetails.total.toFixed(2)}</span>
+                    <span>₹{orderDetails.totalAmount.toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -417,28 +415,38 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                   <Calendar className="w-5 h-5 text-blue-600" />
                   <div>
                     <p className="font-medium text-slate-900">
-                      {orderDetails.status === "Delivered" ? "Delivered" : "Estimated Delivery"}
+                      {normalizedStatus === "delivered" ? "Delivered" : "Estimated Delivery"}
                     </p>
-                    <p className="text-sm text-slate-600">{orderDetails.estimatedDelivery}</p>
+                    <p className="text-sm text-slate-600">
+                      {normalizedStatus === "delivered"
+                        ? `Delivered on ${new Date(orderDetails.createdAt).toLocaleDateString()}`
+                        : orderDetails.estimatedDelivery
+                          ? new Date(orderDetails.estimatedDelivery).toLocaleDateString()
+                          : "To be updated"
+                      }
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-green-600 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-slate-900">Shipping Address</p>
-                    <div className="text-sm text-slate-600">
-                      <p>{orderDetails.shippingAddress.name}</p>
-                      <p>{orderDetails.shippingAddress.address}</p>
-                      <p>{orderDetails.shippingAddress.city}</p>
-                      <p>{orderDetails.shippingAddress.phone}</p>
+                {shippingAddr && (
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-5 h-5 text-green-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-slate-900">Shipping Address</p>
+                      <div className="text-sm text-slate-600">
+                        {shippingAddr.firstName && <p>{shippingAddr.firstName} {shippingAddr.lastName}</p>}
+                        {shippingAddr.street && <p>{shippingAddr.street}</p>}
+                        {shippingAddr.city && <p>{shippingAddr.city}, {shippingAddr.state} {shippingAddr.zipCode}</p>}
+                        {shippingAddr.phone && <p>{shippingAddr.phone}</p>}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
                 <div className="flex items-center gap-3">
                   <CreditCard className="w-5 h-5 text-purple-600" />
                   <div>
                     <p className="font-medium text-slate-900">Payment Method</p>
-                    <p className="text-sm text-slate-600">{orderDetails.paymentMethod}</p>
+                    <p className="text-sm text-slate-600">{orderDetails.paymentMethod || "N/A"}</p>
+                    <p className="text-xs text-slate-500 mt-1">Status: {orderDetails.paymentStatus}</p>
                   </div>
                 </div>
               </CardContent>
@@ -475,22 +483,21 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="space-y-2">
                       <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
                         {product.name}
                       </h3>
-                      
+
                       <div className="flex items-center gap-2">
                         <div className="flex items-center">
                           {[...Array(5)].map((_, i) => (
                             <Star
                               key={i}
-                              className={`w-4 h-4 ${
-                                i < Math.floor(product.rating)
+                              className={`w-4 h-4 ${i < Math.floor(product.rating)
                                   ? "text-yellow-400 fill-current"
                                   : "text-slate-300"
-                              }`}
+                                }`}
                             />
                           ))}
                         </div>
@@ -498,7 +505,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                           {product.rating} ({product.reviews})
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         <span className="text-lg font-bold text-slate-900">
                           ${product.price.toFixed(2)}
@@ -509,7 +516,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                           </span>
                         )}
                       </div>
-                      
+
                       <div className="flex items-center gap-2 pt-2">
                         <button className="flex-1 bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
                           <ShoppingCart className="w-4 h-4" />

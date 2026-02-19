@@ -3,13 +3,15 @@ const router = express.Router();
 const {
   createRazorpayOrder,
   verifyRazorpayPayment,
-  createPayUHash
+  createPayUHash,
+  handleRazorpayWebhook
 } = require('../controllers/paymentController');
 const { authenticateToken } = require('../middleware/auth');
 
 // Razorpay routes
 router.post('/razorpay/create-order', authenticateToken, createRazorpayOrder);
 router.post('/razorpay/verify', authenticateToken, verifyRazorpayPayment);
+router.post('/razorpay/webhook', handleRazorpayWebhook);
 
 // PayU routes
 router.post('/payu/create-hash', authenticateToken, createPayUHash);

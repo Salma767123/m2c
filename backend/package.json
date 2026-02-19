@@ -13,6 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "dev:webhook": "ngrok http --url=endlessly-adapted-shepherd.ngrok-free.app 5000",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

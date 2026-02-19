@@ -26,6 +26,12 @@ export interface Order {
     paymentMethod: string;
     paymentStatus: string;
     customerEmail: string;
+    customerName?: string;
+    customerPhone?: string;
+    trackingReference?: string;
+    estimatedDelivery?: string;
+    actualDelivery?: string;
+    statusHistory?: any[];
 }
 
 export interface CreateOrderParams {

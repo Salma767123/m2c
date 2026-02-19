@@ -19,7 +19,7 @@ const createRazorpayOrder = async (req, res) => {
 
     // Get payment settings
     const paymentSettings = await prisma.paymentSettings.findFirst();
-    
+
     if (!paymentSettings || !paymentSettings.razorpayEnabled) {
       return res.status(400).json({
         success: false,
@@ -91,7 +91,7 @@ const verifyRazorpayPayment = async (req, res) => {
 
     // Get payment settings
     const paymentSettings = await prisma.paymentSettings.findFirst();
-    
+
     if (!paymentSettings || !paymentSettings.razorpayKeySecret) {
       return res.status(500).json({
         success: false,
@@ -153,7 +153,7 @@ const createPayUHash = async (req, res) => {
 
     // Get payment settings
     const paymentSettings = await prisma.paymentSettings.findFirst();
-    
+
     if (!paymentSettings || !paymentSettings.payuEnabled) {
       return res.status(400).json({
         success: false,
@@ -191,8 +191,109 @@ const createPayUHash = async (req, res) => {
   }
 };
 
+// Handle Razorpay Webhook
+const handleRazorpayWebhook = async (req, res) => {
+  try {
+    const signature = req.headers['x-razorpay-signature'];
+
+    if (!signature) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing Razorpay signature'
+      });
+    }
+
+    // Get payment settings
+    const paymentSettings = await prisma.paymentSettings.findFirst();
+
+    if (!paymentSettings || !paymentSettings.razorpayWebhookSecret) {
+      console.error('Webhook received but secret not configured');
+      return res.status(500).json({
+        success: false,
+        error: 'Webhook secret not configured'
+      });
+    }
+
+    // Verify signature
+    const crypto = require('crypto');
+    const hmac = crypto.createHmac('sha256', paymentSettings.razorpayWebhookSecret);
+    hmac.update(JSON.stringify(req.body));
+    const expectedSignature = hmac.digest('hex');
+
+    if (expectedSignature !== signature) {
+      console.error('Webhook signature verification failed');
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid signature'
+      });
+    }
+
+    // Process event
+    const event = req.body.event;
+    const payload = req.body.payload;
+
+    console.log('Razorpay Webhook Event:', event);
+
+    if (event === 'payment.captured') {
+      const payment = payload.payment.entity;
+      const orderId = payment.order_id; // Razorpay Order ID usually starts with order_
+      const paymentId = payment.id; // Razorpay Payment ID usually starts with pay_
+
+      console.log(`Processing payment for Razorpay Order: ${orderId}, Payment ID: ${paymentId}`);
+
+      // Try to find the order in our database.
+      // We search by paymentId field which might contain the Razorpay Order ID or Payment ID.
+      // Note: In current flow, Order is created AFTER payment, so this might not find anything immediately.
+      // But this supports a flow where Order is created BEFORE payment.
+      const order = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { paymentId: orderId },
+            { paymentId: paymentId }
+          ]
+        }
+      });
+
+      if (order) {
+        if (order.paymentStatus !== 'PAID') {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              paymentStatus: 'PAID',
+              // Store the actual payment ID if different
+              paymentId: paymentId,
+              statusHistory: {
+                create: {
+                  status: order.status,
+                  comment: `Payment verified via Webhook. Payment ID: ${paymentId}`,
+                  updatedByType: 'system'
+                }
+              }
+            }
+          });
+          console.log(`Order ${order.orderId} updated to PAID via webhook`);
+        } else {
+          console.log(`Order ${order.orderId} is already PAID`);
+        }
+      } else {
+        console.warn(`Order not found for Razorpay Order ID: ${orderId} or Payment ID: ${paymentId}`);
+      }
+    }
+
+    res.json({ status: 'ok' });
+
+  } catch (error) {
+    console.error('Razorpay webhook error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Webhook processing failed'
+    });
+  }
+};
+
 module.exports = {
   createRazorpayOrder,
   verifyRazorpayPayment,
-  createPayUHash
+  createPayUHash,
+  handleRazorpayWebhook
 };
