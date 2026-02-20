@@ -25,7 +25,7 @@ import { toast } from '@/hooks/use-toast'
 const getStatusBadge = (status: string) => {
   switch (status.toUpperCase()) {
     case 'APPROVED':
-      return <Badge className="bg-green-100 text-green-800">Active</Badge>
+      return <Badge className="bg-green-100 text-green-800">Approved</Badge>
     case 'PENDING':
       return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
     case 'SUSPENDED':
