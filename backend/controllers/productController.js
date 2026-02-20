@@ -2042,7 +2042,12 @@ const getPublicProduct = async (req, res) => {
         weight: true,
         dispatchTimeline: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        inventory: {
+          select: {
+            currentStock: true
+          }
+        }
       }
     });
 
@@ -2203,7 +2208,11 @@ const updateVariantStocks = async (req, res) => {
       }
 
       // Calculate new total stock
-      const totalStock = updatedVariants.reduce((sum, v) => sum + v.stock, 0);
+      let baseStock = 0;
+      if (product.inventory) {
+        baseStock = product.inventory.currentStock;
+      }
+      const totalStock = updatedVariants.reduce((sum, v) => sum + v.stock, 0) + baseStock;
 
       // Update product total stock
       const updatedProduct = await tx.product.update({
@@ -2216,7 +2225,7 @@ const updateVariantStocks = async (req, res) => {
         await tx.inventory.update({
           where: { id: product.inventoryItemId },
           data: {
-            currentStock: totalStock,
+            // currentStock: totalStock, // STOP SYNCING TOTAL STOCK
             lastRestocked: new Date()
           }
         });

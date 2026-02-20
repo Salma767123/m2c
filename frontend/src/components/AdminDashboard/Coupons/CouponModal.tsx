@@ -2,21 +2,7 @@
 
 import { X, Tag, Percent, Calendar, TrendingUp, Info } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
-
-interface Coupon {
-  id: string;
-  code: string;
-  description: string;
-  discountType: 'percentage' | 'fixed';
-  discountValue: number;
-  minPurchase: number;
-  maxDiscount?: number;
-  usageLimit: number;
-  usedCount: number;
-  startDate: string;
-  endDate: string;
-  status: 'active' | 'inactive' | 'expired';
-}
+import { Coupon } from '@/services/couponService';
 
 interface CouponModalProps {
   isOpen: boolean;
@@ -28,18 +14,19 @@ interface CouponModalProps {
   onSubmit: (e: React.FormEvent) => void;
 }
 
-const CouponModal = ({ 
-  isOpen, 
-  onClose, 
-  mode, 
-  coupon, 
-  formData, 
-  setFormData, 
-  onSubmit 
+const CouponModal = ({
+  isOpen,
+  onClose,
+  mode,
+  coupon,
+  formData,
+  setFormData,
+  onSubmit
 }: CouponModalProps) => {
   if (!isOpen) return null;
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -48,15 +35,28 @@ const CouponModal = ({
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const badges = {
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-gray-100 text-gray-800',
-      expired: 'bg-red-100 text-red-800'
-    };
+  const getStatusBadge = (isActive: boolean | undefined, expiryDate: string | undefined) => {
+    const isExpired = expiryDate ? new Date(expiryDate) < new Date() : false;
+
+    if (isExpired) {
+      return (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+          Expired
+        </span>
+      );
+    }
+
+    if (isActive) {
+      return (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+          Active
+        </span>
+      );
+    }
+
     return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${badges[status as keyof typeof badges]}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+        Inactive
       </span>
     );
   };
@@ -94,21 +94,21 @@ const CouponModal = ({
                     <Tag className="w-5 h-5 text-gray-700" />
                     <h3 className="font-semibold text-gray-900">Basic Information</h3>
                   </div>
-                  
+
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Coupon Code</label>
                       <div className="text-gray-900 font-mono text-lg font-bold">{coupon.code}</div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Status</label>
-                      {getStatusBadge(coupon.status)}
+                      {getStatusBadge(coupon.isActive, coupon.expiryDate)}
                     </div>
-                    
+
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
-                      <div className="text-gray-900 text-sm">{coupon.description}</div>
+                      <div className="text-gray-900 text-sm">{coupon.description || '-'}</div>
                     </div>
                   </div>
                 </div>
@@ -121,31 +121,31 @@ const CouponModal = ({
                     <Percent className="w-5 h-5 text-gray-700" />
                     <h3 className="font-semibold text-gray-900">Discount Details</h3>
                   </div>
-                  
+
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Discount Type</label>
-                      <div className="text-gray-900 capitalize">{coupon.discountType}</div>
+                      <div className="text-gray-900 capitalize">{coupon.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount'}</div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Discount Value</label>
                       <div className="text-gray-900 text-2xl font-bold">
-                        {coupon.discountType === 'percentage' 
-                          ? `${coupon.discountValue}%` 
+                        {coupon.discountType === 'PERCENTAGE'
+                          ? `${coupon.discountValue}%`
                           : `₹${coupon.discountValue}`}
                       </div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Minimum Purchase</label>
-                      <div className="text-gray-900">₹{coupon.minPurchase}</div>
+                      <div className="text-gray-900">₹{coupon.minPurchaseAmount || 0}</div>
                     </div>
-                    
-                    {coupon.maxDiscount && (
+
+                    {coupon.maxDiscountAmount && (
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Maximum Discount</label>
-                        <div className="text-gray-900">₹{coupon.maxDiscount}</div>
+                        <div className="text-gray-900">₹{coupon.maxDiscountAmount}</div>
                       </div>
                     )}
                   </div>
@@ -159,30 +159,32 @@ const CouponModal = ({
                     <TrendingUp className="w-5 h-5 text-gray-700" />
                     <h3 className="font-semibold text-gray-900">Usage Statistics</h3>
                   </div>
-                  
+
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Usage Limit</label>
-                      <div className="text-gray-900">{coupon.usageLimit}</div>
+                      <div className="text-gray-900">{coupon.usageLimit || 'Unlimited'}</div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Used Count</label>
-                      <div className="text-gray-900 text-2xl font-bold">{coupon.usedCount}</div>
+                      <div className="text-gray-900 text-2xl font-bold">{coupon.usedCount || 0}</div>
                     </div>
-                    
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Usage Progress</label>
-                      <div className="w-full bg-gray-200 rounded-full h-3">
-                        <div 
-                          className="bg-gray-900 h-3 rounded-full transition-all" 
-                          style={{ width: `${(coupon.usedCount / coupon.usageLimit) * 100}%` }}
-                        />
+
+                    {coupon.usageLimit && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Usage Progress</label>
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div
+                            className="bg-gray-900 h-3 rounded-full transition-all"
+                            style={{ width: `${((coupon.usedCount || 0) / coupon.usageLimit) * 100}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          {Math.round(((coupon.usedCount || 0) / coupon.usageLimit) * 100)}% used
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        {Math.round((coupon.usedCount / coupon.usageLimit) * 100)}% used
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -191,16 +193,16 @@ const CouponModal = ({
                     <Calendar className="w-5 h-5 text-gray-700" />
                     <h3 className="font-semibold text-gray-900">Validity Period</h3>
                   </div>
-                  
+
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date</label>
                       <div className="text-gray-900">{formatDate(coupon.startDate)}</div>
                     </div>
-                    
+
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">End Date</label>
-                      <div className="text-gray-900">{formatDate(coupon.endDate)}</div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Expiry Date</label>
+                      <div className="text-gray-900">{formatDate(coupon.expiryDate)}</div>
                     </div>
                   </div>
                 </div>
@@ -218,7 +220,7 @@ const CouponModal = ({
                       <Tag className="w-5 h-5 text-gray-700" />
                       <h3 className="font-semibold text-gray-900">Basic Information</h3>
                     </div>
-                    
+
                     <div className="space-y-4">
                       {/* Coupon Code | Status */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -229,10 +231,11 @@ const CouponModal = ({
                           <input
                             type="text"
                             required
-                            value={formData.code}
+                            value={formData.code || ''}
                             onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent font-mono"
                             placeholder="e.g., WELCOME10"
+                            disabled={mode === 'edit'} // Code usually immutable
                           />
                         </div>
 
@@ -241,12 +244,12 @@ const CouponModal = ({
                             Status <span className="text-red-500">*</span>
                           </label>
                           <Dropdown
-                            value={formData.status || 'active'}
+                            value={formData.isActive ? 'active' : 'inactive'}
                             options={[
                               { value: 'active', label: 'Active' },
                               { value: 'inactive', label: 'Inactive' }
                             ]}
-                            onChange={(value) => setFormData({ ...formData, status: value as any })}
+                            onChange={(value) => setFormData({ ...formData, isActive: value === 'active' })}
                           />
                         </div>
                       </div>
@@ -254,12 +257,11 @@ const CouponModal = ({
                       {/* Description */}
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Description <span className="text-red-500">*</span>
+                          Description
                         </label>
                         <textarea
-                          required
                           rows={4}
-                          value={formData.description}
+                          value={formData.description || ''}
                           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
                           placeholder="Brief description of the coupon"
@@ -274,7 +276,7 @@ const CouponModal = ({
                       <Percent className="w-5 h-5 text-gray-700" />
                       <h3 className="font-semibold text-gray-900">Discount Details</h3>
                     </div>
-                    
+
                     <div className="space-y-4">
                       {/* Discount Type | Discount Value */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -283,10 +285,10 @@ const CouponModal = ({
                             Discount Type <span className="text-red-500">*</span>
                           </label>
                           <Dropdown
-                            value={formData.discountType || 'percentage'}
+                            value={formData.discountType || 'PERCENTAGE'}
                             options={[
-                              { value: 'percentage', label: 'Percentage' },
-                              { value: 'fixed', label: 'Fixed Amount' }
+                              { value: 'PERCENTAGE', label: 'Percentage' },
+                              { value: 'FIXED_AMOUNT', label: 'Fixed Amount' }
                             ]}
                             onChange={(value) => setFormData({ ...formData, discountType: value as any })}
                           />
@@ -300,10 +302,10 @@ const CouponModal = ({
                             type="number"
                             required
                             min="0"
-                            value={formData.discountValue}
+                            value={formData.discountValue || ''}
                             onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder={formData.discountType === 'percentage' ? '10' : '200'}
+                            placeholder={formData.discountType === 'PERCENTAGE' ? '10' : '200'}
                           />
                         </div>
                       </div>
@@ -312,14 +314,14 @@ const CouponModal = ({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Minimum Purchase <span className="text-red-500">*</span>
+                            Min Purchase <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="number"
                             required
                             min="0"
-                            value={formData.minPurchase}
-                            onChange={(e) => setFormData({ ...formData, minPurchase: Number(e.target.value) })}
+                            value={formData.minPurchaseAmount || ''}
+                            onChange={(e) => setFormData({ ...formData, minPurchaseAmount: Number(e.target.value) })}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                             placeholder="500"
                           />
@@ -327,13 +329,13 @@ const CouponModal = ({
 
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Maximum Discount <span className="text-gray-500 text-xs">(Optional)</span>
+                            Max Discount <span className="text-gray-500 text-xs">(Optional)</span>
                           </label>
                           <input
                             type="number"
                             min="0"
-                            value={formData.maxDiscount || ''}
-                            onChange={(e) => setFormData({ ...formData, maxDiscount: Number(e.target.value) })}
+                            value={formData.maxDiscountAmount || ''}
+                            onChange={(e) => setFormData({ ...formData, maxDiscountAmount: Number(e.target.value) })}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                             placeholder="100"
                           />
@@ -351,23 +353,22 @@ const CouponModal = ({
                       <TrendingUp className="w-5 h-5 text-gray-700" />
                       <h3 className="font-semibold text-gray-900">Usage Limit</h3>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Usage Limit <span className="text-red-500">*</span>
+                        Usage Limit <span className="text-gray-500 text-xs">(Optional)</span>
                       </label>
                       <input
                         type="number"
-                        required
                         min="1"
-                        value={formData.usageLimit}
+                        value={formData.usageLimit || ''}
                         onChange={(e) => setFormData({ ...formData, usageLimit: Number(e.target.value) })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                         placeholder="1000"
                       />
                       <div className="mt-2 flex items-start gap-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
                         <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>Maximum number of times this coupon can be used</span>
+                        <span>Maximum number of times this coupon can be used globally</span>
                       </div>
                     </div>
                   </div>
@@ -378,7 +379,7 @@ const CouponModal = ({
                       <Calendar className="w-5 h-5 text-gray-700" />
                       <h3 className="font-semibold text-gray-900">Validity Period</h3>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Start Date */}
                       <div>
@@ -388,8 +389,8 @@ const CouponModal = ({
                         <input
                           type="date"
                           required
-                          value={formData.startDate}
-                          onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                          value={formData.startDate?.split('T')[0] || ''}
+                          onChange={(e) => setFormData({ ...formData, startDate: new Date(e.target.value).toISOString() })}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                         />
                       </div>
@@ -397,13 +398,13 @@ const CouponModal = ({
                       {/* End Date */}
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          End Date <span className="text-red-500">*</span>
+                          Expiry Date <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="date"
                           required
-                          value={formData.endDate}
-                          onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                          value={formData.expiryDate?.split('T')[0] || ''}
+                          onChange={(e) => setFormData({ ...formData, expiryDate: new Date(e.target.value).toISOString() })}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                         />
                       </div>
