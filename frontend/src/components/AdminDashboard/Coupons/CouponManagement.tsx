@@ -1,17 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Eye, 
-  Edit, 
+import { useState, useEffect } from 'react';
+import {
+  Plus,
+  Search,
+  Eye,
+  Edit,
   Trash2,
   Percent,
   Tag,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Loader2
 } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
 import {
@@ -23,113 +24,82 @@ import {
   TableRow,
 } from '@/components/UI/Table';
 import CouponModal from './CouponModal';
-
-interface Coupon {
-  id: string;
-  code: string;
-  description: string;
-  discountType: 'percentage' | 'fixed';
-  discountValue: number;
-  minPurchase: number;
-  maxDiscount?: number;
-  usageLimit: number;
-  usedCount: number;
-  startDate: string;
-  endDate: string;
-  status: 'active' | 'inactive' | 'expired';
-}
-
-// Mock data
-const mockCoupons: Coupon[] = [
-  {
-    id: '1',
-    code: 'WELCOME10',
-    description: 'Welcome discount for new customers',
-    discountType: 'percentage',
-    discountValue: 10,
-    minPurchase: 500,
-    maxDiscount: 100,
-    usageLimit: 1000,
-    usedCount: 245,
-    startDate: '2024-01-01',
-    endDate: '2024-12-31',
-    status: 'active'
-  },
-  {
-    id: '2',
-    code: 'SUMMER25',
-    description: 'Summer sale - 25% off',
-    discountType: 'percentage',
-    discountValue: 25,
-    minPurchase: 1000,
-    maxDiscount: 500,
-    usageLimit: 500,
-    usedCount: 432,
-    startDate: '2024-06-01',
-    endDate: '2024-08-31',
-    status: 'expired'
-  },
-  {
-    id: '3',
-    code: 'FLAT200',
-    description: 'Flat ₹200 off on orders above ₹2000',
-    discountType: 'fixed',
-    discountValue: 200,
-    minPurchase: 2000,
-    usageLimit: 300,
-    usedCount: 89,
-    startDate: '2024-02-01',
-    endDate: '2024-12-31',
-    status: 'active'
-  }
-];
+import { couponService, Coupon } from '@/services/couponService';
+import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
 const CouponManagement = () => {
-  const [coupons, setCoupons] = useState<Coupon[]>(mockCoupons);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'expired'>('all');
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
-  const [formData, setFormData] = useState<Partial<Coupon>>({
+
+  const initialFormData: Partial<Coupon> = {
     code: '',
     description: '',
-    discountType: 'percentage',
+    discountType: 'PERCENTAGE',
     discountValue: 0,
-    minPurchase: 0,
-    maxDiscount: 0,
+    minPurchaseAmount: 0,
+    maxDiscountAmount: 0,
     usageLimit: 0,
-    startDate: '',
-    endDate: '',
-    status: 'active'
-  });
+    startDate: new Date().toISOString(),
+    expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Default 7 days
+    isActive: true
+  };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-            <CheckCircle className="w-3 h-3" />
-            Active
-          </span>
-        );
-      case 'inactive':
-        return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
-            <XCircle className="w-3 h-3" />
-            Inactive
-          </span>
-        );
-      case 'expired':
-        return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-            <Clock className="w-3 h-3" />
-            Expired
-          </span>
-        );
-      default:
-        return null;
+  const [formData, setFormData] = useState<Partial<Coupon>>(initialFormData);
+
+  useEffect(() => {
+    fetchCoupons();
+  }, []);
+
+  const fetchCoupons = async () => {
+    try {
+      setLoading(true);
+      const response = await couponService.getCoupons();
+      if (response.success && response.data) {
+        // Backend returns { coupons: [], pagination: ... } or just [] depending on implementation
+        // Adjusting based on typical service pattern, assuming response.data.coupons or response.data if it's an array
+        const list = Array.isArray(response.data) ? response.data : (response.data.coupons || []);
+        setCoupons(list);
+      }
+    } catch (error) {
+      console.error('Failed to fetch coupons:', error);
+      showErrorToast('Error', 'Failed to load coupons');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const getStatusBadge = (coupon: Coupon) => {
+    const isExpired = new Date(coupon.expiryDate) < new Date();
+
+    if (isExpired) {
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+          <Clock className="w-3 h-3" />
+          Expired
+        </span>
+      );
+    }
+
+    if (coupon.isActive) {
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+          <CheckCircle className="w-3 h-3" />
+          Active
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+        <XCircle className="w-3 h-3" />
+        Inactive
+      </span>
+    );
   };
 
   const formatDate = (dateString: string) => {
@@ -142,36 +112,34 @@ const CouponManagement = () => {
   };
 
   const filteredCoupons = coupons.filter(coupon => {
-    const matchesSearch = 
+    const matchesSearch =
       coupon.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      coupon.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || coupon.status === statusFilter;
-    
+      (coupon.description && coupon.description.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    let matchesStatus = true;
+    const isExpired = new Date(coupon.expiryDate) < new Date();
+
+    if (statusFilter === 'active') {
+      matchesStatus = coupon.isActive && !isExpired;
+    } else if (statusFilter === 'inactive') {
+      matchesStatus = !coupon.isActive;
+    } else if (statusFilter === 'expired') {
+      matchesStatus = isExpired;
+    }
+
     return matchesSearch && matchesStatus;
   });
 
   const handleCreate = () => {
     setModalMode('create');
-    setFormData({
-      code: '',
-      description: '',
-      discountType: 'percentage',
-      discountValue: 0,
-      minPurchase: 0,
-      maxDiscount: 0,
-      usageLimit: 0,
-      startDate: '',
-      endDate: '',
-      status: 'active'
-    });
+    setFormData(initialFormData);
     setShowModal(true);
   };
 
   const handleEdit = (coupon: Coupon) => {
     setModalMode('edit');
     setSelectedCoupon(coupon);
-    setFormData(coupon);
+    setFormData({ ...coupon });
     setShowModal(true);
   };
 
@@ -181,32 +149,48 @@ const CouponManagement = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this coupon?')) {
-      setCoupons(prev => prev.filter(c => c.id !== id));
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this coupon? This action cannot be undone.')) {
+      try {
+        const response = await couponService.deleteCoupon(id);
+        if (response.success) {
+          setCoupons(prev => prev.filter(c => c.id !== id));
+          showSuccessToast('Success', 'Coupon deleted successfully');
+        }
+      } catch (error: any) {
+        showErrorToast('Error', error.message || 'Failed to delete coupon');
+      }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (modalMode === 'create') {
-      const newCoupon: Coupon = {
-        ...formData as Coupon,
-        id: Date.now().toString(),
-        usedCount: 0
-      };
-      setCoupons(prev => [...prev, newCoupon]);
-    } else if (modalMode === 'edit' && selectedCoupon) {
-      setCoupons(prev => prev.map(c => c.id === selectedCoupon.id ? { ...formData as Coupon, id: c.id } : c));
+    try {
+      if (modalMode === 'create') {
+        const response = await couponService.createCoupon(formData);
+        if (response.success && response.data) {
+          setCoupons(prev => [response.data, ...prev]);
+          showSuccessToast('Success', 'Coupon created successfully');
+          setShowModal(false);
+        }
+      } else if (modalMode === 'edit' && selectedCoupon) {
+        const response = await couponService.updateCoupon(selectedCoupon.id, formData);
+        if (response.success && response.data) {
+          setCoupons(prev => prev.map(c => c.id === selectedCoupon.id ? response.data : c));
+          showSuccessToast('Success', 'Coupon updated successfully');
+          setShowModal(false);
+        }
+      }
+    } catch (error: any) {
+      showErrorToast('Error', error.message || 'Failed to save coupon');
     }
-    setShowModal(false);
   };
 
   const stats = {
     total: coupons.length,
-    active: coupons.filter(c => c.status === 'active').length,
-    inactive: coupons.filter(c => c.status === 'inactive').length,
-    expired: coupons.filter(c => c.status === 'expired').length
+    active: coupons.filter(c => c.isActive && new Date(c.expiryDate) >= new Date()).length,
+    inactive: coupons.filter(c => !c.isActive).length,
+    expired: coupons.filter(c => new Date(c.expiryDate) < new Date()).length
   };
 
   return (
@@ -309,99 +293,107 @@ const CouponManagement = () => {
 
       {/* Coupons Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Coupon Code</TableHead>
-              <TableHead>Discount</TableHead>
-              <TableHead>Usage</TableHead>
-              <TableHead>Valid Period</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredCoupons.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center p-12">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-gray-500">
-                  No coupons found
-                </TableCell>
+                <TableHead>Coupon Code</TableHead>
+                <TableHead>Discount</TableHead>
+                <TableHead>Usage</TableHead>
+                <TableHead>Valid Period</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ) : (
-              filteredCoupons.map((coupon) => (
-                <TableRow key={coupon.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-semibold text-gray-900">{coupon.code}</div>
-                      <div className="text-sm text-gray-500">{coupon.description}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Percent className="w-4 h-4 text-gray-500" />
-                      <span className="font-medium">
-                        {coupon.discountType === 'percentage' 
-                          ? `${coupon.discountValue}%` 
-                          : `₹${coupon.discountValue}`}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Min: ₹{coupon.minPurchase}
-                      {coupon.maxDiscount && ` | Max: ₹${coupon.maxDiscount}`}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="font-medium text-gray-900">
-                        {coupon.usedCount} / {coupon.usageLimit}
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                        <div 
-                          className="bg-gray-900 h-2 rounded-full" 
-                          style={{ width: `${(coupon.usedCount / coupon.usageLimit) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="text-gray-700">{formatDate(coupon.startDate)}</div>
-                      <div className="text-gray-500">to {formatDate(coupon.endDate)}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(coupon.status)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleView(coupon)}
-                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                        title="View"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEdit(coupon)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title="Edit"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(coupon.id)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {filteredCoupons.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-12 text-gray-500">
+                    No coupons found
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                filteredCoupons.map((coupon) => (
+                  <TableRow key={coupon.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-semibold text-gray-900">{coupon.code}</div>
+                        <div className="text-sm text-gray-500">{coupon.description}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Percent className="w-4 h-4 text-gray-500" />
+                        <span className="font-medium">
+                          {coupon.discountType === 'PERCENTAGE'
+                            ? `${coupon.discountValue}%`
+                            : `₹${coupon.discountValue}`}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Min: ₹{coupon.minPurchaseAmount || 0}
+                        {coupon.maxDiscountAmount && ` | Max: ₹${coupon.maxDiscountAmount}`}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="font-medium text-gray-900">
+                          {coupon.usedCount || 0} / {coupon.usageLimit || '∞'}
+                        </div>
+                        {coupon.usageLimit && (
+                          <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                            <div
+                              className="bg-gray-900 h-2 rounded-full"
+                              style={{ width: `${((coupon.usedCount || 0) / coupon.usageLimit) * 100}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="text-gray-700">{formatDate(coupon.startDate)}</div>
+                        <div className="text-gray-500">to {formatDate(coupon.expiryDate)}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(coupon)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleView(coupon)}
+                          className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                          title="View"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(coupon)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(coupon.id)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* Coupon Modal */}

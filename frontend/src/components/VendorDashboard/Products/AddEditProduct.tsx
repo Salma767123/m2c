@@ -6,7 +6,8 @@ import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { ArrowLeft, Save, X, Upload, Package } from 'lucide-react'
+import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon } from 'lucide-react'
+import VariantImageModal from './VariantImageModal'
 import Link from 'next/link'
 import { categories } from '@/components/mockData/products'
 import { useToast } from '@/hooks/use-toast'
@@ -311,6 +312,18 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     price: 0,
     stock: 0
   })
+
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null)
+
+  const handleVariantImageUpdate = (variantId: string, newImages: string[]) => {
+    // Custom logic to update variant images using the existing updateVariant helper if needed,
+    // but updateVariant updates a single field. Let's reuse updateVariant.
+    updateVariant(variantId, 'images', newImages)
+  }
+
+  const getEditingVariant = () => {
+    return formData.variants.find(v => v.id === editingVariantId)
+  }
 
   // Load available inventory items
   useEffect(() => {
@@ -1490,6 +1503,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                   <TableHead>SKU</TableHead>
                                   <TableHead>Price</TableHead>
                                   <TableHead>Stock</TableHead>
+                                  <TableHead className="text-center">Image</TableHead>
                                   <TableHead className="text-center">Action</TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -1561,6 +1575,23 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                           }`}
                                         min="0"
                                       />
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingVariantId(variant.id || null)}
+                                        className={`p-1 inline-flex items-center gap-1 transition-colors ${variant.images && variant.images.length > 0
+                                          ? 'text-blue-600 hover:text-blue-800'
+                                          : 'text-gray-400 hover:text-gray-600'
+                                          }`}
+                                        title={variant.images && variant.images.length > 0 ? "Change image" : "Add image"}
+                                        disabled={!variant.id}
+                                      >
+                                        <ImageIcon className="h-4 w-4" />
+                                        <span className="text-xs font-medium">
+                                          {variant.images && variant.images.length > 0 ? 'Edit' : 'Add'}
+                                        </span>
+                                      </button>
                                     </TableCell>
                                     <TableCell className="text-center">
                                       <button
@@ -2289,6 +2320,20 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
           </div>
         </div>
       </form>
+
+      {editingVariantId && (
+        <VariantImageModal
+          isOpen={!!editingVariantId}
+          onClose={() => setEditingVariantId(null)}
+          variantData={{
+            id: editingVariantId,
+            size: getEditingVariant()?.size || '',
+            color: getEditingVariant()?.color || '',
+            images: getEditingVariant()?.images || []
+          }}
+          onUpdateImages={handleVariantImageUpdate}
+        />
+      )}
     </div>
   )
 }

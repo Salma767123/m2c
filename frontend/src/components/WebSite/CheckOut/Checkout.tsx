@@ -91,10 +91,14 @@ export default function Checkout() {
     overnight: 24.99
   }
 
+  const [discountAmount, setDiscountAmount] = useState(0)
+  const [couponCode, setCouponCode] = useState("")
+
   const [orderSummary, setOrderSummary] = useState({
     subtotal: 0,
     shipping: 0,
     tax: 0,
+    discount: 0,
     total: 0
   })
 
@@ -103,11 +107,23 @@ export default function Checkout() {
     fetchUserProfile()
     fetchPaymentSettings()
     loadRazorpayScript()
+
+    // Load applied coupon
+    const savedCoupon = localStorage.getItem('appliedCoupon')
+    if (savedCoupon) {
+      try {
+        const { code, discountAmount } = JSON.parse(savedCoupon)
+        setCouponCode(code)
+        setDiscountAmount(discountAmount)
+      } catch (e) {
+        console.error("Failed to parse coupon", e)
+      }
+    }
   }, [])
 
   useEffect(() => {
     calculateTotals()
-  }, [cartItems, formData.shippingMethod])
+  }, [cartItems, formData.shippingMethod, discountAmount])
 
   const fetchCart = async () => {
     try {
@@ -129,12 +145,12 @@ export default function Checkout() {
       const response = await userProfileService.getProfile()
       if (response.success && response.data) {
         const userData = response.data
-        
+
         // Split name into first and last name
         const nameParts = userData.name?.split(' ') || ['', '']
         const firstName = nameParts[0] || ''
         const lastName = nameParts.slice(1).join(' ') || ''
-        
+
         // Pre-fill form with user data
         setFormData(prev => ({
           ...prev,
@@ -161,7 +177,7 @@ export default function Checkout() {
       const response = await paymentSettingsService.getPublicPaymentSettings()
       if (response.success && response.data) {
         setPaymentSettings(response.data)
-        
+
         // Set default payment method based on what's enabled
         if (response.data.razorpayEnabled) {
           setFormData(prev => ({ ...prev, paymentMethod: 'razorpay' }))
@@ -202,12 +218,14 @@ export default function Checkout() {
       const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0
       return sum + (itemSubtotal * gstRate)
     }, 0)
-    const total = subtotal + shipping + tax
+    // Calculate total with discount, ensure >= 0
+    const total = Math.max(0, subtotal + shipping + tax - discountAmount)
 
     setOrderSummary({
       subtotal,
       shipping,
       tax,
+      discount: discountAmount,
       total
     })
   }
@@ -345,12 +363,14 @@ export default function Checkout() {
         paymentId,
         shippingCost: orderSummary.shipping,
         tax: orderSummary.tax,
-        discount: 0
+        discount: orderSummary.discount
       })
 
       if (response.success && response.data) {
+        localStorage.removeItem('appliedCoupon')
         router.push(`/order-confirmation?id=${response.data.id}`)
       } else {
+        localStorage.removeItem('appliedCoupon')
         router.push("/order-confirmation")
       }
     } catch (error: any) {
@@ -539,6 +559,12 @@ export default function Checkout() {
                           </div>
                         )
                       })}
+                    </div>
+                  )}
+                  {orderSummary.discount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount</span>
+                      <span className="font-medium">-${orderSummary.discount.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="border-t border-slate-200 pt-4">

@@ -409,12 +409,12 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                     />
                                   </div>
                                 )}
+
                                 <div>
-                                  <div className="font-semibold text-gray-900 text-sm">Default</div>
+                                  <div className="font-semibold text-gray-900 text-sm">
+                                    {product.singleUnitSize ? product.singleUnitSize : (product.singleUnitColor ? product.singleUnitColor : 'Base Variant')}
+                                  </div>
                                   <div className="flex items-center flex-wrap gap-2 mt-1">
-                                    {product.singleUnitSize && (
-                                      <span className="text-xs text-gray-600 font-medium">{product.singleUnitSize}</span>
-                                    )}
                                     {product.singleUnitColorHex && (
                                       <div
                                         className="w-4 h-4 rounded-full border border-gray-300 shrink-0"
@@ -425,11 +425,13 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                     {product.singleUnitColor && (
                                       <span className="text-xs text-gray-600">{product.singleUnitColor}</span>
                                     )}
-                                    {!product.singleUnitSize && !product.singleUnitColor && (
-                                      <span className="text-xs text-gray-600">Base Product</span>
-                                    )}
                                   </div>
                                   <div className="text-lg font-bold text-gray-900 mt-1">${(product.adminFixedPrice || product.basePrice).toFixed(2)}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {(product.inventory?.currentStock ?? (product.hasVariants ? 0 : product.totalStock)) > 0
+                                      ? `${product.inventory?.currentStock ?? (product.hasVariants ? 0 : product.totalStock)} in stock`
+                                      : 'Out of stock'}
+                                  </div>
                                 </div>
                               </div>
                             </button>
@@ -530,7 +532,9 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                 <span className="text-gray-600 text-sm">({selectedVariant.stock} available)</span>
                               )}
                               {!selectedVariant && (
-                                <span className="text-gray-600 text-sm">({product.totalStock} available)</span>
+                                <span className="text-gray-600 text-sm">
+                                  ({product.inventory?.currentStock ?? product.totalStock} available)
+                                </span>
                               )}
                             </div>
                           ) : (
@@ -596,12 +600,12 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
+              </div >
+            </div >
+          </div >
 
           {/* Product Details Section */}
-          <div className="mt-12 bg-white rounded-2xl shadow-lg p-8">
+          < div className="mt-12 bg-white rounded-2xl shadow-lg p-8" >
             <h3 className="text-2xl font-bold text-gray-900 mb-6">Product details</h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-4">
@@ -709,10 +713,11 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                 {showAllDetails ? 'See less' : 'See more'}
               </button>
             </div>
-          </div>
+          </div >
 
           {/* Care Instructions */}
-          {product.fabricSpecifications &&
+          {
+            product.fabricSpecifications &&
             typeof product.fabricSpecifications === 'object' &&
             'careInstructions' in product.fabricSpecifications &&
             Array.isArray((product.fabricSpecifications as any).careInstructions) &&
@@ -730,7 +735,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                   ))}
                 </div>
               </div>
-            )}
+            )
+          }
 
           {/* Features */}
           <div className="mt-8 bg-white rounded-2xl shadow-lg p-8">
@@ -763,8 +769,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </div >
+      </div >
     </>
   );
 };

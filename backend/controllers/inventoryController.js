@@ -437,17 +437,16 @@ const updateStock = async (req, res) => {
 
     // Update stock and create history record in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Check if product has variants
-      if (existingItem.hasProductCreated && existingItem.productId) {
-        const product = await tx.product.findUnique({
-          where: { id: existingItem.productId },
-          include: { variants: true }
-        });
-
-        if (product && product.hasVariants && product.variants.length > 0) {
-          throw new Error('Cannot update stock directly for products with variants. Please update stock via the Product details page to ensure variant stocks are updated correctly.');
-        }
-      }
+      // Check if product has variants - REMOVED BLOCKER to allow base stock updates
+      // if (existingItem.hasProductCreated && existingItem.productId) {
+      //   const product = await tx.product.findUnique({
+      //     where: { id: existingItem.productId },
+      //     include: { variants: true }
+      //   });
+      //   if (product && product.hasVariants && product.variants.length > 0) {
+      //      // ALLOW update now
+      //   }
+      // }
 
       // Update inventory stock
       const updatedItem = await tx.inventory.update({
@@ -473,33 +472,25 @@ const updateStock = async (req, res) => {
         }
       });
 
-      // Sync stock with linked products
-      if (existingItem.hasProductCreated && existingItem.productId) {
-        // We already checked for variants above. If we are here, it means no variants, so safe to update totalStock.
-        await tx.product.update({
-          where: { id: existingItem.productId },
-          data: { totalStock: newStock }
-        });
-        console.log('✅ Synced stock with product:', existingItem.productId);
-      }
-
-      // Also update any products linked via inventoryItemId
-      // Note: If multiple products are linked to one inventory item (one-to-many), and one has variants... chaos.
-      // Assuming 1-to-1 or simple mapping for now.
+      // Sync stock with all linked products (including the main one if set)
       const linkedProducts = await tx.product.findMany({
-        where: { inventoryItemId: id }
+        where: { inventoryItemId: id },
+        include: { variants: true }
       });
 
       if (linkedProducts.length > 0) {
-        // Filter out products with variants from auto-update if any (though they shouldn't exist if data is consistent)
-        // Actually, if we update the inventory stock, we should update the product stock.
-        // But if the product has variants, we blocked this operation at the start of transaction.
-        // So we are safe to update all linked products here effectively.
-        await tx.product.updateMany({
-          where: { inventoryItemId: id },
-          data: { totalStock: newStock }
-        });
-        console.log('✅ Synced stock with', linkedProducts.length, 'linked product(s)');
+        for (const product of linkedProducts) {
+          let variantStockSum = 0;
+          if (product.variants && product.variants.length > 0) {
+            variantStockSum = product.variants.reduce((sum, v) => sum + v.stock, 0);
+          }
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { totalStock: newStock + variantStockSum }
+          });
+          console.log(`✅ Synced stock with product ${product.id}: Base(${newStock}) + Variants(${variantStockSum}) = ${newStock + variantStockSum}`);
+        }
       }
 
       return { updatedItem, historyRecord };

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { cartService } from "@/services/cartService"
+import { couponService } from "@/services/couponService"
 import { publicProductService, PublicProduct } from "@/services/publicProductService"
 import { userAuthService } from "@/services/userAuthService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
@@ -135,6 +136,20 @@ export default function Order() {
 
   const [promoCode, setPromoCode] = useState("")
   const [appliedPromo, setAppliedPromo] = useState("")
+  const [discountAmount, setDiscountAmount] = useState(0)
+
+  useEffect(() => {
+    const savedCoupon = localStorage.getItem('appliedCoupon')
+    if (savedCoupon) {
+      try {
+        const { code, discountAmount } = JSON.parse(savedCoupon)
+        setAppliedPromo(code)
+        setDiscountAmount(discountAmount)
+      } catch (e) {
+        localStorage.removeItem('appliedCoupon')
+      }
+    }
+  }, [])
 
   if (!isHydrated || loading) {
     return (
@@ -205,17 +220,54 @@ export default function Order() {
     }
   }
 
-  const applyPromoCode = () => {
-    if (promoCode.toLowerCase() === "save10") {
-      setAppliedPromo("SAVE10")
-      setPromoCode("")
+  const applyPromoCode = async () => {
+    if (!promoCode.trim()) {
+      showErrorToast("Error", "Please enter a promo code")
+      return;
     }
+
+    try {
+      // Calculate subtotal for validation
+      const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+
+      const response = await couponService.applyCoupon(promoCode, subtotal)
+
+      if (response.success && response.data) {
+        setAppliedPromo(response.data.code)
+        // Ensure discount doesn't exceed total (though backend handles this, good to be safe)
+        setDiscountAmount(response.data.discountAmount)
+        setPromoCode("") // Clear input field
+        showSuccessToast("Success", `Coupon "${response.data.code}" applied! You saved $${response.data.discountAmount.toFixed(2)}`)
+
+        // Save to local storage for Checkout page to retrieve
+        localStorage.setItem('appliedCoupon', JSON.stringify({
+          code: response.data.code,
+          discountAmount: response.data.discountAmount
+        }))
+      } else {
+        throw new Error(response.message || "Invalid coupon")
+      }
+    } catch (error: any) {
+      console.error("Coupon error:", error)
+      setAppliedPromo("")
+      setDiscountAmount(0)
+      localStorage.removeItem('appliedCoupon')
+      showErrorToast("Error", error.message || "Failed to apply coupon")
+    }
+  }
+
+  // Remove coupon
+  const removeCoupon = () => {
+    setAppliedPromo("")
+    setDiscountAmount(0)
+    localStorage.removeItem('appliedCoupon')
+    showSuccessToast("Removed", "Coupon removed")
   }
 
   const calculateSummary = (): OrderSummary => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     const shipping = 0
-    const discount = appliedPromo === "SAVE10" ? subtotal * 0.1 : 0
+    const discount = discountAmount
 
     // Calculate tax based on individual product GST percentages
     const tax = cartItems.reduce((sum, item) => {
@@ -226,7 +278,7 @@ export default function Order() {
 
     const total = subtotal + shipping + tax - discount
 
-    return { subtotal, shipping, tax, discount, total }
+    return { subtotal, shipping, tax, discount, total: total > 0 ? total : 0 }
   }
 
   const summary = calculateSummary()
@@ -384,9 +436,21 @@ export default function Order() {
                   </button>
                 </div>
                 {appliedPromo && (
-                  <div className="mt-3 flex items-center gap-2 text-green-600">
-                    <CheckCircle className="w-5 h-5" />
-                    <span className="font-medium">Promo code "{appliedPromo}" applied!</span>
+                  <div className="mt-3 flex items-center justify-between text-green-600 bg-green-50 p-3 rounded-lg border border-green-100">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5" />
+                      <div>
+                        <span className="font-medium block">Code "{appliedPromo}" applied!</span>
+                        <span className="text-xs text-green-700">You saved ${discountAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={removeCoupon}
+                      className="text-red-500 hover:text-red-700 p-1 hover:bg-white rounded-full transition-colors"
+                      title="Remove coupon"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
               </div>

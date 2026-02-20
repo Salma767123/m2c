@@ -126,6 +126,7 @@ const companyInfoRoutes = require('./routes/companyInfoRoutes');
 const gstSettingsRoutes = require('./routes/gstSettingsRoutes');
 const hubRoutes = require('./routes/hubRoutes');
 const enquiryRoutes = require('./routes/enquiryRoutes');
+const couponRoutes = require('./routes/couponRoutes');
 
 
 // Routes
@@ -145,6 +146,7 @@ app.use('/api/company-info', companyInfoRoutes);
 app.use('/api/gst-settings', gstSettingsRoutes);
 app.use('/api/hubs', hubRoutes);
 app.use('/api/enquiries', enquiryRoutes);
+app.use('/api/coupons', couponRoutes);
 
 // 404 handler
 app.use((req, res) => {

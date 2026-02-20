@@ -53,6 +53,9 @@ interface Product {
   hasVariants: boolean
   variants: ProductVariant[]
   totalStock: number
+  singleUnitSize?: string
+  singleUnitColor?: string
+  singleUnitColorHex?: string
 }
 
 interface UpdateStockPageProps {
@@ -65,13 +68,13 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [inventoryItem, setInventoryItem] = useState<InventoryItem | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
-  
+
   // Stock update form state
   const [newStock, setNewStock] = useState('')
   const [reason, setReason] = useState('')
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState<{ newStock?: string; reason?: string }>({})
-  
+
   // Variant stock updates
   const [variantStocks, setVariantStocks] = useState<Record<string, number>>({})
 
@@ -82,23 +85,23 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   const fetchInventoryData = async () => {
     try {
       setIsLoading(true)
-      
+
       // Fetch inventory item
       const inventoryResponse = await axiosInstance.get(`/inventory/admin/${inventoryId}`)
-      
+
       if (inventoryResponse.data.success) {
         const item = inventoryResponse.data.data
         setInventoryItem(item)
         setNewStock(item.currentStock.toString())
-        
+
         // If product exists, fetch product details with variants
         if (item.hasProductCreated && item.productId) {
-          const productResponse = await axiosInstance.get(`/products/${item.productId}`)
-          
+          const productResponse = await axiosInstance.get(`/products/admin/${item.productId}`)
+
           if (productResponse.data.success) {
             const productData = productResponse.data.data
             setProduct(productData)
-            
+
             // Initialize variant stocks
             if (productData.hasVariants && productData.variants) {
               const initialStocks: Record<string, number> = {}
@@ -125,7 +128,14 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   const validate = () => {
     const newErrors: { newStock?: string; reason?: string } = {}
 
-    if (!product?.hasVariants) {
+    // Base stock validation - only if user changed it? No, if it's there, check it.
+    // If hasVariants, we might want to allow empty base stock update if it hasn't changed.
+    // But for simplicity, let's validate it if it's visible.
+
+    // Actually, we should check if base stock has changed
+    const baseStockChanged = inventoryItem && parseInt(newStock) !== inventoryItem.currentStock
+
+    if (baseStockChanged || !product?.hasVariants) {
       if (!newStock || newStock.trim() === '') {
         newErrors.newStock = 'Stock quantity is required'
       } else if (parseInt(newStock) < 0) {
@@ -157,7 +167,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
 
       if (product?.hasVariants) {
         // Update variant stocks
-        await axiosInstance.put(`/products/${product.id}/variants/stock`, {
+        await axiosInstance.put(`/products/admin/${product.id}/variants/stock`, {
           variants: Object.entries(variantStocks).map(([variantId, stock]) => ({
             variantId,
             stock
@@ -165,8 +175,11 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
           reason: reason.trim(),
           notes: notes.trim() || undefined
         })
-      } else {
-        // Update inventory stock
+      }
+
+      // Update inventory stock (Base Stock)
+      const baseStockChanged = parseInt(newStock) !== inventoryItem.currentStock
+      if (baseStockChanged || !product?.hasVariants) {
         await inventoryService.adminUpdateStock(inventoryId, {
           currentStock: parseInt(newStock),
           reason: reason.trim(),
@@ -212,7 +225,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   const stockDifference = product?.hasVariants
     ? calculateTotalVariantStock() - (product?.totalStock || 0)
     : parseInt(newStock || '0') - (inventoryItem?.currentStock || 0)
-  
+
   const isIncrease = stockDifference > 0
   const isDecrease = stockDifference < 0
 
@@ -339,7 +352,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Variant Stock Updates */}
-              {product?.hasVariants && product.variants.length > 0 ? (
+              {product?.hasVariants && product.variants.length > 0 && (
                 <div className="space-y-4">
                   <label className="block text-sm font-medium text-gray-700">
                     Variant Stock Levels <span className="text-red-500">*</span>
@@ -406,38 +419,77 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     </div>
                   </div>
                 </div>
-              ) : (
-                /* Single Stock Input */
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    New Stock Quantity <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={newStock}
-                    onChange={(e) => {
-                      setNewStock(e.target.value)
-                      setErrors({ ...errors, newStock: undefined })
-                    }}
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.newStock ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter new stock quantity"
-                    min="0"
-                    disabled={isSaving}
-                  />
-                  {errors.newStock && (
-                    <p className="mt-1 text-sm text-red-600">{errors.newStock}</p>
+              )}
+
+              {/* Base/Total Stock Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {product?.hasVariants ? (
+                    <span>
+                      Base Variant Stock
+                      {product.singleUnitSize && product.singleUnitColor && (
+                        <span className="ml-1 text-gray-500 font-normal">
+                          ({product.singleUnitSize} - {product.singleUnitColor})
+                          {product.singleUnitColorHex && (
+                            <span
+                              className="inline-block w-3 h-3 rounded-full ml-1 border border-gray-200 align-middle"
+                              style={{ backgroundColor: product.singleUnitColorHex }}
+                            />
+                          )}
+                        </span>
+                      )}
+                    </span>
+                  ) : 'New Stock Quantity'} <span className="text-red-500">*</span>
+                </label>
+                <div className="flex flex-col gap-1 mb-2">
+                  {product?.hasVariants && (
+                    <p className="text-xs text-gray-500">
+                      Update the stock for the base/default variant (Inventory Stock).
+                    </p>
                   )}
                 </div>
-              )}
+                <input
+                  type="number"
+                  value={newStock}
+                  onChange={(e) => {
+                    setNewStock(e.target.value)
+                    setErrors({ ...errors, newStock: undefined })
+                  }}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.newStock ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  placeholder="Enter stock quantity"
+                  min="0"
+                  disabled={isSaving}
+                />
+                {errors.newStock && (
+                  <p className="mt-1 text-sm text-red-600">{errors.newStock}</p>
+                )}
+
+                {/* Stock Change Indicator for Base Stock */}
+                {stockDifference !== 0 && !isNaN(stockDifference) && !product?.hasVariants && (
+                  <div
+                    className={`flex items-center space-x-2 p-3 mt-2 rounded-lg ${isIncrease ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                      }`}
+                  >
+                    {isIncrease ? (
+                      <TrendingUp className="h-5 w-5" />
+                    ) : (
+                      <TrendingDown className="h-5 w-5" />
+                    )}
+                    <span className="font-medium">
+                      {isIncrease ? '+' : ''}
+                      {stockDifference} units
+                    </span>
+                    <span className="text-sm">({isIncrease ? 'Increase' : 'Decrease'})</span>
+                  </div>
+                )}
+              </div>
 
               {/* Stock Change Indicator */}
               {stockDifference !== 0 && !isNaN(stockDifference) && (
                 <div
-                  className={`flex items-center space-x-2 p-3 rounded-lg ${
-                    isIncrease ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                  }`}
+                  className={`flex items-center space-x-2 p-3 rounded-lg ${isIncrease ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                    }`}
                 >
                   {isIncrease ? (
                     <TrendingUp className="h-5 w-5" />
@@ -463,9 +515,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     setReason(e.target.value)
                     setErrors({ ...errors, reason: undefined })
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                    errors.reason ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${errors.reason ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="e.g., New shipment received, Damaged items removed, Inventory correction"
                   rows={3}
                   disabled={isSaving}
@@ -521,7 +572,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
             </form>
           </CardContent>
         </Card>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }

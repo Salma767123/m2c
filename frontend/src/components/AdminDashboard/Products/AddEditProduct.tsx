@@ -6,7 +6,8 @@ import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { ArrowLeft, Save, X, Upload, Package } from 'lucide-react'
+import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon } from 'lucide-react'
+import VariantImageModal from './VariantImageModal'
 import Link from 'next/link'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
@@ -358,6 +359,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     stock: 0,
     images: [] // New field for variant images
   })
+
+  // State for variant image editing
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null)
+
+  const handleVariantImagesUpdate = (variantId: string, newImages: string[]) => {
+    updateVariant(variantId, 'images', newImages)
+  }
+
+  const getEditingVariant = () => {
+    return formData.variants.find(v => v.id === editingVariantId)
+  }
 
   // Load product data for editing
   useEffect(() => {
@@ -1764,7 +1776,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                     htmlFor="variant-image-upload"
                                     className="inline-block px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
                                   >
-                                    Choose Image
+                                    {newVariant.images && newVariant.images.length > 0 ? 'Change Image' : 'Choose Image'}
                                   </label>
                                   {newVariant.images && newVariant.images.length > 0 && (
                                     <button
@@ -1823,7 +1835,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 {formData.variants.map((variant, idx) => (
                                   <TableRow key={variant.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50 hover:bg-gray-100'}>
                                     <TableCell>
-                                      <div className="w-10 h-10 bg-gray-100 rounded border border-gray-200 overflow-hidden">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingVariantId(variant.id || null)}
+                                        className="w-10 h-10 bg-gray-100 rounded border border-gray-200 overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all relative group"
+                                        title="Manage images"
+                                      >
                                         {variant.images && variant.images.length > 0 ? (
                                           <img src={variant.images[0]} alt={variant.sku} className="w-full h-full object-cover" />
                                         ) : (
@@ -1831,7 +1848,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                             <Package className="w-4 h-4" />
                                           </div>
                                         )}
-                                      </div>
+
+                                        {/* Overlay indicator */}
+                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <ImageIcon className="w-4 h-4 text-white drop-shadow-sm" />
+                                        </div>
+                                      </button>
                                     </TableCell>
                                     <TableCell>
                                       <select
@@ -2458,6 +2480,20 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
           </div>
         </div>
       </form>
+
+      {editingVariantId && (
+        <VariantImageModal
+          isOpen={!!editingVariantId}
+          onClose={() => setEditingVariantId(null)}
+          variantData={{
+            id: editingVariantId,
+            size: getEditingVariant()?.size || '',
+            color: getEditingVariant()?.color || '',
+            images: getEditingVariant()?.images || []
+          }}
+          onUpdateImages={handleVariantImagesUpdate}
+        />
+      )}
     </div>
   )
 }
