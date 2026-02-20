@@ -1361,7 +1361,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   {formData.hasVariants && (
                     <>
                       {/* Add New Variant */}
-                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 bg-gradient-to-br from-gray-50 to-white hover:border-gray-400 transition-colors">
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 bg-linear-to-br from-gray-50 to-white hover:border-gray-400 transition-colors">
                         <div className="flex items-center gap-3 mb-6">
                           <div className="p-2 bg-gray-900 rounded-lg">
                             <Package className="h-5 w-5 text-white" />

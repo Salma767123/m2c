@@ -219,7 +219,6 @@ export default function CategoryLists() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
               <Dropdown
                 value={statusFilter}
                 options={[
