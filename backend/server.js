@@ -61,7 +61,12 @@ app.use((req, res, next) => {
   next();
 });
 // app.use(morgan('combined')); // Commented out to reduce console logs
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Configure express-session for Google OAuth
