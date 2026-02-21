@@ -136,8 +136,11 @@ export interface VendorProfile {
   warehouseAddress?: string;
   warehouseCity?: string;
   warehouseState?: string;
+  warehouseZipCode?: string;
+  warehouseCountry?: string;
   warehouseSize?: string;
   storageCapacity?: string;
+  mapLink?: string;
   shippingMethods?: string[];
   deliveryTime?: string;
   minimumOrderQuantity?: string;

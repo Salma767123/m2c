@@ -269,6 +269,7 @@ model Vendor {
   warehouseCountry      String?   @default("India")
   warehouseSize         String?
   storageCapacity       String?
+  mapLink               String?   // Google Maps embed link
   
   // Vendor Type & Products
   vendorType            VendorType

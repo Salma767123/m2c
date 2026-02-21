@@ -622,6 +622,37 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                   <p className="font-medium">{vendor.storageCapacity}</p>
                 </div>
               )}
+              
+              {/* Google Map Display */}
+              {vendor.mapLink && (
+                <div className="mt-6">
+                  <p className="text-sm text-gray-600 mb-3 font-semibold">Location Map</p>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <iframe
+                      src={vendor.mapLink}
+                      width="100%"
+                      height="400"
+                      style={{ border: 0 }}
+                      allowFullScreen
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      title="Warehouse Location"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="mt-2">
+                    <a
+                      href={vendor.mapLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                    >
+                      <Globe className="h-4 w-4" />
+                      Open in Google Maps
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

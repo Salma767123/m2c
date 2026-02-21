@@ -280,6 +280,7 @@ const registerVendor = async (req, res) => {
         warehouseCountry: warehouseCountry || 'India',
         warehouseSize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
         storageCapacity: warehousingCapacity,
+        mapLink: mapLink || null,
         
         // Vendor Type & Products
         vendorType: getVendorTypeEnum(parsedVendorType),
@@ -672,7 +673,10 @@ const updateVendorById = async (req, res) => {
       warehouseAddress: updateData.warehouseAddress,
       warehouseCity: updateData.warehouseCity,
       warehouseState: updateData.warehouseState,
+      warehouseZipCode: updateData.warehouseZip || null,
+      warehouseCountry: updateData.warehouseCountry || 'India',
       storageCapacity: updateData.warehousingCapacity,
+      mapLink: updateData.mapLink || null,
       
       // Vendor Type & Products
       vendorType: Array.isArray(parsedVendorType) && parsedVendorType.includes('manufacturer') 

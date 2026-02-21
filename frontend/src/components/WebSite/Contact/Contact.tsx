@@ -23,6 +23,7 @@ const Contact = () => {
     website: ''
   });
   const [isSubmittingVendor, setIsSubmittingVendor] = useState(false);
+  const [gstError, setGstError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,14 +46,40 @@ const Contact = () => {
   };
 
   const handleVendorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
+    // Convert GST number to uppercase
+    const updatedValue = name === 'gstNumber' ? value.toUpperCase() : value;
+    
     setVendorFormData({
       ...vendorFormData,
-      [e.target.name]: e.target.value
+      [name]: updatedValue
     });
+
+    // Validate GST number on change
+    if (name === 'gstNumber') {
+      if (value && !/^[A-Z0-9]{15}$/i.test(value)) {
+        setGstError('GST Number must be exactly 15 alphanumeric characters');
+      } else {
+        setGstError('');
+      }
+    }
   };
 
   const handleVendorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate GST number before submission
+    if (!vendorFormData.gstNumber) {
+      setGstError('GST Number is required');
+      return;
+    }
+    
+    if (!/^[A-Z0-9]{15}$/i.test(vendorFormData.gstNumber)) {
+      setGstError('GST Number must be exactly 15 alphanumeric characters');
+      return;
+    }
+    
     setIsSubmittingVendor(true);
     try {
       await enquiryService.submitEnquiry({
@@ -64,6 +91,7 @@ const Contact = () => {
         website: vendorFormData.website || undefined
       });
       setVendorFormData({ name: '', companyName: '', gstNumber: '', email: '', phone: '', website: '' });
+      setGstError('');
       setShowVendorModal(false);
       showSuccessToast('Application Submitted!', 'Thank you for your interest! We will review your application and get back to you soon.');
     } catch (error: any) {
@@ -358,12 +386,19 @@ const Contact = () => {
                         id="gst-number"
                         name="gstNumber"
                         required
+                        maxLength={15}
                         value={vendorFormData.gstNumber}
                         onChange={handleVendorChange}
-                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                        className={`w-full pl-11 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all ${
+                          gstError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                        }`}
                         placeholder="e.g., 29ABCDE1234F1Z5"
                       />
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">15 alphanumeric characters (e.g., 22AAAAA0000A1Z5)</p>
+                    {gstError && (
+                      <p className="text-red-500 text-sm mt-1">{gstError}</p>
+                    )}
                   </div>
 
                   <div>

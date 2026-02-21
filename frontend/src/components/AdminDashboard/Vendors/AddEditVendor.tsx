@@ -317,7 +317,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         sameAsWarehouse: false,
         logo: vendor.companyLogo || null,
         logoFile: null,
-        gstDocument: null,
+        gstDocument: vendor.documents?.find((doc: any) => doc.type === 'GST_CERTIFICATE')?.documentUrl || null,
         gstFile: null,
         
         // Warehouse Details
@@ -325,11 +325,11 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         warehouseAddress: vendor.warehouseAddress || '',
         warehouseCity: vendor.warehouseCity || '',
         warehouseState: vendor.warehouseState || '',
-        warehouseZip: '', // warehouseZipCode not in interface
-        warehouseCountry: 'India', // warehouseCountry not in interface
-        factoryImages: [],
+        warehouseZip: vendor.warehouseZipCode || '',
+        warehouseCountry: vendor.warehouseCountry || 'India',
+        factoryImages: vendor.documents?.filter((doc: any) => doc.type === 'OTHER' && doc.name.includes('Factory')).map((doc: any) => doc.documentUrl) || [],
         routeMap: null,
-        mapLink: '',
+        mapLink: vendor.mapLink || '',
         
         // Owner Profile
         ownerName: vendor.ownerName || '',
