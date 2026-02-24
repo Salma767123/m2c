@@ -1,15 +1,16 @@
 import VendorOrderDetail from "@/components/VendorDashboard/Orders/OrderDetail";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function VendorOrderDetailPage({ params }: PageProps) {
+export default async function VendorOrderDetailPage({ params }: PageProps) {
+  const { id } = await params;
   return (
     <div className="p-6">
-      <VendorOrderDetail orderId={params.id} />
+      <VendorOrderDetail orderId={id} />
     </div>
   );
 }

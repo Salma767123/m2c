@@ -132,6 +132,7 @@ const gstSettingsRoutes = require('./routes/gstSettingsRoutes');
 const hubRoutes = require('./routes/hubRoutes');
 const enquiryRoutes = require('./routes/enquiryRoutes');
 const couponRoutes = require('./routes/couponRoutes');
+const supportRoutes = require('./routes/supportRoutes');
 
 
 // Routes
@@ -139,6 +140,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/vendor-settings', vendorSettingsRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/support', supportRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);

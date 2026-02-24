@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { showSuccessToast } from "@/lib/toast-utils";
+import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { orderService, Order } from "@/services/orderService";
 
 interface HubToCustomerDetailProps {
   orderId: string;
@@ -11,65 +12,61 @@ interface HubToCustomerDetailProps {
 
 export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProps) {
   const router = useRouter();
-  const [orderStatus, setOrderStatus] = useState("At Hub");
+  const [order, setOrder] = useState<Order | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock order data
-  const order = {
-    orderId: "ORD-2024-005",
-    orderDate: "2024-02-14",
-    receivedAtHubDate: "2024-02-15",
-    status: orderStatus,
-    hub: "Mumbai Hub",
-    product: {
-      name: "Linen Curtains",
-      sku: "LC-089",
-      quantity: 1,
-      price: 4000,
-      image: "/assets/images/categories/cs3.jpg",
-    },
-    payment: {
-      method: "Razorpay",
-      transactionId: "TXN-2024-005",
-      amount: 4000,
-      status: "Completed",
-    },
-    vendor: {
-      name: "Home Decor Textiles",
-      email: "vendor@homedecor.com",
-      phone: "+91 98765 11111",
-      address: "789, Textile Hub, Panipat, Haryana - 132103",
-      gst: "06AABCT5678F1Z9",
-      rating: 4,
-      review: "Product received in excellent condition. Packaging was secure and professional. Quality meets expectations.",
-      notice: "Slight delay in shipping but overall good service.",
-    },
-    customer: {
-      name: "David Brown",
-      email: "david.brown@example.com",
-      phone: "+91 98765 99999",
-      address: "456, Marine Drive, Mumbai, Maharashtra - 400002",
-    },
-    shipping: {
-      carrier: "Blue Dart",
-      trackingId: "BD987654321IN",
-      shippedDate: "2024-02-13",
-    },
+  useEffect(() => {
+    fetchOrderDetails();
+  }, [orderId]);
+
+  const fetchOrderDetails = async () => {
+    try {
+      setIsLoading(true);
+      const res = await orderService.getAdminOrderById(orderId);
+      if (res.success) {
+        setOrder(res.data);
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to load order details");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (newStatus: string) => {
+    try {
+      const res = await orderService.updateAdminOrderStatus(orderId, newStatus);
+      if (res.success) {
+        showSuccessToast(`Order marked as ${newStatus.replace(/_/g, " ")}`);
+        setOrder(res.data);
+        if (newStatus === "DELIVERED") {
+          setTimeout(() => {
+            router.push("/admin/dashboard/orders/hub-to-customer");
+          }, 1500);
+        }
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to update order status");
+    }
   };
 
   const handleMarkOutForDelivery = () => {
-    setOrderStatus("Out for Delivery");
-    showSuccessToast("Order marked as out for delivery");
+    handleUpdateStatus("SHIPPED_TO_CUSTOMER");
   };
 
   const handleMarkAsDelivered = () => {
-    setOrderStatus("Delivered");
-    showSuccessToast("Order marked as delivered to customer");
-    
-    // Redirect back to hub to customer list
-    setTimeout(() => {
-      router.push("/admin/dashboard/orders/hub-to-customer");
-    }, 1500);
+    handleUpdateStatus("DELIVERED");
   };
+
+  if (isLoading) {
+    return <div className="p-6 text-center text-gray-500">Loading order details...</div>;
+  }
+
+  if (!order) {
+    return <div className="p-6 text-center text-red-500">Order not found</div>;
+  }
+
+  const { status } = order;
 
   return (
     <div className="space-y-6">
@@ -88,7 +85,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           </div>
         </div>
         <div className="flex gap-3">
-          {order.status === "At Hub" && (
+          {["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB"].includes(status) && (
             <button
               onClick={handleMarkOutForDelivery}
               className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
@@ -96,7 +93,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
               Mark Out for Delivery
             </button>
           )}
-          {order.status === "Out for Delivery" && (
+          {status === "SHIPPED_TO_CUSTOMER" && (
             <button
               onClick={handleMarkAsDelivered}
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
@@ -104,7 +101,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
               Mark as Delivered
             </button>
           )}
-          {order.status === "Delivered" && (
+          {status === "DELIVERED" && (
             <div className="px-6 py-2 bg-green-100 text-green-800 rounded-lg font-medium border border-green-300">
               Order Delivered
             </div>
@@ -122,29 +119,22 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           <div>
             <p className="text-sm text-gray-600">Order Date</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              {new Date(order.orderDate).toLocaleDateString()}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Received at Hub</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
-              {new Date(order.receivedAtHubDate).toLocaleDateString()}
+              {new Date(order.createdAt).toLocaleDateString()}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Status</p>
-            <p className={`text-base font-medium mt-1 ${
-              order.status === "At Hub" ? "text-teal-600" :
-              order.status === "Out for Delivery" ? "text-orange-600" :
-              "text-green-600"
-            }`}>
-              {order.status}
+            <p className={`text-base font-medium mt-1 ${["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB"].includes(status) ? "text-teal-600" :
+                status === "SHIPPED_TO_CUSTOMER" ? "text-orange-600" :
+                  status === "DELIVERED" ? "text-green-600" : "text-gray-600"
+              }`}>
+              {status.replace(/_/g, " ")}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Total Amount</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              ₹{order.payment.amount.toLocaleString()}
+              ₹{order.totalAmount?.toLocaleString()}
             </p>
           </div>
         </div>
@@ -153,28 +143,35 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
       {/* Product Details */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h2>
-        <div className="flex gap-4">
-          <img
-            src={order.product.image}
-            alt={order.product.name}
-            className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-          />
-          <div className="flex-1">
-            <h3 className="text-base font-semibold text-gray-900">{order.product.name}</h3>
-            <p className="text-sm text-gray-600 mt-1">SKU: {order.product.sku}</p>
-            <div className="flex gap-6 mt-2">
-              <div>
-                <p className="text-sm text-gray-600">Quantity</p>
-                <p className="text-base font-medium text-gray-900">{order.product.quantity}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Price</p>
-                <p className="text-base font-medium text-gray-900">
-                  ₹{order.product.price.toLocaleString()}
-                </p>
+        <div className="space-y-4">
+          {order.items?.map((item: any) => (
+            <div key={item.id} className="flex gap-4 p-4 border border-gray-100 rounded-lg">
+              <img
+                src={item.productImage || "/assets/images/placeholder.jpg"}
+                alt={item.productName}
+                className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+              />
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-gray-900">{item.productName}</h3>
+                <p className="text-sm text-gray-600 mt-1">SKU: {item.sku}</p>
+                {item.variantId && (
+                  <p className="text-sm text-gray-600 mt-1">Size: {item.size} | Color: {item.color}</p>
+                )}
+                <div className="flex gap-6 mt-2">
+                  <div>
+                    <p className="text-sm text-gray-600">Quantity</p>
+                    <p className="text-base font-medium text-gray-900">{item.quantity}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Price</p>
+                    <p className="text-base font-medium text-gray-900">
+                      ₹{item.unitPrice.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -187,15 +184,15 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-gray-600">Payment Method</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.payment.method}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentMethod}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Transaction ID</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.payment.transactionId}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentId || "N/A"}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Payment Status</p>
-            <p className="text-base font-medium text-green-600 mt-1">{order.payment.status}</p>
+            <p className="text-base font-medium text-green-600 mt-1">{order.paymentStatus}</p>
           </div>
         </div>
       </div>
@@ -209,19 +206,23 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-600">Customer Name</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.customer.name}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.customerName}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Email</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.customer.email}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.customerEmail}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Phone</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.customer.phone}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.customerPhone || "N/A"}</p>
           </div>
-          <div>
+          <div className="md:col-span-2">
             <p className="text-sm text-gray-600">Delivery Address</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.customer.address}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">
+              {order.shippingAddress?.addressLine1} {order.shippingAddress?.addressLine2 && `, ${order.shippingAddress?.addressLine2}`}
+              <br />
+              {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.postalCode}
+            </p>
           </div>
         </div>
       </div>
@@ -234,96 +235,13 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
         </div>
         <div className="bg-teal-50 border border-teal-200 p-4 rounded-lg">
           <p className="text-sm text-teal-800">
-            Order is currently at <span className="font-semibold">{order.hub}</span>
+            Order processing from <span className="font-semibold">Admin Central Hub</span>
           </p>
         </div>
       </div>
 
-      {/* Vendor Shipping Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center gap-2 mb-4">
-          <Truck className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Vendor Shipping Details</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div>
-            <p className="text-sm text-gray-600">Carrier Service</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.shipping.carrier}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Tracking ID</p>
-            <p className="text-base font-medium text-gray-900 mt-1 font-mono">{order.shipping.trackingId}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Shipped Date</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
-              {new Date(order.shipping.shippedDate).toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-        <div className="border-t border-gray-200 pt-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Vendor: {order.vendor.name}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Email</p>
-              <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.email}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Phone</p>
-              <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.phone}</p>
-            </div>
-            <div className="md:col-span-2">
-              <p className="text-sm text-gray-600">Address</p>
-              <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.address}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Vendor Review */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center gap-2 mb-4">
-          <Star className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Admin Review of Vendor Delivery</h2>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <p className="text-sm text-gray-600 mb-2">Rating</p>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Star
-                  key={star}
-                  className={`h-5 w-5 ${
-                    star <= order.vendor.rating
-                      ? "fill-yellow-400 text-yellow-400"
-                      : "text-gray-300"
-                  }`}
-                />
-              ))}
-              <span className="ml-2 text-sm text-gray-600">
-                {order.vendor.rating} out of 5
-              </span>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 mb-2">Review</p>
-            <p className="text-base text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200">
-              {order.vendor.review}
-            </p>
-          </div>
-          {order.vendor.notice && (
-            <div>
-              <p className="text-sm text-gray-600 mb-2">Notice</p>
-              <p className="text-base text-gray-900 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                {order.vendor.notice}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Delivery Instructions */}
-      {order.status !== "Delivered" && (
+      {status !== "DELIVERED" && (
         <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg">
           <h3 className="text-sm font-semibold text-blue-900 mb-2">Delivery Instructions</h3>
           <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
@@ -337,7 +255,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
       )}
 
       {/* Delivery Completed Message */}
-      {order.status === "Delivered" && (
+      {status === "DELIVERED" && (
         <div className="bg-green-50 border border-green-200 p-6 rounded-lg">
           <h3 className="text-sm font-semibold text-green-900 mb-2">Order Delivered Successfully</h3>
           <p className="text-sm text-green-800">

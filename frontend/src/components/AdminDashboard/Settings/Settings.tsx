@@ -350,6 +350,7 @@ export default function Settings() {
         if (response.data) {
           setRazorpaySettings(prev => ({
             ...prev,
+            enabled: response.data.razorpayEnabled !== undefined ? response.data.razorpayEnabled : prev.enabled,
             keySecret: response.data.razorpayKeySecret || prev.keySecret,
             webhookSecret: response.data.razorpayWebhookSecret || prev.webhookSecret
           }));
@@ -387,6 +388,7 @@ export default function Settings() {
         if (response.data) {
           setPayuSettings(prev => ({
             ...prev,
+            enabled: response.data.payuEnabled !== undefined ? response.data.payuEnabled : prev.enabled,
             merchantSalt: response.data.payuMerchantSalt || prev.merchantSalt
           }));
 
@@ -421,8 +423,8 @@ export default function Settings() {
           <button
             onClick={() => setActiveTab("profile")}
             className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "profile"
-                ? "border-gray-900 text-gray-900"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+              ? "border-gray-900 text-gray-900"
+              : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
           >
             <User className="h-4 w-4 inline mr-2" />
@@ -433,8 +435,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("company")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "company"
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
                   }`}
               >
                 <Building2 className="h-4 w-4 inline mr-2" />
@@ -443,8 +445,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("payment")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "payment"
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
                   }`}
               >
                 <DollarSign className="h-4 w-4 inline mr-2" />
@@ -453,8 +455,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("gst")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "gst"
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
                   }`}
               >
                 <Percent className="h-4 w-4 inline mr-2" />
@@ -463,8 +465,8 @@ export default function Settings() {
               <button
                 onClick={() => setActiveTab("hub")}
                 className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "hub"
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
                   }`}
               >
                 <Warehouse className="h-4 w-4 inline mr-2" />
@@ -495,10 +497,10 @@ export default function Settings() {
                   <div className="mt-2">
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${currentUser.role === "super_admin"
-                          ? "bg-purple-100 text-purple-800"
-                          : currentUser.role === "admin"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-green-100 text-green-800"
+                        ? "bg-purple-100 text-purple-800"
+                        : currentUser.role === "admin"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-green-100 text-green-800"
                         }`}
                     >
                       <Shield className="h-3 w-3 mr-1" />
@@ -683,8 +685,8 @@ export default function Settings() {
                     <label
                       htmlFor="logo-upload"
                       className={`flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${currentUser.role !== "super_admin" || uploadingLogo || logoPreview
-                          ? "opacity-50 cursor-not-allowed pointer-events-none"
-                          : ""
+                        ? "opacity-50 cursor-not-allowed pointer-events-none"
+                        : ""
                         }`}
                     >
                       <Upload className="h-4 w-4" />
@@ -1099,8 +1101,8 @@ export default function Settings() {
                       <span className="text-sm text-gray-600">Status:</span>
                       <span
                         className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${razorpaySettings.enabled
-                            ? "bg-gray-900 text-white"
-                            : "bg-gray-200 text-gray-700"
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-200 text-gray-700"
                           }`}
                       >
                         {razorpaySettings.enabled ? "● Active" : "● Inactive"}
@@ -1271,8 +1273,8 @@ export default function Settings() {
                       <span className="text-sm text-gray-600">Status:</span>
                       <span
                         className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${payuSettings.enabled
-                            ? "bg-gray-900 text-white"
-                            : "bg-gray-200 text-gray-700"
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-200 text-gray-700"
                           }`}
                       >
                         {payuSettings.enabled ? "● Active" : "● Inactive"}

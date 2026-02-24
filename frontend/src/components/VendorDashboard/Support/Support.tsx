@@ -6,60 +6,34 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-
-interface SupportTicket {
-  id: string
-  subject: string
-  description: string
-  status: 'open' | 'in-progress' | 'resolved' | 'closed'
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  category: string
-  createdAt: string
-  updatedAt: string
-  responses: number
-}
+import supportService, { SupportTicket } from '@/services/supportService'
+import { useEffect } from 'react'
 
 export default function Support() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
 
-  // Mock data - replace with actual API call
-  const tickets: SupportTicket[] = [
-    {
-      id: '1',
-      subject: 'Payment not received for order #12345',
-      description: 'I completed an order but haven\'t received payment yet.',
-      status: 'open',
-      priority: 'high',
-      category: 'Payment',
-      createdAt: '2024-01-20',
-      updatedAt: '2024-01-20',
-      responses: 0
-    },
-    {
-      id: '2',
-      subject: 'Product listing not showing up',
-      description: 'My new product listing is not visible on the marketplace.',
-      status: 'in-progress',
-      priority: 'medium',
-      category: 'Technical',
-      createdAt: '2024-01-19',
-      updatedAt: '2024-01-20',
-      responses: 2
-    },
-    {
-      id: '3',
-      subject: 'How to update shipping rates?',
-      description: 'Need help updating my shipping rates for different regions.',
-      status: 'resolved',
-      priority: 'low',
-      category: 'General',
-      createdAt: '2024-01-18',
-      updatedAt: '2024-01-19',
-      responses: 3
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetchTickets()
+  }, [])
+
+  const fetchTickets = async () => {
+    try {
+      setIsLoading(true)
+      const res = await supportService.getMyTickets()
+      if (res.success) {
+        setTickets(res.data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch tickets:', error)
+    } finally {
+      setIsLoading(false)
     }
-  ]
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -93,10 +67,10 @@ export default function Support() {
 
   const filteredTickets = tickets.filter(ticket => {
     const matchesSearch = ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.description.toLowerCase().includes(searchTerm.toLowerCase())
+      ticket.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter
     const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter
-    
+
     return matchesSearch && matchesStatus && matchesPriority
   })
 
@@ -111,7 +85,7 @@ export default function Support() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Support Tickets</h1>
-        <Link 
+        <Link
           href="/vendor/dashboard/support/create"
           className="flex items-center px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors"
         >
@@ -133,7 +107,7 @@ export default function Support() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -145,7 +119,7 @@ export default function Support() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -157,7 +131,7 @@ export default function Support() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -187,7 +161,7 @@ export default function Support() {
                 />
               </div>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="w-full sm:w-48">
                 <Dropdown
@@ -203,7 +177,7 @@ export default function Support() {
                   placeholder="Filter by status"
                 />
               </div>
-              
+
               <div className="w-full sm:w-48">
                 <Dropdown
                   value={priorityFilter}
@@ -264,19 +238,19 @@ export default function Support() {
                     <span className="text-sm text-gray-900">{ticket.category}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-gray-900">{ticket.createdAt}</span>
+                    <span className="text-sm text-gray-900">{new Date(ticket.createdAt).toLocaleDateString()}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-gray-900">{ticket.updatedAt}</span>
+                    <span className="text-sm text-gray-900">{new Date(ticket.updatedAt).toLocaleDateString()}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-gray-900">{ticket.responses}</span>
+                    <span className="text-sm text-gray-900">{ticket.messages?.length || 0}</span>
                   </TableCell>
                   <TableCell>
-                    <button className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium">
+                    <Link href={`/vendor/dashboard/support/${ticket.id}`} className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium">
                       <Eye className="w-4 h-4 mr-1" />
                       View
-                    </button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))

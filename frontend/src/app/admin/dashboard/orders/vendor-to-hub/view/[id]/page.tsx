@@ -1,15 +1,16 @@
 import VendorToHubDetail from "@/components/AdminDashboard/Orders/VendorToHubDetail";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function VendorToHubDetailPage({ params }: PageProps) {
+export default async function VendorToHubDetailPage({ params }: PageProps) {
+  const { id } = await params;
   return (
     <div className="p-6">
-      <VendorToHubDetail orderId={params.id} />
+      <VendorToHubDetail orderId={id} />
     </div>
   );
 }

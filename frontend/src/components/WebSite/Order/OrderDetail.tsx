@@ -83,10 +83,10 @@ const formatStatus = (status: string) => {
 // Helper to get normalized status for comparison
 const getNormalizedStatus = (status: string) => {
   const s = status.toLowerCase()
-  if (['order_created', 'confirmed', 'pending'].includes(s)) return 'processing'
-  if (['dispatched'].includes(s)) return 'shipped'
-  if (['completed'].includes(s)) return 'delivered'
-  if (['failed'].includes(s)) return 'cancelled'
+  if (['order_created', 'confirmed', 'pending', 'processing'].includes(s)) return 'processing'
+  if (['dispatched', 'shipped'].includes(s)) return 'shipped'
+  if (['completed', 'delivered', 'received'].includes(s)) return 'received'
+  if (['failed', 'cancelled'].includes(s)) return 'cancelled'
   return s
 }
 
@@ -94,7 +94,7 @@ const getNormalizedStatus = (status: string) => {
 const getStatusColorClass = (status: string) => {
   const normalized = getNormalizedStatus(status)
   switch (normalized) {
-    case 'delivered': return 'bg-green-100 text-green-800'
+    case 'received': return 'bg-green-100 text-green-800'
     case 'shipped': return 'bg-blue-100 text-blue-800'
     case 'processing': return 'bg-yellow-100 text-yellow-800'
     case 'cancelled': return 'bg-red-100 text-red-800'
@@ -104,11 +104,16 @@ const getStatusColorClass = (status: string) => {
 
 // Helper to check status timeline steps
 const isStatusReached = (orderStatus: string, step: string) => {
-  const statusOrder = ['processing', 'shipped', 'delivered']
+  const statusOrder = ['processing', 'shipped', 'received']
   const normalized = getNormalizedStatus(orderStatus)
+
+  // If cancelled, don't show any progress
+  if (normalized === 'cancelled') return false;
+
   const currentIndex = statusOrder.indexOf(normalized)
   const stepIndex = statusOrder.indexOf(step)
-  return currentIndex >= stepIndex
+  // If the status is unknown (like some admin status not mapped), fallback to current step = -1
+  return currentIndex !== -1 && currentIndex >= stepIndex
 }
 
 const isStatusCurrent = (orderStatus: string, step: string) => {
@@ -247,54 +252,53 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 <CardTitle className="text-xl">Order Status</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mb-2">
-                      <CheckCircle className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="text-sm font-medium text-green-600">Confirmed</span>
-                    <span className="text-xs text-slate-500">{new Date(orderDetails.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                {normalizedStatus === 'cancelled' ? (
+                  <div className="flex flex-col items-center justify-center p-4">
+                    <AlertCircle className="w-12 h-12 text-red-500 mb-2" />
+                    <span className="text-lg font-medium text-red-600">Order Cancelled</span>
+                    <span className="text-sm text-slate-500">{new Date(orderDetails.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'processing') ? "bg-yellow-300" : "bg-slate-300"
-                    }`}></div>
-                  <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'processing') ? "bg-yellow-500" : "bg-slate-300"
-                      }`}>
-                      <Package className="w-5 h-5 text-white" />
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'processing') ? "bg-yellow-500" : "bg-slate-300"
+                        }`}>
+                        <Package className="w-5 h-5 text-white" />
+                      </div>
+                      <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'processing') ? "text-yellow-600" : "text-slate-500"
+                        }`}>Processing</span>
+                      <span className="text-xs text-slate-500">
+                        {isStatusCurrent(orderDetails.status, 'processing') ? "Current" : isStatusReached(orderDetails.status, 'shipped') ? "Complete" : "Pending"}
+                      </span>
                     </div>
-                    <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'processing') ? "text-yellow-600" : "text-slate-500"
-                      }`}>Processing</span>
-                    <span className="text-xs text-slate-500">
-                      {isStatusCurrent(orderDetails.status, 'processing') ? "Current" : isStatusReached(orderDetails.status, 'shipped') ? "Complete" : "Pending"}
-                    </span>
-                  </div>
-                  <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-300" : "bg-slate-300"
-                    }`}></div>
-                  <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-500" : "bg-slate-300"
-                      }`}>
-                      <Truck className="w-5 h-5 text-white" />
+                    <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-300" : "bg-slate-300"
+                      }`}></div>
+                    <div className="flex flex-col items-center">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-500" : "bg-slate-300"
+                        }`}>
+                        <Truck className="w-5 h-5 text-white" />
+                      </div>
+                      <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'shipped') ? "text-blue-600" : "text-slate-500"
+                        }`}>Shipped</span>
+                      <span className="text-xs text-slate-500">
+                        {isStatusCurrent(orderDetails.status, 'shipped') ? "Current" : isStatusReached(orderDetails.status, 'received') ? "Complete" : "Pending"}
+                      </span>
                     </div>
-                    <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'shipped') ? "text-blue-600" : "text-slate-500"
-                      }`}>Shipped</span>
-                    <span className="text-xs text-slate-500">
-                      {isStatusCurrent(orderDetails.status, 'shipped') ? "Current" : isStatusReached(orderDetails.status, 'delivered') ? "Complete" : "Pending"}
-                    </span>
-                  </div>
-                  <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'delivered') ? "bg-green-300" : "bg-slate-300"
-                    }`}></div>
-                  <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'delivered') ? "bg-green-500" : "bg-slate-300"
-                      }`}>
-                      <CheckCircle className="w-5 h-5 text-white" />
+                    <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'received') ? "bg-green-300" : "bg-slate-300"
+                      }`}></div>
+                    <div className="flex flex-col items-center">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'received') ? "bg-green-500" : "bg-slate-300"
+                        }`}>
+                        <CheckCircle className="w-5 h-5 text-white" />
+                      </div>
+                      <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'received') ? "text-green-600" : "text-slate-500"
+                        }`}>Received</span>
+                      <span className="text-xs text-slate-500">
+                        {isStatusCurrent(orderDetails.status, 'received') ? "Complete" : "Pending"}
+                      </span>
                     </div>
-                    <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'delivered') ? "text-green-600" : "text-slate-500"
-                      }`}>Delivered</span>
-                    <span className="text-xs text-slate-500">
-                      {isStatusCurrent(orderDetails.status, 'delivered') ? "Complete" : "Pending"}
-                    </span>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -340,7 +344,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 {/* Action Buttons */}
                 <div className="mt-6 pt-6 border-t border-slate-200">
                   <div className="flex flex-wrap gap-3">
-                    {normalizedStatus !== "delivered" && normalizedStatus !== "cancelled" && (
+                    {normalizedStatus !== "received" && normalizedStatus !== "cancelled" && (
                       <button className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">
                         <Eye className="w-4 h-4" />
                         Track Order
@@ -354,7 +358,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       <MessageCircle className="w-4 h-4" />
                       Contact Support
                     </button>
-                    {normalizedStatus === "delivered" && (
+                    {normalizedStatus === "received" && (
                       <Link href="/checkout">
                         <button className="flex items-center gap-2 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors">
                           <Package className="w-4 h-4" />
@@ -415,10 +419,10 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                   <Calendar className="w-5 h-5 text-blue-600" />
                   <div>
                     <p className="font-medium text-slate-900">
-                      {normalizedStatus === "delivered" ? "Delivered" : "Estimated Delivery"}
+                      {normalizedStatus === "received" ? "Delivered" : "Estimated Delivery"}
                     </p>
                     <p className="text-sm text-slate-600">
-                      {normalizedStatus === "delivered"
+                      {normalizedStatus === "received"
                         ? `Delivered on ${new Date(orderDetails.createdAt).toLocaleDateString()}`
                         : orderDetails.estimatedDelivery
                           ? new Date(orderDetails.estimatedDelivery).toLocaleDateString()
@@ -495,8 +499,8 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                             <Star
                               key={i}
                               className={`w-4 h-4 ${i < Math.floor(product.rating)
-                                  ? "text-yellow-400 fill-current"
-                                  : "text-slate-300"
+                                ? "text-yellow-400 fill-current"
+                                : "text-slate-300"
                                 }`}
                             />
                           ))}

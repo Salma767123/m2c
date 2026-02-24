@@ -70,10 +70,10 @@ export default function OrderList() {
           date: apiOrder.createdAt,
           status: ((s: string) => {
             const normalized = s.toLowerCase();
-            if (['order_created', 'confirmed', 'pending'].includes(normalized)) return 'processing';
-            if (['dispatched'].includes(normalized)) return 'shipped';
-            if (['completed'].includes(normalized)) return 'delivered';
-            if (['failed'].includes(normalized)) return 'cancelled';
+            if (['order_created', 'confirmed', 'pending', 'processing'].includes(normalized)) return 'processing';
+            if (['dispatched', 'shipped'].includes(normalized)) return 'shipped';
+            if (['completed', 'delivered', 'received'].includes(normalized)) return 'received';
+            if (['failed', 'cancelled'].includes(normalized)) return 'cancelled';
             return normalized;
           })(apiOrder.status),
           total: apiOrder.totalAmount,
@@ -115,7 +115,7 @@ export default function OrderList() {
 
   const getStatusIcon = (status: string) => {
     const normalized = status.toLowerCase()
-    if (normalized === 'delivered' || normalized === 'completed') return <CheckCircle className="w-5 h-5 text-green-600" />
+    if (normalized === 'received' || normalized === 'delivered' || normalized === 'completed') return <CheckCircle className="w-5 h-5 text-green-600" />
     if (normalized === 'shipped' || normalized === 'dispatched') return <Truck className="w-5 h-5 text-blue-600" />
     if (normalized === 'processing' || normalized.includes('created') || normalized === 'confirmed') return <Clock className="w-5 h-5 text-yellow-600" />
     if (normalized === 'cancelled' || normalized === 'failed') return <Package className="w-5 h-5 text-red-600" />
@@ -124,7 +124,7 @@ export default function OrderList() {
 
   const getStatusColor = (status: string) => {
     const normalized = status.toLowerCase()
-    if (normalized === 'delivered' || normalized === 'completed') return 'bg-green-100 text-green-800 border-green-200'
+    if (normalized === 'received' || normalized === 'delivered' || normalized === 'completed') return 'bg-green-100 text-green-800 border-green-200'
     if (normalized === 'shipped' || normalized === 'dispatched') return 'bg-blue-100 text-blue-800 border-blue-200'
     if (normalized === 'processing' || normalized.includes('created') || normalized === 'confirmed') return 'bg-yellow-100 text-yellow-800 border-yellow-200'
     if (normalized === 'cancelled' || normalized === 'failed') return 'bg-red-100 text-red-800 border-red-200'
@@ -146,11 +146,11 @@ export default function OrderList() {
 
   // Categorize orders based on status logic
   const currentOrders = filteredOrders.filter(order =>
-    !['delivered', 'completed', 'cancelled', 'failed'].includes(order.status.toLowerCase())
+    !['received', 'delivered', 'completed', 'cancelled', 'failed'].includes(order.status.toLowerCase())
   )
 
   const pastOrders = filteredOrders.filter(order =>
-    ['delivered', 'completed', 'cancelled', 'failed'].includes(order.status.toLowerCase())
+    ['received', 'delivered', 'completed', 'cancelled', 'failed'].includes(order.status.toLowerCase())
   )
 
   if (loading) {
@@ -228,7 +228,7 @@ export default function OrderList() {
                           { value: "all", label: "All Orders" },
                           { value: "processing", label: "Processing" },
                           { value: "shipped", label: "Shipped" },
-                          { value: "delivered", label: "Delivered" },
+                          { value: "received", label: "Received" },
                           { value: "cancelled", label: "Cancelled" }
                         ]}
                         onChange={(value) => setStatusFilter(value as string)}
@@ -347,7 +347,7 @@ export default function OrderList() {
                         </div>
 
                         {/* Estimated Delivery */}
-                        {order.estimatedDelivery && order.status !== 'delivered' && (
+                        {order.estimatedDelivery && order.status !== 'received' && order.status !== 'cancelled' && (
                           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                             <p className="text-sm text-blue-800">
                               <Clock className="w-4 h-4 inline mr-2" />
@@ -456,7 +456,7 @@ export default function OrderList() {
                               View Details
                             </button>
                           </Link>
-                          {order.status === 'delivered' && (
+                          {order.status === 'received' && (
                             <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
                               <Star className="w-4 h-4" />
                               Write Review
@@ -472,7 +472,7 @@ export default function OrderList() {
                             <Download className="w-4 h-4" />
                             Download Invoice / Packing List
                           </button>
-                          {order.status === "delivered" && (
+                          {order.status === "received" && (
                             <button className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
                               <Package className="w-4 h-4" />
                               Reorder

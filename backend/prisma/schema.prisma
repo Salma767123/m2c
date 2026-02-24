@@ -987,3 +987,50 @@ model VendorEnquiry {
 
   @@map("vendor_enquiries")
 }
+
+// ============================================
+// SUPPORT SYSTEM
+// ============================================
+
+model SupportTicket {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId    String   @unique
+  subject     String
+  category    String
+  priority    String   @default("medium") // low, medium, high, urgent
+  description String
+  status      String   @default("open")   // open, in_progress, resolved, closed
+  
+  attachments String[] @default([])
+  
+  creatorId   String   @db.ObjectId
+  creatorType String   // "admin", "vendor", "user"
+  creatorName String?
+  creatorEmail String?
+  
+  messages    TicketMessage[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId    String   @db.ObjectId
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  message     String
+  attachments String[] @default([])
+  
+  senderId    String   @db.ObjectId
+  senderType  String   // "admin", "vendor", "user"
+  senderName  String
+  
+  isRead      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+
+  @@map("ticket_messages")
+}
