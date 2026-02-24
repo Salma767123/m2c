@@ -92,6 +92,16 @@ const getWishlist = async (req, res) => {
   try {
     const userId = req.userId;
 
+    if (!userId) {
+      return res.json({
+        success: true,
+        data: {
+          items: [],
+          count: 0
+        }
+      });
+    }
+
     const wishlist = await prisma.wishlist.findUnique({
       where: { userId },
       include: {

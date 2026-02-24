@@ -6,18 +6,18 @@ const {
   checkInWishlist,
   clearWishlist
 } = require('../controllers/wishlistController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// All wishlist routes require authentication
-router.use(authenticateToken);
+// Optional auth for GET wishlist (so unauthenticated header doesn't 401)
+router.use(optionalAuth);
 
 // Wishlist routes
-router.post('/add', addToWishlist);
+router.post('/add', authenticateToken, addToWishlist);
 router.get('/', getWishlist);
 router.get('/check/:productId', checkInWishlist);
-router.delete('/:productId', removeFromWishlist);
-router.delete('/clear/all', clearWishlist);
+router.delete('/:productId', authenticateToken, removeFromWishlist);
+router.delete('/clear/all', authenticateToken, clearWishlist);
 
 module.exports = router;

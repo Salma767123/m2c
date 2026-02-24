@@ -26,6 +26,7 @@ import {
 import { products } from "@/components/mockData/products"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/UI/Card"
 import orderService, { Order as APIOrder } from "@/services/orderService"
+import ReviewModal from "./ReviewModal"
 
 interface OrderDetailProps {
   orderId: string
@@ -125,6 +126,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   const [orderDetails, setOrderDetails] = useState<APIOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
 
   useEffect(() => {
     fetchOrder()
@@ -359,12 +361,13 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       Contact Support
                     </button>
                     {normalizedStatus === "received" && (
-                      <Link href="/checkout">
-                        <button className="flex items-center gap-2 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors">
-                          <Package className="w-4 h-4" />
-                          Reorder Items
-                        </button>
-                      </Link>
+                      <button
+                        onClick={() => setReviewModalState({ isOpen: true, orderId: orderDetails.id, items: orderDetails.items })}
+                        className="flex items-center gap-2 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors"
+                      >
+                        <Star className="w-4 h-4" />
+                        Write Review
+                      </button>
                     )}
                   </div>
                 </div>
@@ -535,6 +538,12 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
           </Card>
         </div>
       </div>
+      <ReviewModal
+        isOpen={reviewModalState.isOpen}
+        onClose={() => setReviewModalState({ ...reviewModalState, isOpen: false })}
+        orderId={reviewModalState.orderId}
+        items={reviewModalState.items}
+      />
     </div>
   )
 }

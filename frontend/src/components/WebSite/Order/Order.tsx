@@ -20,10 +20,12 @@ import {
 import { products } from "@/components/mockData/products"
 import Dropdown from "@/components/UI/Dropdown"
 import orderService, { Order as APIOrder } from "@/services/orderService"
+import ReviewModal from "./ReviewModal"
 
 // Interface definitions
 interface OrderItem {
   id: string
+  productId: string
   name: string
   image: string
   quantity: number
@@ -48,6 +50,7 @@ export default function OrderList() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
+  const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
 
   // New state for fetching data
   const [orders, setOrders] = useState<Order[]>([])
@@ -80,6 +83,7 @@ export default function OrderList() {
           paymentStatus: apiOrder.paymentStatus,
           items: apiOrder.items.map((item: any) => ({
             id: item.id,
+            productId: item.productId,
             name: item.productName,
             image: item.productImage || "", // Handle missing image
             quantity: item.quantity,
@@ -457,7 +461,10 @@ export default function OrderList() {
                             </button>
                           </Link>
                           {order.status === 'received' && (
-                            <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+                            <button
+                              onClick={() => setReviewModalState({ isOpen: true, orderId: order.id, items: order.items })}
+                              className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                            >
                               <Star className="w-4 h-4" />
                               Write Review
                             </button>
@@ -472,12 +479,6 @@ export default function OrderList() {
                             <Download className="w-4 h-4" />
                             Download Invoice / Packing List
                           </button>
-                          {order.status === "received" && (
-                            <button className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
-                              <Package className="w-4 h-4" />
-                              Reorder
-                            </button>
-                          )}
                         </div>
                       </div>
                     ))}
@@ -634,6 +635,12 @@ export default function OrderList() {
           </div>
         </div>
       </div>
+      <ReviewModal
+        isOpen={reviewModalState.isOpen}
+        onClose={() => setReviewModalState({ ...reviewModalState, isOpen: false })}
+        orderId={reviewModalState.orderId}
+        items={reviewModalState.items}
+      />
     </div>
   )
 }

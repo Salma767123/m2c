@@ -9,6 +9,7 @@ import { userAuthService } from '@/services/userAuthService';
 import { Star, Heart, Truck, Shield, RotateCcw, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { wishlistService } from '@/services/wishlistService';
 import Image from 'next/image';
 
 interface ProductDetailProps {
@@ -165,21 +166,34 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
     }
   };
 
-  const handleWishlistToggle = () => {
+  const handleWishlistToggle = async () => {
     if (!product) return;
 
-    try {
-      setIsWishlisted(!isWishlisted);
+    const isAuthenticated = userAuthService.isAuthenticated();
 
-      if (!isWishlisted) {
-        showSuccessToast(
-          'Added to Wishlist!',
-          `${product.name} has been saved to your wishlist.`
-        );
-      } else {
+    if (!isAuthenticated) {
+      showErrorToast('Login Required', 'Please login to add items to your wishlist');
+      // Redirect to login page after a short delay
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 1500);
+      return;
+    }
+
+    try {
+      if (isWishlisted) {
+        await wishlistService.removeFromWishlist(product.id);
+        setIsWishlisted(false);
         showSuccessToast(
           'Removed from Wishlist',
           `${product.name} has been removed from your wishlist.`
+        );
+      } else {
+        await wishlistService.addToWishlist(product.id);
+        setIsWishlisted(true);
+        showSuccessToast(
+          'Added to Wishlist!',
+          `${product.name} has been saved to your wishlist.`
         );
       }
     } catch (error) {

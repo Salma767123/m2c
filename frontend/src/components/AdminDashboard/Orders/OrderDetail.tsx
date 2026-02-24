@@ -61,8 +61,8 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 </div>
                 <div className="flex gap-3">
                     <span className={`px-4 py-2 rounded-lg font-medium border ${status === "DELIVERED" ? "bg-green-100 text-green-800 border-green-300" :
-                            ["SHIPPED_TO_CUSTOMER", "IN_TRANSIT_TO_ADMIN_HUB"].includes(status) ? "bg-blue-100 text-blue-800 border-blue-300" :
-                                "bg-yellow-100 text-yellow-800 border-yellow-300"
+                        ["SHIPPED_TO_CUSTOMER", "IN_TRANSIT_TO_ADMIN_HUB"].includes(status) ? "bg-blue-100 text-blue-800 border-blue-300" :
+                            "bg-yellow-100 text-yellow-800 border-yellow-300"
                         }`}>
                         Status: {status.replace(/_/g, " ")}
                     </span>
@@ -150,7 +150,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                             </div>
                             <div className="relative pl-8">
                                 <div className={`absolute left-0 top-1.5 w-5 h-5 rounded-full border-4 border-white ${status === "DELIVERED" ? "bg-green-500" :
-                                        status === "SHIPPED_TO_CUSTOMER" ? "bg-blue-500" : "bg-gray-200"
+                                    status === "SHIPPED_TO_CUSTOMER" ? "bg-blue-500" : "bg-gray-200"
                                     }`}></div>
                                 <div>
                                     <p className="text-sm font-semibold text-gray-900">Out for Final Delivery</p>

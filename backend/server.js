@@ -133,7 +133,7 @@ const hubRoutes = require('./routes/hubRoutes');
 const enquiryRoutes = require('./routes/enquiryRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const supportRoutes = require('./routes/supportRoutes');
-
+const reviewRoutes = require('./routes/reviewRoutes');
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -154,6 +154,7 @@ app.use('/api/gst-settings', gstSettingsRoutes);
 app.use('/api/hubs', hubRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // 404 handler
 app.use((req, res) => {

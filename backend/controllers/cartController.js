@@ -122,6 +122,17 @@ const getCart = async (req, res) => {
   try {
     const userId = req.userId;
 
+    if (!userId) {
+      return res.json({
+        success: true,
+        data: {
+          items: [],
+          total: 0,
+          itemCount: 0
+        }
+      });
+    }
+
     const cart = await prisma.cart.findFirst({
       where: { userId },
       include: {

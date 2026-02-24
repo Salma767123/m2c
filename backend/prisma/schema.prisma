@@ -102,6 +102,7 @@ model User {
   
   // Multiple addresses support
   addresses     Address[]
+  reviews       Review[]
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -602,6 +603,7 @@ model Product {
   
   // Images
   images                ProductImage[]
+  reviewsList           Review[] @relation("ProductReviews")
   
   // Stock Management
   totalStock            Int       @default(0)
@@ -723,6 +725,7 @@ model Order {
   
   // Status History
   statusHistory         OrderStatusHistory[]
+  reviews               Review[]
   
   // Timestamps
   orderDate             DateTime  @default(now())
@@ -1033,4 +1036,28 @@ model TicketMessage {
   createdAt   DateTime @default(now())
 
   @@map("ticket_messages")
+}
+
+// ============================================
+// REVIEWS
+// ============================================
+
+model Review {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId   String   @db.ObjectId
+  product     Product  @relation("ProductReviews", fields: [productId], references: [id], onDelete: Cascade)
+  orderId     String   @db.ObjectId
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rating      Int      @default(5)
+  comment     String?
+  images      String[] @default([])
+  isApproved  Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, productId, orderId])
+  @@map("reviews")
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
+import adminReviewService from "@/services/adminReviewService";
 
 interface VendorToHubDetailProps {
   orderId: string;
@@ -101,14 +102,27 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       return;
     }
 
-    // Ideally here we would also hit a review endpoint 
-    await handleUpdateStatus("APPROVED_BY_ADMIN_HUB");
-    setShowReviewModal(false);
+    try {
+      // Save the admin review to the database
+      await adminReviewService.createOrUpdateAdminReview(order!.id, {
+        rating,
+        reviewComments: review.trim(),
+        qualityCheckNotes: notice.trim() || undefined,
+        approved: true,
+      });
 
-    // Redirect to Hub to Customer orders after a short delay
-    setTimeout(() => {
-      router.push("/admin/dashboard/orders/hub-to-customer");
-    }, 1500);
+      // Update order status
+      await handleUpdateStatus("APPROVED_BY_ADMIN_HUB");
+      setShowReviewModal(false);
+      showSuccessToast("Review submitted successfully");
+
+      // Redirect to Hub to Customer orders after a short delay
+      setTimeout(() => {
+        router.push("/admin/dashboard/orders/hub-to-customer");
+      }, 1500);
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to submit review");
+    }
   };
 
   if (isLoading) {

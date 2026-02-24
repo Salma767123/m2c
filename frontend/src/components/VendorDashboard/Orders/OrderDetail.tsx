@@ -161,9 +161,9 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           <div>
             <p className="text-sm text-gray-600">Status</p>
             <p className={`text-base font-medium mt-1 ${status === "VENDOR_PROCESSING" ? "text-blue-600" :
-                status === "PACKED_BY_VENDOR" ? "text-purple-600" :
-                  status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
-                    "text-green-600"
+              status === "PACKED_BY_VENDOR" ? "text-purple-600" :
+                status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
+                  "text-green-600"
               }`}>
               {status.replace(/_/g, " ")}
             </p>

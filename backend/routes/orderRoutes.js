@@ -3,6 +3,7 @@ const router = express.Router();
 const orderController = require('../controllers/orderController');
 const adminOrderController = require('../controllers/adminOrderController');
 const vendorOrderController = require('../controllers/vendorOrderController');
+const adminReviewController = require('../controllers/adminReviewController');
 const { authenticateToken, requireAdminRole, requireVendorRole } = require('../middleware/auth');
 
 // Apply base auth middleware to all routes
@@ -14,6 +15,14 @@ router.use(authenticateToken);
 router.get('/admin', requireAdminRole, adminOrderController.getAllOrdersAdmin);
 router.get('/admin/:id', requireAdminRole, adminOrderController.getAdminOrderById);
 router.put('/admin/:id/status', requireAdminRole, adminOrderController.updateAdminOrderStatus);
+
+// ============================================
+// ADMIN REVIEW ROUTES (/api/orders/admin-reviews/*)
+// ============================================
+router.get('/admin-reviews', requireAdminRole, adminReviewController.getAllAdminReviews);
+router.get('/admin-reviews/order/:orderId', requireAdminRole, adminReviewController.getAdminReviewByOrder);
+router.post('/admin-reviews/order/:orderId', requireAdminRole, adminReviewController.createOrUpdateAdminReview);
+router.delete('/admin-reviews/:id', requireAdminRole, adminReviewController.deleteAdminReview);
 
 // ============================================
 // VENDOR ROUTES (/api/orders/vendor/*)
