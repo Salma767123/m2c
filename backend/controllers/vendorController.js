@@ -2,11 +2,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const { prisma } = require('../config/database');
-const { 
-  sendVendorApprovalEmail, 
-  sendVendorRejectionEmail, 
+const {
+  sendVendorApprovalEmail,
+  sendVendorRejectionEmail,
   sendVendorSuspensionEmail,
-  generateSecurePassword 
+  generateSecurePassword
 } = require('../utils/email/vendorEmailSender');
 
 // Helper function to map business type to enum
@@ -27,7 +27,7 @@ const getVendorTypeEnum = (vendorType) => {
     'importer': 'TRADING_COMPANY',
     'exporter': 'TRADING_COMPANY'
   };
-  
+
   if (Array.isArray(vendorType)) {
     return mapping[vendorType[0]] || 'TEXTILE_MANUFACTURER';
   }
@@ -74,7 +74,7 @@ const registerVendor = async (req, res) => {
       state,
       zipCode,
       country,
-      
+
       // Owner Profile
       ownerName,
       ownerEmail,
@@ -86,7 +86,7 @@ const registerVendor = async (req, res) => {
       ownerCountry,
       yearEstablished,
       employeeCount,
-      
+
       // Warehouse Details
       ownershipType,
       warehouseAddress,
@@ -95,17 +95,17 @@ const registerVendor = async (req, res) => {
       warehouseZip,
       warehouseCountry,
       mapLink,
-      
+
       // Vendor Type & Products
       vendorType,
       marketType,
       selectedCategories,
       categoryRemarks,
-      
+
       // Manufacturing Facilities (if manufacturer)
       enabledFacilities,
       facilityDetails,
-      
+
       // Certifications & Logistics
       selectedCertifications,
       certificationExpiryDates,
@@ -115,7 +115,7 @@ const registerVendor = async (req, res) => {
       warehousingCapacity,
       logisticsPartners,
       shippingMethods,
-      
+
       // Contact & Trade Info
       mainContact,
       alternateContacts,
@@ -126,15 +126,15 @@ const registerVendor = async (req, res) => {
       businessRegistrationNumber,
       taxIdentificationNumber,
       bankingDetails,
-      
+
       // Password for vendor login
       password
     } = req.body;
 
     // Validate required fields
     if (!companyName || !email || !phone || !ownerName || !ownerEmail || !ownerPhone) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: companyName, email, phone, ownerName, ownerEmail, ownerPhone' 
+      return res.status(400).json({
+        error: 'Missing required fields: companyName, email, phone, ownerName, ownerEmail, ownerPhone'
       });
     }
 
@@ -144,8 +144,8 @@ const registerVendor = async (req, res) => {
     });
 
     if (existingVendor) {
-      return res.status(400).json({ 
-        error: 'Vendor already exists with this email' 
+      return res.status(400).json({
+        error: 'Vendor already exists with this email'
       });
     }
 
@@ -200,8 +200,8 @@ const registerVendor = async (req, res) => {
       }
     } catch (uploadError) {
       console.error('File upload error:', uploadError);
-      return res.status(500).json({ 
-        error: 'Failed to upload files: ' + uploadError.message 
+      return res.status(500).json({
+        error: 'Failed to upload files: ' + uploadError.message
       });
     }
 
@@ -226,7 +226,7 @@ const registerVendor = async (req, res) => {
         email,
         password: hashedPassword,
         status: 'PENDING',
-        
+
         // Owner Profile
         ownerName,
         ownerEmail,
@@ -237,14 +237,14 @@ const registerVendor = async (req, res) => {
         ownerZipCode: ownerZipCode || zipCode,
         ownerCountry: ownerCountry || country || 'India',
         ownerPhoto: ownerPhotoUrl,
-        
+
         // Company Details
         companyName,
         companyType: getCompanyTypeEnum(businessType),
         establishedYear: yearEstablished ? parseInt(yearEstablished) : null,
         companyDescription: `${companyName} - ${businessType} established in ${yearEstablished}`,
         companyLogo: logoUrl,
-        
+
         // Contact & Trade Information
         businessPhone: phone,
         businessEmail: email,
@@ -255,13 +255,13 @@ const registerVendor = async (req, res) => {
         businessCountry: country || 'India',
         website,
         gstNumber: gstNumber || null,
-        
+
         // Trade Information
         annualTurnover: employeeCount, // Using employee count as proxy for now
         exportExperience: hasImportExport === 'yes',
         exportCountries: parsedExportCountries || [],
         primaryMarkets: Array.isArray(parsedMarketType) ? parsedMarketType : (parsedMarketType ? [parsedMarketType] : []),
-        
+
         // Manufacturing Facilities
         factoryAddress: warehouseAddress,
         factoryCity: warehouseCity,
@@ -271,7 +271,7 @@ const registerVendor = async (req, res) => {
         factorySize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
         productionCapacity: Object.values(parsedFacilityDetails || {}).map(f => f.capacity).filter(Boolean).join(', '),
         qualityControl: qualityControlProcess,
-        
+
         // Warehouse Details
         warehouseAddress,
         warehouseCity,
@@ -281,27 +281,27 @@ const registerVendor = async (req, res) => {
         warehouseSize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
         storageCapacity: warehousingCapacity,
         mapLink: mapLink || null,
-        
+
         // Vendor Type & Products
         vendorType: getVendorTypeEnum(parsedVendorType),
         productCategories: Object.keys(parsedSelectedCategories || {}),
         productTypes: Object.values(parsedSelectedCategories || {}).flat(),
         specializations: parsedSelectedCertifications || [],
         categoryRemarks: categoryRemarks || null,
-        
+
         // Logistics Information
         shippingMethods: parsedShippingMethods || [],
         deliveryTime: '7-15 days', // Default
         minimumOrderQuantity: '100 pieces', // Default
         paymentTerms: ['30 days', 'LC'], // Default
-        
+
         // Contact & Trade Information
         mainContact: parsedMainContact || null,
         alternateContacts: parsedAlternateContacts || [],
         tradeLicenseNumber: tradeLicenseNumber || null,
         businessRegistrationNumber: businessRegistrationNumber || null,
         taxIdentificationNumber: taxIdentificationNumber || null,
-        
+
         // System fields
         applicationStep: 8, // Completed all steps
         completedSteps: [1, 2, 3, 4, 5, 6, 7, 8],
@@ -326,7 +326,7 @@ const registerVendor = async (req, res) => {
 
     // Create documents
     const documents = [];
-    
+
     if (gstDocumentUrl) {
       documents.push({
         vendorId: vendor.id,
@@ -405,7 +405,7 @@ const registerVendor = async (req, res) => {
 
   } catch (error) {
     console.error('Vendor registration error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error during vendor registration',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -488,7 +488,7 @@ const getAllVendors = async (req, res) => {
     const { status, page = 1, limit = 10, search } = req.query;
 
     const where = {};
-    
+
     if (status) {
       where.status = status.toUpperCase();
     }
@@ -506,6 +506,7 @@ const getAllVendors = async (req, res) => {
       include: {
         certifications: true,
         documents: true,
+        assignedQc: true,
         _count: {
           select: {
             certifications: true,
@@ -520,11 +521,38 @@ const getAllVendors = async (req, res) => {
 
     const total = await prisma.vendor.count({ where });
 
-    res.json({
-      vendors: vendors.map(vendor => ({
+    // Fetch category names for the IDs in productCategories and productTypes
+    const allCategoryIds = [...new Set([
+      ...vendors.flatMap(v => v.productCategories || []),
+      ...vendors.flatMap(v => v.productTypes || [])
+    ])].filter(id => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id));
+
+    let categoryMap = {};
+    if (allCategoryIds.length > 0) {
+      const categories = await prisma.category.findMany({
+        where: { id: { in: allCategoryIds } },
+        select: { id: true, name: true }
+      });
+      categoryMap = categories.reduce((acc, cat) => {
+        acc[cat.id] = cat.name;
+        return acc;
+      }, {});
+    }
+
+    // Map Category IDs to Category Names
+    const formattedVendors = vendors.map(vendor => {
+      const categoryNames = (vendor.productCategories || []).map(id => categoryMap[id] || id);
+      const subCategoryNames = (vendor.productTypes || []).map(id => categoryMap[id] || id);
+      return {
         ...vendor,
+        productCategories: categoryNames,
+        productTypes: subCategoryNames,
         password: undefined
-      })),
+      };
+    });
+
+    res.json({
+      vendors: formattedVendors,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -563,9 +591,33 @@ const getVendorById = async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
+    let categoryNames = vendor.productCategories;
+    let subCategoryNames = vendor.productTypes;
+
+    const idsToFetch = [...new Set([
+      ...(vendor.productCategories || []),
+      ...(vendor.productTypes || [])
+    ])].filter(id => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id));
+
+    if (idsToFetch.length > 0) {
+      const categories = await prisma.category.findMany({
+        where: { id: { in: idsToFetch } },
+        select: { id: true, name: true }
+      });
+      const categoryMap = categories.reduce((acc, cat) => {
+        acc[cat.id] = cat.name;
+        return acc;
+      }, {});
+
+      categoryNames = (vendor.productCategories || []).map(id => categoryMap[id] || id);
+      subCategoryNames = (vendor.productTypes || []).map(id => categoryMap[id] || id);
+    }
+
     res.json({
       vendor: {
         ...vendor,
+        productCategories: categoryNames,
+        productTypes: subCategoryNames,
         password: undefined
       }
     });
@@ -613,17 +665,17 @@ const updateVendorById = async (req, res) => {
         console.log('Uploaded certification files:', certificationFileUrls);
       } catch (uploadError) {
         console.error('Certificate file upload error:', uploadError);
-        return res.status(500).json({ 
-          error: 'Failed to upload certificate files: ' + uploadError.message 
+        return res.status(500).json({
+          error: 'Failed to upload certificate files: ' + uploadError.message
         });
       }
     }
 
     // Parse JSON fields if they're strings
-    const parsedSelectedCertifications = typeof updateData.selectedCertifications === 'string' 
-      ? JSON.parse(updateData.selectedCertifications) 
+    const parsedSelectedCertifications = typeof updateData.selectedCertifications === 'string'
+      ? JSON.parse(updateData.selectedCertifications)
       : updateData.selectedCertifications;
-    
+
     const parsedCertificationExpiryDates = typeof updateData.certificationExpiryDates === 'string'
       ? JSON.parse(updateData.certificationExpiryDates)
       : updateData.certificationExpiryDates;
@@ -661,14 +713,14 @@ const updateVendorById = async (req, res) => {
       businessState: updateData.state,
       businessZipCode: updateData.zipCode || null,
       businessCountry: updateData.country || 'India',
-      
+
       // Owner Profile
       ownerName: updateData.ownerName,
       ownerEmail: updateData.ownerEmail,
       ownerPhone: updateData.ownerPhone,
       establishedYear: updateData.yearEstablished ? parseInt(updateData.yearEstablished) : null,
       annualTurnover: updateData.employeeCount,
-      
+
       // Warehouse Details
       warehouseAddress: updateData.warehouseAddress,
       warehouseCity: updateData.warehouseCity,
@@ -677,30 +729,30 @@ const updateVendorById = async (req, res) => {
       warehouseCountry: updateData.warehouseCountry || 'India',
       storageCapacity: updateData.warehousingCapacity,
       mapLink: updateData.mapLink || null,
-      
+
       // Vendor Type & Products
-      vendorType: Array.isArray(parsedVendorType) && parsedVendorType.includes('manufacturer') 
-        ? 'TEXTILE_MANUFACTURER' 
+      vendorType: Array.isArray(parsedVendorType) && parsedVendorType.includes('manufacturer')
+        ? 'TEXTILE_MANUFACTURER'
         : 'TRADING_COMPANY',
       primaryMarkets: parsedMarketType || [],
       productCategories: Object.keys(parsedSelectedCategories || {}),
       productTypes: Object.values(parsedSelectedCategories || {}).flat(),
-      
+
       // Logistics
       shippingMethods: parsedShippingMethods || [],
       qualityControl: updateData.qualityControlProcess,
-      
+
       // Trade Info
       exportExperience: updateData.hasImportExport === 'yes',
       exportCountries: parsedExportCountries || [],
-      
+
       // Contact & Trade Information
       mainContact: updateData.mainContact ? (typeof updateData.mainContact === 'string' ? JSON.parse(updateData.mainContact) : updateData.mainContact) : null,
       alternateContacts: updateData.alternateContacts ? (typeof updateData.alternateContacts === 'string' ? JSON.parse(updateData.alternateContacts) : updateData.alternateContacts) : [],
       tradeLicenseNumber: updateData.tradeLicenseNumber || null,
       businessRegistrationNumber: updateData.businessRegistrationNumber || null,
       taxIdentificationNumber: updateData.taxIdentificationNumber || null,
-      
+
       // Status (admin can update these)
       status: updateData.status?.toUpperCase() || existingVendor.status
     };
@@ -737,13 +789,13 @@ const updateVendorById = async (req, res) => {
           const certIdUpper = certId.toUpperCase();
           // Use new uploaded file URL, or preserve existing URL, or null
           const documentUrl = certificationFileUrls[certId] || existingCertUrls[certId] || null;
-          
+
           return {
             vendorId,
             name: certIdUpper,
             issuedBy: 'Certification Authority',
-            expiryDate: parsedCertificationExpiryDates?.[certId] 
-              ? new Date(parsedCertificationExpiryDates[certId]) 
+            expiryDate: parsedCertificationExpiryDates?.[certId]
+              ? new Date(parsedCertificationExpiryDates[certId])
               : null,
             documentUrl
           };
@@ -810,7 +862,7 @@ const updateVendorById = async (req, res) => {
 
   } catch (error) {
     console.error('Update vendor by ID error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -1015,28 +1067,28 @@ const vendorLogin = async (req, res) => {
 
     // Check if vendor has a password (approved vendors should have one)
     if (!vendor.password) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Account not activated. Please wait for admin approval.',
         status: vendor.status
       });
     }
 
     if (vendor.status === 'REJECTED') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Your vendor application has been rejected',
         reason: vendor.rejectionReason
       });
     }
 
     if (vendor.status === 'SUSPENDED') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Your vendor account has been suspended',
         reason: vendor.rejectionReason
       });
     }
 
     if (vendor.status === 'PENDING') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Your vendor application is still under review. Please wait for approval.'
       });
     }
@@ -1116,12 +1168,79 @@ const testVendorEmail = async (req, res) => {
 
   } catch (error) {
     console.error('Test email error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to send test email',
-      details: error.message 
+      details: error.message
     });
   }
 };
+
+// Assign QC Checker to a Vendor
+const assignQc = async (req, res) => {
+  try {
+    const { vendorId, checkerId } = req.body;
+
+    if (!vendorId || !checkerId) {
+      return res.status(400).json({ error: 'vendorId and checkerId are required' });
+    }
+
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId }
+    });
+
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    const checker = await prisma.qCChecker.findUnique({
+      where: { id: checkerId }
+    });
+
+    if (!checker) {
+      return res.status(404).json({ error: 'QC Checker not found' });
+    }
+
+    // Update vendor with assigned QC Checker and change status if it was pending
+    const statusUpdate = vendor.status === 'PENDING' ? 'UNDER_REVIEW' : vendor.status;
+
+    const updatedVendor = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        assignedQcId: checkerId,
+        status: statusUpdate
+      },
+      include: {
+        assignedQc: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    // Also update the checker's assignedVendors count
+    await prisma.qCChecker.update({
+      where: { id: checkerId },
+      data: {
+        assignedVendors: {
+          increment: 1
+        }
+      }
+    });
+
+    res.json({
+      message: 'QC Checker assigned successfully',
+      vendor: updatedVendor
+    });
+
+  } catch (error) {
+    console.error('Assign QC Checker error:', error);
+    res.status(500).json({ error: 'Internal server error while assigning QC Checker' });
+  }
+};
+
 
 module.exports = {
   registerVendor,
@@ -1134,5 +1253,6 @@ module.exports = {
   rejectVendor,
   suspendVendor,
   vendorLogin,
-  testVendorEmail
+  testVendorEmail,
+  assignQc
 };

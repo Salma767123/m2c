@@ -134,6 +134,11 @@ const enquiryRoutes = require('./routes/enquiryRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const supportRoutes = require('./routes/supportRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const qcCheckerRoutes = require('./routes/qcCheckerRoutes');
+const invoiceSettingsRoutes = require('./routes/invoiceSettingsRoutes');
+const inspectionRoutes = require('./routes/inspectionRoutes');
+const userManagementRoutes = require('./routes/userManagementRoutes');
+const settlementRoutes = require('./routes/settlementRoutes');
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -155,7 +160,11 @@ app.use('/api/hubs', hubRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/reviews', reviewRoutes);
-
+app.use('/api/qc-checkers', qcCheckerRoutes);
+app.use('/api/invoice-settings', invoiceSettingsRoutes);
+app.use('/api/inspections', inspectionRoutes);
+app.use('/api/admin/users', userManagementRoutes);
+app.use('/api/settlements', settlementRoutes);
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

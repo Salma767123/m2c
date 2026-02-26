@@ -1,90 +1,107 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar, RefreshCw, Send } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
-
-interface QCChecker {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  status: "active" | "inactive" | "suspended";
-  assignedVendors: number;
-  completedInspections: number;
-  joinedDate: string;
-  lastActive: string;
-}
+import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
+import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 
 export default function QCCheckerList() {
-  const [checkers] = useState<QCChecker[]>([
-    {
-      id: "1",
-      name: "John Smith",
-      email: "john.smith@example.com",
-      phone: "+1 234-567-8900",
-      status: "active",
-      assignedVendors: 12,
-      completedInspections: 45,
-      joinedDate: "2024-01-15",
-      lastActive: "2024-02-10",
-    },
-    {
-      id: "2",
-      name: "Sarah Johnson",
-      email: "sarah.j@example.com",
-      phone: "+1 234-567-8901",
-      status: "active",
-      assignedVendors: 8,
-      completedInspections: 32,
-      joinedDate: "2024-01-20",
-      lastActive: "2024-02-09",
-    },
-    {
-      id: "3",
-      name: "Michael Brown",
-      email: "m.brown@example.com",
-      phone: "+1 234-567-8902",
-      status: "inactive",
-      assignedVendors: 5,
-      completedInspections: 18,
-      joinedDate: "2023-12-10",
-      lastActive: "2024-01-25",
-    },
-  ]);
-
+  const [checkers, setCheckers] = useState<QCCheckerData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
-  const filteredCheckers = checkers.filter((checker) => {
-    const matchesSearch =
-      checker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      checker.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      checker.phone.includes(searchTerm);
-    const matchesFilter = filterStatus === "all" || checker.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+  // Fetch QC Checkers
+  const fetchCheckers = async () => {
+    setLoading(true);
+    try {
+      const params: { status?: string; search?: string } = {};
+      if (filterStatus !== "all") params.status = filterStatus;
+      if (searchTerm) params.search = searchTerm;
+
+      const result = await qcCheckerService.getAllQCCheckers(params);
+      if (result.success) {
+        setCheckers(result.data);
+      }
+    } catch (error: any) {
+      console.error("Failed to fetch QC checkers:", error);
+      showErrorToast("Error", error.message || "Failed to fetch QC checkers");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCheckers();
+  }, [filterStatus]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchCheckers();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Delete handler
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete QC Checker "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      await qcCheckerService.deleteQCChecker(id);
+      showSuccessToast("Deleted!", `QC Checker "${name}" has been deleted.`);
+      fetchCheckers();
+    } catch (error: any) {
+      showErrorToast("Delete Failed", error.message || "Failed to delete QC checker");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // Resend credentials
+  const handleResendCredentials = async (id: string, email: string) => {
+    if (!confirm(`Resend login credentials to ${email}? This will reset the password.`)) {
+      return;
+    }
+
+    setResendingId(id);
+    try {
+      const result = await qcCheckerService.resendCredentials(id);
+      showSuccessToast("Credentials Sent!", result.message || `New credentials sent to ${email}`);
+    } catch (error: any) {
+      showErrorToast("Failed", error.message || "Failed to resend credentials");
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
+    const normalizedStatus = status.toLowerCase();
     const styles = {
       active: "bg-green-100 text-green-800",
       inactive: "bg-gray-100 text-gray-800",
       suspended: "bg-red-100 text-red-800",
     };
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles]}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <span className={`px-3 py-1 rounded-full text-xs font-medium ${styles[normalizedStatus as keyof typeof styles] || styles.inactive}`}>
+        {normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1)}
       </span>
     );
   };
 
-  const totalActive = checkers.filter((c) => c.status === "active").length;
-  const totalInactive = checkers.filter((c) => c.status === "inactive").length;
-  const totalInspections = checkers.reduce((sum, c) => sum + c.completedInspections, 0);
+  const totalActive = checkers.filter((c) => c.status === "ACTIVE").length;
+  const totalInactive = checkers.filter((c) => c.status === "INACTIVE").length;
+  const totalInspections = checkers.reduce((sum, c) => sum + (c.completedInspections || 0), 0);
 
   return (
     <div className="p-6">
@@ -94,13 +111,22 @@ export default function QCCheckerList() {
           <h1 className="text-2xl font-bold text-gray-900">QC Checker Management</h1>
           <p className="text-gray-600 mt-1">Manage quality control checkers and their assignments</p>
         </div>
-        <Link
-          href="/admin/dashboard/qc-checker/create"
-          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-        >
-          <UserPlus className="h-5 w-5" />
-          Add QC Checker
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchCheckers}
+            className="flex items-center gap-2 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <Link
+            href="/admin/dashboard/qc-checker/create"
+            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+          >
+            <UserPlus className="h-5 w-5" />
+            Add QC Checker
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
@@ -139,7 +165,7 @@ export default function QCCheckerList() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
               <input
                 type="text"
-                placeholder="Search by name, email, or phone..."
+                placeholder="Search by name, email, phone, or checker ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
@@ -150,9 +176,9 @@ export default function QCCheckerList() {
                 value={filterStatus}
                 options={[
                   { value: "all", label: "All Status" },
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                  { value: "suspended", label: "Suspended" },
+                  { value: "ACTIVE", label: "Active" },
+                  { value: "INACTIVE", label: "Inactive" },
+                  { value: "SUSPENDED", label: "Suspended" },
                 ]}
                 onChange={(val) => setFilterStatus(val as string)}
                 placeholder="Filter by status"
@@ -164,94 +190,108 @@ export default function QCCheckerList() {
 
       {/* Checkers Table */}
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Checker Details</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Assigned Vendors</TableHead>
-              <TableHead>Inspections</TableHead>
-              <TableHead>Joined Date</TableHead>
-              <TableHead>Last Active</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredCheckers.length > 0 ? (
-              filteredCheckers.map((checker) => (
-                <TableRow key={checker.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium text-gray-900">{checker.name}</div>
-                      <div className="text-sm text-gray-500">ID: {checker.id}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
+        {loading ? (
+          <div className="p-12 text-center">
+            <RefreshCw className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-500">Loading QC Checkers...</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Checker Details</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Assigned Vendors</TableHead>
+                <TableHead>Inspections</TableHead>
+                <TableHead>Joined Date</TableHead>
+                <TableHead>Last Active</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {checkers.length > 0 ? (
+                checkers.map((checker) => (
+                  <TableRow key={checker.id}>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium text-gray-900">{checker.name}</div>
+                        <div className="text-sm text-blue-600 font-mono">{checker.checkerId}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm text-gray-900">
+                          <Mail className="h-3 w-3 mr-1 text-gray-400" />
+                          {checker.email}
+                        </div>
+                        <div className="flex items-center text-sm text-gray-500">
+                          <Phone className="h-3 w-3 mr-1 text-gray-400" />
+                          {checker.phone}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(checker.status)}</TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium text-gray-900">{checker.assignedVendors || 0}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium text-blue-600">{checker.completedInspections || 0}</div>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center text-sm text-gray-900">
-                        <Mail className="h-3 w-3 mr-1 text-gray-400" />
-                        {checker.email}
+                        <Calendar className="h-3 w-3 mr-1 text-gray-400" />
+                        {new Date(checker.joiningDate).toLocaleDateString()}
                       </div>
-                      <div className="flex items-center text-sm text-gray-500">
-                        <Phone className="h-3 w-3 mr-1 text-gray-400" />
-                        {checker.phone}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-500">
+                        {checker.lastLoginAt
+                          ? new Date(checker.lastLoginAt).toLocaleDateString()
+                          : "Never"}
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(checker.status)}</TableCell>
-                  <TableCell>
-                    <div className="text-sm font-medium text-gray-900">{checker.assignedVendors}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm font-medium text-blue-600">{checker.completedInspections}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center text-sm text-gray-900">
-                      <Calendar className="h-3 w-3 mr-1 text-gray-400" />
-                      {new Date(checker.joinedDate).toLocaleDateString()}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-gray-500">
-                      {new Date(checker.lastActive).toLocaleDateString()}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="View Details"
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleResendCredentials(checker.id, checker.email)}
+                          disabled={resendingId === checker.id}
+                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50"
+                          title="Resend Credentials"
+                        >
+                          <Send className={`h-4 w-4 ${resendingId === checker.id ? 'animate-pulse' : ''}`} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(checker.id, checker.name)}
+                          disabled={deletingId === checker.id}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          title="Delete Checker"
+                        >
+                          <Trash2 className={`h-4 w-4 ${deletingId === checker.id ? 'animate-pulse' : ''}`} />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={8}>
+                    <div className="p-12 text-center">
+                      <p className="text-gray-500">No QC checkers found</p>
+                      <Link
+                        href="/admin/dashboard/qc-checker/create"
+                        className="inline-flex items-center gap-2 mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Edit Checker"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete Checker"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                        <UserPlus className="h-4 w-4" />
+                        Add your first QC Checker
+                      </Link>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={8}>
-                  <div className="p-12 text-center">
-                    <p className="text-gray-500">No QC checkers found</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </div>
   );

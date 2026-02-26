@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, Clock, Factory, MapPin, Package, FileText, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
@@ -8,6 +8,9 @@ import { Card, CardContent } from "../../UI/Card";
 import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import vendorService from "@/services/vendorService";
+import qcCheckerService from "@/services/qcCheckerService";
+import { useSearchParams } from 'next/navigation';
 
 interface Vendor {
   id: string;
@@ -16,6 +19,9 @@ interface Vendor {
   contactPerson: string;
   phone: string;
   email: string;
+  productCategories?: string[];
+  productTypes?: string[];
+  specializations?: string[];
 }
 
 interface QCChecker {
@@ -36,86 +42,113 @@ interface InspectionItem {
 
 export default function CreateAssignment() {
   const router = useRouter();
-  
-  const [vendors] = useState<Vendor[]>([
-    {
-      id: "1",
-      companyName: "Nav Nit Group of Textiles",
-      location: "Gujarat, India",
-      contactPerson: "Rajesh Patel",
-      phone: "+91 98765 43210",
-      email: "rajesh.patel@navnittextiles.com",
-    },
-    {
-      id: "2",
-      companyName: "Fabric Tech Industries",
-      location: "Tamil Nadu, India",
-      contactPerson: "Suresh Kumar",
-      phone: "+91 98765 43212",
-      email: "suresh.kumar@fabrictechindustries.com",
-    },
-    {
-      id: "3",
-      companyName: "Weave & Co",
-      location: "Karnataka, India",
-      contactPerson: "Arjun Reddy",
-      phone: "+91 98765 43214",
-      email: "arjun.reddy@weaveandco.com",
-    },
-  ]);
+  const searchParams = useSearchParams();
+  const preSelectedVendorId = searchParams.get('vendorId');
 
-  const [qcCheckers] = useState<QCChecker[]>([
-    { id: "1", name: "John Smith", assignedVendors: 12 },
-    { id: "2", name: "Sarah Johnson", assignedVendors: 8 },
-    { id: "3", name: "Michael Brown", assignedVendors: 5 },
-  ]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [qcCheckers, setQcCheckers] = useState<QCChecker[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [inspectionId, setInspectionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const vendorRes = await vendorService.getAllVendors({ limit: 100 });
+        const AllVendors = vendorRes.vendors.map((v: any) => ({
+          id: v.id,
+          companyName: v.companyName,
+          location: `${v.businessCity}, ${v.businessState}`,
+          contactPerson: v.ownerName,
+          phone: v.businessPhone,
+          email: v.email,
+          productCategories: v.productCategories || [],
+          productTypes: v.productTypes || [],
+          specializations: v.specializations || [],
+        }));
+        setVendors(AllVendors);
+
+        const checkersResponse = await qcCheckerService.getAllQCCheckers();
+        if (checkersResponse.success) {
+          setQcCheckers(checkersResponse.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const [formData, setFormData] = useState({
-    vendorId: "",
+    vendorId: preSelectedVendorId || "",
     checkerId: "",
-    po: "",
     client: "",
     scheduledDate: "",
     scheduledTime: "",
     priority: "",
     estimatedDuration: "",
-    selectedItems: [] as number[],
+    selectedItems: [] as (string | number)[],
   });
 
-  const [inspectionItems] = useState<InspectionItem[]>([
-    {
-      id: 1,
-      itemName: "Premium Cotton T-Shirts",
-      description: "100% Organic Cotton Round Neck T-Shirts - Multiple Colors",
-      quantity: 5000,
-      inspectionQuantity: 315,
-      specifications: "GSM: 180, Sizes: S-XXL, Colors: White, Black, Navy, Grey",
+  useEffect(() => {
+    if (preSelectedVendorId) {
+      setFormData(prev => ({ ...prev, vendorId: preSelectedVendorId }))
+      // Fetch existing inspection data if any
+      const fetchExisting = async () => {
+        try {
+          const res = await vendorService.getInspectionByVendorId(preSelectedVendorId);
+          if (res.success && res.inspection) {
+            const insp = res.inspection;
+            setIsEditing(true);
+            setInspectionId(insp.id);
+            setFormData(prev => ({
+              ...prev,
+              checkerId: insp.checkerId || "",
+              client: insp.clientName || "",
+              scheduledDate: insp.scheduledDate || "",
+              scheduledTime: insp.scheduledTime || "",
+              priority: insp.priority || "",
+              estimatedDuration: insp.estimatedDuration || "",
+              selectedItems: (insp.itemsToInspect || []).map((i: any) => i.id)
+            }));
+          }
+        } catch (error) {
+          console.log("No existing assignment found for this vendor, will create new.");
+        }
+      };
+      fetchExisting();
+    }
+  }, [preSelectedVendorId])
+
+  // Dynamically generate inspection items based on the selected vendor
+  const selectedVendor = vendors.find((v) => v.id === formData.vendorId);
+
+  const vendorInspectionItems = selectedVendor ? [
+    ...(selectedVendor.productTypes || []).map((type, idx) => ({
+      id: `type-${idx}`,
+      itemName: type,
+      description: `Subcategory Selected during Registration: ${type}`,
+      quantity: 0,
+      inspectionQuantity: 'TBD',
+      specifications: "Standard QC",
       aqlLevel: "2.5",
-    },
-    {
-      id: 2,
-      itemName: "Denim Jeans",
-      description: "Slim Fit Blue Denim Jeans with Stretch",
-      quantity: 3000,
-      inspectionQuantity: 200,
-      specifications: "Weight: 12oz, Sizes: 28-42, Wash: Stone Wash",
-      aqlLevel: "2.5",
-    },
-    {
-      id: 3,
-      itemName: "Polo Shirts",
-      description: "Cotton Pique Polo Shirts with Embroidered Logo",
-      quantity: 2500,
-      inspectionQuantity: 160,
-      specifications: "GSM: 200, Sizes: S-XL, Colors: White, Navy, Red",
-      aqlLevel: "1.5",
-    },
-  ]);
+    }))
+  ] : [];
+
+  // Fallback to empty items if no vendor selected or category data is missing
+  const displayItems = vendorInspectionItems.length > 0 ? vendorInspectionItems : [];
 
   const handleVendorChange = (value: string | string[]) => {
+    const selectedId = value as string;
+    const vendor = vendors.find(v => v.id === selectedId);
+
     setFormData((prev) => ({
       ...prev,
-      vendorId: value as string,
+      vendorId: selectedId,
+      client: vendor ? vendor.companyName : prev.client,
+      selectedItems: [] // reset items on vendor change
     }));
   };
 
@@ -133,7 +166,7 @@ export default function CreateAssignment() {
     }));
   };
 
-  const handleItemToggle = (itemId: number) => {
+  const handleItemToggle = (itemId: string | number) => {
     setFormData((prev) => ({
       ...prev,
       selectedItems: prev.selectedItems.includes(itemId)
@@ -148,7 +181,6 @@ export default function CreateAssignment() {
     if (
       !formData.vendorId ||
       !formData.checkerId ||
-      !formData.po ||
       !formData.client ||
       !formData.scheduledDate ||
       !formData.scheduledTime ||
@@ -161,27 +193,66 @@ export default function CreateAssignment() {
     }
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      setLoading(true);
+
+      const itemsToInspect = displayItems
+        .filter(item => formData.selectedItems.includes(item.id))
+        .map(item => ({
+          id: item.id,
+          itemName: item.itemName,
+          description: item.description,
+          inspectionQuantity: item.inspectionQuantity,
+          specifications: item.specifications,
+          aqlLevel: item.aqlLevel
+        }));
 
       const vendor = vendors.find((v) => v.id === formData.vendorId);
       const checker = qcCheckers.find((c) => c.id === formData.checkerId);
 
-      showSuccessToast(
-        "Assignment Created!",
-        `Inspection scheduled for ${vendor?.companyName} with ${checker?.name} on ${formData.scheduledDate}.`
-      );
+      if (isEditing && inspectionId) {
+        await vendorService.updateInspection(
+          inspectionId,
+          formData.checkerId,
+          "", // PO Number is removed but api expects string
+          formData.client,
+          formData.scheduledDate,
+          formData.scheduledTime,
+          formData.priority,
+          formData.estimatedDuration,
+          itemsToInspect
+        );
+        showSuccessToast(
+          "Assignment Updated!",
+          `Inspection details for ${vendor?.companyName} have been updated.`
+        );
+      } else {
+        await vendorService.assignQc(
+          formData.vendorId,
+          formData.checkerId,
+          "", // PO Number is removed but api expects string
+          formData.client,
+          formData.scheduledDate,
+          formData.scheduledTime,
+          formData.priority,
+          formData.estimatedDuration,
+          itemsToInspect
+        );
+        showSuccessToast(
+          "Assignment Created!",
+          `Inspection scheduled for ${vendor?.companyName} with Quality Checker ${checker?.name}.`
+        );
+      }
 
       // Redirect back to Assign QC Checker page after a short delay
       setTimeout(() => {
-        router.push("/admin/dashboard/vendors/assign-qc-checker");
+        router.push("/admin/dashboard/vendors/assign-qc");
       }, 1000);
     } catch (error) {
       showErrorToast("Assignment Failed", "Failed to create assignment. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
-
-  const selectedVendor = vendors.find((v) => v.id === formData.vendorId);
 
   return (
     <div className="p-6">
@@ -196,8 +267,8 @@ export default function CreateAssignment() {
           <ArrowLeft className="h-6 w-6" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Create QC Assignment</h1>
-          <p className="text-gray-600 mt-1">Schedule a new quality control inspection</p>
+          <h1 className="text-2xl font-bold text-gray-900">{isEditing ? "Update QC Assignment" : "Create QC Assignment"}</h1>
+          <p className="text-gray-600 mt-1">{isEditing ? "Modify an existing quality control inspection" : "Schedule a new quality control inspection"}</p>
         </div>
       </div>
 
@@ -254,19 +325,6 @@ export default function CreateAssignment() {
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Inspection Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      PO Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.po}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, po: e.target.value }))}
-                      placeholder="e.g., PO-2024-001"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                    />
-                  </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Client Name <span className="text-red-500">*</span>
@@ -346,7 +404,7 @@ export default function CreateAssignment() {
                 <p className="text-sm text-gray-600 mb-4">Select the items that will be inspected</p>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {inspectionItems.map((item) => (
+                  {displayItems.map((item) => (
                     <label
                       key={item.id}
                       className="flex items-start p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
@@ -464,13 +522,12 @@ export default function CreateAssignment() {
                     {formData.priority && (
                       <div>
                         <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                            formData.priority === "high"
-                              ? "bg-red-100 text-red-800"
-                              : formData.priority === "medium"
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${formData.priority === "high"
+                            ? "bg-red-100 text-red-800"
+                            : formData.priority === "medium"
                               ? "bg-amber-100 text-amber-800"
                               : "bg-green-100 text-green-800"
-                          }`}
+                            }`}
                         >
                           {formData.priority.toUpperCase()} PRIORITY
                         </span>
@@ -535,12 +592,13 @@ export default function CreateAssignment() {
               <button
                 type="submit"
                 className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                disabled={loading}
               >
                 <CheckCircle className="h-5 w-5" />
-                Create Assignment
+                {isEditing ? "Update Assignment" : "Create Assignment"}
               </button>
               <Link
-                href="/admin/dashboard/vendors/assign-qc-checker"
+                href="/admin/dashboard/vendors/assign-qc"
                 className="w-full flex items-center justify-center gap-2 border border-gray-300 text-gray-700 font-medium py-3 px-6 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel

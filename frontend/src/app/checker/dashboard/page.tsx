@@ -1,17 +1,35 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Dashboard from "@/components/Checker/CheckerDashboard/CheckerDashboard"
+import { qcCheckerService } from "@/services/qcCheckerService"
 
 export default function DashboardPage() {
   const [checkerID, setCheckerID] = useState("")
+  const router = useRouter()
 
   useEffect(() => {
+    // Check if logged in
+    const token = qcCheckerService.getCheckerToken()
+    if (!token) {
+      router.push('/checker')
+      return
+    }
+
     const storedCheckerID = localStorage.getItem('checkerID')
     if (storedCheckerID) {
       setCheckerID(storedCheckerID)
+    } else {
+      // Try to get from checker data
+      const checkerData = qcCheckerService.getCheckerData()
+      if (checkerData?.checkerId) {
+        setCheckerID(checkerData.checkerId)
+      } else {
+        router.push('/checker')
+      }
     }
-  }, [])
+  }, [router])
 
   if (!checkerID) {
     return (
@@ -26,13 +44,13 @@ export default function DashboardPage() {
 
   return (
     <>
-    <Dashboard 
-      checkerID={checkerID}
-      onSelectVendor={(vendor) => {
-        console.log("Selected vendor:", vendor)
-      }}
-    />
-    
+      <Dashboard
+        checkerID={checkerID}
+        onSelectVendor={(vendor) => {
+          console.log("Selected vendor:", vendor)
+        }}
+      />
+
     </>
   )
 }

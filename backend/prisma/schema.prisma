@@ -19,6 +19,7 @@ model Admin {
   password      String?   // Optional for Google OAuth users
   name          String
   image         String?
+  role          String    @default("admin") // admin, manager, employee
   isActive      Boolean   @default(true)
   isVerified    Boolean   @default(false)
   googleId      String?   @unique
@@ -301,6 +302,13 @@ model Vendor {
   references            VendorReference[]
   inventory             Inventory[]
   products              Product[]
+  
+  // Quality Checker Assignment
+  assignedQcId          String?   @db.ObjectId
+  assignedQc            QCChecker? @relation("VendorQCChecker", fields: [assignedQcId], references: [id])
+  inspections           Inspection[]
+  settlements           Settlement[]
+
   
   // System fields
   applicationStep       Int       @default(1) // Current step in application process
@@ -688,50 +696,52 @@ enum ProductApprovalStatus {
 model Order {
   id                    String    @id @default(auto()) @map("_id") @db.ObjectId
   orderId               String    @unique // Human readable order ID (e.g., ORD-2024-001)
-  
+  invoiceNo             String?   @unique // Invoice number per InvoiceSettings (e.g., INV-2024-25-0001)
+
   // Customer Information
   customerId            String?   @db.ObjectId
   customerName          String
   customerEmail         String
   customerPhone         String
-  
+
   // Shipping Address
   shippingAddress       Json      // Complete address object
-  
+
   // Order Items
   items                 OrderItem[]
-  
+
   // Pricing
   subtotal              Float
   shippingCost          Float     @default(0)
   tax                   Float     @default(0)
   discount              Float     @default(0)
   totalAmount           Float
-  
+
   // Payment Information
   paymentStatus         PaymentStatus @default(PENDING)
   paymentMethod         String?
   paymentId             String?
-  
+
   // Order Status & Tracking
   status                OrderStatus @default(ORDER_CREATED)
   trackingReference     String?   // Internal tracking reference
-  
+
   // Vendor Information (for single vendor orders)
   vendorId              String?   @db.ObjectId
-  
+
   // Admin Hub Processing
   adminReview           AdminReview?
-  
+
   // Status History
   statusHistory         OrderStatusHistory[]
   reviews               Review[]
-  
+  settlements           Settlement[]
+
   // Timestamps
   orderDate             DateTime  @default(now())
   estimatedDelivery     DateTime?
   actualDelivery        DateTime?
-  
+
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -1060,4 +1070,163 @@ model Review {
 
   @@unique([userId, productId, orderId])
   @@map("reviews")
+}
+
+// ============================================
+// QC CHECKER MANAGEMENT
+// ============================================
+
+model QCChecker {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  checkerId         String    @unique // Human readable checker ID (e.g., QC-001)
+  email             String    @unique
+  password          String    // Hashed password
+  name              String
+  phone             String
+  
+  // Address
+  address           String?
+  city              String?
+  state             String?
+  zipCode           String?
+  country           String?   @default("India")
+  
+  // Personal
+  dateOfBirth       DateTime?
+  
+  // Professional
+  joiningDate       DateTime  @default(now())
+  specialization    String?
+  experience        Int?      @default(0) // Years of experience
+  certifications    String?
+  
+  // Assigned Hub
+  assignedHubId     String?   @db.ObjectId
+  
+  // Status & Activity
+  status            QCCheckerStatus @default(ACTIVE)
+  isActive          Boolean   @default(true)
+  lastLoginAt       DateTime?
+  
+  // Stats
+  assignedVendors   Int       @default(0)
+  completedInspections Int    @default(0)
+  
+  // Relations
+  vendorsList       Vendor[]  @relation("VendorQCChecker")
+  inspections       Inspection[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("qc_checkers")
+}
+
+enum QCCheckerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// ============================================
+// BILLING & INVOICE SETTINGS
+// ============================================
+
+model InvoiceSettings {
+  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+  invoicePrefix           String   @default("INV")
+  sequenceLength          Int      @default(4)
+  currentSequence         Int      @default(1)
+  financialYearStart      DateTime
+  financialYearEnd        DateTime
+  autoFinancialYear       Boolean  @default(true)
+  // Month (1-12) and day of month when FY starts — used for auto rollover
+  financialYearStartMonth Int      @default(4)   // 4 = April (Indian FY)
+  financialYearStartDay   Int      @default(1)   // 1st of the month
+  formatTemplate          String   @default("{PREFIX}-{FY}-{SEQ}")
+  
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("invoice_settings")
+}
+
+// ============================================
+// SETTLEMENTS
+// ============================================
+
+model Settlement {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  settlementNumber String   @unique // e.g. SET-2024-0001
+  vendorId         String   @db.ObjectId
+  vendorName       String
+  orderId          String   @db.ObjectId
+  billingNumber    String   // e.g. same as order invoice number
+  period           String   // e.g. "February 2024"
+  amount           Float
+  dueDate          DateTime
+  status           String   @default("Pending") // Pending, Processing, Paid, Failed
+  paymentDate      DateTime?
+  transactionId    String?
+
+  vendor           Vendor   @relation(fields: [vendorId], references: [id])
+  order            Order    @relation(fields: [orderId], references: [id])
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("settlements")
+}
+
+// ============================================
+// INSPECTION MANAGEMENT
+// ============================================
+
+model Inspection {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Relations
+  vendorId          String    @db.ObjectId
+  vendor            Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  checkerId         String    @db.ObjectId
+  checker           QCChecker @relation(fields: [checkerId], references: [id], onDelete: Cascade)
+  
+  // Assignment Details
+  poNumber          String
+  clientName        String
+  scheduledDate     String    // YYYY-MM-DD
+  scheduledTime     String    // HH:MM AM/PM
+  priority          String    // high, medium, low
+  estimatedDuration String
+  
+  // Status & Timing
+  status            InspectionStatus @default(SCHEDULED)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  
+  // Inspection Items (JSON array of category/subcategory objects assigned)
+  itemsToInspect    Json
+  
+  // Results
+  result            InspectionResult?
+  score             Float?
+  notes             String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("inspections")
+}
+
+enum InspectionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum InspectionResult {
+  PASSED
+  FAILED
+  CONDITIONALLY_PASSED
 }

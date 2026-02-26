@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Check, ArrowLeft, ArrowRight } from "lucide-react"
 import GeneralInformation from "./Steps/GeneralInformation"
 import Preparation from "./Steps/Preparation"
@@ -12,15 +12,19 @@ import Documentation from "./Steps/Documentation"
 import Review from "./Steps/Review"
 
 
+import qcCheckerService from "@/services/qcCheckerService"
+
 interface InspectionFormProps {
   vendorName: string
+  vendorId?: string
   onComplete: () => void
 }
 
 type Step = "general" | "prep" | "packaging" | "measurements" | "defects" | "testing" | "documentation" | "review"
 
-export default function InspectionForm({ vendorName, onComplete }: InspectionFormProps) {
+export default function InspectionForm({ vendorName, vendorId, onComplete }: InspectionFormProps) {
   const [currentStep, setCurrentStep] = useState<Step>("general")
+  const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
     // General Information
     client: "",
@@ -31,22 +35,21 @@ export default function InspectionForm({ vendorName, onComplete }: InspectionFor
     serviceType: "Pre-Shipment Inspection",
 
     // Preparation & Order Readiness
-    poNumber: "PO-2024-001",
     items: [
       {
         id: 1,
         itemName: "Cotton T-Shirt",
         itemDescription: "100% Cotton Round Neck T-Shirt - Various Colors",
-        poQuantity: 2500,
-        bookedInspectionQuantity: 200,
+        totalQuantity: 2500,
+        inspectionQuantity: 200,
         status: "Ready"
       },
       {
         id: 2,
         itemName: "Denim Jeans",
         itemDescription: "Blue Denim Straight Fit Jeans - Size 28-42",
-        poQuantity: 2500,
-        bookedInspectionQuantity: 200,
+        totalQuantity: 2500,
+        inspectionQuantity: 200,
         status: "Pending"
       }
     ],
@@ -174,10 +177,51 @@ export default function InspectionForm({ vendorName, onComplete }: InspectionFor
     companyIdCards: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
   })
 
+  // Fetch true inspection data
+  useEffect(() => {
+    async function loadActiveInspection() {
+      try {
+        const response = await qcCheckerService.getInspections();
+        if (response.success && response.inspections) {
+          // Find an active inspection for this vendor
+          const inspection = response.inspections.find(
+            (i: any) =>
+              (vendorId ? i.vendorId === vendorId : i.vendor?.companyName === vendorName) &&
+              (i.status === "IN_PROGRESS" || i.status === "SCHEDULED")
+          );
+
+          if (inspection) {
+            setFormData(prev => {
+              const itemsToInspect = Array.isArray(inspection.itemsToInspect) ? inspection.itemsToInspect : [];
+              return {
+                ...prev,
+                client: inspection.clientName || prev.client,
+                serviceStartDate: inspection.scheduledDate || prev.serviceStartDate,
+                items: itemsToInspect.map((item: any) => ({
+                  id: item.id || Math.random(),
+                  itemName: item.itemName || "",
+                  itemDescription: item.description || item.specifications || "",
+                  totalQuantity: Number(item.quantity) || 0,
+                  inspectionQuantity: Number(item.inspectionQuantity) || 0,
+                  status: "Pending"
+                }))
+              };
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load active inspection for form", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadActiveInspection();
+  }, [vendorName, vendorId]);
+
   // Steps ordered to match PDF report structure exactly
   const steps: { id: Step; label: string; description: string; pdfSection: string }[] = [
     { id: "general", label: "General Information", description: "Vendor and service details", pdfSection: "Section A" },
-    { id: "prep", label: "Order Status", description: "PO details and order readiness", pdfSection: "Section B" },
+    { id: "prep", label: "Item Quantities", description: "Total amounts and readiness", pdfSection: "Section B" },
     { id: "packaging", label: "Packaging & Labeling", description: "Cartons, labels, and protection", pdfSection: "Section C (Items 1-4)" },
     { id: "measurements", label: "Measurements", description: "Dimensions and weight specs", pdfSection: "Spec Verification" },
     { id: "defects", label: "AQL Defects", description: "Workmanship and quality analysis", pdfSection: "Section E" },
@@ -224,13 +268,21 @@ export default function InspectionForm({ vendorName, onComplete }: InspectionFor
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl text-slate-600 font-semibold">Loading assignment details...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen font-sans bg-linear-to-br from-slate-50 to-blue-50/30">
       <div className="p-8 max-w-420 mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
-            <button 
+            <button
               onClick={onComplete}
               className="p-2 hover:bg-white rounded-lg transition-colors"
             >
@@ -252,41 +304,39 @@ export default function InspectionForm({ vendorName, onComplete }: InspectionFor
                 <div key={step.id} className="flex flex-col items-center relative z-10 flex-1">
                   {/* Step Circle */}
                   <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 cursor-pointer text-sm border-2 ${
-                      index < currentStepIndex
-                        ? "bg-linear-to-r from-blue-600 to-blue-700 text-white border-blue-600 shadow-lg"
-                        : index === currentStepIndex
+                    className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 cursor-pointer text-sm border-2 ${index < currentStepIndex
+                      ? "bg-linear-to-r from-blue-600 to-blue-700 text-white border-blue-600 shadow-lg"
+                      : index === currentStepIndex
                         ? "bg-linear-to-r from-blue-600 to-blue-700 text-white border-blue-600 shadow-lg ring-4 ring-blue-100"
                         : "bg-white border-slate-300 text-slate-500 hover:border-slate-400"
-                    }`}
+                      }`}
                     onClick={() => setCurrentStep(step.id)}
                   >
                     {index < currentStepIndex ? <Check className="w-5 h-5" /> : index + 1}
                   </div>
-                  
+
                   {/* Step Label */}
                   <div className="mt-3 text-center max-w-24">
-                    <p className={`text-xs font-medium leading-tight ${
-                      index <= currentStepIndex ? "text-slate-900" : "text-slate-500"
-                    }`}>
+                    <p className={`text-xs font-medium leading-tight ${index <= currentStepIndex ? "text-slate-900" : "text-slate-500"
+                      }`}>
                       {step.label}
                     </p>
                   </div>
                 </div>
               ))}
             </div>
-            
+
             {/* Progress Line */}
             <div className="absolute top-6 left-6 right-6 h-0.5 bg-slate-200 z-0">
-              <div 
+              <div
                 className="h-full bg-linear-to-r from-blue-600 to-blue-700 transition-all duration-500 ease-out"
-                style={{ 
-                  width: `${(currentStepIndex / (steps.length - 1)) * 100}%` 
+                style={{
+                  width: `${(currentStepIndex / (steps.length - 1)) * 100}%`
                 }}
               />
             </div>
           </div>
-          
+
           {/* Current Step Info */}
           <div className="text-center bg-slate-50 rounded-xl p-6">
             <div className="flex items-center justify-center gap-2 mb-2">
@@ -315,27 +365,26 @@ export default function InspectionForm({ vendorName, onComplete }: InspectionFor
           <button
             onClick={goToPrevStep}
             disabled={currentStepIndex === 0}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 ${
-              currentStepIndex === 0 
-                ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
-                : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 ${currentStepIndex === 0
+              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+              : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+              }`}
           >
             <ArrowLeft className="w-4 h-4" />
             Previous
           </button>
 
           {currentStep === "review" ? (
-            <button 
-              onClick={onComplete} 
+            <button
+              onClick={onComplete}
               className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-emerald-600 to-emerald-700 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-200 shadow-md hover:shadow-lg"
             >
               <Check className="w-5 h-5" />
               Seal & Generate Report
             </button>
           ) : (
-            <button 
-              onClick={goToNextStep} 
+            <button
+              onClick={goToNextStep}
               className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
             >
               Next

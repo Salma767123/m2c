@@ -19,6 +19,7 @@ export interface OrderItem {
 export interface Order {
     id: string;
     orderId: string;
+    invoiceNo?: string;        // ← invoice number from InvoiceSettings
     status: string;
     totalAmount: number;
     subtotal: number;
@@ -27,6 +28,7 @@ export interface Order {
     discount: number;
     items: OrderItem[];
     createdAt: string;
+    orderDate?: string;
     shippingAddress: any; // Define precise type if possible
     paymentMethod?: string;
     paymentId?: string;

@@ -20,6 +20,8 @@ import {
   FileText,
   Users,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { qcCheckerService } from '@/services/qcCheckerService'
 
 interface HeaderProps {
   onMenuToggle?: () => void
@@ -29,9 +31,16 @@ interface HeaderProps {
 export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [checkerName, setCheckerName] = useState('Quality Inspector')
   const pathname = usePathname()
+  const router = useRouter()
   const notificationsRef = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const data = qcCheckerService.getCheckerData()
+    if (data?.name) setCheckerName(data.name)
+  }, [])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -154,9 +163,8 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
                     {notifications.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`border-b border-gray-100 p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                          notification.unread ? 'bg-gray-50' : ''
-                        }`}
+                        className={`border-b border-gray-100 p-4 hover:bg-gray-50 cursor-pointer transition-colors ${notification.unread ? 'bg-gray-50' : ''
+                          }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -198,7 +206,7 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
                   <div className="p-3 border-b border-gray-200 bg-gray-50">
-                    <p className="font-semibold text-black">Quality Inspector</p>
+                    <p className="font-semibold text-black">{checkerName}</p>
                     <p className="text-sm text-gray-500">QC Checker</p>
                   </div>
                   <div className="py-2">
@@ -216,7 +224,13 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
                     </button>
                   </div>
                   <div className="border-t border-gray-200 p-2 bg-gray-50">
-                    <button className="flex items-center w-full px-4 py-2 text-black hover:bg-gray-100 transition-colors font-medium">
+                    <button
+                      onClick={() => {
+                        qcCheckerService.clearCheckerAuth()
+                        router.push('/checker')
+                      }}
+                      className="flex items-center w-full px-4 py-2 text-black hover:bg-gray-100 transition-colors font-medium"
+                    >
                       <LogOut className="mr-3 h-4 w-4" />
                       <span className="text-sm">Sign out</span>
                     </button>

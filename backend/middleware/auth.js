@@ -23,7 +23,7 @@ const authenticateToken = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Handle vendor tokens differently
     if (decoded.type === 'vendor' && decoded.vendorId) {
       // Check vendor exists and is active
@@ -59,7 +59,46 @@ const authenticateToken = async (req, res, next) => {
         role: 'VENDOR',
         vendorId: vendor.id
       };
-      
+
+      next();
+      return;
+    }
+
+    // Handle QC Checker tokens
+    if (decoded.type === 'qc_checker' && decoded.checkerId) {
+      const checker = await prisma.qCChecker.findUnique({
+        where: { id: decoded.checkerId },
+        select: {
+          id: true,
+          checkerId: true,
+          email: true,
+          name: true,
+          status: true,
+          isActive: true,
+        }
+      });
+
+      if (!checker) {
+        return res.status(401).json({
+          success: false,
+          error: 'QC Checker not found'
+        });
+      }
+
+      if (!checker.isActive || checker.status === 'SUSPENDED') {
+        return res.status(403).json({
+          success: false,
+          error: 'QC Checker account is not active'
+        });
+      }
+
+      req.userId = checker.id;
+      req.user = {
+        ...checker,
+        role: 'QC_CHECKER',
+        checkerId: checker.id
+      };
+
       next();
       return;
     }
@@ -73,7 +112,7 @@ const authenticateToken = async (req, res, next) => {
         error: 'Session expired or invalid. Please login again.'
       });
     }
-    
+
     // Check if user exists and is active in all collections
     let user = await prisma.user.findUnique({
       where: { id: decoded.userId || decoded.id },
@@ -127,7 +166,7 @@ const authenticateToken = async (req, res, next) => {
       ...user,
       role: userType
     };
-    
+
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
@@ -136,7 +175,7 @@ const authenticateToken = async (req, res, next) => {
         error: 'Invalid token'
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
@@ -164,7 +203,7 @@ const requireRole = (roles) => {
 
     const userRole = req.user.role;
     const allowedRoles = Array.isArray(roles) ? roles : [roles];
-    
+
     // Normalize role names for comparison
     const normalizedUserRole = userRole.toLowerCase();
     const normalizedAllowedRoles = allowedRoles.map(role => role.toLowerCase());
@@ -226,7 +265,7 @@ const optionalAuth = async (req, res, next) => {
 
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
+
       // Handle vendor tokens
       if (decoded.type === 'vendor' && decoded.vendorId) {
         const vendor = await prisma.vendor.findUnique({

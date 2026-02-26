@@ -16,14 +16,14 @@ export interface VendorRegistrationData {
   state: string;
   zipCode: string;
   country: string;
-  
+
   // Owner Profile
   ownerName: string;
   ownerEmail: string;
   ownerPhone: string;
   yearEstablished: string;
   employeeCount: string;
-  
+
   // Warehouse Details
   ownershipType: string;
   warehouseAddress: string;
@@ -32,17 +32,17 @@ export interface VendorRegistrationData {
   warehouseZip: string;
   warehouseCountry: string;
   mapLink?: string;
-  
+
   // Vendor Type & Products
   vendorType: string | string[];
   marketType: string | string[];
   selectedCategories: Record<string, string[]>;
   categoryRemarks?: string;
-  
+
   // Manufacturing Facilities
   enabledFacilities?: Record<string, boolean>;
   facilityDetails?: Record<string, any>;
-  
+
   // Certifications & Logistics
   selectedCertifications: string[];
   certificationExpiryDates: Record<string, string>;
@@ -52,7 +52,7 @@ export interface VendorRegistrationData {
   warehousingCapacity?: string;
   logisticsPartners?: string;
   shippingMethods: string[];
-  
+
   // Contact & Trade Info
   mainContact: {
     name: string;
@@ -75,7 +75,7 @@ export interface VendorRegistrationData {
     accountNumber: string;
     swiftCode: string;
   };
-  
+
   // Password
   password: string;
 }
@@ -262,7 +262,7 @@ class VendorService {
     if (!token) {
       throw new Error('No vendor authentication token found');
     }
-    
+
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -275,7 +275,7 @@ class VendorService {
     if (!token) {
       throw new Error('No vendor authentication token found');
     }
-    
+
     return {
       'Authorization': `Bearer ${token}`
     };
@@ -295,7 +295,7 @@ class VendorService {
   // Register vendor with form data and files
   static async registerVendor(formData: VendorRegistrationData, files: VendorFiles) {
     const form = new FormData();
-    
+
     // Add all form fields
     Object.keys(formData).forEach(key => {
       const value = (formData as any)[key];
@@ -305,7 +305,7 @@ class VendorService {
         form.append(key, value || '');
       }
     });
-    
+
     // Add files
     if (files.logo) {
       form.append('logo', files.logo);
@@ -327,40 +327,40 @@ class VendorService {
         form.append(`certificationId_${index}`, certId);
       });
     }
-    
+
     try {
       const response = await axiosInstance.post('/vendors/register', form, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Vendor registration error:', error);
       throw error;
     }
   }
-  
+
   // Login vendor
   static async loginVendor(email: string, password: string): Promise<VendorLoginResponse> {
     try {
       const response = await axiosInstance.post('/vendors/login', { email, password });
-      
+
       const data = response.data;
-      
+
       // Store token in localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('vendorToken', data.token);
         localStorage.setItem('vendorData', JSON.stringify(data.vendor));
       }
-      
+
       return data;
     } catch (error: any) {
       // The axios interceptor returns a custom error object: { message, status, data }
       // Also handle standard axios error structure for backward compatibility
       let errorMessage = 'Invalid credentials';
-      
+
       if (error?.message) {
         errorMessage = error.message;
       } else if (error?.response?.data?.error) {
@@ -372,47 +372,47 @@ class VendorService {
       } else if (error?.data?.message) {
         errorMessage = error.data.message;
       }
-      
+
       console.error('Vendor login error:', { error, errorMessage });
       throw new Error(errorMessage);
     }
   }
-  
+
   // Get vendor profile
   static async getVendorProfile(): Promise<{ vendor: VendorProfile }> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('vendorToken') : null;
     if (!token) {
       throw new Error('No authentication token found');
     }
-    
+
     try {
       const response = await axiosInstance.get('/vendors/profile', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Get vendor profile error:', error);
       throw error;
     }
   }
-  
+
   // Update vendor profile
   static async updateVendorProfile(updateData: Partial<VendorProfile>) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('vendorToken') : null;
     if (!token) {
       throw new Error('No authentication token found');
     }
-    
+
     try {
       const response = await axiosInstance.put('/vendors/profile', updateData, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Update vendor profile error:', error);
@@ -424,7 +424,7 @@ class VendorService {
   static async getAllVendors(filters: VendorFilters = {}): Promise<VendorsListResponse> {
     const token = this.getAdminToken();
     console.log('Admin token check:', token ? 'Token found' : 'No token found');
-    
+
     if (!token) {
       throw new Error('No admin authentication token found');
     }
@@ -444,7 +444,7 @@ class VendorService {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       console.log('Response status:', response.status);
       console.log('Vendors data received:', response.data);
       return response.data;
@@ -467,7 +467,7 @@ class VendorService {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Get vendor by ID error:', error);
@@ -479,7 +479,7 @@ class VendorService {
   static async updateVendorById(vendorId: string, vendorData: any) {
     const token = this.getAdminToken();
     console.log('updateVendorById - Admin token:', token ? 'Found' : 'Not found');
-    
+
     if (!token) {
       throw new Error('No admin authentication token found');
     }
@@ -487,19 +487,19 @@ class VendorService {
     try {
       console.log('updateVendorById - Sending request to:', `/vendors/${vendorId}`);
       console.log('updateVendorById - Data:', vendorData);
-      
+
       // Prepare FormData for file uploads
       const formData = new FormData();
-      
+
       // Add all form fields
       Object.keys(vendorData).forEach(key => {
         const value = vendorData[key];
-        
+
         // Skip certificationFiles as we'll handle them separately
         if (key === 'certificationFiles') {
           return;
         }
-        
+
         // Handle different data types
         if (typeof value === 'object' && value !== null && !(value instanceof File)) {
           formData.append(key, JSON.stringify(value));
@@ -507,7 +507,7 @@ class VendorService {
           formData.append(key, value);
         }
       });
-      
+
       // Add certification files
       if (vendorData.certificationFiles) {
         let fileIndex = 0;
@@ -519,14 +519,14 @@ class VendorService {
           }
         });
       }
-      
+
       const response = await axiosInstance.put(`/vendors/${vendorId}`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       console.log('updateVendorById - Response:', response.data);
       return response.data;
     } catch (error: any) {
@@ -549,7 +549,7 @@ class VendorService {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Approve vendor error:', error);
@@ -570,7 +570,7 @@ class VendorService {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Reject vendor error:', error);
@@ -591,14 +591,113 @@ class VendorService {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('Suspend vendor error:', error);
       throw error;
     }
   }
-  
+
+  // Admin: Assign QC Checker & Create Inspection
+  static async assignQc(
+    vendorId: string,
+    checkerId: string,
+    poNumber: string,
+    clientName: string,
+    scheduledDate: string,
+    scheduledTime: string,
+    priority: string,
+    estimatedDuration: string,
+    itemsToInspect: any[]
+  ) {
+    const token = this.getAdminToken();
+    if (!token) {
+      throw new Error('No admin authentication token found');
+    }
+
+    try {
+      const response = await axiosInstance.post(`/inspections/assign`, {
+        vendorId,
+        checkerId,
+        poNumber,
+        clientName,
+        scheduledDate,
+        scheduledTime,
+        priority,
+        estimatedDuration,
+        itemsToInspect
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Assign QC error:', error);
+      throw error;
+    }
+  }
+
+  // Admin: Get Inspection by Vendor
+  static async getInspectionByVendorId(vendorId: string) {
+    const token = this.getAdminToken();
+    if (!token) {
+      throw new Error('No admin authentication token found');
+    }
+
+    try {
+      const response = await axiosInstance.get(`/inspections/vendor/${vendorId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get Inspection error:', error);
+      throw error;
+    }
+  }
+
+  // Admin: Update Inspection
+  static async updateInspection(
+    inspectionId: string,
+    checkerId: string,
+    poNumber: string,
+    clientName: string,
+    scheduledDate: string,
+    scheduledTime: string,
+    priority: string,
+    estimatedDuration: string,
+    itemsToInspect: any[]
+  ) {
+    const token = this.getAdminToken();
+    if (!token) {
+      throw new Error('No admin authentication token found');
+    }
+
+    try {
+      const response = await axiosInstance.put(`/inspections/${inspectionId}`, {
+        checkerId,
+        poNumber,
+        clientName,
+        scheduledDate,
+        scheduledTime,
+        priority,
+        estimatedDuration,
+        itemsToInspect
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Update Inspection error:', error);
+      throw error;
+    }
+  }
+
   // Logout vendor
   static logout() {
     if (typeof window !== 'undefined') {
@@ -606,13 +705,13 @@ class VendorService {
       localStorage.removeItem('vendorData');
     }
   }
-  
+
   // Check if vendor is logged in
   static isLoggedIn(): boolean {
     if (typeof window === 'undefined') return false;
     return !!localStorage.getItem('vendorToken');
   }
-  
+
   // Get stored vendor data
   static getStoredVendorData(): VendorProfile | null {
     if (typeof window === 'undefined') return null;
@@ -803,14 +902,14 @@ class VendorService {
   ) {
     try {
       const formData = new FormData();
-      
+
       if (certificateFile) {
         formData.append('certificate', certificateFile);
       }
-      
+
       formData.append('name', certificationData.name);
       formData.append('issuedBy', certificationData.issuedBy);
-      
+
       if (certificationData.certificateNumber) {
         formData.append('certificateNumber', certificationData.certificateNumber);
       }
@@ -843,11 +942,11 @@ class VendorService {
   ) {
     try {
       const formData = new FormData();
-      
+
       if (certificateFile) {
         formData.append('certificate', certificateFile);
       }
-      
+
       if (certificationData.name) {
         formData.append('name', certificationData.name);
       }

@@ -6,15 +6,15 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import axiosInstance from '@/lib/axios'
-import { 
-  Eye, 
-  EyeOff, 
-  Lock, 
-  AlertCircle, 
-  BarChart3, 
-  Shield, 
-  Settings, 
-  Users 
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  AlertCircle,
+  BarChart3,
+  Shield,
+  Settings,
+  Users
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
@@ -75,7 +75,7 @@ export default function AdminLogin() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }))
-    
+
     // Real-time validation
     if (name === 'email') {
       validateEmail(value)
@@ -102,7 +102,7 @@ export default function AdminLogin() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!loginData.email || !loginData.password) {
       showErrorToast('Validation Error', 'Please fill in all fields.')
       return
@@ -139,20 +139,16 @@ export default function AdminLogin() {
 
       console.log('Super Admin login successful, storing auth data...')
 
-      // Store authentication data
-      if (loginData.rememberMe) {
-        localStorage.setItem('adminToken', loginResponse.token)
-        localStorage.setItem('adminUser', JSON.stringify(loginResponse.user))
-        console.log('Stored in localStorage')
-      } else {
-        sessionStorage.setItem('adminToken', loginResponse.token)
-        sessionStorage.setItem('adminUser', JSON.stringify(loginResponse.user))
-        console.log('Stored in sessionStorage')
-      }
+      // Store authentication data — always localStorage for admin
+      // (httpOnly cookie also set by backend for 7-day persistence)
+      localStorage.setItem('adminToken', loginResponse.token)
+      localStorage.setItem('adminUser', JSON.stringify(loginResponse.user))
+      console.log('Stored in localStorage (permanent for admin sessions)')
+
 
       // Show success toast
       showSuccessToast('Login Successful', `Welcome back, ${loginResponse.user.name}!`)
-      
+
       // Small delay to show the toast before redirect
       setTimeout(() => {
         router.push('/admin/dashboard')
@@ -214,7 +210,7 @@ export default function AdminLogin() {
                   <p className="text-white/80 text-sm">Full system access & user role management</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4 bg-white/20 backdrop-blur-md rounded-xl p-4 transition-all duration-300 hover:bg-white/25 hover:shadow-lg hover:scale-[1.02] cursor-default">
                 <div className="shrink-0 w-12 h-12 bg-white/30 rounded-lg flex items-center justify-center">
                   <Settings className="w-6 h-6 text-white" />
@@ -224,7 +220,7 @@ export default function AdminLogin() {
                   <p className="text-white/80 text-sm">Department management & oversight</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4 bg-white/20 backdrop-blur-md rounded-xl p-4 transition-all duration-300 hover:bg-white/25 hover:shadow-lg hover:scale-[1.02] cursor-default">
                 <div className="shrink-0 w-12 h-12 bg-white/30 rounded-lg flex items-center justify-center">
                   <Users className="w-6 h-6 text-white" />
@@ -286,11 +282,10 @@ export default function AdminLogin() {
                     value={loginData.email}
                     onChange={handleLoginChange}
                     onBlur={() => validateEmail(loginData.email)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
-                      emailError
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${emailError
                         ? "border-red-500 focus:ring-red-200"
                         : "border-gray-300 focus:ring-[#455a64]"
-                    }`}
+                      }`}
                     placeholder="Enter your email"
                     autoFocus
                     required
@@ -362,7 +357,7 @@ export default function AdminLogin() {
                 </div>
 
                 {/* Sign In Button - Primary */}
-                <Button 
+                <Button
                   type="submit"
                   disabled={isLoading}
                   className="w-full bg-gray-900 hover:bg-gray-700 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"

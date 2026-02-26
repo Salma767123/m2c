@@ -1,244 +1,257 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Eye, Download, Share2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Search, Eye, RefreshCw, FileText, Receipt } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/UI/Table";
 import Dropdown from "@/components/UI/Dropdown";
+import { orderService, Order } from "@/services/orderService";
+import { showErrorToast } from "@/lib/toast-utils";
 
-interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  orderId: string;
-  customer: string;
-  date: string;
-  dueDate: string;
-  amount: number;
-  status: "Paid" | "Pending" | "Overdue";
-  type: "Customer" | "Vendor";
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const mockInvoices: Invoice[] = [
-  {
-    id: "1",
-    invoiceNumber: "INV-2024-001",
-    orderId: "ORD-2024-001",
-    customer: "John Doe",
-    date: "2024-02-10",
-    dueDate: "2024-02-20",
-    amount: 2500,
-    status: "Paid",
-    type: "Customer",
-  },
-  {
-    id: "2",
-    invoiceNumber: "INV-2024-002",
-    orderId: "ORD-2024-002",
-    customer: "Jane Smith",
-    date: "2024-02-11",
-    dueDate: "2024-02-21",
-    amount: 5000,
-    status: "Pending",
-    type: "Customer",
-  },
-  {
-    id: "3",
-    invoiceNumber: "INV-2024-003",
-    orderId: "ORD-2024-003",
-    customer: "Textile Traders",
-    date: "2024-02-12",
-    dueDate: "2024-02-22",
-    amount: 3500,
-    status: "Paid",
-    type: "Vendor",
-  },
-  {
-    id: "4",
-    invoiceNumber: "INV-2024-004",
-    orderId: "ORD-2024-004",
-    customer: "Mike Johnson",
-    date: "2024-02-13",
-    dueDate: "2024-02-23",
-    amount: 1500,
-    status: "Overdue",
-    type: "Customer",
-  },
-];
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+
+const fmtINR = (n: number) =>
+  "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Map payment status → invoice status label
+const invoiceStatus = (paymentStatus?: string): "Paid" | "Pending" | "Overdue" => {
+  if (!paymentStatus) return "Pending";
+  const p = paymentStatus.toUpperCase();
+  if (p === "PAID" || p === "SUCCESS" || p === "CAPTURED") return "Paid";
+  if (p === "FAILED" || p === "REFUNDED") return "Overdue";
+  return "Pending";
+};
+
+const statusColor = (s: string) => {
+  if (s === "Paid") return "bg-green-100 text-green-800";
+  if (s === "Pending") return "bg-yellow-100 text-yellow-800";
+  return "bg-red-100 text-red-800";
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function InvoiceManagement() {
   const router = useRouter();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [typeFilter, setTypeFilter] = useState("All");
 
   const statusOptions = ["All", "Paid", "Pending", "Overdue"];
-  const typeOptions = ["All", "Customer", "Vendor"];
 
-  const filteredInvoices = mockInvoices.filter((invoice) => {
-    const matchesSearch =
-      invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.customer.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "All" || invoice.status === statusFilter;
-    const matchesType = typeFilter === "All" || invoice.type === typeFilter;
-    return matchesSearch && matchesStatus && matchesType;
+  // ── Fetch all orders (admin) ──────────────────────────────────────────────
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await orderService.getAdminOrders();
+      if (res.success) {
+        // Only show orders that have an invoice number assigned
+        setOrders(res.data); // show all; invoiceNo may be null for old orders
+      }
+    } catch (err: any) {
+      showErrorToast("Error", err.message || "Failed to load invoices");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  // ── Derived stats ─────────────────────────────────────────────────────────
+  const ordersWithInvoice = orders.filter(o => o.invoiceNo);
+  const paid = ordersWithInvoice.filter(o => invoiceStatus(o.paymentStatus) === "Paid").length;
+  const pending = ordersWithInvoice.filter(o => invoiceStatus(o.paymentStatus) === "Pending").length;
+  const overdue = ordersWithInvoice.filter(o => invoiceStatus(o.paymentStatus) === "Overdue").length;
+
+  // ── Filter ────────────────────────────────────────────────────────────────
+  const filtered = orders.filter(order => {
+    const invNo = (order.invoiceNo || "").toLowerCase();
+    const ordId = (order.orderId || "").toLowerCase();
+    const custRaw = order.customerName || order.customerEmail || "";
+    const cust = custRaw.toLowerCase();
+    const search = searchTerm.toLowerCase();
+
+    const matchSearch = !search ||
+      invNo.includes(search) || ordId.includes(search) || cust.includes(search);
+
+    const status = invoiceStatus(order.paymentStatus);
+    const matchStatus = statusFilter === "All" || status === statusFilter;
+
+    return matchSearch && matchStatus;
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Paid":
-        return "bg-green-100 text-green-800";
-      case "Pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "Overdue":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  // ── Print invoice in new tab ──────────────────────────────────────────────
+  const handlePrintInvoice = async (order: Order) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+      const token = localStorage.getItem("adminToken") || sessionStorage.getItem("adminToken") || "";
+      const response = await fetch(`${baseUrl}/orders/admin/${order.id}/invoice`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+      const html = await response.text();
+      const win = window.open("", "_blank");
+      if (win) { win.document.write(html); win.document.close(); win.focus(); }
+    } catch {
+      showErrorToast("Error", "Failed to generate invoice");
     }
   };
 
-  const getTypeColor = (type: string) => {
-    return type === "Customer" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800";
-  };
-
-  const handleViewInvoice = (invoiceId: string) => {
-    router.push(`/admin/dashboard/billing/invoices/view/${invoiceId}`);
-  };
-
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Total Invoices</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{mockInvoices.length}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Paid</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">
-            {mockInvoices.filter((i) => i.status === "Paid").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Pending</p>
-          <p className="text-2xl font-bold text-yellow-600 mt-1">
-            {mockInvoices.filter((i) => i.status === "Pending").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Overdue</p>
-          <p className="text-2xl font-bold text-red-600 mt-1">
-            {mockInvoices.filter((i) => i.status === "Overdue").length}
-          </p>
-        </div>
+
+      {/* ── Stats ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Total Invoices", value: ordersWithInvoice.length, color: "text-gray-900" },
+          { label: "Paid", value: paid, color: "text-green-600" },
+          { label: "Pending", value: pending, color: "text-yellow-600" },
+          { label: "Overdue", value: overdue, color: "text-red-600" },
+        ].map(s => (
+          <div key={s.label} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <p className="text-sm text-gray-600">{s.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      {/* ── Filters ── */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
               type="text"
-              placeholder="Search by Invoice Number, Order ID, or Customer..."
+              placeholder="Search by Invoice No, Order ID or Customer…"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
             />
           </div>
-          <div className="w-full md:w-48">
+          <div className="w-full md:w-44">
             <Dropdown
               value={statusFilter}
               options={statusOptions}
-              onChange={(value) => setStatusFilter(value as string)}
+              onChange={v => setStatusFilter(v as string)}
               placeholder="Filter by Status"
             />
           </div>
-          <div className="w-full md:w-48">
-            <Dropdown
-              value={typeFilter}
-              options={typeOptions}
-              onChange={(value) => setTypeFilter(value as string)}
-              placeholder="Filter by Type"
-            />
-          </div>
+          <button
+            onClick={fetchOrders}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
-      {/* Invoices Table */}
+      {/* ── Table ── */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Invoice Number</TableHead>
-              <TableHead>Order ID</TableHead>
-              <TableHead>Customer/Vendor</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Due Date</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredInvoices.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <RefreshCw className="h-6 w-6 animate-spin text-gray-400 mr-3" />
+            <span className="text-gray-500">Loading invoices…</span>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                  No invoices found
-                </TableCell>
+                <TableHead>Invoice No</TableHead>
+                <TableHead>Order ID</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ) : (
-              filteredInvoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                  <TableCell>{invoice.orderId}</TableCell>
-                  <TableCell>{invoice.customer}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${getTypeColor(
-                        invoice.type
-                      )}`}
-                    >
-                      {invoice.type}
-                    </span>
-                  </TableCell>
-                  <TableCell>{new Date(invoice.date).toLocaleDateString()}</TableCell>
-                  <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
-                  <TableCell>₹{invoice.amount.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                        invoice.status
-                      )}`}
-                    >
-                      {invoice.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleViewInvoice(invoice.id)}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="View Invoice"
-                      >
-                        <Eye className="h-5 w-5" />
-                      </button>
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-12 text-gray-400">
+                    <Receipt className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                    <p>No invoices found</p>
+                    {!searchTerm && statusFilter === "All" && (
+                      <p className="text-xs mt-1 text-gray-400">New orders will appear here once placed</p>
+                    )}
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                filtered.map(order => {
+                  const status = invoiceStatus(order.paymentStatus);
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-mono font-semibold text-indigo-700">
+                        {order.invoiceNo ? (
+                          <span className="flex items-center gap-1.5">
+                            <FileText className="h-3.5 w-3.5" />
+                            {order.invoiceNo}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-xs italic">No invoice</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{order.orderId}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">{order.customerName || "—"}</p>
+                          <p className="text-xs text-gray-500">{order.customerEmail}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {fmtDate(order.orderDate || order.createdAt)}
+                      </TableCell>
+                      <TableCell className="font-semibold">{fmtINR(order.totalAmount)}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{order.paymentMethod || "—"}</TableCell>
+                      <TableCell>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColor(status)}`}>
+                          {status}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => router.push(`/admin/dashboard/billing/invoices/view/${order.id}`)}
+                            className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="View Invoice"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          {order.invoiceNo && (
+                            <button
+                              onClick={() => handlePrintInvoice(order)}
+                              className="p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
+                              title="Print Invoice"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        )}
       </div>
+
+      {/* ── Footer count ── */}
+      {!loading && filtered.length > 0 && (
+        <p className="text-xs text-gray-400 text-right">
+          Showing {filtered.length} of {orders.length} orders
+        </p>
+      )}
     </div>
   );
 }

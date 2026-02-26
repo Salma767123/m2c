@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, Briefcase } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, Briefcase, FileText, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
+import axiosInstance from "@/lib/axios";
 
 interface OrderDetailProps {
     orderId: string;
@@ -14,6 +15,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
     const router = useRouter();
     const [order, setOrder] = useState<Order | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [invoiceLoading, setInvoiceLoading] = useState(false);
 
     useEffect(() => {
         fetchOrderDetails();
@@ -32,6 +34,35 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             setIsLoading(false);
         }
     };
+
+    const handlePrintInvoice = async () => {
+        if (!order) return;
+        setInvoiceLoading(true);
+        try {
+            // Open invoice in a new tab — the endpoint returns raw HTML
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+            const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken') || '';
+            const invoiceUrl = `${baseUrl}/orders/admin/${order.id}/invoice`;
+
+            // Fetch the HTML and open it in a new window for print
+            const response = await fetch(invoiceUrl, {
+                headers: { Authorization: `Bearer ${token}` },
+                credentials: 'include',
+            });
+            const html = await response.text();
+            const win = window.open('', '_blank');
+            if (win) {
+                win.document.write(html);
+                win.document.close();
+                win.focus();
+            }
+        } catch (error: any) {
+            showErrorToast('Invoice Error', error.message || 'Failed to generate invoice');
+        } finally {
+            setInvoiceLoading(false);
+        }
+    };
+
 
     if (isLoading) {
         return <div className="p-6 text-center text-gray-500">Loading order overview...</div>;
@@ -56,13 +87,32 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                     </button>
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">Order Details Overview</h1>
-                        <p className="text-sm text-gray-600 mt-1">Full overview of Order ID: {order.orderId}</p>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                            <p className="text-sm text-gray-600">Order ID: <span className="font-mono font-semibold">{order.orderId}</span></p>
+                            {order.invoiceNo && (
+                                <span className="inline-flex items-center gap-1.5 text-sm bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-3 py-0.5 font-semibold">
+                                    <FileText className="h-3.5 w-3.5" />
+                                    Invoice: {order.invoiceNo}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 items-center">
+                    {/* Print Invoice Button */}
+                    <button
+                        onClick={handlePrintInvoice}
+                        disabled={invoiceLoading}
+                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    >
+                        {invoiceLoading
+                            ? <span className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />
+                            : <FileText className="h-4 w-4" />}
+                        {invoiceLoading ? 'Generating…' : 'Print Invoice'}
+                    </button>
                     <span className={`px-4 py-2 rounded-lg font-medium border ${status === "DELIVERED" ? "bg-green-100 text-green-800 border-green-300" :
-                        ["SHIPPED_TO_CUSTOMER", "IN_TRANSIT_TO_ADMIN_HUB"].includes(status) ? "bg-blue-100 text-blue-800 border-blue-300" :
-                            "bg-yellow-100 text-yellow-800 border-yellow-300"
+                            ["SHIPPED_TO_CUSTOMER", "IN_TRANSIT_TO_ADMIN_HUB"].includes(status) ? "bg-blue-100 text-blue-800 border-blue-300" :
+                                "bg-yellow-100 text-yellow-800 border-yellow-300"
                         }`}>
                         Status: {status.replace(/_/g, " ")}
                     </span>

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -10,6 +11,8 @@ import {
   Settings,
   LogOut,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { qcCheckerService } from '@/services/qcCheckerService'
 
 const sidebarItems = [
   {
@@ -36,6 +39,18 @@ const sidebarItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const [checkerName, setCheckerName] = useState('Quality Inspector')
+
+  useEffect(() => {
+    const data = qcCheckerService.getCheckerData()
+    if (data?.name) setCheckerName(data.name)
+  }, [])
+
+  const handleLogout = () => {
+    qcCheckerService.clearCheckerAuth()
+    router.push('/checker')
+  }
 
   return (
     <div className="flex h-full w-64 flex-col bg-white border-r border-gray-700 text-gray-800 font-sans">
@@ -49,7 +64,7 @@ export default function Sidebar() {
         {sidebarItems.map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href
-          
+
           return (
             <Link
               key={item.href}
@@ -76,12 +91,15 @@ export default function Sidebar() {
               <span className="text-sm font-medium">QI</span>
             </div>
           </div>
-          <div className="ml-3">
-            <p className="text-sm font-bold">Quality Inspector</p>
+          <div className="ml-3 text-left">
+            <p className="text-sm font-bold truncate w-40">{checkerName}</p>
             <p className="text-sm text-gray-900">QC Checker</p>
           </div>
         </div>
-        <button className="mt-3 flex w-full items-center px-2 py-2 text-sm font-medium text-gray-900 rounded-md hover:bg-gray-700 hover:text-white transition-colors">
+        <button
+          onClick={handleLogout}
+          className="mt-3 flex w-full items-center px-2 py-2 text-sm font-medium text-gray-900 rounded-md hover:bg-gray-700 hover:text-white transition-colors"
+        >
           <LogOut className="mr-3 h-4 w-4" />
           Sign out
         </button>

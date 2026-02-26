@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const { generateInvoiceNo } = require('../utils/invoiceGenerator');
 
 // Create new order
 const createOrder = async (req, res) => {
@@ -52,6 +53,8 @@ const createOrder = async (req, res) => {
         let subtotal = 0;
         const orderItemsData = [];
         const stockUpdates = [];
+        const vendorTotals = {}; // Tracks vendor amounts using their base prices
+
 
         // Helper to get vendor details
         // We need to fetch product details for each item to get price, vendor, etc.
@@ -86,6 +89,20 @@ const createOrder = async (req, res) => {
             const itemTotal = unitPrice * item.quantity;
             subtotal += itemTotal;
 
+            // Calculate Vendor Settlement using vendor's base price
+            const vendorPrice = product.basePrice || 0;
+            const vendorItemTotal = vendorPrice * item.quantity;
+
+            if (product.vendorId) {
+                if (!vendorTotals[product.vendorId]) {
+                    vendorTotals[product.vendorId] = {
+                        amount: 0,
+                        vendorName: product.vendor.companyName || product.vendor.ownerName || 'Unknown Vendor'
+                    };
+                }
+                vendorTotals[product.vendorId].amount += vendorItemTotal;
+            }
+
             // Prepare Order Item Data
             orderItemsData.push({
                 productId: product.id,
@@ -118,7 +135,17 @@ const createOrder = async (req, res) => {
         const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
         const orderDisplayId = `ORD-${new Date().getFullYear()}-${timestamp}${random}`;
 
+        // Generate invoice number from InvoiceSettings
+        const invoiceNo = await generateInvoiceNo(prisma);
+
         const totalAmount = subtotal + shippingCost + tax - discount;
+
+        // Group vendor totals for Settlements (Now calculated in the main cart loop)
+
+        const datePeriod = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        // Set due date to 7 days from now
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 7);
 
         // Use transaction to ensure data integrity
         const result = await prisma.$transaction(async (tx) => {
@@ -126,6 +153,7 @@ const createOrder = async (req, res) => {
             const newOrder = await tx.order.create({
                 data: {
                     orderId: orderDisplayId,
+                    invoiceNo,                    // ← from InvoiceSettings
                     customerId: userId,
                     customerName: user.name,
                     customerEmail: user.email,
@@ -155,10 +183,34 @@ const createOrder = async (req, res) => {
                     where: { id: update.id },
                     data: {
                         totalStock: { decrement: update.quantity }
-                        // We can't easily check 'status' here without reading again or writing raw query, 
-                        // so we skip status update for now or do it in a separate process/trigger if critical.
-                        // Or we can assume > 0 if validated.
                     }
+                });
+            }
+
+            // Create Vendor Settlements
+            const settlementRecords = [];
+            const vendorKeys = Object.keys(vendorTotals);
+            for (let i = 0; i < vendorKeys.length; i++) {
+                const vid = vendorKeys[i];
+                const vData = vendorTotals[vid];
+                const seqStr = String(i + 1).padStart(3, '0');
+                const setNum = `SET-${new Date().getFullYear()}-${timestamp}-${seqStr}`;
+                settlementRecords.push({
+                    settlementNumber: setNum,
+                    vendorId: vid,
+                    vendorName: vData.vendorName,
+                    orderId: newOrder.id,
+                    billingNumber: invoiceNo || orderDisplayId,
+                    period: datePeriod,
+                    amount: vData.amount,
+                    dueDate: dueDate,
+                    status: 'Pending'
+                });
+            }
+
+            if (settlementRecords.length > 0) {
+                await tx.settlement.createMany({
+                    data: settlementRecords
                 });
             }
 

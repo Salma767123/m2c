@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff, Percent, Warehouse } from "lucide-react";
 import GSTSettingsTab from "./GSTSettingsTab";
 import HubSettingsTab from "./HubSettingsTab";
+import InvoiceSettings from "../Billing/Settings/InvoiceSettings";
 import { Card, CardContent } from "../../UI/Card";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
@@ -41,7 +42,7 @@ export default function Settings() {
     zipCode: "10001",
   });
 
-  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice">("profile");
 
   // Profile form state
   const [profileData, setProfileData] = useState({
@@ -471,6 +472,16 @@ export default function Settings() {
               >
                 <Warehouse className="h-4 w-4 inline mr-2" />
                 Hub Management
+              </button>
+              <button
+                onClick={() => setActiveTab("invoice")}
+                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "invoice"
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                <FileText className="h-4 w-4 inline mr-2" />
+                Invoice Settings
               </button>
             </>
           )}
@@ -1415,6 +1426,11 @@ export default function Settings() {
       {/* Hub Management Tab */}
       {activeTab === "hub" && canAccessAdminSettings && (
         <HubSettingsTab />
+      )}
+
+      {/* Invoice Settings Tab */}
+      {activeTab === "invoice" && canAccessAdminSettings && (
+        <InvoiceSettings />
       )}
     </div>
   );
