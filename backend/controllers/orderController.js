@@ -63,6 +63,9 @@ const createOrder = async (req, res) => {
                 where: { id: item.productId },
                 include: {
                     vendor: true, // Need vendor info for OrderItem
+                    variants: item.variantId ? {
+                        where: { id: item.variantId }
+                    } : false,
                     images: {
                         where: { isPrimary: true },
                         take: 1
@@ -77,15 +80,18 @@ const createOrder = async (req, res) => {
                 });
             }
 
+            const variant = item.variantId && product.variants?.length > 0 ? product.variants[0] : null;
+
             // Check stock
-            if (product.trackInventory && product.totalStock < item.quantity) {
+            const checkStock = variant ? variant.stock : product.totalStock;
+            if (product.trackInventory && checkStock < item.quantity) {
                 return res.status(400).json({
                     success: false,
                     error: `Insufficient stock for product: ${product.name}`
                 });
             }
 
-            const unitPrice = product.adminFixedPrice || product.basePrice;
+            const unitPrice = variant ? variant.price : (product.adminFixedPrice || product.basePrice);
             const itemTotal = unitPrice * item.quantity;
             subtotal += itemTotal;
 
@@ -107,14 +113,16 @@ const createOrder = async (req, res) => {
             orderItemsData.push({
                 productId: product.id,
                 productName: product.name,
-                productImage: product.images[0]?.url || '',
+                productImage: variant?.images?.[0] || product.images[0]?.url || '',
                 quantity: item.quantity,
                 unitPrice: unitPrice,
                 totalPrice: itemTotal,
                 vendorId: product.vendorId,
                 vendorName: product.vendor.companyName || product.vendor.ownerName,
-                sku: product.baseSku, // Using baseSku as CartItem doesn't track variant SKU
-                // variantId, size, color would go here if CartItem supported it
+                sku: variant ? variant.sku : product.baseSku,
+                variantId: variant ? variant.id : undefined,
+                size: variant ? variant.size : product.singleUnitSize || undefined,
+                color: variant ? variant.color : product.singleUnitColor || undefined
             });
 
             // Prepare stock update list
@@ -124,7 +132,10 @@ const createOrder = async (req, res) => {
                 // For now, we collect the ID to decrement later in transaction.
                 stockUpdates.push({
                     id: product.id,
-                    quantity: item.quantity
+                    variantId: variant ? variant.id : null,
+                    quantity: item.quantity,
+                    inventoryItemId: product.inventoryItemId,
+                    currentTotalStock: product.totalStock
                 });
             }
         }
@@ -179,12 +190,53 @@ const createOrder = async (req, res) => {
 
             // Update Stock
             for (const update of stockUpdates) {
+                const productUpdateData = {
+                    totalStock: { decrement: update.quantity }
+                };
+
+                // Check if the stock drops to 0 or below, set inStock to false
+                if (update.currentTotalStock - update.quantity <= 0) {
+                    productUpdateData.inStock = false;
+                }
+
                 await tx.product.update({
                     where: { id: update.id },
-                    data: {
-                        totalStock: { decrement: update.quantity }
-                    }
+                    data: productUpdateData
                 });
+
+                // Also decrement the specific variant's stock if applicable
+                if (update.variantId) {
+                    await tx.productVariant.update({
+                        where: { id: update.variantId },
+                        data: {
+                            stock: { decrement: update.quantity }
+                        }
+                    });
+                }
+
+                // Also reduce from Inventory model if linked
+                if (update.inventoryItemId) {
+                    await tx.inventory.update({
+                        where: { id: update.inventoryItemId },
+                        data: {
+                            currentStock: { decrement: update.quantity }
+                        }
+                    });
+
+                    // Log stock change history
+                    await tx.stockChangeHistory.create({
+                        data: {
+                            inventoryId: update.inventoryItemId,
+                            previousStock: update.currentTotalStock,
+                            newStock: Math.max(0, update.currentTotalStock - update.quantity),
+                            changeAmount: -Math.abs(update.quantity),
+                            reason: `Order placed: ${orderDisplayId}`,
+                            changedBy: userId,
+                            changedByType: 'system',
+                            changedByName: user.name
+                        }
+                    });
+                }
             }
 
             // Create Vendor Settlements

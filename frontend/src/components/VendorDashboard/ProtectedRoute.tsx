@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation'
 import LoadingSpinner from '@/components/UI/LoadingSpinner'
 import AuthError from '@/components/UI/AuthError'
 import VendorService from '@/services/vendorService'
-import { 
-  isVendorLoggedIn, 
-  getVendorData, 
+import {
+  isVendorLoggedIn,
+  getVendorData,
   isVendorSuspended,
   isVendorPending,
   isVendorRejected,
-  clearVendorAuth 
+  clearVendorAuth
 } from '@/lib/vendorAuth'
 import { AUTH_ERRORS } from '@/constants/authErrors'
 
@@ -30,53 +30,53 @@ export default function VendorProtectedRoute({ children }: VendorProtectedRouteP
       try {
         // Wait for storage to be ready (especially important for new tabs)
         await new Promise(resolve => setTimeout(resolve, 200))
-        
+
         // Check if vendor is logged in
         if (!isVendorLoggedIn()) {
           console.log('VendorProtectedRoute: No vendor login found')
-          router.replace('/vendor/login')
+          router.replace('/vendor')
           return
         }
-        
+
         // Get stored vendor data
         const vendorData = getVendorData()
-        
+
         if (!vendorData) {
           console.log('VendorProtectedRoute: No vendor data found')
           clearVendorAuth()
-          router.replace('/vendor/login')
+          router.replace('/vendor')
           return
         }
-        
+
         // Check if vendor is suspended
         if (isVendorSuspended()) {
           setErrorMessage(AUTH_ERRORS.SUSPENDED_ACCOUNT)
           clearVendorAuth()
           setTimeout(() => {
-            router.replace('/vendor/login?reason=suspended')
+            router.replace('/vendor?reason=suspended')
           }, 3000)
           return
         }
-        
+
         // Check if vendor is pending approval
         if (isVendorPending()) {
           setErrorMessage(AUTH_ERRORS.PENDING_APPROVAL)
           setTimeout(() => {
-            router.replace('/vendor/login?reason=pending')
+            router.replace('/vendor?reason=pending')
           }, 3000)
           return
         }
-        
+
         // Check if vendor is rejected
         if (isVendorRejected()) {
           setErrorMessage(AUTH_ERRORS.REJECTED_ACCOUNT)
           clearVendorAuth()
           setTimeout(() => {
-            router.replace('/vendor/login?reason=rejected')
+            router.replace('/vendor?reason=rejected')
           }, 3000)
           return
         }
-        
+
         // Verify token is still valid by making a test API call
         try {
           await VendorService.getVendorProfile()
@@ -84,25 +84,25 @@ export default function VendorProtectedRoute({ children }: VendorProtectedRouteP
           setIsAuthorized(true)
         } catch (error: any) {
           console.error('VendorProtectedRoute: Token validation failed:', error)
-          
+
           // Check if it's a 401/403 error (unauthorized)
           if (error?.response?.status === 401 || error?.response?.status === 403) {
             setErrorMessage(AUTH_ERRORS.TOKEN_EXPIRED)
           } else {
             setErrorMessage(AUTH_ERRORS.UNKNOWN_ERROR)
           }
-          
+
           clearVendorAuth()
           setTimeout(() => {
-            router.replace('/vendor/login')
+            router.replace('/vendor')
           }, 2000)
           return
         }
-        
+
       } catch (error) {
         console.error('VendorProtectedRoute: Auth check error:', error)
         clearVendorAuth()
-        router.replace('/vendor/login')
+        router.replace('/vendor')
       } finally {
         setIsLoading(false)
       }
@@ -129,9 +129,9 @@ export default function VendorProtectedRoute({ children }: VendorProtectedRouteP
   // Show error message
   if (errorMessage) {
     return (
-      <AuthError 
+      <AuthError
         error={errorMessage}
-        onGoToLogin={() => router.push('/vendor/login')}
+        onGoToLogin={() => router.push('/vendor')}
         autoRedirect={true}
         redirectSeconds={3}
       />

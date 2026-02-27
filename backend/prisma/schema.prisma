@@ -165,6 +165,7 @@ model CartItem {
   cartId    String   @db.ObjectId
   cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productId String   @db.ObjectId
+  variantId String?  @db.ObjectId
   quantity  Int      @default(1)
   price     Float    // Store price at time of adding to cart
   

@@ -118,7 +118,7 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
 
     try {
       // Add to cart via API
-      await cartService.addToCart(product.id, quantity);
+      await cartService.addToCart(product.id, quantity, selectedVariant?.id);
 
       const variantInfo = selectedVariant ? ` (${selectedVariant.size} - ${selectedVariant.color})` : '';
 

@@ -20,25 +20,25 @@ export function useVendorStatusCheck(intervalMs: number = 60000) {
     const checkStatus = async () => {
       try {
         const { vendor } = await VendorService.getVendorProfile()
-        
+
         // If status changed to suspended, logout immediately
         if (vendor.status === 'SUSPENDED') {
           console.log('useVendorStatusCheck: Vendor suspended, logging out')
           clearVendorAuth()
           VendorService.logout()
-          router.replace('/vendor/login?reason=suspended')
+          router.replace('/vendor?reason=suspended')
           return
         }
-        
+
         // If status changed to rejected, logout
         if (vendor.status === 'REJECTED') {
           console.log('useVendorStatusCheck: Vendor rejected, logging out')
           clearVendorAuth()
           VendorService.logout()
-          router.replace('/vendor/login?reason=rejected')
+          router.replace('/vendor?reason=rejected')
           return
         }
-        
+
         setStatus(vendor.status)
       } catch (error) {
         console.error('useVendorStatusCheck: Status check failed:', error)

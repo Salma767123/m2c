@@ -3,7 +3,7 @@ const { prisma } = require('../config/database');
 // Add item to cart
 const addToCart = async (req, res) => {
   try {
-    const { productId, quantity = 1 } = req.body;
+    const { productId, quantity = 1, variantId } = req.body;
     const userId = req.userId;
 
     if (!productId) {
@@ -22,7 +22,10 @@ const addToCart = async (req, res) => {
         basePrice: true,
         adminFixedPrice: true,
         inStock: true,
-        totalStock: true
+        totalStock: true,
+        variants: {
+          where: variantId ? { id: variantId } : {}
+        }
       }
     });
 
@@ -33,10 +36,19 @@ const addToCart = async (req, res) => {
       });
     }
 
-    if (!product.inStock || product.totalStock < quantity) {
+    if (variantId && (!product.variants || product.variants.length === 0)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product variant not found'
+      });
+    }
+
+    const checkStock = variantId ? product.variants[0].stock : product.totalStock;
+
+    if (!product.inStock || checkStock < quantity) {
       return res.status(400).json({
         success: false,
-        error: 'Product is out of stock or insufficient quantity available'
+        error: 'Product or variant is out of stock or insufficient quantity available'
       });
     }
 
@@ -57,11 +69,15 @@ const addToCart = async (req, res) => {
     const existingItem = await prisma.cartItem.findFirst({
       where: {
         cartId: cart.id,
-        productId
+        productId,
+        variantId: variantId || null
       }
     });
 
-    const price = product.adminFixedPrice || product.basePrice;
+    let price = product.adminFixedPrice || product.basePrice;
+    if (variantId && product.variants && product.variants.length > 0) {
+      price = product.variants[0].price;
+    }
 
     if (existingItem) {
       // Update quantity
@@ -78,6 +94,7 @@ const addToCart = async (req, res) => {
         data: {
           cartId: cart.id,
           productId,
+          variantId: variantId || null,
           quantity,
           price
         }
