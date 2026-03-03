@@ -42,10 +42,10 @@ const buildCategoryTree = (categories) => {
 // Get all categories with hierarchy
 const getAllCategories = async (req, res) => {
   try {
-    const { 
-      search, 
-      status, 
-      parentId, 
+    const {
+      search,
+      status,
+      parentId,
       includeSubcategories = 'true',
       showRootOnly = 'true', // New parameter to control root-only display
       sortBy = 'sortOrder',
@@ -54,18 +54,18 @@ const getAllCategories = async (req, res) => {
 
     // Build where clause
     const where = {};
-    
+
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } }
       ];
     }
-    
+
     if (status && status !== 'all') {
       where.status = status.toUpperCase();
     }
-    
+
     // Handle parent filtering logic
     if (parentId) {
       // If specific parentId is requested, show only those subcategories
@@ -114,8 +114,8 @@ const getAllCategories = async (req, res) => {
       subcategoryCount: category._count.subcategories
     }));
 
-    // If building tree structure
-    if (includeSubcategories === 'true' && !parentId) {
+    // If building tree structure from flat list
+    if (includeSubcategories === 'true' && !parentId && showRootOnly !== 'true') {
       const categoryTree = buildCategoryTree(categoriesWithStats);
       return res.json({
         success: true,
@@ -316,7 +316,7 @@ const createCategory = async (req, res) => {
     });
   } catch (error) {
     console.error('Create category error:', error);
-    
+
     // Handle unique constraint violation
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -503,7 +503,7 @@ const updateCategory = async (req, res) => {
     });
   } catch (error) {
     console.error('Update category error:', error);
-    
+
     if (error.code === 'P2002') {
       return res.status(400).json({
         success: false,
@@ -583,15 +583,15 @@ const getCategoryStats = async (req, res) => {
       where: { parentId: null }
     });
     const activeRootCategories = await prisma.category.count({
-      where: { 
+      where: {
         parentId: null,
-        status: 'ACTIVE' 
+        status: 'ACTIVE'
       }
     });
     const inactiveRootCategories = await prisma.category.count({
-      where: { 
+      where: {
         parentId: null,
-        status: 'INACTIVE' 
+        status: 'INACTIVE'
       }
     });
 
@@ -600,15 +600,15 @@ const getCategoryStats = async (req, res) => {
       where: { parentId: { not: null } }
     });
     const activeSubcategories = await prisma.category.count({
-      where: { 
+      where: {
         parentId: { not: null },
-        status: 'ACTIVE' 
+        status: 'ACTIVE'
       }
     });
     const inactiveSubcategories = await prisma.category.count({
-      where: { 
+      where: {
         parentId: { not: null },
-        status: 'INACTIVE' 
+        status: 'INACTIVE'
       }
     });
 
@@ -625,14 +625,14 @@ const getCategoryStats = async (req, res) => {
         active: activeRootCategories, // Show active root categories
         inactive: inactiveRootCategories, // Show inactive root categories
         subcategories: totalSubcategories, // Total subcategories
-        
+
         // Detailed breakdown
         rootCategories: totalRootCategories,
         activeRootCategories,
         inactiveRootCategories,
         activeSubcategories,
         inactiveSubcategories,
-        
+
         // Overall totals (including subcategories)
         totalAllCategories: totalCategories,
         activeAllCategories: activeCategories,
@@ -819,7 +819,7 @@ const createSubcategory = async (req, res) => {
     });
   } catch (error) {
     console.error('Create subcategory error:', error);
-    
+
     if (error.code === 'P2002') {
       return res.status(400).json({
         success: false,
@@ -924,7 +924,7 @@ const updateSubcategory = async (req, res) => {
     });
   } catch (error) {
     console.error('Update subcategory error:', error);
-    
+
     if (error.code === 'P2002') {
       return res.status(400).json({
         success: false,
@@ -1287,19 +1287,19 @@ const moveSubcategory = async (req, res) => {
 const validateHierarchyDepth = async (parentId, maxDepth = 3) => {
   let depth = 0;
   let currentParentId = parentId;
-  
+
   while (currentParentId && depth < maxDepth) {
     const parent = await prisma.category.findUnique({
       where: { id: currentParentId },
       select: { parentId: true }
     });
-    
+
     if (!parent) break;
-    
+
     currentParentId = parent.parentId;
     depth++;
   }
-  
+
   return depth < maxDepth;
 };
 
@@ -1307,7 +1307,7 @@ const validateHierarchyDepth = async (parentId, maxDepth = 3) => {
 const getCategoryPath = async (categoryId) => {
   const path = [];
   let currentId = categoryId;
-  
+
   while (currentId) {
     const category = await prisma.category.findUnique({
       where: { id: currentId },
@@ -1318,13 +1318,13 @@ const getCategoryPath = async (categoryId) => {
         parentId: true
       }
     });
-    
+
     if (!category) break;
-    
+
     path.unshift(category);
     currentId = category.parentId;
   }
-  
+
   return path;
 };
 
@@ -1362,11 +1362,11 @@ const getCategoryBreadcrumb = async (req, res) => {
 // Search categories and subcategories
 const searchCategories = async (req, res) => {
   try {
-    const { 
-      q: searchQuery, 
-      status, 
+    const {
+      q: searchQuery,
+      status,
       includeSubcategories = 'true',
-      limit = 20 
+      limit = 20
     } = req.query;
 
     if (!searchQuery || searchQuery.trim().length < 2) {
@@ -1446,14 +1446,14 @@ const searchCategories = async (req, res) => {
 // Get category tree with full hierarchy
 const getCategoryTree = async (req, res) => {
   try {
-    const { 
+    const {
       status = 'ACTIVE',
       includeInactive = 'false',
-      maxDepth = 3 
+      maxDepth = 3
     } = req.query;
 
     const where = {};
-    
+
     if (includeInactive === 'false') {
       where.status = status.toUpperCase();
     }

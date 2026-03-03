@@ -12,7 +12,7 @@ const Products = () => {
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('category');
   const subcategoryParam = searchParams.get('subcategory');
-  
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,46 +25,50 @@ const Products = () => {
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  
+
   // Filter states
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
   const [selectedRating, setSelectedRating] = useState(0);
   const [inStockOnly, setInStockOnly] = useState(false);
-  
+
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch category and subcategory names from slugs
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
+
+  // Fetch category and subcategory names from slugs and populate dropdown
   useEffect(() => {
-    const fetchCategoryNames = async () => {
-      if (categoryParam) {
-        try {
-          const categoriesResponse = await categoryService.getAllCategories({
-            status: 'ACTIVE',
-            showRootOnly: 'true',
-            includeSubcategories: 'true'
-          });
-          
-          if (categoriesResponse.success && categoriesResponse.data) {
+    const fetchCategories = async () => {
+      try {
+        const categoriesResponse = await categoryService.getAllCategories({
+          status: 'ACTIVE',
+          showRootOnly: 'true',
+          includeSubcategories: 'true'
+        });
+
+        if (categoriesResponse.success && categoriesResponse.data) {
+          setCategoriesList(categoriesResponse.data);
+
+          if (categoryParam) {
             const foundCategory = categoriesResponse.data.find(
               (cat: any) => cat.slug === categoryParam
             );
-            
+
             if (foundCategory) {
               setCategoryName(foundCategory.name);
               setSelectedCategory(foundCategory.name);
-              
+
               if (subcategoryParam && foundCategory.subcategories) {
                 const foundSubcategory = foundCategory.subcategories.find(
                   (sub: any) => sub.slug === subcategoryParam
                 );
-                
+
                 if (foundSubcategory) {
                   setSubcategoryName(foundSubcategory.name);
                   setSelectedSubcategory(foundSubcategory.name);
@@ -72,17 +76,19 @@ const Products = () => {
               }
             }
           }
-        } catch (error) {
-          console.error('Failed to fetch category names:', error);
         }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
       }
     };
 
-    fetchCategoryNames();
+    fetchCategories();
   }, [categoryParam, subcategoryParam]);
 
   // Fetch products from API
   useEffect(() => {
+    let ignore = false;
+
     const fetchProducts = async () => {
       try {
         setLoading(true);
@@ -98,20 +104,28 @@ const Products = () => {
           sortOrder: sortBy === 'price-low' ? 'asc' : 'desc',
           inStock: inStockOnly || undefined
         });
-        
-        if (response.success && response.data) {
+
+        if (!ignore && response.success && response.data) {
           setProducts(response.data.items);
           setTotalPages(response.data.pagination.totalPages);
           setTotalItems(response.data.pagination.totalItems);
         }
       } catch (error) {
-        console.error('Failed to fetch products:', error);
+        if (!ignore) {
+          console.error('Failed to fetch products:', error);
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     };
 
     fetchProducts();
+
+    return () => {
+      ignore = true;
+    };
   }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly]);
 
   // Close dropdowns when clicking outside
@@ -140,7 +154,9 @@ const Products = () => {
     setPriceRange({ min: 0, max: 1000 });
     setSelectedRating(0);
     setSelectedCategory('All');
+    setCategoryName('');
     setSelectedSubcategory('');
+    setSubcategoryName('');
     setSearchTerm('');
     setInStockOnly(false);
     setCurrentPage(1);
@@ -148,16 +164,16 @@ const Products = () => {
 
   // Filter products locally (for color and rating which aren't in API)
   const filteredProducts = products.filter(product => {
-    const matchesColor = selectedColors.length === 0 || selectedColors.some(color => 
+    const matchesColor = selectedColors.length === 0 || selectedColors.some(color =>
       product.tags?.some(tag => tag.toLowerCase().includes(color.toLowerCase()))
     );
-    
+
     const matchesRating = selectedRating === 0 || (product.rating && product.rating >= selectedRating);
-    
+
     return matchesColor && matchesRating;
   });
 
-  const activeFiltersCount = selectedColors.length + 
+  const activeFiltersCount = selectedColors.length +
     (selectedRating > 0 ? 1 : 0) +
     (priceRange.min > 0 || priceRange.max < 1000 ? 1 : 0) +
     (inStockOnly ? 1 : 0);
@@ -172,7 +188,7 @@ const Products = () => {
               Our Product Collection
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Discover authentic, handcrafted textiles made by skilled artisans using traditional techniques 
+              Discover authentic, handcrafted textiles made by skilled artisans using traditional techniques
               passed down through generations.
             </p>
           </div>
@@ -221,17 +237,33 @@ const Products = () => {
                 {showCategoryDropdown && (
                   <div className="absolute right-0 z-10 w-56 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
                     <div className="py-1">
-                      {['All', 'Kitchen Towels', 'Hand Towels', 'Bath Towels', 'Aprons', 'Table Linens', 'Decorative Textiles'].map((category) => (
+                      <button
+                        onClick={() => {
+                          setSelectedCategory('All');
+                          setCategoryName('');
+                          setSelectedSubcategory('');
+                          setSubcategoryName('');
+                          setShowCategoryDropdown(false);
+                          setCurrentPage(1);
+                        }}
+                        className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100"
+                      >
+                        All Categories
+                      </button>
+                      {categoriesList.map((cat) => (
                         <button
-                          key={category}
+                          key={cat.id}
                           onClick={() => {
-                            setSelectedCategory(category);
+                            setSelectedCategory(cat.name);
+                            setCategoryName(cat.name);
+                            setSelectedSubcategory('');
+                            setSubcategoryName('');
                             setShowCategoryDropdown(false);
                             setCurrentPage(1);
                           }}
                           className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100"
                         >
-                          {category === 'All' ? 'All Categories' : category}
+                          {cat.name}
                         </button>
                       ))}
                     </div>
@@ -355,7 +387,7 @@ const Products = () => {
                             type="number"
                             placeholder="Min"
                             value={priceRange.min}
-                            onChange={(e) => setPriceRange({...priceRange, min: Number(e.target.value)})}
+                            onChange={(e) => setPriceRange({ ...priceRange, min: Number(e.target.value) })}
                             className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-amber-500 focus:border-amber-500"
                           />
                           <span className="text-gray-500">to</span>
@@ -363,7 +395,7 @@ const Products = () => {
                             type="number"
                             placeholder="Max"
                             value={priceRange.max}
-                            onChange={(e) => setPriceRange({...priceRange, max: Number(e.target.value)})}
+                            onChange={(e) => setPriceRange({ ...priceRange, max: Number(e.target.value) })}
                             className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-amber-500 focus:border-amber-500"
                           />
                         </div>
@@ -419,9 +451,8 @@ const Products = () => {
                                 {Array.from({ length: 5 }, (_, i) => (
                                   <Star
                                     key={i}
-                                    className={`w-4 h-4 ${
-                                      i < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                                    }`}
+                                    className={`w-4 h-4 ${i < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                      }`}
                                   />
                                 ))}
                               </div>
@@ -474,11 +505,10 @@ const Products = () => {
                 </div>
               ) : (
                 <>
-                  <div className={`${
-                    viewMode === 'grid' 
-                      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
-                      : 'space-y-4'
-                  }`}>
+                  <div className={`${viewMode === 'grid'
+                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+                    : 'space-y-4'
+                    }`}>
                     {filteredProducts.map((product) => (
                       <ProductCard key={product.id} product={product} />
                     ))}
