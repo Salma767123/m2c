@@ -133,7 +133,7 @@ export default function Categories() {
                   className="group text-center"
                 >
                   {/* Category Image */}
-                  <div className="relative w-full aspect-square mb-4 overflow-hidden rounded-md bg-gradient-to-br from-gray-100 to-gray-200">
+                  <div className="relative w-full aspect-square mb-4 overflow-hidden rounded-md bg-linear-to-br from-gray-100 to-gray-200">
                     {category.image ? (
                       <Image
                         src={category.image}

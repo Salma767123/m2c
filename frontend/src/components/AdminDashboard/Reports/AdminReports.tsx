@@ -1610,7 +1610,7 @@ export default function AdminReports() {
                     <FileText className="w-6 h-6 text-gray-600" />
                     <h3 className="text-lg font-semibold text-gray-900">Report Preview</h3>
                   </div>
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 min-h-[300px]">
+                  <div className="bg-white p-6 rounded-lg border border-gray-200 min-h-75">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between pb-4 border-b border-gray-200">
                         <div>

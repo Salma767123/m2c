@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "m2c_app",
+    "slug": "m2c_app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/1024.png",
+    "scheme": "mobile",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/images/logo3.png",
+        "backgroundImage": "./assets/images/logo3.png",
+        "monochromeImage": "./assets/images/logo3.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/logo3.png"
+    },
+    "plugins": [
+      "expo-router"
+      
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
