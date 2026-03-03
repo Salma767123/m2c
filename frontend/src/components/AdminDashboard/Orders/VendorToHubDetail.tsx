@@ -1,210 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { orderService, Order } from "@/services/orderService";
+import adminReviewService from "@/services/adminReviewService";
 
 interface VendorToHubDetailProps {
   orderId: string;
 }
 
-interface Hub {
-  id: string;
-  name: string;
-  location: string;
-}
-
-interface Order {
-  id: string;
-  orderId: string;
-  product: {
-    name: string;
-    sku: string;
-    quantity: number;
-    price: number;
-    image: string;
-  };
-  orderDate: string;
-  status: "Pending" | "Assigned" | "Packed" | "Shipped" | "Delivered";
-  vendor: {
-    name: string;
-    email: string;
-    phone: string;
-    address: string;
-    gst: string;
-  };
-  assignedHub: string;
-  payment: {
-    method: string;
-    transactionId: string;
-    amount: number;
-    status: string;
-  };
-  shipping?: {
-    carrier: string;
-    trackingId: string;
-    shippedDate: string;
-  };
-}
-
-const mockHubs: Hub[] = [
-  { id: "1", name: "Mumbai Hub", location: "Mumbai, Maharashtra" },
-  { id: "2", name: "Delhi Hub", location: "New Delhi, Delhi" },
-  { id: "3", name: "Bangalore Hub", location: "Bangalore, Karnataka" },
-  { id: "4", name: "Chennai Hub", location: "Chennai, Tamil Nadu" },
-  { id: "5", name: "Kolkata Hub", location: "Kolkata, West Bengal" },
-];
-
-// Mock orders data matching VendorToHub.tsx
-const mockOrders: Order[] = [
-  {
-    id: "1",
-    orderId: "ORD-2024-001",
-    product: {
-      name: "Cotton Bedsheet Set",
-      sku: "CBS-001",
-      quantity: 2,
-      price: 1250,
-      image: "/assets/images/categories/cs1.jpg",
-    },
-    orderDate: "2024-02-10",
-    status: "Pending",
-    vendor: {
-      name: "Textile Traders",
-      email: "vendor@textiletraders.com",
-      phone: "+91 98765 43210",
-      address: "456, Textile Market, Surat, Gujarat - 395003",
-      gst: "27AABCT1234F1Z5",
-    },
-    assignedHub: "Not Assigned",
-    payment: {
-      method: "Razorpay",
-      transactionId: "TXN-2024-001",
-      amount: 2500,
-      status: "Completed",
-    },
-  },
-  {
-    id: "2",
-    orderId: "ORD-2024-002",
-    product: {
-      name: "Silk Saree",
-      sku: "SS-045",
-      quantity: 1,
-      price: 5000,
-      image: "/assets/images/categories/cs2.jpg",
-    },
-    orderDate: "2024-02-11",
-    status: "Assigned",
-    vendor: {
-      name: "Silk Emporium",
-      email: "contact@silkemporium.com",
-      phone: "+91 98765 43211",
-      address: "789, Silk Market, Kanchipuram, Tamil Nadu - 631502",
-      gst: "33AABCS5678G1Z6",
-    },
-    assignedHub: "Mumbai Hub",
-    payment: {
-      method: "Razorpay",
-      transactionId: "TXN-2024-002",
-      amount: 5000,
-      status: "Completed",
-    },
-  },
-  {
-    id: "3",
-    orderId: "ORD-2024-003",
-    product: {
-      name: "Woolen Blanket",
-      sku: "WB-023",
-      quantity: 3,
-      price: 1166.67,
-      image: "/assets/images/categories/cs3.jpg",
-    },
-    orderDate: "2024-02-12",
-    status: "Packed",
-    vendor: {
-      name: "Wool Crafts",
-      email: "info@woolcrafts.com",
-      phone: "+91 98765 43212",
-      address: "321, Wool Market, Ludhiana, Punjab - 141001",
-      gst: "03AABCW9012H1Z7",
-    },
-    assignedHub: "Delhi Hub",
-    payment: {
-      method: "Razorpay",
-      transactionId: "TXN-2024-003",
-      amount: 3500,
-      status: "Completed",
-    },
-  },
-  {
-    id: "4",
-    orderId: "ORD-2024-004",
-    product: {
-      name: "Cotton Towel Set",
-      sku: "CTS-012",
-      quantity: 5,
-      price: 300,
-      image: "/assets/images/categories/cs4.jpg",
-    },
-    orderDate: "2024-02-13",
-    status: "Shipped",
-    vendor: {
-      name: "Home Textiles",
-      email: "sales@hometextiles.com",
-      phone: "+91 98765 43213",
-      address: "654, Textile Hub, Coimbatore, Tamil Nadu - 641001",
-      gst: "33AABCH3456I1Z8",
-    },
-    assignedHub: "Bangalore Hub",
-    payment: {
-      method: "Razorpay",
-      transactionId: "TXN-2024-004",
-      amount: 1500,
-      status: "Completed",
-    },
-    shipping: {
-      carrier: "Blue Dart",
-      trackingId: "BD123456789IN",
-      shippedDate: "2024-02-14",
-    },
-  },
-];
+import { hubService, Hub } from "@/services/hubService";
 
 export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   const router = useRouter();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [showHubModal, setShowHubModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedHub, setSelectedHub] = useState("");
-  
-  // Find the order from mock data
-  const initialOrder = mockOrders.find(o => o.id === orderId) || mockOrders[0];
-  
-  const [orderStatus, setOrderStatus] = useState(initialOrder.status);
-  const [assignedHub, setAssignedHub] = useState(initialOrder.assignedHub);
-  
+
   // Review form state
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [review, setReview] = useState("");
   const [notice, setNotice] = useState("");
 
-  // Current order data with state updates
-  const order: Order = {
-    ...initialOrder,
-    status: orderStatus,
-    assignedHub: assignedHub,
-    shipping: orderStatus === "Shipped" || orderStatus === "Delivered" ? 
-      initialOrder.shipping || {
-        carrier: "Blue Dart",
-        trackingId: "BD" + Math.random().toString(36).substr(2, 9).toUpperCase(),
-        shippedDate: new Date().toISOString().split('T')[0],
-      } : undefined,
+  const [hubs, setHubs] = useState<Hub[]>([]);
+
+  useEffect(() => {
+    fetchOrderDetails();
+    fetchHubs();
+  }, [orderId]);
+
+  const fetchHubs = async () => {
+    try {
+      const res = await hubService.getHubs();
+      if (res.success) {
+        setHubs(res.data.filter(h => h.isActive));
+      }
+    } catch (error) {
+      console.error("Failed to fetch hubs", error);
+    }
   };
 
+  const fetchOrderDetails = async () => {
+    try {
+      setIsLoading(true);
+      const res = await orderService.getAdminOrderById(orderId);
+      if (res.success) {
+        setOrder(res.data);
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to fetch order details");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (newStatus: string) => {
+    try {
+      const res = await orderService.updateAdminOrderStatus(orderId, newStatus);
+      if (res.success) {
+        showSuccessToast(`Order marked as ${newStatus.replace(/_/g, " ")}`);
+        setOrder(res.data);
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to update order status");
+    }
+  };
 
   const handleProceed = () => {
     setShowHubModal(true);
@@ -216,18 +83,16 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       return;
     }
 
-    const hubName = mockHubs.find((h) => h.id === selectedHub)?.name;
-    showSuccessToast(`Order assigned to ${hubName}`);
+    const hubName = hubs.find((h) => h.id === selectedHub)?.name;
     setShowHubModal(false);
-    setOrderStatus("Assigned");
-    setAssignedHub(hubName || "");
+    handleUpdateStatus("VENDOR_PROCESSING");
   };
 
   const handleMarkAsReceived = () => {
-    setShowReviewModal(true);
+    handleUpdateStatus("RECEIVED_AT_ADMIN_HUB");
   };
 
-  const handleSubmitReview = () => {
+  const handleSubmitReview = async () => {
     if (rating === 0) {
       showErrorToast("Please provide a rating");
       return;
@@ -237,15 +102,38 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       return;
     }
 
-    showSuccessToast("Review submitted successfully. Order marked as delivered.");
-    setShowReviewModal(false);
-    setOrderStatus("Delivered");
-    
-    // Redirect to Hub to Customer orders after a short delay
-    setTimeout(() => {
-      router.push("/admin/dashboard/orders/hub-to-customer");
-    }, 1500);
+    try {
+      // Save the admin review to the database
+      await adminReviewService.createOrUpdateAdminReview(order!.id, {
+        rating,
+        reviewComments: review.trim(),
+        qualityCheckNotes: notice.trim() || undefined,
+        approved: true,
+      });
+
+      // Update order status
+      await handleUpdateStatus("APPROVED_BY_ADMIN_HUB");
+      setShowReviewModal(false);
+      showSuccessToast("Review submitted successfully");
+
+      // Redirect to Hub to Customer orders after a short delay
+      setTimeout(() => {
+        router.push("/admin/dashboard/orders/hub-to-customer");
+      }, 1500);
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to submit review");
+    }
   };
+
+  if (isLoading) {
+    return <div className="p-6 text-center text-gray-500">Loading order details...</div>;
+  }
+
+  if (!order) {
+    return <div className="p-6 text-center text-red-500">Order not found</div>;
+  }
+
+  const assignedHub = order.status === "ORDER_CREATED" ? "Not Assigned" : "Admin Central Hub";
 
   return (
     <div className="space-y-6">
@@ -264,20 +152,28 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
         </div>
         <div className="flex gap-3">
-          {order.status === "Pending" && (
+          {order.status === "ORDER_CREATED" && (
             <button
               onClick={handleProceed}
               className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
             >
-              Assign Hub
+              Assign Hub / Proceed
             </button>
           )}
-          {order.status === "Shipped" && (
+          {order.status === "IN_TRANSIT_TO_ADMIN_HUB" && (
             <button
               onClick={handleMarkAsReceived}
               className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium"
             >
               Mark as Received at Hub
+            </button>
+          )}
+          {order.status === "RECEIVED_AT_ADMIN_HUB" && (
+            <button
+              onClick={() => setShowReviewModal(true)}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Review Delivery & Approve
             </button>
           )}
         </div>
@@ -293,28 +189,26 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <div>
             <p className="text-sm text-gray-600">Order Date</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              {new Date(order.orderDate).toLocaleDateString()}
+              {new Date(order.createdAt).toLocaleDateString()}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Status</p>
-            <p className={`text-base font-medium mt-1 ${
-              order.status === "Pending" ? "text-yellow-600" :
-              order.status === "Assigned" ? "text-blue-600" :
-              order.status === "Packed" ? "text-purple-600" :
-              order.status === "Shipped" ? "text-indigo-600" :
-              order.status === "Delivered" ? "text-green-600" :
-              "text-gray-600"
-            }`}>
-              {order.status}
+            <p className={`text-base font-medium mt-1 ${order.status === "ORDER_CREATED" ? "text-yellow-600" :
+              order.status === "VENDOR_PROCESSING" ? "text-blue-600" :
+                order.status === "PACKED_BY_VENDOR" ? "text-purple-600" :
+                  order.status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
+                    ["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "DELIVERED", "SHIPPED_TO_CUSTOMER"].includes(order.status) ? "text-green-600" :
+                      "text-gray-600"
+              }`}>
+              {order.status.replace(/_/g, " ")}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Assigned Hub</p>
-            <p className={`text-base font-medium mt-1 ${
-              order.assignedHub === "Not Assigned" ? "text-red-600" : "text-gray-900"
-            }`}>
-              {order.assignedHub}
+            <p className={`text-base font-medium mt-1 ${assignedHub === "Not Assigned" ? "text-red-600" : "text-gray-900"
+              }`}>
+              {assignedHub}
             </p>
           </div>
         </div>
@@ -322,7 +216,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <div>
             <p className="text-sm text-gray-600">Total Amount</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              ₹{order.payment.amount.toLocaleString()}
+              ₹{order.totalAmount?.toLocaleString()}
             </p>
           </div>
         </div>
@@ -331,28 +225,35 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       {/* Product Details */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h2>
-        <div className="flex gap-4">
-          <img
-            src={order.product.image}
-            alt={order.product.name}
-            className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-          />
-          <div className="flex-1">
-            <h3 className="text-base font-semibold text-gray-900">{order.product.name}</h3>
-            <p className="text-sm text-gray-600 mt-1">SKU: {order.product.sku}</p>
-            <div className="flex gap-6 mt-2">
-              <div>
-                <p className="text-sm text-gray-600">Quantity</p>
-                <p className="text-base font-medium text-gray-900">{order.product.quantity}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Price</p>
-                <p className="text-base font-medium text-gray-900">
-                  ₹{order.product.price.toLocaleString()}
-                </p>
+        <div className="space-y-4">
+          {order.items?.map((item: any) => (
+            <div key={item.id} className="flex gap-4 p-4 border border-gray-100 rounded-lg">
+              <img
+                src={item.productImage || "/assets/images/placeholder.jpg"}
+                alt={item.productName}
+                className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+              />
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-gray-900">{item.productName}</h3>
+                <p className="text-sm text-gray-600 mt-1">SKU: {item.sku}</p>
+                {item.variantId && (
+                  <p className="text-sm text-gray-600 mt-1">Size: {item.size} | Color: {item.color}</p>
+                )}
+                <div className="flex gap-6 mt-2">
+                  <div>
+                    <p className="text-sm text-gray-600">Quantity</p>
+                    <p className="text-base font-medium text-gray-900">{item.quantity}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Price</p>
+                    <p className="text-base font-medium text-gray-900">
+                      ₹{item.unitPrice.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -365,15 +266,15 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-gray-600">Payment Method</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.payment.method}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentMethod}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Transaction ID</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.payment.transactionId}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentId || "N/A"}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Payment Status</p>
-            <p className="text-base font-medium text-green-600 mt-1">{order.payment.status}</p>
+            <p className="text-base font-medium text-green-600 mt-1">{order.paymentStatus}</p>
           </div>
         </div>
       </div>
@@ -382,34 +283,24 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <div className="flex items-center gap-2 mb-4">
           <Building2 className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Vendor Details</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Vendor Information</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-600">Vendor Name</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.name}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Email</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.email}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Phone</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.phone}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">GST Number</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.gst}</p>
-          </div>
-          <div className="md:col-span-2">
-            <p className="text-sm text-gray-600">Address</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.vendor.address}</p>
-          </div>
-        </div>
+        {/* We can grab vendor info from the first item since order processing from VendorToHub implies items from same vendor */}
+        {(() => {
+          const vendorName = order.items?.[0]?.vendorName || "Unknown Vendor";
+          return (
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Vendor Name</p>
+                <p className="text-base font-medium text-gray-900 mt-1">{vendorName}</p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
-      {/* Vendor Shipping Details */}
-      {(order.status === "Shipped") && order.shipping && (
+      {/* Vendor Shipping Details - Not fully tracked in basic status atm but mocked visualization */}
+      {(["IN_TRANSIT_TO_ADMIN_HUB", "RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(order.status)) && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-4">
             <Truck className="h-5 w-5 text-gray-600" />
@@ -417,24 +308,8 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-4">
             <p className="text-sm text-blue-800">
-              Shipping information provided by vendor when order was shipped to {order.assignedHub}
+              Shipping information currently tracked manually or via integrated system.
             </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Carrier Service</p>
-              <p className="text-base font-medium text-gray-900 mt-1">{order.shipping.carrier}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Tracking ID</p>
-              <p className="text-base font-medium text-gray-900 mt-1 font-mono">{order.shipping.trackingId}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Shipped Date</p>
-              <p className="text-base font-medium text-gray-900 mt-1">
-                {new Date(order.shipping.shippedDate).toLocaleDateString()}
-              </p>
-            </div>
           </div>
         </div>
       )}
@@ -449,48 +324,12 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Product Info */}
+              {/* Product Info Summary */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Product Information</h3>
-                <div className="flex gap-4">
-                  <img
-                    src={order.product.image}
-                    alt={order.product.name}
-                    className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900">{order.product.name}</p>
-                    <p className="text-sm text-gray-600 mt-1">SKU: {order.product.sku}</p>
-                    <p className="text-sm text-gray-600">Quantity: {order.product.quantity}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Vendor Info */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Vendor Information</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-gray-600">Vendor Name</p>
-                    <p className="text-sm font-medium text-gray-900">{order.vendor.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Phone</p>
-                    <p className="text-sm font-medium text-gray-900">{order.vendor.phone}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Email</p>
-                    <p className="text-sm font-medium text-gray-900">{order.vendor.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">GST Number</p>
-                    <p className="text-sm font-medium text-gray-900">{order.vendor.gst}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-xs text-gray-600">Address</p>
-                    <p className="text-sm font-medium text-gray-900">{order.vendor.address}</p>
-                  </div>
-                </div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Product Summary</h3>
+                <p className="text-sm text-gray-600">
+                  Total Items: {order.items.length}
+                </p>
               </div>
 
               {/* Hub Selection */}
@@ -498,9 +337,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                 <Dropdown
                   label="Select Hub"
                   value={selectedHub}
-                  options={mockHubs.map((hub) => ({
+                  options={hubs.map((hub) => ({
                     value: hub.id,
-                    label: `${hub.name} - ${hub.location}`,
+                    label: `${hub.name} - ${hub.city}, ${hub.state}`,
                   }))}
                   onChange={(value) => setSelectedHub(value as string)}
                   placeholder="Choose a hub"
@@ -546,19 +385,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
             <div className="p-6 space-y-6">
               {/* Order Info */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Order Information</h3>
-                <div className="flex gap-4">
-                  <img
-                    src={order.product.image}
-                    alt={order.product.name}
-                    className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900">{order.product.name}</p>
-                    <p className="text-sm text-gray-600 mt-1">Order ID: {order.orderId}</p>
-                    <p className="text-sm text-gray-600">Vendor: {order.vendor.name}</p>
-                  </div>
-                </div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Reviewing Delivery From Vendor</h3>
+                <p className="text-sm text-gray-600">Order ID: {order.orderId}</p>
+                <p className="text-sm text-gray-600">Vendor: {order.items?.[0]?.vendorName || "Unknown"}</p>
               </div>
 
               {/* Rating */}
@@ -577,11 +406,10 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                       className="focus:outline-none transition-transform hover:scale-110"
                     >
                       <Star
-                        className={`h-8 w-8 ${
-                          star <= (hoveredRating || rating)
-                            ? "fill-yellow-400 text-yellow-400"
-                            : "text-gray-300"
-                        }`}
+                        className={`h-8 w-8 ${star <= (hoveredRating || rating)
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "text-gray-300"
+                          }`}
                       />
                     </button>
                   ))}

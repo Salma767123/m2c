@@ -1,15 +1,16 @@
 import InvoiceDetail from "@/components/AdminDashboard/Billing/InvoiceDetail";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function InvoiceDetailPage({ params }: PageProps) {
+export default async function InvoiceDetailPage({ params }: PageProps) {
+  const { id } = await params;
   return (
     <div className="p-6">
-      <InvoiceDetail invoiceId={params.id} />
+      <InvoiceDetail invoiceId={id} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, UserCheck, Building2, Mail, Phone, CheckCircle, Plus, Package, Eye } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
@@ -25,45 +25,45 @@ interface QCChecker {
   assignedVendors: number;
 }
 
-export default function AssignQCChecker() {
-  const [vendors] = useState<Vendor[]>([
-    {
-      id: "1",
-      companyName: "Textile Co.",
-      ownerName: "John Doe",
-      email: "john@textile.com",
-      phone: "+1 234-567-8900",
-      status: "APPROVED",
-      assignedChecker: "1",
-      assignedCheckerName: "John Smith",
-    },
-    {
-      id: "2",
-      companyName: "Home Fabrics Ltd.",
-      ownerName: "Jane Smith",
-      email: "jane@homefabrics.com",
-      phone: "+1 234-567-8901",
-      status: "APPROVED",
-      assignedChecker: null,
-      assignedCheckerName: null,
-    },
-    {
-      id: "3",
-      companyName: "Quality Textiles",
-      ownerName: "Mike Johnson",
-      email: "mike@quality.com",
-      phone: "+1 234-567-8902",
-      status: "APPROVED",
-      assignedChecker: "2",
-      assignedCheckerName: "Sarah Johnson",
-    },
-  ]);
+import vendorService from '@/services/vendorService';
+import qcCheckerService from '@/services/qcCheckerService';
 
-  const [qcCheckers] = useState<QCChecker[]>([
-    { id: "1", name: "John Smith", assignedVendors: 12 },
-    { id: "2", name: "Sarah Johnson", assignedVendors: 8 },
-    { id: "3", name: "Michael Brown", assignedVendors: 5 },
-  ]);
+export default function AssignQCChecker() {
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [qcCheckers, setQcCheckers] = useState<QCChecker[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Fetch vendors (filter for pending or under review usually)
+        const vendorListResponse = await vendorService.getAllVendors({ limit: 100 });
+        const AllVendors = vendorListResponse.vendors.map((v: any) => ({
+          id: v.id,
+          companyName: v.companyName,
+          ownerName: v.ownerName,
+          email: v.email,
+          phone: v.businessPhone,
+          status: v.status,
+          assignedChecker: v.assignedQcId || null,
+          assignedCheckerName: v.assignedQc?.name || null,
+        }));
+        setVendors(AllVendors);
+
+        // Fetch QC checkers
+        const checkersResponse = await qcCheckerService.getAllQCCheckers();
+        if (checkersResponse.success) {
+          setQcCheckers(checkersResponse.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -74,15 +74,15 @@ export default function AssignQCChecker() {
       vendor.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       vendor.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       vendor.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesAssignmentFilter =
       filterStatus === "all" ||
       (filterStatus === "assigned" && vendor.assignedChecker) ||
       (filterStatus === "unassigned" && !vendor.assignedChecker);
-    
+
     const matchesVendorStatusFilter =
       filterVendorStatus === "all" || vendor.status === filterVendorStatus;
-    
+
     return matchesSearch && matchesAssignmentFilter && matchesVendorStatusFilter;
   });
 
@@ -201,7 +201,6 @@ export default function AssignQCChecker() {
               <TableHead>Contact</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Assigned QC Checker</TableHead>
-              <TableHead>Products Count</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -247,14 +246,6 @@ export default function AssignQCChecker() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-900">
-                        {Math.floor(Math.random() * 10) + 1} products
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
                       <Link
                         href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -263,7 +254,7 @@ export default function AssignQCChecker() {
                         <Eye className="h-4 w-4" />
                       </Link>
                       <Link
-                        href="/admin/dashboard/vendors/assign-qc-checker/add"
+                        href={`/admin/dashboard/vendors/assign-qc-checker/add?vendorId=${vendor.id}`}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
                       >
                         <UserCheck className="h-4 w-4" />
@@ -275,7 +266,7 @@ export default function AssignQCChecker() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={5}>
                   <div className="p-12 text-center">
                     <p className="text-gray-500">No vendors found</p>
                   </div>

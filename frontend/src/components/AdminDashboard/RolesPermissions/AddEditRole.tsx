@@ -8,76 +8,13 @@ import { Badge } from '@/components/UI/Badge'
 import { AlertCircle } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
-interface Permission {
-  id: string
-  name: string
-  description: string
-  module: string
-}
-
-interface Role {
-  id: string
-  name: string
-  description: string
-  permissions: Permission[]
-  userCount: number
-  isSystem: boolean
-  createdAt: string
-  updatedAt: string
-}
+import { roleService, Role, Permission } from '@/services/roleService'
 
 interface AddEditRoleProps {
   role?: Role | null
   isEdit?: boolean
 }
 
-const mockPermissions: Permission[] = [
-  // Dashboard
-  { id: '1', name: 'view_dashboard', description: 'View dashboard', module: 'Dashboard' },
-  
-  // Users
-  { id: '2', name: 'view_users', description: 'View users list', module: 'Users' },
-  { id: '3', name: 'create_users', description: 'Create new users', module: 'Users' },
-  { id: '4', name: 'edit_users', description: 'Edit existing users', module: 'Users' },
-  { id: '5', name: 'delete_users', description: 'Delete users', module: 'Users' },
-  
-  // Products
-  { id: '6', name: 'view_products', description: 'View products list', module: 'Products' },
-  { id: '7', name: 'create_products', description: 'Create new products', module: 'Products' },
-  { id: '8', name: 'edit_products', description: 'Edit existing products', module: 'Products' },
-  { id: '9', name: 'delete_products', description: 'Delete products', module: 'Products' },
-  
-  // Vendors
-  { id: '10', name: 'view_vendors', description: 'View vendors list', module: 'Vendors' },
-  { id: '11', name: 'create_vendors', description: 'Create new vendors', module: 'Vendors' },
-  { id: '12', name: 'edit_vendors', description: 'Edit existing vendors', module: 'Vendors' },
-  { id: '13', name: 'delete_vendors', description: 'Delete vendors', module: 'Vendors' },
-  
-  // Categories
-  { id: '14', name: 'view_categories', description: 'View categories list', module: 'Categories' },
-  { id: '15', name: 'create_categories', description: 'Create new categories', module: 'Categories' },
-  { id: '16', name: 'edit_categories', description: 'Edit existing categories', module: 'Categories' },
-  { id: '17', name: 'delete_categories', description: 'Delete categories', module: 'Categories' },
-  
-  // Inventory
-  { id: '18', name: 'view_inventory', description: 'View inventory list', module: 'Inventory' },
-  { id: '19', name: 'create_inventory', description: 'Create inventory items', module: 'Inventory' },
-  { id: '20', name: 'edit_inventory', description: 'Edit inventory items', module: 'Inventory' },
-  { id: '21', name: 'delete_inventory', description: 'Delete inventory items', module: 'Inventory' },
-  
-  // Reports
-  { id: '22', name: 'view_reports', description: 'View reports', module: 'Reports' },
-  { id: '23', name: 'export_reports', description: 'Export reports', module: 'Reports' },
-  
-  // Settings
-  { id: '24', name: 'view_settings', description: 'View system settings', module: 'Settings' },
-  { id: '25', name: 'manage_settings', description: 'Manage system settings', module: 'Settings' },
-  
-  // Reviews
-  { id: '26', name: 'view_reviews', description: 'View reviews', module: 'Reviews' },
-  { id: '27', name: 'moderate_reviews', description: 'Moderate reviews', module: 'Reviews' },
-  { id: '28', name: 'delete_reviews', description: 'Delete reviews', module: 'Reviews' },
-]
 
 export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) {
   const router = useRouter()
@@ -86,20 +23,35 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
     description: '',
     selectedPermissions: [] as string[]
   })
-  const [errors, setErrors] = useState<{[key: string]: string}>({})
+  const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const [isLoading, setIsLoading] = useState(false)
+  const [availablePermissions, setAvailablePermissions] = useState<Permission[]>([])
+
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const res = await roleService.getPermissions()
+        if (res.success) {
+          setAvailablePermissions(res.data)
+        }
+      } catch (error) {
+        showErrorToast('Failed to load permissions')
+      }
+    }
+    fetchPermissions()
+  }, [])
 
   useEffect(() => {
     if (role && isEdit) {
       setFormData({
         name: role.name,
         description: role.description,
-        selectedPermissions: role.permissions.map(p => p.id)
+        selectedPermissions: role.permissions.map(p => p.name)
       })
     }
   }, [role, isEdit])
 
-  const groupedPermissions = mockPermissions.reduce((acc, permission) => {
+  const groupedPermissions = availablePermissions.reduce((acc, permission) => {
     if (!acc[permission.module]) {
       acc[permission.module] = []
     }
@@ -113,7 +65,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
       ...prev,
       [name]: value
     }))
-    
+
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -122,29 +74,29 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
     }
   }
 
-  const handlePermissionToggle = (permissionId: string) => {
+  const handlePermissionToggle = (permissionName: string) => {
     setFormData(prev => ({
       ...prev,
-      selectedPermissions: prev.selectedPermissions.includes(permissionId)
-        ? prev.selectedPermissions.filter(id => id !== permissionId)
-        : [...prev.selectedPermissions, permissionId]
+      selectedPermissions: prev.selectedPermissions.includes(permissionName)
+        ? prev.selectedPermissions.filter(name => name !== permissionName)
+        : [...prev.selectedPermissions, permissionName]
     }))
   }
 
   const handleModuleToggle = (modulePermissions: Permission[]) => {
-    const modulePermissionIds = modulePermissions.map(p => p.id)
-    const allSelected = modulePermissionIds.every(id => formData.selectedPermissions.includes(id))
-    
+    const modulePermissionNames = modulePermissions.map(p => p.name)
+    const allSelected = modulePermissionNames.every(name => formData.selectedPermissions.includes(name))
+
     setFormData(prev => ({
       ...prev,
       selectedPermissions: allSelected
-        ? prev.selectedPermissions.filter(id => !modulePermissionIds.includes(id))
-        : [...new Set([...prev.selectedPermissions, ...modulePermissionIds])]
+        ? prev.selectedPermissions.filter(name => !modulePermissionNames.includes(name))
+        : [...new Set([...prev.selectedPermissions, ...modulePermissionNames])]
     }))
   }
 
   const validateForm = () => {
-    const newErrors: {[key: string]: string} = {}
+    const newErrors: { [key: string]: string } = {}
 
     if (!formData.name.trim()) {
       newErrors.name = 'Role name is required'
@@ -166,33 +118,31 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       return
     }
 
     setIsLoading(true)
     try {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      const selectedPermissionObjects = mockPermissions.filter(p => 
-        formData.selectedPermissions.includes(p.id)
-      )
-
-      const roleData = {
-        name: formData.name,
-        description: formData.description,
-        permissions: selectedPermissionObjects,
-        ...(role && { id: role.id })
+      if (isEdit && role) {
+        await roleService.updateRole(role.id, {
+          name: formData.name,
+          description: formData.description,
+          permissions: formData.selectedPermissions,
+        })
+      } else {
+        await roleService.createRole({
+          name: formData.name,
+          description: formData.description,
+          permissions: formData.selectedPermissions,
+        })
       }
 
-      console.log('Role data:', roleData)
-      
       showSuccessToast(isEdit ? 'Role updated successfully' : 'Role created successfully')
       router.push('/admin/dashboard/roles-permissions')
-    } catch (error) {
-      showErrorToast('Failed to save role')
+    } catch (error: any) {
+      showErrorToast(error.response?.data?.error || 'Failed to save role')
     } finally {
       setIsLoading(false)
     }
@@ -244,9 +194,8 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent ${
-                      errors.name ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent ${errors.name ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                     placeholder="Enter role name"
                     disabled={isLoading}
                   />
@@ -268,9 +217,8 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                     value={formData.description}
                     onChange={handleInputChange}
                     rows={3}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent resize-none ${
-                      errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent resize-none ${errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
                     placeholder="Describe the role's responsibilities"
                     disabled={isLoading}
                   />
@@ -291,7 +239,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-semibold text-black">Permissions</CardTitle>
                 <Badge className="bg-gray-200 text-gray-800">
-                  {formData.selectedPermissions.length} of {mockPermissions.length} selected
+                  {formData.selectedPermissions.length} of {availablePermissions.length} selected
                 </Badge>
               </div>
               {errors.permissions && (
@@ -300,7 +248,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   <span>{errors.permissions}</span>
                 </div>
               )}
-              
+
               {/* Quick Actions */}
               <div className="flex flex-wrap gap-2 pt-3">
                 <Button
@@ -309,7 +257,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   size="sm"
                   onClick={() => setFormData(prev => ({
                     ...prev,
-                    selectedPermissions: mockPermissions.filter(p => p.name.startsWith('view_')).map(p => p.id)
+                    selectedPermissions: availablePermissions.filter(p => p.name.startsWith('view_')).map(p => p.name)
                   }))}
                   disabled={isLoading}
                   className="border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -322,9 +270,9 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   size="sm"
                   onClick={() => setFormData(prev => ({
                     ...prev,
-                    selectedPermissions: mockPermissions.filter(p => 
+                    selectedPermissions: availablePermissions.filter(p =>
                       p.name.startsWith('view_') || p.name.startsWith('create_') || p.name.startsWith('edit_')
-                    ).map(p => p.id)
+                    ).map(p => p.name)
                   }))}
                   disabled={isLoading}
                   className="border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -337,7 +285,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   size="sm"
                   onClick={() => setFormData(prev => ({
                     ...prev,
-                    selectedPermissions: mockPermissions.map(p => p.id)
+                    selectedPermissions: availablePermissions.map(p => p.name)
                   }))}
                   disabled={isLoading}
                   className="border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -362,8 +310,8 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
             <CardContent className="p-6">
               <div className="space-y-6">
                 {Object.entries(groupedPermissions).map(([module, modulePermissions]) => {
-                  const allSelected = modulePermissions.every(p => formData.selectedPermissions.includes(p.id))
-                  const someSelected = modulePermissions.some(p => formData.selectedPermissions.includes(p.id))
+                  const allSelected = modulePermissions.every(p => formData.selectedPermissions.includes(p.name))
+                  const someSelected = modulePermissions.some(p => formData.selectedPermissions.includes(p.name))
 
                   return (
                     <div key={module} className="border border-gray-200 rounded-lg bg-white">
@@ -384,14 +332,13 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                               </p>
                             </div>
                           </label>
-                          <Badge className={`${
-                            allSelected 
-                              ? 'bg-black text-white' 
-                              : someSelected 
-                                ? 'bg-gray-600 text-white'
-                                : 'bg-gray-200 text-gray-600'
-                          }`}>
-                            {modulePermissions.filter(p => formData.selectedPermissions.includes(p.id)).length} / {modulePermissions.length}
+                          <Badge className={`${allSelected
+                            ? 'bg-black text-white'
+                            : someSelected
+                              ? 'bg-gray-600 text-white'
+                              : 'bg-gray-200 text-gray-600'
+                            }`}>
+                            {modulePermissions.filter(p => formData.selectedPermissions.includes(p.name)).length} / {modulePermissions.length}
                           </Badge>
                         </div>
                       </div>
@@ -399,21 +346,20 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                       <div className="p-4">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           {modulePermissions.map((permission) => {
-                            const isSelected = formData.selectedPermissions.includes(permission.id)
+                            const isSelected = formData.selectedPermissions.includes(permission.name)
 
                             return (
                               <label
                                 key={permission.id}
-                                className={`flex items-start space-x-3 cursor-pointer p-3 rounded-lg border transition-all ${
-                                  isSelected
-                                    ? 'bg-gray-50 border-gray-300'
-                                    : 'border-gray-200 hover:bg-gray-50'
-                                }`}
+                                className={`flex items-start space-x-3 cursor-pointer p-3 rounded-lg border transition-all ${isSelected
+                                  ? 'bg-gray-50 border-gray-300'
+                                  : 'border-gray-200 hover:bg-gray-50'
+                                  }`}
                               >
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
-                                  onChange={() => handlePermissionToggle(permission.id)}
+                                  onChange={() => handlePermissionToggle(permission.name)}
                                   className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black mt-0.5"
                                   disabled={isLoading}
                                 />
@@ -446,7 +392,7 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
                   {formData.selectedPermissions.length} permissions selected for this role
                 </p>
               </div>
-              
+
               <div className="flex items-center space-x-3">
                 <Button
                   type="button"

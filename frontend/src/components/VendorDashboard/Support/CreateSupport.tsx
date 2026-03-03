@@ -5,8 +5,11 @@ import { ArrowLeft, Send, Paperclip } from 'lucide-react'
 import Link from 'next/link'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Dropdown from '@/components/UI/Dropdown'
+import supportService from '@/services/supportService'
+import { useRouter } from 'next/navigation'
 
 export default function CreateSupport() {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     subject: '',
     category: 'technical',
@@ -57,23 +60,23 @@ export default function CreateSupport() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
-    
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Reset form
-      setFormData({
-        subject: '',
-        category: 'technical',
-        priority: 'medium',
-        description: '',
-        attachments: []
-      })
-      
-      showSuccessToast('Ticket Created!', 'Your support ticket has been submitted successfully.')
-    } catch (error) {
-      showErrorToast('Submission Failed', 'Failed to create ticket. Please try again.')
+      const payload = {
+        subject: formData.subject,
+        category: formData.category,
+        priority: formData.priority,
+        description: formData.description,
+      }
+
+      const res = await supportService.createTicket(payload)
+
+      if (res.success) {
+        showSuccessToast('Ticket Created!', 'Your support ticket has been submitted successfully.')
+        router.push('/vendor/dashboard/support')
+      }
+    } catch (error: any) {
+      showErrorToast('Submission Failed', error.message || 'Failed to create ticket. Please try again.')
     } finally {
       setIsSubmitting(false)
     }

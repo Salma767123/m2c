@@ -12,13 +12,12 @@ interface ReviewProps {
     serviceStartDate: string
     serviceType: string
     // Order Information
-    poNumber: string
     items: Array<{
       id: number
       itemName: string
       itemDescription: string
-      poQuantity: number
-      bookedInspectionQuantity: number
+      totalQuantity: number
+      inspectionQuantity: number
       status: string
     }>
     packedQuantity: number
@@ -54,8 +53,8 @@ export default function Review({ formData }: ReviewProps) {
   // Collect all remark codes and calculate average
   const getRemarkAnalysis = () => {
     const remarkCodes: number[] = []
-    const remarkDetails: Array<{category: string, code: string}> = []
-    
+    const remarkDetails: Array<{ category: string, code: string }> = []
+
     const categories = [
       { key: 'shipperCartonRemark', label: 'Shipper Carton Packaging' },
       { key: 'innerCartonRemark', label: 'Inner Carton Packaging' },
@@ -64,7 +63,7 @@ export default function Review({ formData }: ReviewProps) {
       { key: 'aqlWorkmanshipRemark', label: 'AQL Workmanship' },
       { key: 'onSiteTestsRemark', label: 'On-site Tests' }
     ]
-    
+
     categories.forEach(category => {
       const remarkValue = formData[category.key as keyof typeof formData] as string
       if (remarkValue && remarkValue.trim()) {
@@ -75,9 +74,9 @@ export default function Review({ formData }: ReviewProps) {
         }
       }
     })
-    
+
     const average = remarkCodes.length > 0 ? remarkCodes.reduce((sum, code) => sum + code, 0) / remarkCodes.length : 0
-    
+
     return {
       codes: remarkCodes,
       details: remarkDetails,
@@ -89,13 +88,13 @@ export default function Review({ formData }: ReviewProps) {
   // Calculate overall result based on remark code average
   const calculateOverallResult = () => {
     const remarkAnalysis = getRemarkAnalysis()
-    
+
     // If no remark codes, consider as perfect (10)
     const effectiveAverage = remarkAnalysis.count === 0 ? 10 : remarkAnalysis.average
-    
+
     let status: string
     let description: string
-    
+
     if (effectiveAverage >= 8) {
       status = 'PASS'
       description = 'Quality standards met successfully'
@@ -106,7 +105,7 @@ export default function Review({ formData }: ReviewProps) {
       status = 'REJECTED'
       description = 'Quality standards not met - product rejected'
     }
-    
+
     return {
       status,
       description,
@@ -167,10 +166,6 @@ export default function Review({ formData }: ReviewProps) {
           </h3>
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b border-slate-200">
-              <span className="text-slate-600">PO Number:</span>
-              <span className="font-mono text-slate-900 font-medium">{formData.poNumber}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-slate-200">
               <span className="text-slate-600">Total Items:</span>
               <span className="text-slate-900">{formData.items.length}</span>
             </div>
@@ -199,7 +194,7 @@ export default function Review({ formData }: ReviewProps) {
                 <tr className="border-b border-slate-300">
                   <th className="text-left py-3 px-3 font-semibold text-slate-700">Item</th>
                   <th className="text-left py-3 px-3 font-semibold text-slate-700">Description</th>
-                  <th className="text-left py-3 px-3 font-semibold text-slate-700">PO Qty</th>
+                  <th className="text-left py-3 px-3 font-semibold text-slate-700">Total Qty</th>
                   <th className="text-left py-3 px-3 font-semibold text-slate-700">Inspection Qty</th>
                   <th className="text-left py-3 px-3 font-semibold text-slate-700">Status</th>
                 </tr>
@@ -209,8 +204,8 @@ export default function Review({ formData }: ReviewProps) {
                   <tr key={item.id}>
                     <td className="py-3 px-3 text-slate-900 font-medium">{item.itemName}</td>
                     <td className="py-3 px-3 text-slate-600">{item.itemDescription}</td>
-                    <td className="py-3 px-3 text-slate-900">{item.poQuantity}</td>
-                    <td className="py-3 px-3 text-slate-900">{item.bookedInspectionQuantity}</td>
+                    <td className="py-3 px-3 text-slate-900">{item.totalQuantity}</td>
+                    <td className="py-3 px-3 text-slate-900">{item.inspectionQuantity}</td>
                     <td className="py-3 px-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(item.status)}`}>
                         {item.status}
@@ -265,7 +260,7 @@ export default function Review({ formData }: ReviewProps) {
             </span>
           </div>
         </div>
-        
+
         {/* Remark Analysis Summary */}
         <div className="bg-slate-50 rounded-lg p-4 mt-4">
           <h4 className="font-semibold text-slate-900 mb-3">Remark Analysis:</h4>
@@ -279,16 +274,15 @@ export default function Review({ formData }: ReviewProps) {
               <div className="text-sm text-slate-600">Average Score</div>
             </div>
             <div>
-              <div className={`text-2xl font-bold ${
-                overallResult.status === 'PASS' ? 'text-emerald-600' : 
+              <div className={`text-2xl font-bold ${overallResult.status === 'PASS' ? 'text-emerald-600' :
                 overallResult.status === 'RE-INSPECTION' ? 'text-amber-600' : 'text-red-600'
-              }`}>
+                }`}>
                 {overallResult.status}
               </div>
               <div className="text-sm text-slate-600">Result</div>
             </div>
           </div>
-          
+
           {/* Detailed Remark Breakdown */}
           {overallResult.remarkDetails.length > 0 && (
             <div className="mt-4">
@@ -326,14 +320,13 @@ export default function Review({ formData }: ReviewProps) {
             <div className="text-slate-600 text-sm">Minor Defects</div>
           </div>
           <div className="text-center">
-            <div className={`text-2xl font-bold mb-1 ${
-              formData.criticalDefects <= formData.maxAllowedCritical &&
+            <div className={`text-2xl font-bold mb-1 ${formData.criticalDefects <= formData.maxAllowedCritical &&
               formData.majorDefects <= formData.maxAllowedMajor &&
               formData.minorDefects <= formData.maxAllowedMinor ? "text-emerald-600" : "text-red-600"
-            }`}>
+              }`}>
               {formData.criticalDefects <= formData.maxAllowedCritical &&
-              formData.majorDefects <= formData.maxAllowedMajor &&
-              formData.minorDefects <= formData.maxAllowedMinor ? "PASS" : "FAIL"}
+                formData.majorDefects <= formData.maxAllowedMajor &&
+                formData.minorDefects <= formData.maxAllowedMinor ? "PASS" : "FAIL"}
             </div>
             <div className="text-slate-600 text-sm">AQL Result</div>
           </div>
@@ -351,7 +344,7 @@ export default function Review({ formData }: ReviewProps) {
             <div>• Average below 6: <span className="font-medium text-red-600">REJECTED</span></div>
           </div>
         </div>
-        
+
         <div className="space-y-3">
           <label className="flex items-center gap-3 cursor-pointer">
             <input
@@ -384,11 +377,11 @@ export default function Review({ formData }: ReviewProps) {
             <span className="text-slate-700 font-medium">REJECTED (Average: {overallResult.average.toFixed(1)})</span>
           </label>
         </div>
-        
+
         {overallResult.remarkCodes.length > 0 && (
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
             <span className="text-sm font-medium text-blue-800">
-              Remark Codes: {overallResult.remarkCodes.join(', ')} 
+              Remark Codes: {overallResult.remarkCodes.join(', ')}
               (Total: {overallResult.totalRemarks}, Average: {overallResult.average.toFixed(1)})
             </span>
           </div>
@@ -397,13 +390,12 @@ export default function Review({ formData }: ReviewProps) {
 
       {/* Final Status Display */}
       <div
-        className={`p-6 rounded-xl text-center border-2 ${
-          overallResult.status === 'PASS'
-            ? "bg-emerald-50 border-emerald-200"
-            : overallResult.status === 'REJECTED'
+        className={`p-6 rounded-xl text-center border-2 ${overallResult.status === 'PASS'
+          ? "bg-emerald-50 border-emerald-200"
+          : overallResult.status === 'REJECTED'
             ? "bg-red-50 border-red-200"
             : "bg-amber-50 border-amber-200"
-        }`}
+          }`}
       >
         <div className="flex items-center justify-center gap-3 mb-2">
           {overallResult.status === 'PASS' ? (
@@ -414,26 +406,25 @@ export default function Review({ formData }: ReviewProps) {
             <AlertTriangle className="w-8 h-8 text-amber-600" />
           )}
           <p
-            className={`font-bold text-2xl ${
-              overallResult.status === 'PASS'
-                ? "text-emerald-800"
-                : overallResult.status === 'REJECTED'
+            className={`font-bold text-2xl ${overallResult.status === 'PASS'
+              ? "text-emerald-800"
+              : overallResult.status === 'REJECTED'
                 ? "text-red-800"
                 : "text-amber-800"
-            }`}
+              }`}
           >
             {overallResult.status === 'PASS'
               ? "INSPECTION PASSED ✓"
               : overallResult.status === 'REJECTED'
-              ? "INSPECTION REJECTED ✗"
-              : "RE-INSPECTION REQUIRED ⚠️"}
+                ? "INSPECTION REJECTED ✗"
+                : "RE-INSPECTION REQUIRED ⚠️"}
           </p>
         </div>
         <p className="text-slate-600 mb-2">
           {overallResult.description}
         </p>
         <div className="text-sm text-slate-500">
-          Average Score: {overallResult.average.toFixed(1)}/10 
+          Average Score: {overallResult.average.toFixed(1)}/10
           {overallResult.totalRemarks > 0 && ` (${overallResult.totalRemarks} remarks)`}
         </div>
       </div>

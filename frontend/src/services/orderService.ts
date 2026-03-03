@@ -8,12 +8,18 @@ export interface OrderItem {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
-    // Add other fields as needed
+    vendorId: string;
+    vendorName: string;
+    sku: string;
+    variantId?: string;
+    size?: string;
+    color?: string;
 }
 
 export interface Order {
     id: string;
     orderId: string;
+    invoiceNo?: string;        // ← invoice number from InvoiceSettings
     status: string;
     totalAmount: number;
     subtotal: number;
@@ -22,9 +28,11 @@ export interface Order {
     discount: number;
     items: OrderItem[];
     createdAt: string;
+    orderDate?: string;
     shippingAddress: any; // Define precise type if possible
-    paymentMethod: string;
-    paymentStatus: string;
+    paymentMethod?: string;
+    paymentId?: string;
+    paymentStatus?: string;
     customerEmail: string;
     customerName?: string;
     customerPhone?: string;
@@ -81,6 +89,66 @@ class OrderService {
             return response.data;
         } catch (error: any) {
             throw new Error(error.response?.data?.error || 'Failed to fetch order');
+        }
+    }
+
+    // ============================================
+    // VENDOR ACTIONS
+    // ============================================
+    async getVendorOrders(): Promise<{ success: boolean; data: Order[] }> {
+        try {
+            const response = await axios.get('/orders/vendor');
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.error || 'Failed to fetch vendor orders');
+        }
+    }
+
+    async getVendorOrderById(id: string): Promise<{ success: boolean; data: Order }> {
+        try {
+            const response = await axios.get(`/orders/vendor/${id}`);
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.error || 'Failed to fetch vendor order');
+        }
+    }
+
+    async updateVendorOrderStatus(id: string, status: string): Promise<{ success: boolean; data: Order }> {
+        try {
+            const response = await axios.put(`/orders/vendor/${id}/status`, { status });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.error || 'Failed to update vendor order status');
+        }
+    }
+
+    // ============================================
+    // ADMIN ACTIONS
+    // ============================================
+    async getAdminOrders(): Promise<{ success: boolean; data: Order[] }> {
+        try {
+            const response = await axios.get('/orders/admin');
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.error || 'Failed to fetch admin orders');
+        }
+    }
+
+    async getAdminOrderById(id: string): Promise<{ success: boolean; data: Order }> {
+        try {
+            const response = await axios.get(`/orders/admin/${id}`);
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.error || 'Failed to fetch admin order');
+        }
+    }
+
+    async updateAdminOrderStatus(id: string, status: string): Promise<{ success: boolean; data: Order }> {
+        try {
+            const response = await axios.put(`/orders/admin/${id}/status`, { status });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.error || 'Failed to update admin order status');
         }
     }
 }

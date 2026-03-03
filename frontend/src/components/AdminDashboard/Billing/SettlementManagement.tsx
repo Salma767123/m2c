@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Eye, CheckCircle, Clock, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Eye, CheckCircle, Clock, X, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -13,79 +13,43 @@ import {
 } from "@/components/UI/Table";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
-
-interface Settlement {
-  id: string;
-  settlementNumber: string;
-  vendor: string;
-  billingNumber: string;
-  period: string;
-  amount: number;
-  dueDate: string;
-  status: "Pending" | "Processing" | "Paid" | "Failed";
-  paymentDate?: string;
-  transactionId?: string;
-}
-
-const mockSettlements: Settlement[] = [
-  {
-    id: "1",
-    settlementNumber: "SET-2024-001",
-    vendor: "Textile Traders",
-    billingNumber: "BILL-2024-001",
-    period: "January 2024",
-    amount: 112500,
-    dueDate: "2024-02-10",
-    status: "Paid",
-    paymentDate: "2024-02-08",
-    transactionId: "TXN-SET-001",
-  },
-  {
-    id: "2",
-    settlementNumber: "SET-2024-002",
-    vendor: "Silk Emporium",
-    billingNumber: "BILL-2024-002",
-    period: "January 2024",
-    amount: 88200,
-    dueDate: "2024-02-10",
-    status: "Processing",
-  },
-  {
-    id: "3",
-    settlementNumber: "SET-2024-003",
-    vendor: "Wool Crafts",
-    billingNumber: "BILL-2024-003",
-    period: "February 2024",
-    amount: 67500,
-    dueDate: "2024-03-10",
-    status: "Pending",
-  },
-  {
-    id: "4",
-    settlementNumber: "SET-2024-004",
-    vendor: "Home Textiles",
-    billingNumber: "BILL-2024-004",
-    period: "February 2024",
-    amount: 130500,
-    dueDate: "2024-03-10",
-    status: "Pending",
-  },
-];
+import { settlementService, Settlement } from "@/services/settlementService";
 
 export default function SettlementManagement() {
   const router = useRouter();
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
   const [transactionId, setTransactionId] = useState("");
+  const [processing, setProcessing] = useState(false);
 
   const statusOptions = ["All", "Pending", "Processing", "Paid", "Failed"];
 
-  const filteredSettlements = mockSettlements.filter((settlement) => {
+  const fetchSettlements = async () => {
+    try {
+      setLoading(true);
+      const res = await settlementService.getAllSettlements();
+      if (res.success) {
+        setSettlements(res.data);
+      }
+    } catch (error: any) {
+      showErrorToast(error?.error || "Failed to load settlements");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSettlements();
+  }, []);
+
+  const filteredSettlements = settlements.filter((settlement) => {
     const matchesSearch =
       settlement.settlementNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      settlement.vendor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      settlement.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       settlement.billingNumber.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "All" || settlement.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -106,34 +70,43 @@ export default function SettlementManagement() {
     }
   };
 
-  const handleViewSettlement = (settlementId: string) => {
-    router.push(`/admin/dashboard/billing/settlement/view/${settlementId}`);
-  };
-
   const handleMarkAsPaid = (settlement: Settlement) => {
     setSelectedSettlement(settlement);
     setShowPaymentModal(true);
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     if (!transactionId.trim()) {
       showErrorToast("Please enter transaction ID");
       return;
     }
 
-    showSuccessToast(`Settlement ${selectedSettlement?.settlementNumber} marked as paid`);
-    setShowPaymentModal(false);
-    setSelectedSettlement(null);
-    setTransactionId("");
+    if (!selectedSettlement) return;
+
+    try {
+      setProcessing(true);
+      const res = await settlementService.updateSettlementStatus(selectedSettlement.id, "Paid", transactionId);
+      if (res.success) {
+        showSuccessToast(`Settlement ${selectedSettlement.settlementNumber} marked as paid`);
+        setShowPaymentModal(false);
+        setSelectedSettlement(null);
+        setTransactionId("");
+        fetchSettlements(); // refresh table
+      }
+    } catch (error: any) {
+      showErrorToast(error?.error || "Failed to confirm payment");
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const totalPending = mockSettlements
+  const totalPending = settlements
     .filter((s) => s.status === "Pending")
     .reduce((sum, s) => sum + s.amount, 0);
-  const totalProcessing = mockSettlements
+  const totalProcessing = settlements
     .filter((s) => s.status === "Processing")
     .reduce((sum, s) => sum + s.amount, 0);
-  const totalPaid = mockSettlements
+  const totalPaid = settlements
     .filter((s) => s.status === "Paid")
     .reduce((sum, s) => sum + s.amount, 0);
 
@@ -143,7 +116,7 @@ export default function SettlementManagement() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Total Settlements</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{mockSettlements.length}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{settlements.length}</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <p className="text-sm text-gray-600">Pending</p>
@@ -180,74 +153,82 @@ export default function SettlementManagement() {
               placeholder="Filter by Status"
             />
           </div>
+          <button
+            onClick={fetchSettlements}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
       {/* Settlements Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Settlement Number</TableHead>
-              <TableHead>Vendor</TableHead>
-              <TableHead>Billing Number</TableHead>
-              <TableHead>Period</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Due Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredSettlements.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center p-10">
+            <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+            <span className="ml-3 text-gray-500 font-medium">Loading Settlements...</span>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                  No settlements found
-                </TableCell>
+                <TableHead>Settlement No.</TableHead>
+                <TableHead>Vendor</TableHead>
+                <TableHead>Billing/Order No.</TableHead>
+                <TableHead>Period</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Due Date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ) : (
-              filteredSettlements.map((settlement) => (
-                <TableRow key={settlement.id}>
-                  <TableCell className="font-medium">{settlement.settlementNumber}</TableCell>
-                  <TableCell>{settlement.vendor}</TableCell>
-                  <TableCell>{settlement.billingNumber}</TableCell>
-                  <TableCell>{settlement.period}</TableCell>
-                  <TableCell className="font-medium">₹{settlement.amount.toLocaleString()}</TableCell>
-                  <TableCell>{new Date(settlement.dueDate).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                        settlement.status
-                      )}`}
-                    >
-                      {settlement.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleViewSettlement(settlement.id)}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="View Settlement"
-                      >
-                        <Eye className="h-5 w-5" />
-                      </button>
-                      {(settlement.status === "Pending" || settlement.status === "Processing") && (
-                        <button
-                          onClick={() => handleMarkAsPaid(settlement)}
-                          className="p-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Mark as Paid"
-                        >
-                          <CheckCircle className="h-5 w-5" />
-                        </button>
-                      )}
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {filteredSettlements.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    No settlements found
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                filteredSettlements.map((settlement) => (
+                  <TableRow key={settlement.id}>
+                    <TableCell className="font-medium text-indigo-600">{settlement.settlementNumber}</TableCell>
+                    <TableCell className="font-medium">{settlement.vendorName}</TableCell>
+                    <TableCell>{settlement.billingNumber}</TableCell>
+                    <TableCell>{settlement.period}</TableCell>
+                    <TableCell className="font-medium">₹{settlement.amount.toLocaleString()}</TableCell>
+                    <TableCell>{new Date(settlement.dueDate).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                          settlement.status
+                        )}`}
+                      >
+                        {settlement.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        {(settlement.status === "Pending" || settlement.status === "Processing") && (
+                          <button
+                            onClick={() => handleMarkAsPaid(settlement)}
+                            className="p-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Mark as Paid"
+                          >
+                            <CheckCircle className="h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* Payment Confirmation Modal */}
@@ -274,7 +255,7 @@ export default function SettlementManagement() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Vendor:</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedSettlement.vendor}</span>
+                    <span className="text-sm font-medium text-gray-900">{selectedSettlement.vendorName}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Amount:</span>
@@ -306,14 +287,17 @@ export default function SettlementManagement() {
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                disabled={processing}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmPayment}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                disabled={processing}
+                className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
               >
+                {processing && <RefreshCw className="h-4 w-4 animate-spin" />}
                 Confirm Payment
               </button>
             </div>

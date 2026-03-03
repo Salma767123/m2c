@@ -14,59 +14,7 @@ interface Order {
   status: 'pending' | 'packed' | 'shipped' | 'delivered';
   orderDate: string;
 }
-
-const recentOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'ORD-2024-001',
-    product: 'Premium Cotton Kitchen Towel Set',
-    quantity: 2,
-    amount: 1198,
-    hub: 'Mumbai Hub',
-    status: 'delivered',
-    orderDate: '2024-02-10',
-  },
-  {
-    id: '2',
-    orderNumber: 'ORD-2024-002',
-    product: 'Handwoven Bath Towel Collection',
-    quantity: 1,
-    amount: 899,
-    hub: 'Delhi Hub',
-    status: 'shipped',
-    orderDate: '2024-02-11',
-  },
-  {
-    id: '3',
-    orderNumber: 'ORD-2024-003',
-    product: 'Organic Tea Towel Set',
-    quantity: 3,
-    amount: 1347,
-    hub: 'Bangalore Hub',
-    status: 'packed',
-    orderDate: '2024-02-12',
-  },
-  {
-    id: '4',
-    orderNumber: 'ORD-2024-004',
-    product: 'Heritage Table Runner',
-    quantity: 1,
-    amount: 799,
-    hub: 'Chennai Hub',
-    status: 'pending',
-    orderDate: '2024-02-13',
-  },
-  {
-    id: '5',
-    orderNumber: 'ORD-2024-005',
-    product: 'Artisan Linen Apron',
-    quantity: 2,
-    amount: 698,
-    hub: 'Kolkata Hub',
-    status: 'pending',
-    orderDate: '2024-02-14',
-  },
-];
+// mock data removed
 
 const getStatusIcon = (status: string) => {
   switch (status) {
@@ -98,7 +46,7 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-export default function RecentOrders() {
+export default function RecentOrders({ orders }: { orders: any[] }) {
   return (
     <Card className="border border-gray-200 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -106,8 +54,8 @@ export default function RecentOrders() {
           <ShoppingCart className="w-5 h-5 text-blue-600" />
           Recent Orders
         </CardTitle>
-        <Link 
-          href="/vendor/dashboard/orders" 
+        <Link
+          href="/vendor/dashboard/orders"
           className="text-sm text-gray-600 hover:text-gray-900 font-medium"
         >
           View All
@@ -115,7 +63,7 @@ export default function RecentOrders() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {recentOrders.map((order) => (
+          {orders && orders.map((order) => (
             <div
               key={order.id}
               className="flex items-start justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -123,23 +71,22 @@ export default function RecentOrders() {
               <div className="flex-1">
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">{order.orderNumber}</h4>
-                    <p className="text-sm text-gray-600">{order.product}</p>
+                    <h4 className="font-semibold text-gray-900 mb-1">{order.orderId}</h4>
+                    <p className="text-sm text-gray-600">{order.customerName}</p>
                   </div>
                   <span
-                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(order.status)}`}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold capitalize bg-gray-100 text-gray-800`}
                   >
-                    {getStatusIcon(order.status)}
+                    {getStatusIcon(order.status?.toLowerCase())}
                     {order.status}
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-sm text-gray-600">
                   <span className="font-semibold text-gray-900">₹{order.amount.toLocaleString()}</span>
-                  <span>Qty: {order.quantity}</span>
-                  <span>{order.hub}</span>
+                  <span>Items: {order.items}</span>
                   <span className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    {new Date(order.orderDate).toLocaleDateString('en-IN')}
+                    {new Date(order.date).toLocaleDateString('en-IN')}
                   </span>
                 </div>
               </div>

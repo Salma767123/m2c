@@ -7,72 +7,34 @@ import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
-
-interface SupportTicket {
-  id: string;
-  ticketId: string;
-  vendorName: string;
-  vendorEmail: string;
-  subject: string;
-  description: string;
-  status: "open" | "in-progress" | "resolved" | "closed";
-  priority: "low" | "medium" | "high" | "urgent";
-  category: string;
-  createdAt: string;
-  updatedAt: string;
-  responses: number;
-}
+import supportService, { SupportTicket } from "@/services/supportService";
+import { useEffect } from "react";
 
 export default function AdminSupport() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
 
-  // Mock data - replace with actual API call
-  const tickets: SupportTicket[] = [
-    {
-      id: "1",
-      ticketId: "TKT-2024-001",
-      vendorName: "Textile Co.",
-      vendorEmail: "vendor@textile.com",
-      subject: "Payment not received for order #12345",
-      description: "I completed an order but haven't received payment yet.",
-      status: "open",
-      priority: "high",
-      category: "Payment",
-      createdAt: "2024-02-08",
-      updatedAt: "2024-02-08",
-      responses: 0,
-    },
-    {
-      id: "2",
-      ticketId: "TKT-2024-002",
-      vendorName: "Home Fabrics Ltd.",
-      vendorEmail: "support@homefabrics.com",
-      subject: "Product listing not showing up",
-      description: "My new product listing is not visible on the marketplace.",
-      status: "in-progress",
-      priority: "medium",
-      category: "Technical",
-      createdAt: "2024-02-07",
-      updatedAt: "2024-02-08",
-      responses: 2,
-    },
-    {
-      id: "3",
-      ticketId: "TKT-2024-003",
-      vendorName: "Quality Textiles",
-      vendorEmail: "info@qualitytextiles.com",
-      subject: "How to update shipping rates?",
-      description: "Need help updating my shipping rates for different regions.",
-      status: "resolved",
-      priority: "low",
-      category: "General",
-      createdAt: "2024-02-06",
-      updatedAt: "2024-02-07",
-      responses: 3,
-    },
-  ];
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTickets();
+  }, []);
+
+  const fetchTickets = async () => {
+    try {
+      setIsLoading(true);
+      const res = await supportService.getAllTickets();
+      if (res.success) {
+        setTickets(res.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch tickets:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -123,7 +85,7 @@ export default function AdminSupport() {
     const matchesSearch =
       ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
       ticket.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.creatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       ticket.ticketId.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
@@ -276,8 +238,8 @@ export default function AdminSupport() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium text-gray-900">{ticket.vendorName}</div>
-                      <div className="text-sm text-gray-500">{ticket.vendorEmail}</div>
+                      <div className="font-medium text-gray-900">{ticket.creatorName}</div>
+                      <div className="text-sm text-gray-500">{ticket.creatorEmail}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -309,10 +271,10 @@ export default function AdminSupport() {
                     <span className="text-sm text-gray-900">{ticket.category}</span>
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm text-gray-900">{ticket.createdAt}</div>
+                    <div className="text-sm text-gray-900">{new Date(ticket.createdAt).toLocaleDateString()}</div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-gray-900">{ticket.responses}</span>
+                    <span className="text-sm text-gray-900">{ticket.messages?.length || 0}</span>
                   </TableCell>
                   <TableCell>
                     <Link

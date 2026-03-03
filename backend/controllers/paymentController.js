@@ -217,11 +217,18 @@ const handleRazorpayWebhook = async (req, res) => {
     // Verify signature
     const crypto = require('crypto');
     const hmac = crypto.createHmac('sha256', paymentSettings.razorpayWebhookSecret);
-    hmac.update(JSON.stringify(req.body));
+
+    // Use rawBody if available, otherwise fallback to stringified body (less reliable)
+    // Note: rawBody is captured by express.json middleware in server.js
+    const verificationPayload = req.rawBody || JSON.stringify(req.body);
+    hmac.update(verificationPayload);
+
     const expectedSignature = hmac.digest('hex');
 
     if (expectedSignature !== signature) {
       console.error('Webhook signature verification failed');
+      console.error('Expected:', expectedSignature);
+      console.error('Received:', signature);
       return res.status(400).json({
         success: false,
         error: 'Invalid signature'

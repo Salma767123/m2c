@@ -1,276 +1,128 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { ArrowLeft, Download, Share2, Printer, X } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+
+import { ArrowLeft, Printer, RefreshCw, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
-import Dropdown from "@/components/UI/Dropdown";
+import { showErrorToast } from "@/lib/toast-utils";
+import { orderService, Order } from "@/services/orderService";
+import axios from "@/lib/axios";
 
 interface InvoiceDetailProps {
-  invoiceId: string;
+  invoiceId: string; // can be order.id (ObjectId) or order.orderId (ORD-...) or order.invoiceNo (INV-...)
 }
+
+const fmtDate = (d?: string) =>
+  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+const fmtINR = (n: number) =>
+  "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const payStatusColor = (s?: string) => {
+  if (!s) return "text-yellow-600";
+  const p = s.toUpperCase();
+  if (p === "PAID" || p === "SUCCESS" || p === "CAPTURED") return "text-green-600";
+  return "text-yellow-600";
+};
 
 export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
   const router = useRouter();
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [downloadFormat, setDownloadFormat] = useState("");
-  const [shareEmail, setShareEmail] = useState("");
   const invoiceRef = useRef<HTMLDivElement>(null);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [printing, setPrinting] = useState(false);
+  const [companyName, setCompanyName] = useState("M2C Store");
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
-  // Mock invoice data
-  const invoice = {
-    invoiceNumber: "INV-2024-001",
-    orderId: "ORD-2024-001",
-    date: "2024-02-10",
-    dueDate: "2024-02-20",
-    status: "Paid",
-    type: "Customer",
-    company: {
-      name: "Navnit Textiles",
-      address: "123, Textile Market, Mumbai, Maharashtra - 400001",
-      phone: "+91 98765 00000",
-      email: "info@navnittextiles.com",
-      gst: "27AABCT1234F1Z5",
-    },
-    billTo: {
-      name: "John Doe",
-      address: "456, MG Road, Mumbai, Maharashtra - 400002",
-      phone: "+91 98765 12345",
-      email: "john.doe@example.com",
-      gst: "27AABCT5678F1Z9",
-    },
-    items: [
-      {
-        id: "1",
-        description: "Cotton Bedsheet Set",
-        sku: "CBS-001",
-        quantity: 2,
-        rate: 1250,
-        amount: 2500,
-      },
-    ],
-    subtotal: 2500,
-    tax: 450,
-    discount: 0,
-    total: 2950,
-    paymentMethod: "Razorpay",
-    transactionId: "TXN-2024-001",
-  };
-
-  const handleDownload = () => {
-    if (!downloadFormat) {
-      showErrorToast("Please select a format");
-      return;
+  // ── Fetch order ────────────────────────────────────────────────────────────
+  const fetchOrder = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [orderRes, companyRes] = await Promise.all([
+        orderService.getAdminOrderById(invoiceId),
+        axios.get('/company-info').catch(() => null),
+      ]);
+      if (orderRes.success) setOrder(orderRes.data);
+      if (companyRes?.data?.success) {
+        setCompanyName(companyRes.data.data?.companyName || "M2C Store");
+        setCompanyLogo(companyRes.data.data?.companyLogo || "/assets/logo/logo2.png");
+      } else {
+        setCompanyLogo("/assets/logo/logo2.png");
+      }
+    } catch (err: any) {
+      showErrorToast("Error", err.message || "Failed to load invoice");
+    } finally {
+      setLoading(false);
     }
+  }, [invoiceId]);
 
-    // Simulate download
-    showSuccessToast(`Invoice downloaded as ${downloadFormat}`);
-    setShowDownloadModal(false);
-    setDownloadFormat("");
-  };
+  useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
-  const handleShare = () => {
-    if (!shareEmail.trim()) {
-      showErrorToast("Please enter an email address");
-      return;
+  // ── Print via backend HTML ─────────────────────────────────────────────────
+  const handlePrint = async () => {
+    if (!order) return;
+    setPrinting(true);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+      const token = localStorage.getItem("adminToken") || sessionStorage.getItem("adminToken") || "";
+      const response = await fetch(`${baseUrl}/orders/admin/${order.id}/invoice`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+      const html = await response.text();
+      const win = window.open("", "_blank");
+      if (win) {
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        // Trigger print after content loads
+        setTimeout(() => win.print(), 300);
+      }
+    } catch {
+      showErrorToast("Error", "Failed to generate invoice for printing");
+    } finally {
+      setPrinting(false);
     }
-
-    // Simulate share
-    showSuccessToast(`Invoice shared to ${shareEmail}`);
-    setShowShareModal(false);
-    setShareEmail("");
   };
 
-  const handlePrint = () => {
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+  // ── Loading state ──────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="h-6 w-6 animate-spin text-gray-400 mr-3" />
+        <span className="text-gray-500">Loading invoice…</span>
+      </div>
+    );
+  }
 
-    const invoiceContent = invoiceRef.current?.innerHTML || '';
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Invoice ${invoice.invoiceNumber}</title>
-          <style>
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              color: #000;
-            }
-            .invoice-container {
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 20px 0;
-            }
-            table thead {
-              background-color: #1a1a1a;
-              color: white;
-            }
-            table th,
-            table td {
-              border: 1px solid #000;
-              padding: 12px;
-              text-align: left;
-            }
-            table th {
-              font-weight: 600;
-            }
-            table td {
-              background-color: #fff;
-            }
-            .text-right {
-              text-align: right;
-            }
-            .text-center {
-              text-align: center;
-            }
-            .border-b {
-              border-bottom: 1px solid #e5e7eb;
-            }
-            .font-bold {
-              font-weight: 700;
-            }
-            .font-semibold {
-              font-weight: 600;
-            }
-            .font-medium {
-              font-medium: 500;
-            }
-            .text-3xl {
-              font-size: 1.875rem;
-            }
-            .text-2xl {
-              font-size: 1.5rem;
-            }
-            .text-base {
-              font-size: 1rem;
-            }
-            .text-sm {
-              font-size: 0.875rem;
-            }
-            .text-xs {
-              font-size: 0.75rem;
-            }
-            .mt-2 {
-              margin-top: 0.5rem;
-            }
-            .mt-6 {
-              margin-top: 1.5rem;
-            }
-            .mb-2 {
-              margin-bottom: 0.5rem;
-            }
-            .mb-6 {
-              margin-bottom: 1.5rem;
-            }
-            .pb-6 {
-              padding-bottom: 1.5rem;
-            }
-            .pt-6 {
-              padding-top: 1.5rem;
-            }
-            .px-4 {
-              padding-left: 1rem;
-              padding-right: 1rem;
-            }
-            .py-2 {
-              padding-top: 0.5rem;
-              padding-bottom: 0.5rem;
-            }
-            .py-3 {
-              padding-top: 0.75rem;
-              padding-bottom: 0.75rem;
-            }
-            .totals-section {
-              display: flex;
-              justify-content: flex-end;
-              margin-bottom: 1.5rem;
-            }
-            .totals-box {
-              width: 300px;
-            }
-            .totals-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 0.5rem 0;
-              border-bottom: 1px solid #e5e7eb;
-            }
-            .total-final {
-              display: flex;
-              justify-content: space-between;
-              padding: 0.75rem 1rem;
-              background-color: #1a1a1a;
-              color: white;
-              border-radius: 8px;
-              margin-top: 0.5rem;
-              font-weight: 700;
-            }
-            .header-section {
-              display: flex;
-              justify-content: space-between;
-              border-bottom: 1px solid #e5e7eb;
-              padding-bottom: 1.5rem;
-              margin-bottom: 1.5rem;
-            }
-            .text-gray-600 {
-              color: #4b5563;
-            }
-            .text-gray-900 {
-              color: #111827;
-            }
-            .text-green-600 {
-              color: #16a34a;
-            }
-            .text-yellow-600 {
-              color: #ca8a04;
-            }
-            .text-red-600 {
-              color: #dc2626;
-            }
-            @media print {
-              body {
-                padding: 0;
-              }
-              @page {
-                size: A4;
-                margin: 1cm;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="invoice-container">
-            ${invoiceContent}
-          </div>
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    printWindow.focus();
-    
-    // Wait for content to load then print
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
-  };
+  if (!order) {
+    return (
+      <div className="text-center py-20">
+        <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+        <p className="text-gray-500">Invoice not found</p>
+        <button onClick={() => router.back()} className="mt-4 text-sm text-indigo-600 hover:underline">
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  const addr = typeof order.shippingAddress === "string"
+    ? JSON.parse(order.shippingAddress)
+    : order.shippingAddress || {};
+
+  const addrStr = [
+    addr.addressLine1,
+    addr.addressLine2,
+    addr.city && addr.state ? `${addr.city}, ${addr.state}` : (addr.city || addr.state),
+    addr.postalCode || addr.zipCode,
+    addr.country,
+  ].filter(Boolean).join(", ");
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
+      {/* ── Action Bar ── */}
       <div className="flex items-center justify-between print:hidden">
         <div className="flex items-center gap-4">
           <button
@@ -280,249 +132,169 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Invoice Details</h1>
-            <p className="text-sm text-gray-600 mt-1">Invoice: {invoice.invoiceNumber}</p>
+            <h1 className="text-2xl font-bold text-gray-900">Invoice Detail</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-gray-500">Order: <span className="font-mono font-semibold">{order.orderId}</span></span>
+              {order.invoiceNo && (
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-2.5 py-0.5">
+                  <FileText className="h-3 w-3" />
+                  {order.invoiceNo}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowDownloadModal(true)}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </button>
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
-          >
-            <Share2 className="h-4 w-4" />
-            Share
-          </button>
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center gap-2"
-          >
-            <Printer className="h-4 w-4" />
-            Print
-          </button>
-        </div>
+        <button
+          onClick={handlePrint}
+          disabled={printing}
+          className="flex items-center gap-2 px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors font-medium"
+        >
+          {printing
+            ? <RefreshCw className="h-4 w-4 animate-spin" />
+            : <Printer className="h-4 w-4" />}
+          {printing ? "Generating…" : "Print Invoice"}
+        </button>
       </div>
 
-      {/* Invoice Content */}
-      <div ref={invoiceRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-        {/* Company Header */}
-        <div className="border-b border-gray-200 pb-6 mb-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900">{invoice.company.name}</h2>
-              <p className="text-sm text-gray-600 mt-2">{invoice.company.address}</p>
-              <p className="text-sm text-gray-600">Phone: {invoice.company.phone}</p>
-              <p className="text-sm text-gray-600">Email: {invoice.company.email}</p>
-              <p className="text-sm text-gray-600">GST: {invoice.company.gst}</p>
-            </div>
-            <div className="text-right">
-              <h3 className="text-2xl font-bold text-gray-900">INVOICE</h3>
-              <p className="text-sm text-gray-600 mt-2">
-                Invoice #: <span className="font-medium text-gray-900">{invoice.invoiceNumber}</span>
-              </p>
-              <p className="text-sm text-gray-600">
-                Order #: <span className="font-medium text-gray-900">{invoice.orderId}</span>
-              </p>
-              <p className="text-sm text-gray-600">
-                Date: <span className="font-medium text-gray-900">{new Date(invoice.date).toLocaleDateString()}</span>
-              </p>
-              <p className="text-sm text-gray-600">
-                Due Date: <span className="font-medium text-gray-900">{new Date(invoice.dueDate).toLocaleDateString()}</span>
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* ── Invoice Document ── */}
+      <div ref={invoiceRef} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
 
-        {/* Bill To */}
-        <div className="mb-6">
-          <h4 className="text-sm font-semibold text-gray-900 mb-2">BILL TO:</h4>
-          <p className="text-base font-medium text-gray-900">{invoice.billTo.name}</p>
-          <p className="text-sm text-gray-600">{invoice.billTo.address}</p>
-          <p className="text-sm text-gray-600">Phone: {invoice.billTo.phone}</p>
-          <p className="text-sm text-gray-600">Email: {invoice.billTo.email}</p>
-          {invoice.billTo.gst && <p className="text-sm text-gray-600">GST: {invoice.billTo.gst}</p>}
-        </div>
-
-        {/* Items Table */}
-        <div className="mb-6">
-          <table className="w-full border-collapse border border-gray-900">
-            <thead className="bg-gray-900 text-white">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium border border-gray-900">Description</th>
-                <th className="px-4 py-3 text-left text-sm font-medium border border-gray-900">SKU</th>
-                <th className="px-4 py-3 text-center text-sm font-medium border border-gray-900">Quantity</th>
-                <th className="px-4 py-3 text-right text-sm font-medium border border-gray-900">Rate</th>
-                <th className="px-4 py-3 text-right text-sm font-medium border border-gray-900">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoice.items.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-4 py-3 text-sm text-gray-900 border border-gray-300">{item.description}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600 border border-gray-300">{item.sku}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-center border border-gray-300">{item.quantity}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right border border-gray-300">₹{item.rate.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium border border-gray-300">₹{item.amount.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Totals */}
-        <div className="flex justify-end mb-6">
-          <div className="w-64">
-            <div className="flex justify-between py-2 border-b border-gray-200">
-              <span className="text-sm text-gray-600">Subtotal:</span>
-              <span className="text-sm font-medium text-gray-900">₹{invoice.subtotal.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-200">
-              <span className="text-sm text-gray-600">Tax (18%):</span>
-              <span className="text-sm font-medium text-gray-900">₹{invoice.tax.toLocaleString()}</span>
-            </div>
-            {invoice.discount > 0 && (
-              <div className="flex justify-between py-2 border-b border-gray-200">
-                <span className="text-sm text-gray-600">Discount:</span>
-                <span className="text-sm font-medium text-red-600">-₹{invoice.discount.toLocaleString()}</span>
-              </div>
+        {/* Header */}
+        <div className="bg-gray-900 px-8 py-6 flex justify-between items-start">
+          <div className="flex items-center gap-4">
+            {companyLogo && (
+              <img
+                src={companyLogo}
+                alt={`${companyName} logo`}
+                className="h-16 w-auto object-contain rounded-lg bg-white p-1"
+              />
             )}
-            <div className="flex justify-between py-3 bg-gray-900 text-white px-4 rounded-lg mt-2">
-              <span className="text-base font-semibold">Total:</span>
-              <span className="text-base font-bold">₹{invoice.total.toLocaleString()}</span>
+            <div>
+              {(companyName !== "M2C Store" && companyName !== "M2C Marketplace Pvt Ltd") && (
+                <p className="text-2xl font-bold text-white mb-1">{companyName}</p>
+              )}
+              <p className="text-indigo-400 font-mono font-semibold text-lg">{order.invoiceNo || order.orderId}</p>
             </div>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Date</p>
+            <p className="text-white font-semibold">{fmtDate(order.orderDate || order.createdAt)}</p>
+            <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold ${(order.paymentStatus || "").toUpperCase() === "PAID" || (order.paymentStatus || "").toUpperCase() === "SUCCESS"
+              ? "bg-green-500 text-white"
+              : "bg-yellow-400 text-gray-900"
+              }`}>
+              {order.paymentStatus || "PENDING"}
+            </span>
           </div>
         </div>
 
-        {/* Payment Info */}
-        <div className="border-t border-gray-200 pt-6">
-          <h4 className="text-sm font-semibold text-gray-900 mb-2">PAYMENT INFORMATION:</h4>
-          <p className="text-sm text-gray-600">Payment Method: <span className="font-medium text-gray-900">{invoice.paymentMethod}</span></p>
-          <p className="text-sm text-gray-600">Transaction ID: <span className="font-medium text-gray-900">{invoice.transactionId}</span></p>
-          <p className="text-sm text-gray-600 mt-2">Status: <span className={`font-medium ${invoice.status === "Paid" ? "text-green-600" : "text-yellow-600"}`}>{invoice.status}</span></p>
-        </div>
+        <div className="p-8">
+          {/* Bill To + Order Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 pb-8 border-b border-gray-100">
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Bill To</p>
+              <p className="font-bold text-gray-900 text-base">{order.customerName || "—"}</p>
+              <p className="text-sm text-gray-600 mt-1">{order.customerEmail}</p>
+              <p className="text-sm text-gray-600">{order.customerPhone || "—"}</p>
+              {addrStr && <p className="text-sm text-gray-600 mt-2 leading-relaxed">{addrStr}</p>}
+            </div>
+            <div className="md:text-right">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Order Info</p>
+              <div className="space-y-1 text-sm">
+                <div className="flex md:justify-end gap-4">
+                  <span className="text-gray-500">Order ID</span>
+                  <span className="font-mono font-semibold text-gray-900">{order.orderId}</span>
+                </div>
+                <div className="flex md:justify-end gap-4">
+                  <span className="text-gray-500">Invoice No</span>
+                  <span className="font-mono font-semibold text-indigo-700">{order.invoiceNo || "—"}</span>
+                </div>
+                <div className="flex md:justify-end gap-4">
+                  <span className="text-gray-500">Payment</span>
+                  <span className="font-semibold text-gray-900">{order.paymentMethod || "—"}</span>
+                </div>
+                {order.paymentId && (
+                  <div className="flex md:justify-end gap-4">
+                    <span className="text-gray-500">Txn ID</span>
+                    <span className="font-mono text-xs text-gray-600 break-all max-w-[180px]">{order.paymentId}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 mt-6 pt-6 text-center">
-          <p className="text-sm text-gray-600">Thank you for your business!</p>
-          <p className="text-xs text-gray-500 mt-2">This is a computer-generated invoice and does not require a signature.</p>
+          {/* Items Table */}
+          <div className="mb-8">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">#</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">Item</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">SKU</th>
+                  <th className="text-center px-4 py-3 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">Qty</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">Unit Price</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(order.items || []).map((item: any, i: number) => (
+                  <tr key={item.id} className="border-b border-gray-100">
+                    <td className="px-4 py-3 text-gray-400">{i + 1}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900">{item.productName}</div>
+                      {item.vendorName && <div className="text-xs text-gray-500">Vendor: {item.vendorName}</div>}
+                      {item.size && <div className="text-xs text-gray-500">Size: {item.size}</div>}
+                      {item.color && <div className="text-xs text-gray-500">Color: {item.color}</div>}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.sku || "—"}</td>
+                    <td className="px-4 py-3 text-center">{item.quantity}</td>
+                    <td className="px-4 py-3 text-right">{fmtINR(item.unitPrice)}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{fmtINR(item.totalPrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Totals */}
+          <div className="flex justify-end">
+            <div className="w-64 space-y-2 text-sm">
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">Subtotal</span>
+                <span className="font-medium">{fmtINR(order.subtotal)}</span>
+              </div>
+              {order.shippingCost > 0 && (
+                <div className="flex justify-between py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Shipping</span>
+                  <span className="font-medium">{fmtINR(order.shippingCost)}</span>
+                </div>
+              )}
+              {order.tax > 0 && (
+                <div className="flex justify-between py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Tax (GST)</span>
+                  <span className="font-medium">{fmtINR(order.tax)}</span>
+                </div>
+              )}
+              {order.discount > 0 && (
+                <div className="flex justify-between py-1 border-b border-gray-100">
+                  <span className="text-green-600">Discount</span>
+                  <span className="font-medium text-green-600">− {fmtINR(order.discount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between py-3 px-4 bg-gray-900 text-white rounded-lg mt-2">
+                <span className="font-bold text-base">Grand Total</span>
+                <span className="font-bold text-base">{fmtINR(order.totalAmount)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-10 pt-6 border-t border-gray-100 text-center">
+            <p className="text-sm text-gray-500">Thank you for your purchase!</p>
+            <p className="text-xs text-gray-400 mt-1">This is a computer-generated invoice and does not require a signature.</p>
+          </div>
         </div>
       </div>
-
-      {/* Download Modal */}
-      {showDownloadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Download Invoice</h2>
-              <button
-                onClick={() => setShowDownloadModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Format
-                </label>
-                <Dropdown
-                  value={downloadFormat}
-                  options={[
-                    { value: "thermal", label: "Thermal Print (80mm)" },
-                    { value: "a4", label: "A4 Size (PDF)" },
-                  ]}
-                  onChange={(value) => setDownloadFormat(value as string)}
-                  placeholder="Choose format"
-                />
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  {downloadFormat === "thermal" && "Optimized for 80mm thermal printers"}
-                  {downloadFormat === "a4" && "Standard A4 size PDF format"}
-                  {!downloadFormat && "Please select a format to continue"}
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowDownloadModal(false)}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDownload}
-                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
-              >
-                Download
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Share Invoice</h2>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={shareEmail}
-                  onChange={(e) => setShareEmail(e.target.value)}
-                  placeholder="Enter email address"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                />
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  Invoice will be sent as a PDF attachment to the specified email address.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleShare}
-                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
-              >
-                Share
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

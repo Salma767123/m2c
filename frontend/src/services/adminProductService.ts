@@ -169,10 +169,20 @@ class AdminProductService {
   // Reject a product
   async rejectProduct(id: string, rejectionReason: string): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
     try {
-      const response = await axios.put(`/products/${id}/reject`, { rejectionReason });
+      const response = await axios.put(`/products/${id}/reject`, { reason: rejectionReason });
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to reject product');
+    }
+  }
+
+  // Assign QC Checker to a product
+  async assignQCChecker(id: string, qcCheckerId: string): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
+    try {
+      const response = await axios.post(`/products/admin/${id}/assign-qc`, { qcCheckerId });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to assign QC checker');
     }
   }
 }

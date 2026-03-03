@@ -61,7 +61,12 @@ app.use((req, res, next) => {
   next();
 });
 // app.use(morgan('combined')); // Commented out to reduce console logs
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Configure express-session for Google OAuth
@@ -127,13 +132,25 @@ const gstSettingsRoutes = require('./routes/gstSettingsRoutes');
 const hubRoutes = require('./routes/hubRoutes');
 const enquiryRoutes = require('./routes/enquiryRoutes');
 const couponRoutes = require('./routes/couponRoutes');
-
+const supportRoutes = require('./routes/supportRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+const qcCheckerRoutes = require('./routes/qcCheckerRoutes');
+const invoiceSettingsRoutes = require('./routes/invoiceSettingsRoutes');
+const inspectionRoutes = require('./routes/inspectionRoutes');
+const userManagementRoutes = require('./routes/userManagementRoutes');
+const settlementRoutes = require('./routes/settlementRoutes');
+const reportsRoutes = require('./routes/reportsRoutes');
+const vendorReportsRoutes = require('./routes/vendorReportsRoutes');
+const roleRoutes = require('./routes/roleRoutes');
+const adminDashboardRoutes = require('./routes/adminDashboardRoutes');
+const vendorDashboardRoutes = require('./routes/vendorDashboardRoutes');
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/vendor-settings', vendorSettingsRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/support', supportRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
@@ -147,7 +164,17 @@ app.use('/api/gst-settings', gstSettingsRoutes);
 app.use('/api/hubs', hubRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/coupons', couponRoutes);
-
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/qc-checkers', qcCheckerRoutes);
+app.use('/api/invoice-settings', invoiceSettingsRoutes);
+app.use('/api/inspections', inspectionRoutes);
+app.use('/api/admin/users', userManagementRoutes);
+app.use('/api/settlements', settlementRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/vendor-reports', vendorReportsRoutes);
+app.use('/api/roles', roleRoutes);
+app.use('/api/admin-dashboard', adminDashboardRoutes);
+app.use('/api/vendor-dashboard', vendorDashboardRoutes);
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

@@ -7,9 +7,10 @@ import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { Eye, Check, X, Search, Filter, AlertCircle } from 'lucide-react'
+import { Eye, Check, X, Search, Filter, AlertCircle, UserPlus } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { adminProductService } from '@/services/adminProductService'
+import qcCheckerService from '@/services/qcCheckerService'
 
 interface VendorProductRequest {
   id: string
@@ -55,6 +56,11 @@ export default function VendorProductRequests() {
   const [selectedRequest, setSelectedRequest] = useState<VendorProductRequest | null>(null)
   const [showRejectionModal, setShowRejectionModal] = useState(false)
   const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null)
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [assigningRequestId, setAssigningRequestId] = useState<string | null>(null)
+  const [qcCheckers, setQcCheckers] = useState<{ id: string; name: string }[]>([])
+  const [selectedQcChecker, setSelectedQcChecker] = useState<string>('')
+
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -62,10 +68,22 @@ export default function VendorProductRequests() {
     limit: 10
   })
 
-  // Load product requests from API
+  // Load product requests and QC Checkers from API
   useEffect(() => {
     loadRequests()
+    loadQcCheckers()
   }, [statusFilter, searchTerm, pagination.currentPage])
+
+  const loadQcCheckers = async () => {
+    try {
+      const response = await qcCheckerService.getAllQCCheckers();
+      if (response.success && response.data) {
+        setQcCheckers(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching QC checkers:', error);
+    }
+  }
 
   const loadRequests = async () => {
     setLoading(true)
@@ -78,7 +96,7 @@ export default function VendorProductRequests() {
       }
 
       const response = await adminProductService.getAllProducts(params)
-      
+
       if (response.success) {
         setRequests(response.data.products)
         setPagination(prev => ({
@@ -104,7 +122,7 @@ export default function VendorProductRequests() {
 
     try {
       const response = await adminProductService.approveProduct(requestId, parseFloat(adminPrice))
-      
+
       if (response.success) {
         showSuccessToast('Product Approved', 'The vendor product has been approved successfully.')
         loadRequests() // Reload the list
@@ -124,7 +142,7 @@ export default function VendorProductRequests() {
 
     try {
       const response = await adminProductService.rejectProduct(rejectingRequestId, reason.trim())
-      
+
       if (response.success) {
         showSuccessToast('Product Rejected', 'The vendor has been notified of the rejection.')
         setShowRejectionModal(false)
@@ -133,6 +151,32 @@ export default function VendorProductRequests() {
       }
     } catch (error: any) {
       showErrorToast('Rejection Failed', error.message || 'Unable to reject product.')
+    }
+  }
+
+  const handleAssignClick = (requestId: string) => {
+    setAssigningRequestId(requestId)
+    setShowAssignModal(true)
+  }
+
+  const handleAssignQC = async () => {
+    if (!assigningRequestId || !selectedQcChecker) {
+      showErrorToast('Validation Error', 'Please select a QC Checker')
+      return
+    }
+
+    try {
+      const response = await adminProductService.assignQCChecker(assigningRequestId, selectedQcChecker)
+
+      if (response.success) {
+        showSuccessToast('QC Checker Assigned', 'The product has been assigned for inspection.')
+        setShowAssignModal(false)
+        setAssigningRequestId(null)
+        setSelectedQcChecker('')
+        loadRequests() // Reload the list
+      }
+    } catch (error: any) {
+      showErrorToast('Assignment Failed', error.message || 'Unable to assign QC Checker.')
     }
   }
 
@@ -256,8 +300,8 @@ export default function VendorProductRequests() {
                       <div className="flex items-center space-x-3">
                         <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                           {request.images?.[0]?.url ? (
-                            <img 
-                              src={request.images[0].url} 
+                            <img
+                              src={request.images[0].url}
                               alt={request.name}
                               className="w-full h-full object-cover rounded-lg"
                             />
@@ -341,8 +385,18 @@ export default function VendorProductRequests() {
                               size="sm"
                               onClick={() => handleRejectClick(request.id)}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Reject"
                             >
                               <X className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAssignClick(request.id)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              title="Assign QC Checker"
+                            >
+                              <UserPlus className="h-4 w-4" />
                             </Button>
                           </>
                         )}
@@ -428,6 +482,52 @@ export default function VendorProductRequests() {
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
                 Reject Product
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign QC Checker Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Assign QC Checker</h3>
+            <p className="text-gray-600 mb-4">
+              Select a Quality Checker to inspect this product before it can be approved.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                QC Checker
+              </label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                value={selectedQcChecker}
+                onChange={(e) => setSelectedQcChecker(e.target.value)}
+              >
+                <option value="">Select a QC Checker</option>
+                {qcCheckers.map(qc => (
+                  <option key={qc.id} value={qc.id}>{qc.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAssignModal(false)
+                  setAssigningRequestId(null)
+                  setSelectedQcChecker('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAssignQC}
+                className="bg-gray-900 hover:bg-gray-800 text-white"
+                disabled={!selectedQcChecker}
+              >
+                Assign
               </Button>
             </div>
           </div>

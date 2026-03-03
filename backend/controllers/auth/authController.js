@@ -10,7 +10,7 @@ const sendEmail = async (emailData) => {
   try {
     console.log("📧 Attempting to send email to:", emailData.to);
     console.log("📧 Email subject:", emailData.subject);
-    
+
     // Get active email configuration from database
     let emailConfig;
     try {
@@ -23,7 +23,7 @@ const sendEmail = async (emailData) => {
     }
 
     let result;
-    
+
     if (emailConfig) {
       // Use database SMTP configuration
       console.log("📧 Using database SMTP configuration");
@@ -40,7 +40,7 @@ const sendEmail = async (emailData) => {
       console.log("📧 SMTP Port:", process.env.SMTP_PORT);
       console.log("📧 SMTP User:", process.env.SMTP_USER);
       console.log("📧 SMTP From:", process.env.SMTP_FROM_EMAIL);
-      
+
       result = await sendEmailWithEnv({
         to: emailData.to,
         subject: emailData.subject,
@@ -55,7 +55,7 @@ const sendEmail = async (emailData) => {
     } else {
       console.error("❌ Failed to send email:", result.message);
     }
-    
+
     return result;
   } catch (error) {
     console.error("❌ Email sending error:", error);
@@ -155,11 +155,11 @@ const register = async (req, res) => {
     console.log("💾 Creating user in database...");
     const user = isAdmin
       ? await prisma.admin.create({
-          data: userData,
-        })
+        data: userData,
+      })
       : await prisma.user.create({
-          data: userData,
-        });
+        data: userData,
+      });
     console.log("✅ User created:", user.id);
 
     // Create Customer record for non-admin users (monolith approach)
@@ -292,7 +292,10 @@ const login = async (req, res) => {
 
     // Check admin collection first if it's an admin email
     if (isAdminEmail) {
-      user = await prisma.admin.findUnique({ where: { email } });
+      user = await prisma.admin.findUnique({
+        where: { email },
+        include: { role: true }
+      });
       userType = "admin";
       console.log(`🔍 Checking admin collection for admin email: ${email}`);
     } else {
@@ -304,8 +307,14 @@ const login = async (req, res) => {
 
       if (!user) {
         user = isEmail
-          ? await prisma.admin.findUnique({ where: { email } })
-          : await prisma.admin.findFirst({ where: { phoneNumber: email } });
+          ? await prisma.admin.findUnique({
+            where: { email },
+            include: { role: true }
+          })
+          : await prisma.admin.findFirst({
+            where: { phoneNumber: email },
+            include: { role: true }
+          });
         userType = "admin";
       }
     }
@@ -405,6 +414,8 @@ const login = async (req, res) => {
           companyName: userType === "admin" ? user.companyName : undefined,
           gstNumber: userType === "admin" ? user.gstNumber : undefined,
           onboardingCompleted: userType === "admin" ? user.onboardingCompleted : undefined,
+          roleName: userType === "admin" && user.role ? user.role.name : userType,
+          permissions: userType === "admin" && user.role ? user.role.permissions : []
         },
       },
     });
@@ -436,15 +447,16 @@ const googleCallback = async (req, res) => {
     // Check if user exists in appropriate collection
     let user = isAdmin
       ? await prisma.admin.findFirst({
-          where: {
-            OR: [{ email }, { googleId }],
-          },
-        })
+        where: {
+          OR: [{ email }, { googleId }],
+        },
+        include: { role: true }
+      })
       : await prisma.user.findFirst({
-          where: {
-            OR: [{ email }, { googleId }],
-          },
-        });
+        where: {
+          OR: [{ email }, { googleId }],
+        },
+      });
 
     if (user) {
       // Existing user found
@@ -471,44 +483,44 @@ const googleCallback = async (req, res) => {
         isVerified: true, // Safe to set true (already verified or Google user)
         lastLogin: new Date(),
       };
-      
+
       // Note: FCM token should be saved via dedicated endpoint, not during OAuth
-      
+
       // Only update name if user was previously a Google user (not local registration)
       // This preserves the name user chose during registration
       if (user.provider === "google") {
         updateData.name = name;
       }
-      
+
       // Only update image if:
       // 1. User has no image (null) OR
       // 2. User's current image is from Google (contains 'googleusercontent.com' or 'google.com') OR
       // 3. User was previously a Google user
       // This preserves custom uploaded images
       const isGoogleImage = user.image && (
-        user.image.includes('googleusercontent.com') || 
+        user.image.includes('googleusercontent.com') ||
         user.image.includes('google.com') ||
         user.image.includes('lh3.googleusercontent.com')
       );
-      
+
       if (!user.image || isGoogleImage || user.provider === "google") {
         updateData.image = image;
       }
-      
+
       user = isAdmin
         ? await prisma.admin.update({
-            where: { id: user.id },
-            data: updateData,
-          })
+          where: { id: user.id },
+          data: updateData,
+        })
         : await prisma.user.update({
-            where: { id: user.id },
-            data: updateData,
-          });
+          where: { id: user.id },
+          data: updateData,
+        });
       console.log("✅ Existing user updated with Google credentials (name preserved)");
     } else {
       // Create new user in appropriate collection (auto-register)
       console.log("🆕 Auto-registering new Google user:", email);
-      
+
       const createData = {
         email,
         googleId,
@@ -518,9 +530,9 @@ const googleCallback = async (req, res) => {
         isVerified: true, // Google users are auto-verified
         lastLogin: new Date(),
       };
-      
+
       // Note: FCM token should be saved via dedicated endpoint, not during OAuth
-      
+
       user = isAdmin
         ? await prisma.admin.create({ data: createData })
         : await prisma.user.create({ data: createData });
@@ -610,6 +622,8 @@ const googleCallback = async (req, res) => {
           companyName: isAdmin ? user.companyName : undefined,
           gstNumber: isAdmin ? user.gstNumber : undefined,
           onboardingCompleted: isAdmin ? user.onboardingCompleted : undefined,
+          roleName: isAdmin && user.role ? user.role.name : (isAdmin ? 'admin' : 'user'),
+          permissions: isAdmin && user.role ? user.role.permissions : []
         },
       },
     });
@@ -654,7 +668,7 @@ const verifyEmail = async (req, res) => {
 
     if (!user) {
       console.log("❌ No user found with this token");
-      
+
       // Token not found - could mean already verified or invalid token
       // Return a generic message that's user-friendly
       console.log("ℹ️ Token not found - likely already verified or expired");
@@ -819,7 +833,7 @@ const forgotPassword = async (req, res) => {
     let resetUrl;
     let userName;
     let emailSubject;
-    
+
     if (userType === "vendor") {
       resetUrl = `${process.env.FRONTEND_URL}/vendor/reset-password?token=${resetToken}`;
       userName = user.ownerName || user.companyName;
@@ -1257,7 +1271,7 @@ const updateProfile = async (req, res) => {
       // Sync profile information to Customer collection for regular users
       try {
         console.log("🔄 Syncing user profile to customer collection...");
-        
+
         // Check if customer record exists
         const existingCustomer = await prisma.customer.findUnique({
           where: { userId },
@@ -1425,18 +1439,17 @@ const googleAuthSuccess = async (req, res) => {
     });
 
     // Redirect to frontend with token (for backward compatibility)
-    const redirectUrl = `${
-      process.env.FRONTEND_URL
-    }/auth/google/success?token=${token}&user=${encodeURIComponent(
-      JSON.stringify({
-        id: req.user.id,
-        email: req.user.email,
-        name: req.user.name,
-        role: req.user.role,
-        image: req.user.image,
-        isVerified: req.user.isVerified,
-      })
-    )}`;
+    const redirectUrl = `${process.env.FRONTEND_URL
+      }/auth/google/success?token=${token}&user=${encodeURIComponent(
+        JSON.stringify({
+          id: req.user.id,
+          email: req.user.email,
+          name: req.user.name,
+          role: req.user.role,
+          image: req.user.image,
+          isVerified: req.user.isVerified,
+        })
+      )}`;
 
     res.redirect(redirectUrl);
   } catch (error) {
@@ -1937,13 +1950,13 @@ const getUserStats = async (req, res) => {
       const allOrders = [...onlineOrders, ...posOrders];
       const totalOrders = allOrders.length;
       const totalSpent = allOrders.reduce((sum, order) => sum + order.total, 0);
-      const completedOrders = allOrders.filter(order => 
+      const completedOrders = allOrders.filter(order =>
         order.orderStatus === 'delivered' || order.orderStatus === 'completed'
       ).length;
-      const pendingOrders = allOrders.filter(order => 
+      const pendingOrders = allOrders.filter(order =>
         ['pending', 'confirmed', 'processing', 'shipped'].includes(order.orderStatus)
       ).length;
-      const cancelledOrders = allOrders.filter(order => 
+      const cancelledOrders = allOrders.filter(order =>
         order.orderStatus === 'cancelled'
       ).length;
       const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
@@ -2034,7 +2047,7 @@ const superAdminLogin = async (req, res) => {
     console.log(`🔍 Super Admin login attempt: ${email}`);
 
     // Only check admin collection for super admin login
-    const admin = await prisma.admin.findUnique({ 
+    const admin = await prisma.admin.findUnique({
       where: { email },
       select: {
         id: true,

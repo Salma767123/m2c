@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { userManagementService, Staff } from '@/services/userManagementService';
+import { roleService, Role } from '@/services/roleService';
+import { hasPermission } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Badge } from '@/components/UI/Badge';
@@ -13,12 +16,13 @@ import {
   TableRow,
 } from '@/components/UI/Table';
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb';
+import { useRouter } from 'next/navigation';
 import Dropdown from '@/components/UI/Dropdown';
-import { 
-  Users as UsersIcon, 
-  UserPlus, 
-  Search, 
-  Filter, 
+import {
+  Users as UsersIcon,
+  UserPlus,
+  Search,
+  Filter,
   Eye,
   Edit,
   Trash2,
@@ -31,159 +35,72 @@ import {
   UserX
 } from 'lucide-react';
 
-interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  role: 'admin' | 'manager' | 'employee';
-  status: 'active' | 'inactive' | 'suspended' | 'pending';
-  joinDate: string;
-  lastLogin: string;
-  totalOrders: number;
-  totalSpent: number;
-  loyaltyTier?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
-  avatar?: string;
-  address: {
-    addressLine1: string;
-    addressLine2?: string;
-    landmark?: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  };
-  isEmailVerified: boolean;
-  isPhoneVerified: boolean;
-}
-// Mock users data
-const mockUsers: User[] = [
-  {
-    id: '1',
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    email: 'sarah.johnson@email.com',
-    phone: '+1 (555) 123-4567',
-    role: 'employee',
-    status: 'active',
-    joinDate: '2024-01-15T10:30:00Z',
-    lastLogin: '2024-02-01T14:20:00Z',
-    totalOrders: 15,
-    totalSpent: 2450.75,
-    address: {
-      addressLine1: '123 Main Street',
-      addressLine2: 'Apt 4B',
-      landmark: 'Near Central Park',
-      city: 'New York',
-      state: 'NY',
-      zipCode: '10001',
-      country: 'United States'
-    },
-    isEmailVerified: true,
-    isPhoneVerified: true
-  },
-  {
-    id: '2',
-    firstName: 'Michael',
-    lastName: 'Chen',
-    email: 'michael.chen@email.com',
-    phone: '+1 (555) 987-6543',
-    role: 'manager',
-    status: 'active',
-    joinDate: '2024-01-10T09:15:00Z',
-    lastLogin: '2024-02-02T11:45:00Z',
-    totalOrders: 0,
-    totalSpent: 0,
-    address: {
-      addressLine1: '456 Oak Avenue',
-      addressLine2: 'Suite 200',
-      landmark: 'Business District',
-      city: 'Los Angeles',
-      state: 'CA',
-      zipCode: '90210',
-      country: 'United States'
-    },
-    isEmailVerified: true,
-    isPhoneVerified: false
-  },
-  {
-    id: '3',
-    firstName: 'Emily',
-    lastName: 'Rodriguez',
-    email: 'emily.rodriguez@email.com',
-    phone: '+1 (555) 456-7890',
-    role: 'employee',
-    status: 'inactive',
-    joinDate: '2023-12-20T16:45:00Z',
-    lastLogin: '2024-01-25T08:30:00Z',
-    totalOrders: 32,
-    totalSpent: 5680.25,
-    address: {
-      addressLine1: '789 Pine Street',
-      addressLine2: 'Unit 12',
-      landmark: 'Downtown Area',
-      city: 'Chicago',
-      state: 'IL',
-      zipCode: '60601',
-      country: 'United States'
-    },
-    isEmailVerified: true,
-    isPhoneVerified: true
-  },
-  {
-    id: '4',
-    firstName: 'David',
-    lastName: 'Wilson',
-    email: 'david.wilson@email.com',
-    phone: '+1 (555) 321-9876',
-    role: 'admin',
-    status: 'active',
-    joinDate: '2023-11-01T12:00:00Z',
-    lastLogin: '2024-02-03T09:15:00Z',
-    totalOrders: 0,
-    totalSpent: 0,
-    address: {
-      addressLine1: '321 Admin Boulevard',
-      city: 'Seattle',
-      state: 'WA',
-      zipCode: '98101',
-      country: 'United States'
-    },
-    isEmailVerified: true,
-    isPhoneVerified: true
-  },
-  {
-    id: '5',
-    firstName: 'Lisa',
-    lastName: 'Thompson',
-    email: 'lisa.thompson@email.com',
-    phone: '+1 (555) 654-3210',
-    role: 'employee',
-    status: 'suspended',
-    joinDate: '2024-01-20T14:30:00Z',
-    lastLogin: '2024-01-28T16:20:00Z',
-    totalOrders: 3,
-    totalSpent: 125.50,
-    address: {
-      addressLine1: '654 Elm Street',
-      city: 'Miami',
-      state: 'FL',
-      zipCode: '33101',
-      country: 'United States'
-    },
-    isEmailVerified: false,
-    isPhoneVerified: false
-  }
-];
-
 export default function UserManagement() {
-  const [users] = useState<User[]>(mockUsers);
+  const router = useRouter();
+  const [users, setUsers] = useState<Staff[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Calculate stats
+  useEffect(() => {
+    fetchStaff();
+    fetchRoles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, roleFilter, statusFilter]);
+
+  const fetchRoles = async () => {
+    try {
+      const data = await roleService.getRoles();
+      if (data.success) {
+        setAvailableRoles(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch roles', error);
+    }
+  };
+
+  const fetchStaff = async () => {
+    try {
+      const data = await userManagementService.getStaff({
+        search: searchTerm,
+        role: roleFilter === 'all' ? undefined : roleFilter,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      });
+      setUsers(data);
+    } catch (error) {
+      console.error('Failed to fetch staff', error);
+    }
+  };
+
+  const handleStatusChange = async (userId: string, newStatus: 'active' | 'suspended') => {
+    try {
+      await userManagementService.updateStaffStatus(userId, newStatus);
+      fetchStaff();
+    } catch (error) {
+      console.error('Failed to update status', error);
+    }
+  };
+
+  const handleDelete = async (userId: string) => {
+    if (!window.confirm('Are you sure you want to delete this staff member?')) return;
+    try {
+      await userManagementService.deleteStaff(userId);
+      fetchStaff();
+    } catch (error) {
+      console.error('Failed to delete staff', error);
+    }
+  };
+
+  const handleAddStaff = () => {
+    router.push('/admin/dashboard/users/add');
+  };
+
+  const handleEditStaff = (userId: string) => {
+    router.push(`/admin/dashboard/users/edit/${userId}`);
+  };
+
+  // Calculate stats from current data
   const totalUsers = users.length;
   const newThisMonth = users.filter(user => {
     const joinDate = new Date(user.joinDate);
@@ -199,19 +116,8 @@ export default function UserManagement() {
   const suspendedUsers = users.filter(user => user.status === 'suspended').length;
   const pendingUsers = users.filter(user => user.status === 'pending').length;
 
-  // Filter users
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phone.includes(searchTerm);
-    
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  // Filtering is now done server-side; keep local reference for table
+  const filteredUsers = users;
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -229,15 +135,13 @@ export default function UserManagement() {
   };
 
   const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return <Badge className="bg-purple-100 text-purple-800">Admin</Badge>;
-      case 'manager':
-        return <Badge className="bg-blue-100 text-blue-800">Manager</Badge>;
-      case 'employee':
-        return <Badge className="bg-green-100 text-green-800">Employee</Badge>;
-      default:
-        return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>;
+    const roleLower = role.toLowerCase();
+    if (roleLower.includes('admin')) {
+      return <Badge className="bg-purple-100 text-purple-800">{role}</Badge>;
+    } else if (roleLower.includes('manager')) {
+      return <Badge className="bg-blue-100 text-blue-800">{role}</Badge>;
+    } else {
+      return <Badge className="bg-green-100 text-green-800">{role}</Badge>;
     }
   };
 
@@ -250,15 +154,20 @@ export default function UserManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600">Manage internal staff and their access levels</p>
+          <p className="text-gray-600">Manage internal staff and their access levels (Ready for Add Staff)</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button className="bg-gray-900 hover:bg-gray-800 text-white">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add Staff Member
+          <Button
+            onClick={handleAddStaff}
+            className="bg-primary hover:bg-primary/90 text-white shadow-lg px-6 py-2 rounded-lg font-semibold flex items-center transition-all hover:scale-105 active:scale-95"
+            style={{ backgroundColor: '#111827' }} // Ensuring it's dark as requested
+          >
+            <UserPlus className="h-5 w-5 mr-2" />
+            <span>Add Staff Member</span>
           </Button>
         </div>
       </div>
+
       {/* Stats Cards */}
       <div className="grid gap-6 lg:grid-cols-6">
         <Card>
@@ -335,7 +244,7 @@ export default function UserManagement() {
             <Filter className="w-5 h-5 text-gray-600" />
             <h3 className="text-lg font-semibold text-slate-900">Filter Users</h3>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -350,7 +259,7 @@ export default function UserManagement() {
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 placeholder:text-slate-400"
               />
             </div>
-            
+
             <div>
               <Dropdown
                 label="User Role"
@@ -358,15 +267,13 @@ export default function UserManagement() {
                 value={roleFilter}
                 options={[
                   { value: 'all', label: 'All Roles' },
-                  { value: 'admin', label: 'Admin' },
-                  { value: 'manager', label: 'Manager' },
-                  { value: 'employee', label: 'Employee' }
+                  ...availableRoles.map(r => ({ value: r.id, label: r.name }))
                 ]}
-                onChange={(value) => setRoleFilter(value as string)}
+                onChange={(value: string | string[]) => setRoleFilter(value as string)}
                 placeholder="Select role"
               />
             </div>
-            
+
             <div>
               <Dropdown
                 label="User Status"
@@ -379,13 +286,14 @@ export default function UserManagement() {
                   { value: 'suspended', label: 'Suspended' },
                   { value: 'pending', label: 'Pending' }
                 ]}
-                onChange={(value) => setStatusFilter(value as string)}
+                onChange={(value: string | string[]) => setStatusFilter(value as string)}
                 placeholder="Select status"
               />
             </div>
           </div>
         </CardContent>
       </Card>
+
       {/* Users Table */}
       <Card>
         <CardHeader>
@@ -473,30 +381,57 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           className="hover:bg-gray-100"
                           title="View User Details"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="hover:bg-gray-100"
-                          title="Edit User"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="hover:bg-red-100 text-red-600"
-                          title="Delete User"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {hasPermission('edit_users') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-gray-100"
+                            title="Edit User"
+                            onClick={() => handleEditStaff(user.id)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {hasPermission('edit_users') && user.status === 'active' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-yellow-100 text-yellow-600"
+                            title="Suspend User"
+                            onClick={() => handleStatusChange(user.id, 'suspended')}
+                          >
+                            <UserX className="h-4 w-4" />
+                          </Button>
+                        ) : hasPermission('edit_users') ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-green-100 text-green-600"
+                            title="Activate User"
+                            onClick={() => handleStatusChange(user.id, 'active')}
+                          >
+                            <UserCheck className="h-4 w-4" />
+                          </Button>
+                        ) : null}
+                        {hasPermission('delete_users') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-red-100 text-red-600"
+                            title="Delete User"
+                            onClick={() => handleDelete(user.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

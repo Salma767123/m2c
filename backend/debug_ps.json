@@ -1,0 +1,15 @@
+[
+  {
+    "id": "6998062e52bcfb464a374846",
+    "razorpayEnabled": false,
+    "razorpayKeyId": "rzp_test_RBS9iwQZq0dS3v",
+    "razorpayKeySecret": ",Eoa4k2Ir52X5v4fHzIgdxr35",
+    "razorpayWebhookSecret": "magizh@1409",
+    "payuEnabled": false,
+    "payuMerchantKey": null,
+    "payuMerchantSalt": null,
+    "updatedBy": "6998014752bcfb464a374836",
+    "createdAt": "2026-02-20T06:58:54.075Z",
+    "updatedAt": "2026-02-21T06:32:30.381Z"
+  }
+]

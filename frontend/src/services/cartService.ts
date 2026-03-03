@@ -28,9 +28,9 @@ export interface CartResponse {
 
 class CartService {
   // Add item to cart
-  async addToCart(productId: string, quantity: number = 1): Promise<CartResponse> {
+  async addToCart(productId: string, quantity: number = 1, variantId?: string): Promise<CartResponse> {
     try {
-      const response = await axios.post('/cart/add', { productId, quantity });
+      const response = await axios.post('/cart/add', { productId, quantity, variantId });
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to add item to cart');

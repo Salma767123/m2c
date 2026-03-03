@@ -5,6 +5,8 @@ export interface AdminUser {
   email: string
   name: string
   role: string
+  roleName?: string
+  permissions?: string[]
   image?: string
   isVerified?: boolean
   phoneNumber?: string
@@ -25,6 +27,24 @@ export interface AuthTokens {
   user: AdminUser
 }
 
+// RBAC helper
+export function hasPermission(permission: string | string[]): boolean {
+  try {
+    const auth = getStoredAuth()
+    if (!auth || !auth.user) return false
+
+    // SuperAdmin override
+    if (auth.user.roleName === 'Super Admin' || auth.user.role === 'admin') return true;
+
+    if (!auth.user.permissions) return false
+
+    const permissionsToCheck = Array.isArray(permission) ? permission : [permission]
+    return permissionsToCheck.some(p => auth.user.permissions?.includes(p))
+  } catch (e) {
+    return false
+  }
+}
+
 // Storage keys
 const TOKEN_KEY = 'adminToken'
 const USER_KEY = 'adminUser'
@@ -36,28 +56,28 @@ export function getStoredAuth(): AuthTokens | null {
     if (typeof window === 'undefined') {
       return null
     }
-    
+
     // Check sessionStorage first, then localStorage
     let token = sessionStorage.getItem(TOKEN_KEY)
     let userStr = sessionStorage.getItem(USER_KEY)
-    
+
     if (!token || !userStr) {
       token = localStorage.getItem(TOKEN_KEY)
       userStr = localStorage.getItem(USER_KEY)
     }
-    
+
     if (!token || !userStr) {
       return null
     }
-    
+
     const user = JSON.parse(userStr)
-    
+
     // Validate user object has required properties
     if (!user || !user.id || !user.role) {
       console.warn('Invalid user data found in storage')
       return null
     }
-    
+
     return { token, user }
   } catch (error) {
     console.error('Error getting stored auth:', error)
@@ -112,7 +132,7 @@ export function getAuthHeader(): Record<string, string> {
   if (!auth) {
     return {}
   }
-  
+
   return {
     'Authorization': `Bearer ${auth.token}`
   }
@@ -121,7 +141,7 @@ export function getAuthHeader(): Record<string, string> {
 // API call wrapper with authentication
 export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const authHeaders = getAuthHeader()
-  
+
   const response = await fetch(url, {
     ...options,
     credentials: 'include', // Include httpOnly cookies
@@ -131,20 +151,20 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
       ...options.headers,
     },
   })
-  
+
   // If unauthorized, clear auth and redirect to login (but not for login attempts)
   if (response.status === 401) {
-    const isLoginAttempt = url.includes('/auth/login') || 
-                          url.includes('/auth/admin/login') ||
-                          url.includes('/auth/vendor') ||
-                          url.includes('/vendors/login');
-    
+    const isLoginAttempt = url.includes('/auth/login') ||
+      url.includes('/auth/admin/login') ||
+      url.includes('/auth/vendor') ||
+      url.includes('/vendors/login');
+
     if (!isLoginAttempt) {
       clearAuth()
       window.location.href = '/admin/login'
     }
   }
-  
+
   return response
 }
 
@@ -168,7 +188,7 @@ export async function logout(): Promise<void> {
     if (typeof window !== 'undefined') {
       const { showSuccessToast } = await import('@/lib/toast-utils')
       showSuccessToast('Logged Out', 'You have been successfully logged out.')
-      
+
       // Small delay to show the toast before redirect
       setTimeout(() => {
         window.location.href = '/admin/login'

@@ -1,47 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
-import { Eye } from 'lucide-react'
-import Link from 'next/link'
-
-// Mock data
-const recentOrders = [
-  {
-    id: 'ORD-001',
-    customer: 'John Doe',
-    amount: '$129.99',
-    status: 'Delivered',
-    date: '2024-02-14'
-  },
-  {
-    id: 'ORD-002',
-    customer: 'Jane Smith',
-    amount: '$45.50',
-    status: 'Processing',
-    date: '2024-02-14'
-  },
-  {
-    id: 'ORD-003',
-    customer: 'Mike Johnson',
-    amount: '$89.99',
-    status: 'Shipped',
-    date: '2024-02-13'
-  },
-  {
-    id: 'ORD-004',
-    customer: 'Sarah Williams',
-    amount: '$65.00',
-    status: 'Pending',
-    date: '2024-02-13'
-  },
-  {
-    id: 'ORD-005',
-    customer: 'David Brown',
-    amount: '$55.99',
-    status: 'Delivered',
-    date: '2024-02-12'
-  }
-]
+import { useRouter } from 'next/navigation'
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -58,35 +17,76 @@ const getStatusBadge = (status: string) => {
   }
 }
 
-export default function RecentOrders() {
+export default function RecentOrders({ orders }: { orders: any[] }) {
+  const router = useRouter()
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Recent Orders</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs font-semibold text-white uppercase">Order ID</TableHead>
-              <TableHead className="text-xs font-semibold text-white uppercase">Customer</TableHead>
-              <TableHead className="text-xs font-semibold text-white uppercase">Amount</TableHead>
-              <TableHead className="text-xs font-semibold text-white uppercase">Status</TableHead>
-              <TableHead className="text-xs font-semibold text-white uppercase">Date</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {recentOrders.map((order) => (
-              <TableRow key={order.id} className="hover:bg-gray-50 transition-colors">
-                <TableCell className="font-medium text-gray-900">{order.id}</TableCell>
-                <TableCell className="text-gray-700">{order.customer}</TableCell>
-                <TableCell className="font-semibold text-gray-900">{order.amount}</TableCell>
-                <TableCell>{getStatusBadge(order.status)}</TableCell>
-                <TableCell className="text-gray-500">{order.date}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-800">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  Order ID
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  Customer
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  Date
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  Amount
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                  Status
+                </th>
+                <th scope="col" className="relative px-6 py-3">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {orders && orders.map((order) => (
+                <tr key={order.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                    #{order.orderId}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {order.customerName}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(order.date).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${order.totalAmount.toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusBadge(order.status)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      onClick={() => router.push(`/admin/dashboard/orders/view/${order.id}`)}
+                      className="text-blue-600 hover:text-blue-900 mr-3"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => router.push(`/admin/dashboard/orders/view/${order.id}`)}
+                      className="text-indigo-600 hover:text-indigo-900"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </CardContent>
     </Card>
   )

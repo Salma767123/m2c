@@ -1041,6 +1041,47 @@ const rejectProduct = async (req, res) => {
   }
 };
 
+// Admin: Assign QC Checker to Product
+const assignQCCheckerToProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { qcCheckerId } = req.body;
+
+    if (!qcCheckerId) {
+      return res.status(400).json({ error: 'QC Checker ID is required' });
+    }
+
+    const checker = await prisma.qCChecker.findUnique({ where: { id: qcCheckerId } });
+    if (!checker) {
+      return res.status(404).json({ error: 'QC Checker not found' });
+    }
+
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: {
+        assignedQcId: qcCheckerId,
+      },
+      include: {
+        assignedQc: {
+          select: { name: true, email: true }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'QC Checker assigned to product successfully',
+      data: updatedProduct
+    });
+  } catch (error) {
+    console.error('Error assigning QC Checker to product:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.status(500).json({ error: 'Database error', details: error.message });
+  }
+};
+
 // Admin: Get single product by ID (no vendor restriction)
 const getProductForAdmin = async (req, res) => {
   try {
@@ -2270,6 +2311,7 @@ module.exports = {
   deleteProductByAdmin,
   approveProduct,
   rejectProduct,
+  assignQCCheckerToProduct,
   getAllProductsForAdmin,
   getPublicProducts,
   getPublicProduct,

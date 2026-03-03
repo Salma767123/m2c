@@ -23,6 +23,7 @@ import {
   Search,
   Target,
 } from "lucide-react";
+import { qcCheckerService } from "@/services/qcCheckerService";
 
 interface LoginPageProps {
   onLogin: (checkerID: string) => void;
@@ -35,10 +36,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [error, setError] = useState("");
   const [checkerIDError, setCheckerIDError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [showInspectionInfo, setShowInspectionInfo] = useState(false);
   const checkerIDInputRef = useRef<HTMLInputElement>(null);
-
-  const mockCheckers = ["CHECKER_001", "CHECKER_002", "CHECKER_003", "CHECKER_004"];
 
   // Autofocus checker ID field on mount
   useEffect(() => {
@@ -53,9 +53,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       setCheckerIDError("");
       return true;
     }
-    const checkerIDRegex = /^CHECKER_\d{3}$/;
+    const checkerIDRegex = /^QC-\d{3}$/;
     if (!checkerIDRegex.test(value.toUpperCase())) {
-      setCheckerIDError("Invalid format. Use CHECKER_XXX format");
+      setCheckerIDError("Invalid format. Use QC-XXX format (e.g., QC-001)");
       return false;
     }
     setCheckerIDError("");
@@ -90,9 +90,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     validatePassword(value);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!checkerID.trim()) {
       setCheckerIDError("Please enter your Checker ID");
       return;
@@ -103,12 +103,27 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       return;
     }
 
-    if (!mockCheckers.includes(checkerID.toUpperCase())) {
-      setError("Invalid credentials. Please check your Checker ID and password.");
-      return;
-    }
+    setIsLoading(true);
+    setError("");
 
-    onLogin(checkerID.toUpperCase());
+    try {
+      const result = await qcCheckerService.login({
+        checkerId: checkerID.toUpperCase(),
+        password,
+      });
+
+      if (result.success && result.data) {
+        // Store auth data
+        qcCheckerService.storeCheckerAuth(result.data.token, result.data.checker);
+
+        // Call onLogin callback with the checker ID
+        onLogin(result.data.checker.checkerId);
+      }
+    } catch (error: any) {
+      setError(error.message || "Invalid credentials. Please check your Checker ID and password.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -147,7 +162,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   <p className="text-white/80 text-sm">Thorough quality checks before dispatch</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4 bg-white/20 backdrop-blur-md rounded-xl p-4 transition-all duration-300 hover:bg-white/25 hover:shadow-lg hover:scale-[1.02] cursor-default">
                 <div className="shrink-0 w-12 h-12 bg-white/30 rounded-lg flex items-center justify-center">
                   <BarChart3 className="w-6 h-6 text-white" />
@@ -157,7 +172,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   <p className="text-white/80 text-sm">Identify and categorize quality issues</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4 bg-white/20 backdrop-blur-md rounded-xl p-4 transition-all duration-300 hover:bg-white/25 hover:shadow-lg hover:scale-[1.02] cursor-default">
                 <div className="shrink-0 w-12 h-12 bg-white/30 rounded-lg flex items-center justify-center">
                   <FileCheck className="w-6 h-6 text-white" />
@@ -218,13 +233,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     value={checkerID}
                     onChange={handleCheckerIDChange}
                     onBlur={() => validateCheckerID(checkerID)}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
-                      checkerIDError
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${checkerIDError
                         ? "border-red-500 focus:ring-red-200"
                         : "border-gray-300 focus:ring-[#455a64]"
-                    }`}
-                    placeholder="Enter your Checker ID (e.g., CHECKER_001)"
+                      }`}
+                    placeholder="Enter your Checker ID (e.g., QC-001)"
                     autoFocus
+                    disabled={isLoading}
                   />
                   {checkerIDError && (
                     <div className="flex items-center mt-2 text-red-600 text-sm">
@@ -249,12 +264,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                       value={password}
                       onChange={handlePasswordChange}
                       onBlur={() => validatePassword(password)}
-                      className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${
-                        passwordError
+                      className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:border-[#455a64] transition-all duration-200 bg-white text-gray-900 placeholder-gray-500 ${passwordError
                           ? "border-red-500 focus:ring-red-200"
                           : "border-gray-300 focus:ring-[#455a64]"
-                      }`}
+                        }`}
                       placeholder="Enter your password"
+                      disabled={isLoading}
                     />
                     <button
                       type="button"
@@ -290,7 +305,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   </div>
                 )}
 
-                {/* Remember & Forgot */}
+                {/* Remember */}
                 <div className="flex items-center justify-between">
                   <label className="flex items-center cursor-pointer">
                     <input
@@ -301,68 +316,38 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                       Remember me
                     </span>
                   </label>
-                  <button
-                    type="button"
-                    className="text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
-                  >
-                    Forgot password?
-                  </button>
                 </div>
 
                 {/* Sign In Button */}
-                <Button 
+                <Button
                   type="submit"
-                  className="w-full bg-gray-900 hover:bg-gray-700 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
+                  disabled={isLoading}
+                  className="w-full bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 text-white py-3 text-sm font-semibold rounded-lg shadow-md transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg"
                 >
-                  <Lock className="w-4 h-4 mr-2" />
-                  Sign In to QC Portal
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Signing In...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 mr-2" />
+                      Sign In to QC Portal
+                    </>
+                  )}
                 </Button>
               </form>
 
-              {/* Demo Credentials Section - Collapsible */}
+              {/* Help Section */}
               <div className="mt-8 pt-6 border-t border-gray-200">
                 <div className="text-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowInspectionInfo(!showInspectionInfo)}
-                    className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors"
-                  >
-                    <span>Demo Credentials & Inspection Info</span>
-                    <ChevronDown
-                      className={`w-4 h-4 transition-transform duration-300 ${
-                        showInspectionInfo ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {showInspectionInfo && (
-                    <div className="bg-gray-50 rounded-lg p-4 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <h4 className="font-semibold text-gray-900 mb-3 text-sm">
-                        QC Checker Accounts
-                      </h4>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-4">
-                        {mockCheckers.map((checker) => (
-                          <div key={checker} className="flex items-center">
-                            <CheckCircle className="w-3 h-3 text-gray-600 mr-1.5 shrink-0" />
-                            <span className="font-mono">{checker}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="text-xs text-gray-500 bg-white p-2 rounded border mb-3">
-                        Password: <span className="font-mono">demo123</span> (for all demo accounts)
-                      </div>
-                      <div className="text-xs text-gray-600 space-y-1">
-                        <div className="flex items-center">
-                          <Target className="w-3 h-3 text-gray-500 mr-1.5" />
-                          <span>Access inspection forms & checklists</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Search className="w-3 h-3 text-gray-500 mr-1.5" />
-                          <span>Track defects & quality metrics</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-sm text-gray-500">
+                    Your login credentials were sent to your email by the admin.
+                    If you haven&apos;t received them, please contact your administrator.
+                  </p>
                 </div>
               </div>
             </CardContent>

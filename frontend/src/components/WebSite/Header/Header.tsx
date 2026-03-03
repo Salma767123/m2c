@@ -103,11 +103,11 @@ const Header = () => {
       // Check admin auth
       const adminLoggedIn = isAuthenticated()
       setIsAdminLoggedIn(adminLoggedIn)
-      
+
       // Check user auth
       const userToken = localStorage.getItem('userToken') || sessionStorage.getItem('userToken')
       const userData = localStorage.getItem('userData') || sessionStorage.getItem('userData')
-      
+
       if (userToken && userData) {
         setIsUserLoggedIn(true)
         try {
@@ -122,20 +122,20 @@ const Header = () => {
         setUserName('')
       }
     }
-    
+
     // Check immediately and also on storage changes
     checkAuth()
-    
+
     // Listen for storage changes (in case user logs in/out in another tab)
     const handleStorageChange = () => {
       checkAuth()
     }
-    
+
     window.addEventListener('storage', handleStorageChange)
-    
+
     // Also check periodically in case of same-tab changes
     const interval = setInterval(checkAuth, 1000)
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange)
       clearInterval(interval)
@@ -193,21 +193,21 @@ const Header = () => {
       // Import user auth service and toast utils
       const { userAuthService } = await import('@/services/userAuthService')
       const { showSuccessToast } = await import('@/lib/toast-utils')
-      
+
       // Call logout API
       await userAuthService.logout()
-      
+
       // Clear auth data
       userAuthService.clearAuthData()
-      
+
       // Update state
       setIsUserLoggedIn(false)
       setUserName('')
       setShowAccountDropdown(false)
-      
+
       // Show success toast
       showSuccessToast('Logged Out', 'You have been successfully logged out.')
-      
+
       // Redirect to home after a short delay to show toast
       setTimeout(() => {
         window.location.href = '/'
@@ -215,7 +215,7 @@ const Header = () => {
     } catch (error) {
       console.error('Logout error:', error)
       const { showSuccessToast } = await import('@/lib/toast-utils')
-      
+
       // Clear data anyway
       localStorage.removeItem('userToken')
       sessionStorage.removeItem('userToken')
@@ -223,10 +223,10 @@ const Header = () => {
       sessionStorage.removeItem('userData')
       setIsUserLoggedIn(false)
       setUserName('')
-      
+
       // Show success toast even on error since we're clearing locally
       showSuccessToast('Logged Out', 'You have been logged out.')
-      
+
       setTimeout(() => {
         window.location.href = '/'
       }, 1000)
@@ -241,12 +241,12 @@ const Header = () => {
           Bath Towel Collection on 50% off
         </p>
       </div>
-      
+
       {/* Main Header */}
       <header className="bg-white shadow-lg border-b border-gray-100 transition-all duration-300">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="flex items-center h-16 sm:h-18 md:h-20 xl:h-28 gap-2 sm:gap-3 md:gap-4">
-            
+
             {/* Section 1: Logo (30% on desktop, 50% on mobile/tablet) */}
             <div className="w-[50%] md:w-[30%] flex justify-start shrink-0">
               <Link href="/" className="flex items-center">
@@ -287,7 +287,7 @@ const Header = () => {
                   </span>
                 )}
               </Link>
-              
+
               {/* Cart */}
               <Link
                 href="/cart"
@@ -552,11 +552,10 @@ const Header = () => {
             <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-1 sm:space-y-2 max-h-[calc(100vh-120px)] overflow-y-auto">
               <Link
                 href="/"
-                className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
-                  isActiveLink("/")
+                className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/")
                     ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
                     : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
-                }`}
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Home
@@ -564,47 +563,43 @@ const Header = () => {
 
               <Link
                 href="/products"
-                className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
-                  isActiveLink("/products")
+                className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/products")
                     ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
                     : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
-                }`}
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Products
               </Link>
-              
+
               <Link
                 href="/about"
-                className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
-                  isActiveLink("/about")
+                className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/about")
                     ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
                     : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
-                }`}
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 About
               </Link>
-              
+
               <Link
                 href="/contact"
-                className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
-                  isActiveLink("/contact")
+                className={`block px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/contact")
                     ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
                     : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
-                }`}
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Contact
               </Link>
-              
+
               <Link
                 href="/order"
-                className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${
-                  isActiveLink("/order")
+                className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-medium transition-all duration-200 text-sm sm:text-base ${isActiveLink("/order")
                     ? "bg-linear-to-r from-gray-500 to-gray-600 text-white shadow-md"
                     : "text-slate-700 hover:bg-slate-100 hover:text-gray-600"
-                }`}
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 <ShoppingCart className="w-4 h-4" />
@@ -647,7 +642,7 @@ const Header = () => {
                     <IconUserFilled className="w-4 h-4" />
                     My Account
                   </Link>
-                  
+
                   <button
                     onClick={() => {
                       setIsMenuOpen(false)

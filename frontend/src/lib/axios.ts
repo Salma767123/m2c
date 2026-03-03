@@ -4,26 +4,29 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
   timeout: 10000, // 10 seconds timeout
+  withCredentials: true, // Always send httpOnly cookies (enables 7-day admin sessions)
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+
 // Request interceptor to add auth token
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Get token from localStorage or sessionStorage
-    // Check for admin token first, then vendor token, then user token
+    // Check for admin token first, then vendor token, then checker token, then user token
     const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
     const vendorToken = localStorage.getItem('vendorToken');
+    const checkerToken = localStorage.getItem('checkerToken');
     const userToken = localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
-    
-    const token = adminToken || vendorToken || userToken;
-    
+
+    const token = adminToken || vendorToken || checkerToken || userToken;
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     return config;
   },
   (error) => {
@@ -41,21 +44,25 @@ axiosInstance.interceptors.response.use(
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
-      
+
       switch (status) {
         case 401:
           // Check if this is a login attempt - don't redirect for login failures
-          const isLoginAttempt = error.config?.url?.includes('/auth/login') || 
-                                error.config?.url?.includes('/auth/admin/login') ||
-                                error.config?.url?.includes('/auth/vendor') ||
-                                error.config?.url?.includes('/vendors/login');
-          
+          const isLoginAttempt = error.config?.url?.includes('/auth/login') ||
+            error.config?.url?.includes('/auth/admin/login') ||
+            error.config?.url?.includes('/auth/vendor') ||
+            error.config?.url?.includes('/vendors/login') ||
+            error.config?.url?.includes('/qc-checkers/login');
+
           if (!isLoginAttempt) {
             // Unauthorized - clear tokens and redirect to login (only for authenticated requests)
             localStorage.removeItem('adminToken');
             sessionStorage.removeItem('adminToken');
             localStorage.removeItem('vendorToken');
             localStorage.removeItem('vendorData');
+            localStorage.removeItem('checkerToken');
+            localStorage.removeItem('checkerData');
+            localStorage.removeItem('checkerID');
             localStorage.removeItem('userToken');
             sessionStorage.removeItem('userToken');
             localStorage.removeItem('userData');
@@ -67,6 +74,8 @@ axiosInstance.interceptors.response.use(
                 window.location.href = '/admin/login';
               } else if (currentPath.includes('/vendor')) {
                 window.location.href = '/vendor';
+              } else if (currentPath.includes('/checker')) {
+                window.location.href = '/checker';
               } else {
                 window.location.href = '/login';
               }
@@ -88,7 +97,7 @@ axiosInstance.interceptors.response.use(
         default:
           console.error('API Error:', data?.error || `HTTP ${status}`);
       }
-      
+
       // Return a more user-friendly error without creating a new Error object
       const errorMessage = data?.error || data?.message || `HTTP ${status}`;
       return Promise.reject({ message: errorMessage, status, data });
@@ -109,7 +118,7 @@ export default axiosInstance;
 // Create axios instance with vendor token
 export const createVendorAxiosInstance = () => {
   const vendorToken = typeof window !== 'undefined' ? localStorage.getItem('vendorToken') : null;
-  
+
   return axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
     timeout: 10000,
@@ -123,7 +132,7 @@ export const createVendorAxiosInstance = () => {
 // Create axios instance with admin token
 export const createAdminAxiosInstance = () => {
   const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-  
+
   return axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
     timeout: 10000,

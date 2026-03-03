@@ -17,23 +17,19 @@ const Wishlist = () => {
   useEffect(() => {
     const authStatus = userAuthService.isAuthenticated();
     setIsAuthenticated(authStatus);
-    
+
     if (!authStatus) {
-      // Not authenticated - redirect to login
-      showErrorToast('Login Required', 'Please login to view your wishlist');
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 1500);
+      setIsLoading(false);
       return;
     }
-    
+
     loadWishlist();
   }, []);
 
   const loadWishlist = async () => {
     try {
       setIsLoading(true);
-      
+
       // Load from backend for authenticated users
       const response = await wishlistService.getWishlist();
       if (response.success && response.data) {
@@ -148,7 +144,7 @@ const Wishlist = () => {
               Items you've saved for later
             </p>
           </div>
-          
+
           <div className="flex space-x-4 mt-4 sm:mt-0">
             <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               Share Wishlist
@@ -166,7 +162,7 @@ const Wishlist = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {wishlistItems.map((item) => {
             if (!item.product) return null;
-            
+
             return (
               <div key={item.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                 {/* Product Image */}
@@ -187,7 +183,7 @@ const Wishlist = () => {
                       Out of Stock
                     </div>
                   )}
-                  
+
                   {/* Remove from Wishlist */}
                   <button
                     onClick={() => removeFromWishlist(item.productId)}
@@ -202,13 +198,13 @@ const Wishlist = () => {
                   <div className="mb-2">
                     <span className="text-sm text-gray-600 font-medium">{item.product.category}</span>
                   </div>
-                  
+
                   <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
                     <Link href={`/products/${item.productId}`} className="hover:text-gray-600 transition-colors">
                       {item.product.name}
                     </Link>
                   </h3>
-                  
+
                   {/* Rating */}
                   {item.product.rating && (
                     <div className="flex items-center mb-2">
@@ -216,9 +212,8 @@ const Wishlist = () => {
                         {[...Array(5)].map((_, i) => (
                           <span
                             key={i}
-                            className={`text-sm ${
-                              i < Math.floor(item.product!.rating || 0) ? 'text-yellow-400' : 'text-gray-300'
-                            }`}
+                            className={`text-sm ${i < Math.floor(item.product!.rating || 0) ? 'text-yellow-400' : 'text-gray-300'
+                              }`}
                           >
                             ★
                           </span>
@@ -229,7 +224,7 @@ const Wishlist = () => {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Price */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
@@ -248,29 +243,28 @@ const Wishlist = () => {
                   <p className="text-xs text-gray-500 mb-3">
                     Added on {new Date(item.createdAt).toLocaleDateString()}
                   </p>
-                  
+
                   {/* Action Buttons */}
                   <div className="flex space-x-2">
                     <button
                       onClick={() => addToCart(item.productId, item.product!.name)}
                       disabled={!item.product.inStock}
-                      className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                        item.product.inStock
-                          ? 'bg-gray-800 text-white hover:bg-gray-900'
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      }`}
+                      className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${item.product.inStock
+                        ? 'bg-gray-800 text-white hover:bg-gray-900'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
                     >
                       <ShoppingCart className="w-4 h-4 inline mr-1" />
                       {item.product.inStock ? 'Add to Cart' : 'Out of Stock'}
                     </button>
-                    
+
                     <button
                       onClick={() => shareProduct(item.productId, item.product!.name)}
                       className="p-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                     >
                       <Share2 className="w-4 h-4 text-gray-600" />
                     </button>
-                    
+
                     <button
                       onClick={() => removeFromWishlist(item.productId)}
                       className="p-2 border border-gray-300 rounded hover:bg-gray-50 hover:border-gray-300 transition-colors"

@@ -1,187 +1,74 @@
 'use client';
 
-import { useState } from 'react';
-import { Download, Filter, Search, Calendar, DollarSign, CheckCircle, Clock, AlertCircle, Eye, X, Edit } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Download, Search, Calendar, DollarSign, CheckCircle, Clock, AlertCircle, Eye, X, Edit, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
 import Dropdown from '@/components/UI/Dropdown';
-
-interface Payout {
-  id: string;
-  payoutId: string;
-  billingPeriod: string;
-  periodStartDate: string;
-  periodEndDate: string;
-  amount: number;
-  grossSales: number;
-  refunds: number;
-  netSales: number;
-  commissionRate: number;
-  commissionAmount: number;
-  status: 'completed' | 'pending' | 'failed' | 'processing';
-  initiatedDate: string;
-  completedDate?: string;
-  bankAccount: string;
-  ordersCount: number;
-  transactionId?: string;
-  failureReason?: string;
-  orders?: Array<{
-    orderId: string;
-    orderNumber: string;
-    customerName: string;
-    amount: number;
-    vendorEarnings: number;
-    orderDate: string;
-  }>;
-}
-
-interface PayoutSchedule {
-  frequency: string;
-  nextPayoutDate: string;
-  minimumPayoutAmount: number;
-  processingDays: number;
-  cutoffDay: string;
-}
-
-interface BankDetails {
-  bankName: string;
-  accountNumber: string;
-  accountHolderName: string;
-  ifscCode: string;
-}
-
-const mockPayoutSchedule: PayoutSchedule = {
-  frequency: 'Weekly',
-  nextPayoutDate: '2024-02-15',
-  minimumPayoutAmount: 1000,
-  processingDays: 3,
-  cutoffDay: 'Every Monday',
-};
-
-const mockBankDetails: BankDetails = {
-  bankName: 'HDFC Bank',
-  accountNumber: '**** **** **** 1234',
-  accountHolderName: 'Textile Co. Pvt Ltd',
-  ifscCode: 'HDFC0001234',
-};
-
-const mockPayouts: Payout[] = [
-  {
-    id: '1',
-    payoutId: 'PAY-001',
-    billingPeriod: 'January 2024',
-    periodStartDate: '2024-01-01',
-    periodEndDate: '2024-01-31',
-    amount: 110250,
-    grossSales: 125000,
-    refunds: 2500,
-    netSales: 122500,
-    commissionRate: 10,
-    commissionAmount: 12250,
-    status: 'completed',
-    initiatedDate: '2024-02-01',
-    completedDate: '2024-02-03',
-    bankAccount: '**** **** **** 1234',
-    ordersCount: 156,
-    transactionId: 'TXN-20240203-001',
-    orders: [
-      {
-        orderId: '1',
-        orderNumber: 'ORD-001',
-        customerName: 'John Doe',
-        amount: 2500,
-        vendorEarnings: 2250,
-        orderDate: '2024-01-15',
-      },
-      {
-        orderId: '2',
-        orderNumber: 'ORD-002',
-        customerName: 'Sarah Smith',
-        amount: 1800,
-        vendorEarnings: 1620,
-        orderDate: '2024-01-16',
-      },
-    ],
-  },
-  {
-    id: '2',
-    payoutId: 'PAY-002',
-    billingPeriod: 'December 2023',
-    periodStartDate: '2023-12-01',
-    periodEndDate: '2023-12-31',
-    amount: 98000,
-    grossSales: 110000,
-    refunds: 1000,
-    netSales: 109000,
-    commissionRate: 10,
-    commissionAmount: 10900,
-    status: 'completed',
-    initiatedDate: '2024-01-01',
-    completedDate: '2024-01-03',
-    bankAccount: '**** **** **** 1234',
-    ordersCount: 142,
-    transactionId: 'TXN-20240103-001',
-  },
-  {
-    id: '3',
-    payoutId: 'PAY-003',
-    billingPeriod: 'February 2024 (Week 1)',
-    periodStartDate: '2024-02-01',
-    periodEndDate: '2024-02-07',
-    amount: 22750,
-    grossSales: 25500,
-    refunds: 250,
-    netSales: 25250,
-    commissionRate: 10,
-    commissionAmount: 2525,
-    status: 'processing',
-    initiatedDate: '2024-02-08',
-    bankAccount: '**** **** **** 1234',
-    ordersCount: 34,
-  },
-  {
-    id: '4',
-    payoutId: 'PAY-004',
-    billingPeriod: 'November 2023',
-    periodStartDate: '2023-11-01',
-    periodEndDate: '2023-11-30',
-    amount: 5000,
-    grossSales: 5600,
-    refunds: 100,
-    netSales: 5500,
-    commissionRate: 10,
-    commissionAmount: 550,
-    status: 'failed',
-    initiatedDate: '2023-12-01',
-    bankAccount: '**** **** **** 1234',
-    ordersCount: 15,
-    failureReason: 'Invalid bank account details. Please update your bank information.',
-  },
-];
+import { settlementService, Settlement } from '@/services/settlementService';
+import VendorService, { VendorBankDetails } from '@/services/vendorService';
+import { showErrorToast } from '@/lib/toast-utils';
 
 export default function PayoutsEnhanced() {
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'pending' | 'failed' | 'processing'>('all');
-  const [selectedPayout, setSelectedPayout] = useState<Payout | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('All Status');
+  const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [bankDetails, setBankDetails] = useState<VendorBankDetails | null>(null);
+  const [bankLoading, setBankLoading] = useState(true);
 
-  const filteredPayouts = mockPayouts.filter((payout) => {
-    const matchesSearch = payout.payoutId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         payout.billingPeriod.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || payout.status === filterStatus;
+  const fetchSettlements = async () => {
+    try {
+      setLoading(true);
+      const res = await settlementService.getVendorSettlements();
+      if (res?.success && Array.isArray(res.data)) {
+        setSettlements(res.data);
+      }
+    } catch (error: any) {
+      showErrorToast(error?.error || "Failed to load settlements");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBankDetails = async () => {
+    try {
+      setBankLoading(true);
+      const res = await VendorService.getVendorBankDetails();
+      setBankDetails(res.bankDetails);
+    } catch {
+      setBankDetails(null);
+    } finally {
+      setBankLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSettlements();
+    fetchBankDetails();
+  }, []);
+
+  const filteredSettlements = settlements.filter((settlement) => {
+    const matchesSearch =
+      (settlement.settlementNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (settlement.billingNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'All Status' || settlement.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed':
+      case 'Paid':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'processing':
+      case 'Processing':
         return <Clock className="w-5 h-5 text-blue-600" />;
-      case 'pending':
+      case 'Pending':
         return <Clock className="w-5 h-5 text-yellow-600" />;
-      case 'failed':
+      case 'Failed':
         return <AlertCircle className="w-5 h-5 text-red-600" />;
       default:
         return null;
@@ -190,42 +77,49 @@ export default function PayoutsEnhanced() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'completed':
+      case 'Paid':
         return 'bg-green-100 text-green-800';
-      case 'processing':
+      case 'Processing':
         return 'bg-blue-100 text-blue-800';
-      case 'pending':
+      case 'Pending':
         return 'bg-yellow-100 text-yellow-800';
-      case 'failed':
+      case 'Failed':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const totalCompleted = mockPayouts
-    .filter((p) => p.status === 'completed')
-    .reduce((sum, p) => sum + p.amount, 0);
+  const totalCompleted = settlements
+    .filter((s) => s.status === 'Paid')
+    .reduce((sum, s) => sum + s.amount, 0);
 
-  const totalPending = mockPayouts
-    .filter((p) => p.status === 'pending' || p.status === 'processing')
-    .reduce((sum, p) => sum + p.amount, 0);
+  const totalPending = settlements
+    .filter((s) => s.status === 'Pending' || s.status === 'Processing')
+    .reduce((sum, s) => sum + s.amount, 0);
 
-  const totalFailed = mockPayouts
-    .filter((p) => p.status === 'failed')
-    .reduce((sum, p) => sum + p.amount, 0);
+  const totalFailed = settlements
+    .filter((s) => s.status === 'Failed')
+    .reduce((sum, s) => sum + s.amount, 0);
 
-  const thisMonthPayouts = mockPayouts
-    .filter((p) => {
-      const date = new Date(p.initiatedDate);
+  const thisMonthPayouts = settlements
+    .filter((s) => {
+      if (!s.createdAt) return false;
+      const date = new Date(s.createdAt);
       const now = new Date();
       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
     })
-    .reduce((sum, p) => sum + p.amount, 0);
+    .reduce((sum, s) => sum + s.amount, 0);
 
-  const viewPayoutDetails = (payout: Payout) => {
-    setSelectedPayout(payout);
+  const viewPayoutDetails = (settlement: Settlement) => {
+    setSelectedSettlement(settlement);
     setShowDetailsModal(true);
+  };
+
+  // Mask the account number for display security
+  const maskAccountNumber = (acc: string) => {
+    if (!acc || acc.length < 4) return acc;
+    return '*'.repeat(acc.length - 4) + acc.slice(-4);
   };
 
   return (
@@ -233,7 +127,7 @@ export default function PayoutsEnhanced() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Payouts</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Settlements & Payouts</h1>
           <p className="text-sm text-gray-600 mt-1">View and manage your payout history</p>
         </div>
         <button className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200">
@@ -248,10 +142,10 @@ export default function PayoutsEnhanced() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Completed</p>
+                <p className="text-sm text-gray-600 mb-1">Total Paid</p>
                 <p className="text-2xl font-bold text-gray-900">₹{totalCompleted.toLocaleString('en-IN')}</p>
                 <p className="text-xs text-gray-600 mt-1">
-                  {mockPayouts.filter((p) => p.status === 'completed').length} payouts
+                  {settlements.filter((p) => p.status === 'Paid').length} payouts
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-green-100">
@@ -280,10 +174,10 @@ export default function PayoutsEnhanced() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Pending</p>
+                <p className="text-sm text-gray-600 mb-1">Pending/Processing</p>
                 <p className="text-2xl font-bold text-gray-900">₹{totalPending.toLocaleString('en-IN')}</p>
                 <p className="text-xs text-gray-600 mt-1">
-                  {mockPayouts.filter((p) => p.status === 'pending' || p.status === 'processing').length} payouts
+                  {settlements.filter((p) => p.status === 'Pending' || p.status === 'Processing').length} payouts
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-yellow-100">
@@ -300,7 +194,7 @@ export default function PayoutsEnhanced() {
                 <p className="text-sm text-gray-600 mb-1">Failed</p>
                 <p className="text-2xl font-bold text-gray-900">₹{totalFailed.toLocaleString('en-IN')}</p>
                 <p className="text-xs text-gray-600 mt-1">
-                  {mockPayouts.filter((p) => p.status === 'failed').length} payouts
+                  {settlements.filter((p) => p.status === 'Failed').length} payouts
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-red-100">
@@ -311,47 +205,8 @@ export default function PayoutsEnhanced() {
         </Card>
       </div>
 
-      {/* Payout Schedule & Bank Details */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Payout Schedule */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-gray-600" />
-              Payout Schedule
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Frequency</p>
-                <p className="font-semibold text-gray-900">{mockPayoutSchedule.frequency}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Next Payout</p>
-                <p className="font-semibold text-gray-900">
-                  {new Date(mockPayoutSchedule.nextPayoutDate).toLocaleDateString('en-IN')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Minimum Amount</p>
-                <p className="font-semibold text-gray-900">
-                  ₹{mockPayoutSchedule.minimumPayoutAmount.toLocaleString('en-IN')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Processing Time</p>
-                <p className="font-semibold text-gray-900">{mockPayoutSchedule.processingDays} business days</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm text-gray-600 mb-1">Cutoff Day</p>
-                <p className="font-semibold text-gray-900">{mockPayoutSchedule.cutoffDay}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bank Account */}
+      {/* Bank Account */}
+      <div>
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -359,34 +214,77 @@ export default function PayoutsEnhanced() {
                 <DollarSign className="w-5 h-5 text-gray-600" />
                 Bank Account
               </CardTitle>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Edit className="w-4 h-4" />
-                Edit
-              </Button>
+              <Link href="/vendor/dashboard/settings/bank">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Edit className="w-4 h-4" />
+                  {bankDetails ? 'Manage' : 'Add Bank Details'}
+                </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Bank Name</p>
-                <p className="font-semibold text-gray-900">{mockBankDetails.bankName}</p>
+            {bankLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />
+                <span className="ml-2 text-sm text-gray-500">Loading bank details...</span>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Account Holder</p>
-                <p className="font-semibold text-gray-900">{mockBankDetails.accountHolderName}</p>
+            ) : bankDetails ? (
+              <div className="space-y-4">
+                {/* Verification Badge */}
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium w-fit ${bankDetails.isVerified ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}>
+                  {bankDetails.isVerified
+                    ? <><ShieldCheck className="w-4 h-4" /> Verified by Admin</>
+                    : <><ShieldAlert className="w-4 h-4" /> Pending Verification</>
+                  }
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Bank Name</p>
+                    <p className="font-semibold text-gray-900">{bankDetails.bankName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Account Holder</p>
+                    <p className="font-semibold text-gray-900">{bankDetails.accountHolderName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Account Number</p>
+                    <p className="font-semibold font-mono text-gray-900">{maskAccountNumber(bankDetails.accountNumber)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">IFSC Code</p>
+                    <p className="font-semibold text-gray-900">{bankDetails.ifscCode}</p>
+                  </div>
+                  {bankDetails.accountType && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Account Type</p>
+                      <p className="font-semibold text-gray-900 capitalize">{bankDetails.accountType}</p>
+                    </div>
+                  )}
+                  {bankDetails.branchName && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Branch</p>
+                      <p className="font-semibold text-gray-900">{bankDetails.branchName}</p>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Account Number</p>
-                <p className="font-semibold font-mono text-gray-900">{mockBankDetails.accountNumber}</p>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
+                <AlertCircle className="w-10 h-10 text-yellow-500" />
+                <p className="text-sm font-semibold text-gray-700">No bank details added yet</p>
+                <p className="text-xs text-gray-500">Add your bank account to receive payouts from settlements.</p>
+                <Link href="/vendor/dashboard/settings/bank">
+                  <Button size="sm" className="gap-2 bg-gray-900 hover:bg-gray-700 text-white mt-1">
+                    <ExternalLink className="w-4 h-4" />
+                    Add Bank Details
+                  </Button>
+                </Link>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">IFSC Code</p>
-                <p className="font-semibold text-gray-900">{mockBankDetails.ifscCode}</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
+
 
       {/* Filters */}
       <Card>
@@ -396,7 +294,7 @@ export default function PayoutsEnhanced() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
               <input
                 type="text"
-                placeholder="Search by payout ID or period..."
+                placeholder="Search by settlement number or order number..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 transition"
@@ -406,117 +304,119 @@ export default function PayoutsEnhanced() {
             <div className="w-full sm:w-48">
               <Dropdown
                 value={filterStatus}
-                options={[
-                  { value: 'all', label: 'All Status' },
-                  { value: 'completed', label: 'Completed' },
-                  { value: 'processing', label: 'Processing' },
-                  { value: 'pending', label: 'Pending' },
-                  { value: 'failed', label: 'Failed' },
-                ]}
-                onChange={(val) => setFilterStatus(val as any)}
+                options={["All Status", "Paid", "Processing", "Pending", "Failed"]}
+                onChange={(val) => setFilterStatus(val as string)}
                 placeholder="Filter by status"
               />
             </div>
+
+            <button
+              onClick={fetchSettlements}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
           </div>
         </CardContent>
       </Card>
 
       {/* Payouts Table */}
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Payout ID</TableHead>
-              <TableHead>Billing Period</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Initiated Date</TableHead>
-              <TableHead>Orders</TableHead>
-              <TableHead>Transaction ID</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredPayouts.length > 0 ? (
-              filteredPayouts.map((payout) => (
-                <TableRow key={payout.id} className="hover:bg-gray-50">
-                  <TableCell>
-                    <div className="font-semibold text-gray-900">{payout.payoutId}</div>
-                    {payout.completedDate && (
-                      <div className="text-xs text-gray-600 mt-1">
-                        Completed: {new Date(payout.completedDate).toLocaleDateString('en-IN')}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
+            <span className="ml-3 text-gray-500 font-medium">Loading Settlements...</span>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Settlement No.</TableHead>
+                <TableHead>Billing/Order No.</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Period</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Due/Payment Date</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredSettlements.length > 0 ? (
+                filteredSettlements.map((settlement) => (
+                  <TableRow key={settlement.id} className="hover:bg-gray-50">
+                    <TableCell>
+                      <div className="font-semibold text-indigo-600">{settlement.settlementNumber}</div>
+                      {settlement.transactionId && (
+                        <div className="text-xs text-gray-500 mt-1 font-mono">
+                          TXN: {settlement.transactionId}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-900">{settlement.billingNumber}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-semibold text-gray-900">
+                        ₹{settlement.amount.toLocaleString('en-IN')}
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-gray-900">{payout.billingPeriod}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {new Date(payout.periodStartDate).toLocaleDateString('en-IN')} -{' '}
-                      {new Date(payout.periodEndDate).toLocaleDateString('en-IN')}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-semibold text-gray-900">
-                      ₹{payout.amount.toLocaleString('en-IN')}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">{payout.ordersCount} orders</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(payout.status)}
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(payout.status)}`}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-900">{settlement.period}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(settlement.status)}
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(settlement.status)}`}
+                        >
+                          {settlement.status}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {settlement.paymentDate ? (
+                        <div className="text-sm text-gray-600">
+                          Paid: {new Date(settlement.paymentDate).toLocaleDateString('en-IN')}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-600">
+                          Due: {new Date(settlement.dueDate).toLocaleDateString('en-IN')}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => viewPayoutDetails(settlement)}
+                        className="gap-2"
                       >
-                        {payout.status}
-                      </span>
-                    </div>
-                    {payout.failureReason && (
-                      <div className="text-xs text-red-600 mt-1 max-w-xs">{payout.failureReason}</div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-gray-600">
-                      {new Date(payout.initiatedDate).toLocaleDateString('en-IN')}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-semibold text-gray-900">{payout.ordersCount}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-gray-600 font-mono text-xs">
-                      {payout.transactionId || '-'}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => viewPayoutDetails(payout)}
-                      className="gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      View Details
-                    </Button>
+                        <Eye className="w-4 h-4" />
+                        Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-gray-500 py-12">
+                    <p className="text-sm">No settlements found matching your filters</p>
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-gray-500 py-12">
-                  <p className="text-sm">No payouts found matching your filters</p>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        )}
       </Card>
 
       {/* Payout Details Modal */}
-      {showDetailsModal && selectedPayout && (
+      {showDetailsModal && selectedSettlement && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Payout Details</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Settlement Details</h2>
               <button
                 onClick={() => setShowDetailsModal(false)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -526,44 +426,54 @@ export default function PayoutsEnhanced() {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Payout Information */}
+              {/* Settlement Information */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Payout Information</h3>
                 <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Payout ID</p>
-                    <p className="font-semibold text-gray-900">{selectedPayout.payoutId}</p>
+                    <p className="text-sm text-gray-600 mb-1">Settlement Number</p>
+                    <p className="font-semibold text-gray-900">{selectedSettlement.settlementNumber}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Billing Period</p>
-                    <p className="font-semibold text-gray-900">{selectedPayout.billingPeriod}</p>
+                    <p className="text-sm text-gray-600 mb-1">Billing Number</p>
+                    <p className="font-semibold text-gray-900">{selectedSettlement.billingNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Period</p>
+                    <p className="font-semibold text-gray-900">{selectedSettlement.period}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Status</p>
                     <span
-                      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(selectedPayout.status)}`}
+                      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(selectedSettlement.status)}`}
                     >
-                      {selectedPayout.status}
+                      {selectedSettlement.status}
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Initiated Date</p>
+                    <p className="text-sm text-gray-600 mb-1">Created At</p>
                     <p className="font-semibold text-gray-900">
-                      {new Date(selectedPayout.initiatedDate).toLocaleDateString('en-IN')}
+                      {selectedSettlement.createdAt ? new Date(selectedSettlement.createdAt).toLocaleDateString('en-IN') : '-'}
                     </p>
                   </div>
-                  {selectedPayout.completedDate && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Due Date</p>
+                    <p className="font-semibold text-gray-900">
+                      {new Date(selectedSettlement.dueDate).toLocaleDateString('en-IN')}
+                    </p>
+                  </div>
+                  {selectedSettlement.paymentDate && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Completed Date</p>
+                      <p className="text-sm text-gray-600 mb-1">Payment Date</p>
                       <p className="font-semibold text-gray-900">
-                        {new Date(selectedPayout.completedDate).toLocaleDateString('en-IN')}
+                        {new Date(selectedSettlement.paymentDate).toLocaleDateString('en-IN')}
                       </p>
                     </div>
                   )}
-                  {selectedPayout.transactionId && (
+                  {selectedSettlement.transactionId && (
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Transaction ID</p>
-                      <p className="font-semibold font-mono text-gray-900">{selectedPayout.transactionId}</p>
+                      <p className="font-semibold font-mono text-gray-900">{selectedSettlement.transactionId}</p>
                     </div>
                   )}
                 </div>
@@ -571,103 +481,19 @@ export default function PayoutsEnhanced() {
 
               {/* Financial Breakdown */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Breakdown</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Overview</h3>
                 <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Gross Sales</span>
-                    <span className="font-semibold text-gray-900">
-                      ₹{selectedPayout.grossSales.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Refunds</span>
-                    <span className="font-semibold text-gray-900">
-                      -₹{selectedPayout.refunds.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center border-t pt-3">
-                    <span className="text-gray-600">Net Sales</span>
-                    <span className="font-semibold text-gray-900">
-                      ₹{selectedPayout.netSales.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">
-                      Platform Commission ({selectedPayout.commissionRate}%)
-                    </span>
-                    <span className="font-semibold text-gray-900">
-                      -₹{selectedPayout.commissionAmount.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center border-t-2 border-gray-300 pt-3">
-                    <span className="font-bold text-gray-900 text-lg">Payout Amount</span>
+                  <div className="flex justify-between items-center border-t border-gray-300 pt-3">
+                    <span className="font-bold text-gray-900 text-lg">Settlement Amount</span>
                     <span className="font-bold text-gray-900 text-lg">
-                      ₹{selectedPayout.amount.toLocaleString('en-IN')}
+                      ₹{selectedSettlement.amount.toLocaleString('en-IN')}
                     </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Orders Included */}
-              {selectedPayout.orders && selectedPayout.orders.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Orders Included ({selectedPayout.ordersCount})
-                  </h3>
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Order ID</TableHead>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Your Earnings</TableHead>
-                          <TableHead>Date</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedPayout.orders.map((order) => (
-                          <TableRow key={order.orderId}>
-                            <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                            <TableCell>{order.customerName}</TableCell>
-                            <TableCell>₹{order.amount.toLocaleString('en-IN')}</TableCell>
-                            <TableCell className="text-gray-900 font-semibold">
-                              ₹{order.vendorEarnings.toLocaleString('en-IN')}
-                            </TableCell>
-                            <TableCell>{new Date(order.orderDate).toLocaleDateString('en-IN')}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-
-              {/* Bank Details */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Bank Details</h3>
-                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Bank Name</p>
-                    <p className="font-semibold text-gray-900">{mockBankDetails.bankName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Account Holder</p>
-                    <p className="font-semibold text-gray-900">{mockBankDetails.accountHolderName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Account Number</p>
-                    <p className="font-semibold font-mono text-gray-900">{selectedPayout.bankAccount}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">IFSC Code</p>
-                    <p className="font-semibold text-gray-900">{mockBankDetails.ifscCode}</p>
                   </div>
                 </div>
               </div>
 
               {/* Download Receipt Button */}
-              {selectedPayout.status === 'completed' && (
+              {selectedSettlement.status === 'Paid' && (
                 <Button className="w-full bg-gray-900 hover:bg-gray-700 text-white gap-2">
                   <Download className="w-4 h-4" />
                   Download Receipt
@@ -682,10 +508,8 @@ export default function PayoutsEnhanced() {
       <Card className="bg-gray-50 border-gray-200">
         <CardContent className="p-4">
           <p className="text-sm text-gray-700">
-            <span className="font-semibold">Note:</span> Payouts are processed {mockPayoutSchedule.frequency.toLowerCase()} 
-            to your registered bank account. Processing typically takes {mockPayoutSchedule.processingDays} business days. 
-            You will receive a confirmation email for each payout. Minimum payout amount is ₹
-            {mockPayoutSchedule.minimumPayoutAmount.toLocaleString('en-IN')}.
+            <span className="font-semibold">Note:</span> Payouts are processed
+            to your registered bank account. You will receive a confirmation email for each payout.
           </p>
         </CardContent>
       </Card>

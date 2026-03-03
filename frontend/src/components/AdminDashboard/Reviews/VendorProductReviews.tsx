@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Star, Search, Eye, AlertCircle } from "lucide-react";
-import { mockOrders } from "../../mockData/orders";
+import { useState, useEffect, useCallback } from "react";
+import { Star, Search, Eye, AlertCircle, RefreshCw, Package } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
+import adminReviewService, { AdminOrderReview } from "@/services/adminReviewService";
 
 interface VendorProductReview {
   id: string;
@@ -29,58 +29,70 @@ interface VendorProductReview {
 
 export default function VendorProductReviews() {
   const [reviews, setReviews] = useState<VendorProductReview[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedReview, setSelectedReview] = useState<VendorProductReview | null>(null);
+  const [stats, setStats] = useState({ total: 0, approved: 0, rejected: 0 });
 
-  // Load reviews from orders with admin reviews
-  useEffect(() => {
-    const reviewsFromOrders: VendorProductReview[] = [];
-    
-    mockOrders.forEach(order => {
-      if (order.adminReview) {
-        // Create a review entry for each item in the order
-        order.items.forEach(item => {
-          reviewsFromOrders.push({
-            id: `${order.id}_${item.id}`,
-            orderId: order.orderId,
-            vendorName: item.vendorName,
-            productName: item.productName,
-            productSKU: item.sku,
-            reviewedDate: order.adminReview!.reviewedAt || new Date().toISOString(),
-            status: order.adminReview!.approved ? "approved" : "rejected",
-            rating: order.adminReview!.rating || 0,
-            reviewComments: order.adminReview!.reviewComments || "",
-            qualityCheckNotes: order.adminReview!.qualityCheckNotes || "",
-            rejectionReason: order.adminReview!.rejectionReason || undefined,
-            customerName: order.customerName,
-            orderDate: order.orderDate,
-            totalAmount: item.totalPrice,
-            quantity: item.quantity,
-            productImage: item.productImage,
+  const fetchReviews = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await adminReviewService.getAllAdminReviews({
+        search: searchTerm || undefined,
+        status: filterStatus !== "all" ? filterStatus : undefined,
+        limit: 100,
+      });
+
+      if (response.success) {
+        // Transform API data to match our display format (one entry per order item)
+        const transformed: VendorProductReview[] = [];
+
+        response.data.forEach((adminReview: AdminOrderReview) => {
+          const order = adminReview.order;
+          if (!order) return;
+
+          order.items.forEach((item) => {
+            transformed.push({
+              id: `${adminReview.id}_${item.id}`,
+              orderId: order.orderId,
+              vendorName: item.vendorName,
+              productName: item.productName,
+              productSKU: item.sku,
+              reviewedDate: adminReview.reviewedAt || adminReview.createdAt,
+              status: adminReview.approved ? "approved" : "rejected",
+              rating: adminReview.rating || 0,
+              reviewComments: adminReview.reviewComments || "",
+              qualityCheckNotes: adminReview.qualityCheckNotes || "",
+              rejectionReason: adminReview.rejectionReason || undefined,
+              customerName: order.customerName,
+              orderDate: order.orderDate,
+              totalAmount: item.totalPrice,
+              quantity: item.quantity,
+              productImage: item.productImage || "",
+            });
           });
         });
+
+        setReviews(transformed);
+        setStats(response.stats);
       }
-    });
-    
-    setReviews(reviewsFromOrders);
-  }, []);
+    } catch (error) {
+      console.error("Error fetching admin reviews:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm, filterStatus]);
 
-  const handleApprove = (id: string) => {
-    // Reviews are already approved/rejected during order process
-    // This is just for viewing
-  };
-
-  const handleReject = (id: string) => {
-    // Reviews are already approved/rejected during order process
-    // This is just for viewing
-  };
+  useEffect(() => {
+    fetchReviews();
+  }, [fetchReviews]);
 
   const filteredReviews = reviews.filter(review => {
     const matchesSearch = review.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         review.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         review.productSKU.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         review.orderId.toLowerCase().includes(searchTerm.toLowerCase());
+      review.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      review.productSKU.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      review.orderId.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === "all" || review.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -103,9 +115,8 @@ export default function VendorProductReviews() {
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`h-4 w-4 ${
-              star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-            }`}
+            className={`h-4 w-4 ${star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+              }`}
           />
         ))}
       </div>
@@ -117,7 +128,7 @@ export default function VendorProductReviews() {
       <Breadcrumb />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Vendor Product Reviews</h1>
-        <p className="text-gray-600 mt-1">Review and approve vendor product submissions</p>
+        <p className="text-gray-600 mt-1">Quality check reviews given by admin after receiving products from vendors</p>
       </div>
 
       {/* Stats */}
@@ -125,14 +136,14 @@ export default function VendorProductReviews() {
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-gray-600">Total Reviews</div>
-            <div className="text-2xl font-bold text-gray-900">{reviews.length}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-gray-600">Approved</div>
             <div className="text-2xl font-bold text-green-600">
-              {reviews.filter(r => r.status === "approved").length}
+              {stats.approved}
             </div>
           </CardContent>
         </Card>
@@ -140,7 +151,7 @@ export default function VendorProductReviews() {
           <CardContent className="p-4">
             <div className="text-sm text-gray-600">Rejected</div>
             <div className="text-2xl font-bold text-red-600">
-              {reviews.filter(r => r.status === "rejected").length}
+              {stats.rejected}
             </div>
           </CardContent>
         </Card>
@@ -178,86 +189,99 @@ export default function VendorProductReviews() {
 
       {/* Reviews Table */}
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead>Vendor</TableHead>
-              <TableHead>Order ID</TableHead>
-              <TableHead>Rating</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Reviewed Date</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredReviews.length > 0 ? (
-              filteredReviews.map((review) => (
-                <TableRow key={review.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={review.productImage}
-                        alt={review.productName}
-                        className="w-12 h-12 object-cover rounded border border-gray-200"
-                      />
-                      <div>
-                        <div className="font-medium text-gray-900">{review.productName}</div>
-                        <div className="text-sm text-gray-500">SKU: {review.productSKU}</div>
+        {loading ? (
+          <div className="p-12 text-center">
+            <RefreshCw className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-500">Loading reviews...</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Vendor</TableHead>
+                <TableHead>Order ID</TableHead>
+                <TableHead>Rating</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Reviewed Date</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredReviews.length > 0 ? (
+                filteredReviews.map((review) => (
+                  <TableRow key={review.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        {review.productImage ? (
+                          <img
+                            src={review.productImage}
+                            alt={review.productName}
+                            className="w-12 h-12 object-cover rounded border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-gray-100 rounded border border-gray-200 flex items-center justify-center">
+                            <Package className="w-6 h-6 text-gray-400" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-medium text-gray-900">{review.productName}</div>
+                          <div className="text-sm text-gray-500">SKU: {review.productSKU}</div>
+                        </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-900">{review.vendorName}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm font-mono text-gray-900">{review.orderId}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {renderStars(review.rating)}
+                        <span className="text-sm text-gray-600">({review.rating})</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(review.status)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-gray-900">
+                        {new Date(review.reviewedDate).toLocaleDateString()}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(review.reviewedDate).toLocaleTimeString()}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        onClick={() => setSelectedReview(review)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7}>
+                    <div className="p-12 text-center">
+                      <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500 text-lg font-medium mb-2">No reviews found</p>
+                      <p className="text-gray-400 text-sm">
+                        {reviews.length === 0
+                          ? "Admin reviews will appear here after quality checks are completed during order processing."
+                          : "Try adjusting your search or filter criteria."}
+                      </p>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-gray-900">{review.vendorName}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm font-mono text-gray-900">{review.orderId}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {renderStars(review.rating)}
-                      <span className="text-sm text-gray-600">({review.rating})</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(review.status)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-gray-900">
-                      {new Date(review.reviewedDate).toLocaleDateString()}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {new Date(review.reviewedDate).toLocaleTimeString()}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <button
-                      onClick={() => setSelectedReview(review)}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    >
-                      <Eye className="h-4 w-4" />
-                      View
-                    </button>
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7}>
-                  <div className="p-12 text-center">
-                    <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg font-medium mb-2">No reviews found</p>
-                    <p className="text-gray-400 text-sm">
-                      {reviews.length === 0 
-                        ? "Admin reviews will appear here after quality checks are completed during order processing."
-                        : "Try adjusting your search or filter criteria."}
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        )}
       </Card>
 
       {/* Detail Modal */}
@@ -267,11 +291,17 @@ export default function VendorProductReviews() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-start">
                 <div className="flex items-start gap-4">
-                  <img
-                    src={selectedReview.productImage}
-                    alt={selectedReview.productName}
-                    className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                  />
+                  {selectedReview.productImage ? (
+                    <img
+                      src={selectedReview.productImage}
+                      alt={selectedReview.productName}
+                      className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                      <Package className="w-10 h-10 text-gray-400" />
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">{selectedReview.productName}</h2>
                     <p className="text-sm text-gray-500 mt-1">SKU: {selectedReview.productSKU}</p>
@@ -287,7 +317,7 @@ export default function VendorProductReviews() {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-6 space-y-6">
               {/* Rating */}
               <div className="bg-gray-50 p-4 rounded-lg">
@@ -304,7 +334,7 @@ export default function VendorProductReviews() {
               <div>
                 <label className="text-sm font-semibold text-gray-700 block mb-2">Review Comments</label>
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <p className="text-gray-900">{selectedReview.reviewComments}</p>
+                  <p className="text-gray-900">{selectedReview.reviewComments || "No comments provided"}</p>
                 </div>
               </div>
 
@@ -312,7 +342,7 @@ export default function VendorProductReviews() {
               <div>
                 <label className="text-sm font-semibold text-gray-700 block mb-2">Quality Check Notes</label>
                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <p className="text-gray-900">{selectedReview.qualityCheckNotes}</p>
+                  <p className="text-gray-900">{selectedReview.qualityCheckNotes || "No notes provided"}</p>
                 </div>
               </div>
 
@@ -342,7 +372,7 @@ export default function VendorProductReviews() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700">Amount</label>
-                  <p className="text-gray-900 font-medium">${selectedReview.totalAmount.toFixed(2)}</p>
+                  <p className="text-gray-900 font-medium">₹{selectedReview.totalAmount.toFixed(2)}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700">Order Date</label>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   ArrowLeft,
   Calendar,
@@ -16,9 +16,13 @@ import {
   Play,
   FileText,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  ThumbsUp,
+  ThumbsDown
 } from "lucide-react"
 import { Vendor } from "@/types/inspection"
+import qcCheckerService from "@/services/qcCheckerService"
+import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 
 interface VendorDetailProps {
   vendor: Vendor
@@ -26,12 +30,31 @@ interface VendorDetailProps {
   onStartInspection: (vendor: Vendor) => void
 }
 
-export default function VendorDetail({ 
-  vendor, 
-  onBack, 
-  onStartInspection 
+export default function VendorDetail({
+  vendor,
+  onBack,
+  onStartInspection
 }: VendorDetailProps) {
   const [activeTab, setActiveTab] = useState('overview')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const isActionable = vendor.status === 'review' || vendor.status === 'pending'
+  const [inspections, setInspections] = useState<any[]>([]);
+
+  // Fetch true inspections instead of using mock upcoming
+  useEffect(() => {
+    async function loadInspections() {
+      try {
+        const response = await qcCheckerService.getInspections();
+        if (response.success) {
+          // Filter to just this vendor
+          setInspections(response.inspections.filter((i: any) => i.vendorId === vendor.id));
+        }
+      } catch (err) {
+        console.error("Failed to load inspections", err);
+      }
+    }
+    loadInspections();
+  }, [vendor.id]);
 
   // Mock detailed vendor data - extending the vendor object with additional data
   const vendorDetails = {
@@ -70,25 +93,23 @@ export default function VendorDetail({
         result: "failed"
       }
     ],
-    upcomingInspections: [
-      {
-        id: 1,
-        po: "PO-2024-006",
-        scheduledDate: "2024-01-15",
-        scheduledTime: "09:00 AM",
-        items: "Premium Cotton T-Shirts",
-        priority: "high"
-      },
-      {
-        id: 2,
-        po: "PO-2024-012",
-        scheduledDate: "2024-01-20",
-        scheduledTime: "02:00 PM",
-        items: "Organic Cotton Hoodies",
-        priority: "medium"
-      }
-    ]
   }
+
+  // Use state instead of mock upcoming items
+  const actualUpcomingInspections = inspections.filter(i => i.status === 'SCHEDULED' || i.status === 'IN_PROGRESS');
+
+  const handleStartInspection = async (inspectionId: string) => {
+    setIsProcessing(true);
+    try {
+      await qcCheckerService.startInspection(inspectionId);
+      showSuccessToast("Inspection Started", "The inspection status is now In Progress");
+      // Ideally redirect to the specific inspection panel here
+    } catch (error) {
+      showErrorToast("Error", "Failed to start inspection. Ensure it has not been completed.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     const colors = {
@@ -123,7 +144,7 @@ export default function VendorDetail({
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-4">
-          <button 
+          <button
             onClick={onBack}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
@@ -138,13 +159,59 @@ export default function VendorDetail({
             </div>
             <p className="text-slate-600">Comprehensive vendor information and inspection history</p>
           </div>
-          <button
-            onClick={() => onStartInspection(vendor)}
-            className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
-          >
-            <Play className="w-4 h-4" />
-            Start New Inspection
-          </button>
+          <div className="flex gap-2">
+            {isActionable && (
+              <>
+                <button
+                  onClick={async () => {
+                    setIsProcessing(true);
+                    try {
+                      await qcCheckerService.approveVendor(vendor.id);
+                      showSuccessToast("Success", "Vendor Approved successfully");
+                      onBack(); // Refresh list ideally, but going back works
+                    } catch (e) {
+                      showErrorToast("Error", "Failed to approve vendor");
+                    } finally { setIsProcessing(false) }
+                  }}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-4 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-50"
+                >
+                  <ThumbsUp className="w-4 h-4" />
+                  Approve
+                </button>
+                <button
+                  onClick={async () => {
+                    const reason = window.prompt("Enter Rejection Reason:");
+                    if (reason) {
+                      setIsProcessing(true);
+                      try {
+                        await qcCheckerService.rejectVendor(vendor.id, reason);
+                        showSuccessToast("Success", "Vendor Rejected successfully");
+                        onBack();
+                      } catch (e) {
+                        showErrorToast("Error", "Failed to reject vendor");
+                      } finally { setIsProcessing(false) }
+                    }
+                  }}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-4 py-3 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-all disabled:opacity-50"
+                >
+                  <ThumbsDown className="w-4 h-4" />
+                  Reject
+                </button>
+              </>
+            )}
+            {actualUpcomingInspections.length > 0 && (
+              <button
+                onClick={() => handleStartInspection(actualUpcomingInspections[0].id)}
+                disabled={isProcessing}
+                className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
+              >
+                <Play className="w-4 h-4" />
+                Start Now ({actualUpcomingInspections[0].poNumber})
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -160,7 +227,7 @@ export default function VendorDetail({
               <p className="font-semibold">{vendorDetails.fullName}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
               <MapPin className="w-5 h-5" />
@@ -170,7 +237,7 @@ export default function VendorDetail({
               <p className="font-semibold">{vendor.location}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
               <Calendar className="w-5 h-5" />
@@ -180,7 +247,7 @@ export default function VendorDetail({
               <p className="font-semibold">{vendor.recentPO}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
               <TrendingUp className="w-5 h-5" />
@@ -201,11 +268,10 @@ export default function VendorDetail({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                }`}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
               >
                 {tab.label}
               </button>
@@ -271,7 +337,7 @@ export default function VendorDetail({
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <label className="text-sm font-medium text-slate-600">Factory Details</label>
                 <div className="mt-1">
@@ -317,14 +383,14 @@ export default function VendorDetail({
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">Upcoming Inspections</h3>
           <div className="space-y-4">
-            {vendorDetails.upcomingInspections.map((inspection) => (
+            {actualUpcomingInspections.length > 0 ? actualUpcomingInspections.map((inspection: any) => (
               <div key={inspection.id} className="border border-slate-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
-                      {inspection.po}
+                      {inspection.poNumber}
                     </span>
-                    <span className="font-medium text-slate-900">{inspection.items}</span>
+                    <span className="font-medium text-slate-900">{inspection.clientName}</span>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getPriorityColor(inspection.priority)}`}>
                     {inspection.priority.toUpperCase()}
@@ -341,7 +407,7 @@ export default function VendorDetail({
                   </div>
                 </div>
               </div>
-            ))}
+            )) : <p className="text-sm text-slate-500">No pending inspections found.</p>}
           </div>
         </div>
       )}
@@ -355,7 +421,7 @@ export default function VendorDetail({
             <p className="text-2xl font-bold text-slate-900">{vendorDetails.performance.totalInspections}</p>
             <p className="text-sm text-slate-600">Total Inspections</p>
           </div>
-          
+
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center">
             <div className="p-3 bg-green-100 rounded-lg w-fit mx-auto mb-3">
               <CheckCircle className="w-6 h-6 text-green-600" />
@@ -363,7 +429,7 @@ export default function VendorDetail({
             <p className="text-2xl font-bold text-slate-900">{vendorDetails.performance.passRate}%</p>
             <p className="text-sm text-slate-600">Pass Rate</p>
           </div>
-          
+
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center">
             <div className="p-3 bg-amber-100 rounded-lg w-fit mx-auto mb-3">
               <TrendingUp className="w-6 h-6 text-amber-600" />
@@ -371,7 +437,7 @@ export default function VendorDetail({
             <p className="text-2xl font-bold text-slate-900">{vendorDetails.performance.averageScore}/10</p>
             <p className="text-sm text-slate-600">Average Score</p>
           </div>
-          
+
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center">
             <div className="p-3 bg-purple-100 rounded-lg w-fit mx-auto mb-3">
               <Clock className="w-6 h-6 text-purple-600" />

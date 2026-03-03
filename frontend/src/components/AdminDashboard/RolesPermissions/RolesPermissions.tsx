@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { roleService, Role, Permission } from '@/services/roleService'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Edit,
+  Trash2,
   Search,
   AlertCircle,
   Shield,
@@ -26,150 +27,34 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
-
-interface Permission {
-  id: string
-  name: string
-  description: string
-  module: string
-}
-
-interface Role {
-  id: string
-  name: string
-  description: string
-  permissions: Permission[]
-  userCount: number
-  isSystem: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-const mockPermissions: Permission[] = [
-  // Dashboard
-  { id: '1', name: 'view_dashboard', description: 'View dashboard', module: 'Dashboard' },
-  
-  // Users
-  { id: '2', name: 'view_users', description: 'View users list', module: 'Users' },
-  { id: '3', name: 'create_users', description: 'Create new users', module: 'Users' },
-  { id: '4', name: 'edit_users', description: 'Edit existing users', module: 'Users' },
-  { id: '5', name: 'delete_users', description: 'Delete users', module: 'Users' },
-  
-  // Products
-  { id: '6', name: 'view_products', description: 'View products list', module: 'Products' },
-  { id: '7', name: 'create_products', description: 'Create new products', module: 'Products' },
-  { id: '8', name: 'edit_products', description: 'Edit existing products', module: 'Products' },
-  { id: '9', name: 'delete_products', description: 'Delete products', module: 'Products' },
-  
-  // Orders
-  { id: '10', name: 'view_orders', description: 'View orders list', module: 'Orders' },
-  { id: '11', name: 'create_orders', description: 'Create new orders', module: 'Orders' },
-  { id: '12', name: 'edit_orders', description: 'Edit existing orders', module: 'Orders' },
-  { id: '13', name: 'delete_orders', description: 'Delete orders', module: 'Orders' },
-  
-  // Vendors
-  { id: '14', name: 'view_vendors', description: 'View vendors list', module: 'Vendors' },
-  { id: '15', name: 'create_vendors', description: 'Create new vendors', module: 'Vendors' },
-  { id: '16', name: 'edit_vendors', description: 'Edit existing vendors', module: 'Vendors' },
-  { id: '17', name: 'delete_vendors', description: 'Delete vendors', module: 'Vendors' },
-  
-  // Categories
-  { id: '18', name: 'view_categories', description: 'View categories list', module: 'Categories' },
-  { id: '19', name: 'create_categories', description: 'Create new categories', module: 'Categories' },
-  { id: '20', name: 'edit_categories', description: 'Edit existing categories', module: 'Categories' },
-  { id: '21', name: 'delete_categories', description: 'Delete categories', module: 'Categories' },
-  
-  // Inventory
-  { id: '22', name: 'view_inventory', description: 'View inventory list', module: 'Inventory' },
-  { id: '23', name: 'create_inventory', description: 'Create inventory items', module: 'Inventory' },
-  { id: '24', name: 'edit_inventory', description: 'Edit inventory items', module: 'Inventory' },
-  { id: '25', name: 'delete_inventory', description: 'Delete inventory items', module: 'Inventory' },
-  
-  // Reports
-  { id: '26', name: 'view_reports', description: 'View reports', module: 'Reports' },
-  { id: '27', name: 'export_reports', description: 'Export reports', module: 'Reports' },
-  
-  // Settings
-  { id: '28', name: 'view_settings', description: 'View system settings', module: 'Settings' },
-  { id: '29', name: 'manage_settings', description: 'Manage system settings', module: 'Settings' },
-  
-  // Reviews
-  { id: '30', name: 'view_reviews', description: 'View reviews', module: 'Reviews' },
-  { id: '31', name: 'moderate_reviews', description: 'Moderate reviews', module: 'Reviews' },
-  { id: '32', name: 'delete_reviews', description: 'Delete reviews', module: 'Reviews' },
-]
-
-const mockRoles: Role[] = [
-  {
-    id: '1',
-    name: 'Super Admin',
-    description: 'Full system access with all permissions',
-    permissions: mockPermissions,
-    userCount: 2,
-    isSystem: true,
-    createdAt: '2024-01-01',
-    updatedAt: '2024-01-01'
-  },
-  {
-    id: '2',
-    name: 'Admin',
-    description: 'Administrative access with limited permissions',
-    permissions: mockPermissions.filter(p => !p.name.includes('manage_settings')),
-    userCount: 5,
-    isSystem: false,
-    createdAt: '2024-01-15',
-    updatedAt: '2024-02-01'
-  },
-  {
-    id: '3',
-    name: 'Manager',
-    description: 'Management access for products and orders',
-    permissions: mockPermissions.filter(p => 
-      p.module === 'Dashboard' || 
-      p.module === 'Products' || 
-      p.module === 'Orders' || 
-      p.name === 'view_reports'
-    ),
-    userCount: 8,
-    isSystem: false,
-    createdAt: '2024-01-20',
-    updatedAt: '2024-01-25'
-  },
-  {
-    id: '4',
-    name: 'Viewer',
-    description: 'Read-only access to most modules',
-    permissions: mockPermissions.filter(p => p.name.startsWith('view_')),
-    userCount: 12,
-    isSystem: false,
-    createdAt: '2024-02-01',
-    updatedAt: '2024-02-01'
-  },
-  {
-    id: '5',
-    name: 'Content Editor',
-    description: 'Can create and edit content but not delete',
-    permissions: mockPermissions.filter(p => 
-      p.name.startsWith('view_') || 
-      p.name.startsWith('create_') || 
-      p.name.startsWith('edit_')
-    ),
-    userCount: 6,
-    isSystem: false,
-    createdAt: '2024-02-05',
-    updatedAt: '2024-02-05'
-  }
-]
-
 export default function RolesPermissions() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'roles' | 'permissions' | 'users'>('roles')
-  const [roles, setRoles] = useState<Role[]>(mockRoles)
-  const [permissions] = useState<Permission[]>(mockPermissions)
+  const [roles, setRoles] = useState<Role[]>([])
+  const [permissions, setPermissions] = useState<Permission[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        const [rolesRes, permsRes] = await Promise.all([
+          roleService.getRoles(),
+          roleService.getPermissions()
+        ])
+        if (rolesRes.success) setRoles(rolesRes.data)
+        if (permsRes.success) setPermissions(permsRes.data)
+      } catch (error) {
+        showErrorToast('Failed to load roles and permissions')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
 
   const filteredRoles = roles.filter(role =>
     role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -202,15 +87,17 @@ export default function RolesPermissions() {
 
     setIsLoading(true)
     try {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      setRoles(prev => prev.filter(role => role.id !== roleToDelete.id))
-      showSuccessToast('Role deleted successfully')
-      setShowDeleteModal(false)
-      setRoleToDelete(null)
-    } catch (error) {
-      showErrorToast('Failed to delete role')
+      const res = await roleService.deleteRole(roleToDelete.id)
+      if (res.success) {
+        setRoles(prev => prev.filter(role => role.id !== roleToDelete.id))
+        showSuccessToast('Role deleted successfully')
+        setShowDeleteModal(false)
+        setRoleToDelete(null)
+      } else {
+        throw new Error(res.message || 'Failed to delete role')
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || 'Failed to delete role')
     } finally {
       setIsLoading(false)
     }
@@ -225,8 +112,8 @@ export default function RolesPermissions() {
             <h1 className="text-2xl font-bold text-black">Roles & Permissions</h1>
             <p className="text-gray-600 mt-1">Manage user roles and system permissions</p>
           </div>
-          <Button 
-            onClick={handleCreateRole} 
+          <Button
+            onClick={handleCreateRole}
             className="bg-black hover:bg-gray-800 text-white"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -248,7 +135,7 @@ export default function RolesPermissions() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -260,7 +147,7 @@ export default function RolesPermissions() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -272,7 +159,7 @@ export default function RolesPermissions() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white border-gray-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -298,11 +185,10 @@ export default function RolesPermissions() {
               <button
                 key={key}
                 onClick={() => setActiveTab(key as any)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm ${
-                  activeTab === key
+                className={`py-4 px-2 border-b-2 font-medium text-sm ${activeTab === key
                     ? 'border-black text-black'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 {label} ({count})
               </button>
@@ -351,7 +237,7 @@ export default function RolesPermissions() {
                         <span className="text-xs text-gray-500">Users</span>
                         <div className="text-lg font-bold text-black">{role.userCount}</div>
                       </div>
-                      
+
                       <div className="bg-gray-50 rounded p-2">
                         <span className="text-xs text-gray-500">Permissions</span>
                         <div className="text-lg font-bold text-black">{role.permissions.length}</div>
@@ -445,14 +331,14 @@ export default function RolesPermissions() {
                   <p className="text-sm text-gray-600">This action cannot be undone</p>
                 </div>
               </div>
-              
+
               <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-4">
                 <p className="text-gray-800 text-sm">
-                  Are you sure you want to delete <strong>"{roleToDelete.name}"</strong>? 
+                  Are you sure you want to delete <strong>"{roleToDelete.name}"</strong>?
                   This will affect <strong>{roleToDelete.userCount} users</strong>.
                 </p>
               </div>
-              
+
               <div className="flex space-x-3">
                 <Button
                   variant="outline"

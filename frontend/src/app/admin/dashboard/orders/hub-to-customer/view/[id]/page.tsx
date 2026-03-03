@@ -1,15 +1,16 @@
 import HubToCustomerDetail from "@/components/AdminDashboard/Orders/HubToCustomerDetail";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function HubToCustomerDetailPage({ params }: PageProps) {
+export default async function HubToCustomerDetailPage({ params }: PageProps) {
+  const { id } = await params;
   return (
     <div className="p-6">
-      <HubToCustomerDetail orderId={params.id} />
+      <HubToCustomerDetail orderId={id} />
     </div>
   );
 }

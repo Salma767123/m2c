@@ -1,189 +1,125 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Check, ArrowLeft, ArrowRight } from "lucide-react"
-import GeneralInformation from "./Steps/GeneralInformation"
-import Preparation from "./Steps/Preparation"
-import Packaging from "./Steps/Packaging"
-import Measurements from "./Steps/Measurements"
-import Defects from "./Steps/Defects"
-import Testing from "./Steps/Testing"
-import Documentation from "./Steps/Documentation"
-import Review from "./Steps/Review"
+import FactoryDetails from "./Steps/FactoryDetails"
+import LegalRegistration from "./Steps/LegalRegistration"
+import ProductionInfo from "./Steps/ProductionInfo"
+import BasicInfrastructure from "./Steps/BasicInfrastructure"
+import QualitySafety from "./Steps/QualitySafety"
+import InspectionInfo from "./Steps/InspectionInfo"
+import BasicEvidence from "./Steps/BasicEvidence"
 
+import qcCheckerService from "@/services/qcCheckerService"
 
 interface InspectionFormProps {
   vendorName: string
+  vendorId?: string
   onComplete: () => void
 }
 
-type Step = "general" | "prep" | "packaging" | "measurements" | "defects" | "testing" | "documentation" | "review"
+type Step =
+  | "factoryDetails"
+  | "legalRegistration"
+  | "productionInfo"
+  | "basicInfrastructure"
+  | "qualitySafety"
+  | "inspectionInfo"
+  | "basicEvidence"
 
-export default function InspectionForm({ vendorName, onComplete }: InspectionFormProps) {
-  const [currentStep, setCurrentStep] = useState<Step>("general")
+export default function InspectionForm({ vendorName, vendorId, onComplete }: InspectionFormProps) {
+  const [currentStep, setCurrentStep] = useState<Step>("factoryDetails")
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [inspectionId, setInspectionId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
-    // General Information
-    client: "",
-    vendor: vendorName,
-    factory: "",
-    serviceLocation: "",
-    serviceStartDate: "",
-    serviceType: "Pre-Shipment Inspection",
+    // 1. Factory Details
+    vendorName: vendorName,
+    vendorId: vendorId || "",
+    factoryName: "",
+    factoryAddress: "",
+    contactPersonName: "",
+    contactPhoneNumber: "",
 
-    // Preparation & Order Readiness
-    poNumber: "PO-2024-001",
-    items: [
-      {
-        id: 1,
-        itemName: "Cotton T-Shirt",
-        itemDescription: "100% Cotton Round Neck T-Shirt - Various Colors",
-        poQuantity: 2500,
-        bookedInspectionQuantity: 200,
-        status: "Ready"
-      },
-      {
-        id: 2,
-        itemName: "Denim Jeans",
-        itemDescription: "Blue Denim Straight Fit Jeans - Size 28-42",
-        poQuantity: 2500,
-        bookedInspectionQuantity: 200,
-        status: "Pending"
-      }
-    ],
-    packedQuantity: 5000,
-    cartonCount: 50,
-    warehousePhotoEvidences: [] as string[],
+    // 2. Legal & Registration
+    businessRegistrationNumber: "",
+    gstTaxId: "",
+    factoryLicenseNumber: "",
 
-    // Packaging & Labeling Verification
-    shipperCartonQuality: ["pass"] as string[],
-    innerCartonPackaging: [] as string[],
-    retailPackagingQuality: ["pass"] as string[],
-    productTypeConformity: [] as string[],
-    aqlWorkmanship: [] as string[],
-    onSiteTests: [] as string[],
-    labelingComplete: [] as string[],
-    internalProtection: ["pass"] as string[],
-    shipperCartonRemark: "",
-    innerCartonRemark: "",
-    retailPackagingRemark: "",
-    productTypeRemark: "",
-    aqlWorkmanshipRemark: "",
-    onSiteTestsRemark: "",
-    packagingPhotos: [] as string[],
+    // 3. Production Info
+    productsManufactured: "",
+    monthlyProductionCapacity: "",
+    numberOfProductionWorkers: "",
+    categoryToInspect: "",
 
-    // Physical Measurement & Weight
-    measurements: [
-      {
-        id: 1,
-        sampleName: "S1",
-        cartonLength: 45,
-        cartonWidth: 30,
-        cartonHeight: 25,
-        productLength: 45,
-        productWidth: 30,
-        retailWeight: 0.5,
-        cartonGrossWeight: 25,
-      },
-      {
-        id: 2,
-        sampleName: "S2",
-        cartonLength: 45.1,
-        cartonWidth: 30.1,
-        cartonHeight: 25,
-        productLength: 45.1,
-        productWidth: 30.1,
-        retailWeight: 0.51,
-        cartonGrossWeight: 25.2,
-      },
-    ],
-    measurementPhotos: [] as string[],
+    // 4. Basic Infrastructure Check
+    machineryAvailable: "Yes",
+    electricityAvailable: "Yes",
+    waterAvailable: "Yes",
+    storageAreaAvailable: "Yes",
 
-    // Workmanship & AQL Defects
-    // AQL Configuration
-    inspectionLevel: "L-II",
-    sampleSize: 200,
-    aqlCritical: 0,
-    aqlMajor: 1.0,
-    aqlMinor: 2.5,
-    maxAllowedCritical: 0,
-    maxAllowedMajor: 5,
-    maxAllowedMinor: 10,
-    // Defect Counts
-    criticalDefects: 0,
-    majorDefects: 0,
-    minorDefects: 2,
-    criticalDefectDetails: "" as string,
-    majorDefectDetails: "" as string,
-    minorDefectDetails: "" as string,
-    defectPhotos: [] as string[],
+    // 5. Quality & Safety
+    qualityCheckProcess: "Yes",
+    safetyEquipment: "Yes",
+    cleanWorkingEnvironment: "Yes",
 
-    // On-Site Testing & Quality Checks
-    dropTestResult: "pass",
-    colorFastnessDry: "pass",
-    colorFastnessWet: "pass",
-    seamStrengthResult: "pass",
-    smellCheck: "pass",
-    tests: [
-      {
-        id: "drop",
-        label: "Drop Test",
-        detail: "",
-        pass: true,
-        fail: false,
-        photos: [] as string[],
-        rightPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-        wrongPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-      },
-      {
-        id: "colorFastness",
-        label: "Color Fastness",
-        detail: "",
-        pass: true,
-        fail: false,
-        photos: [] as string[],
-        rightPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-        wrongPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-      },
-      {
-        id: "seamStrength",
-        label: "Seam Strength",
-        detail: "",
-        pass: true,
-        fail: false,
-        photos: [] as string[],
-        rightPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-        wrongPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-      },
-      {
-        id: "smell",
-        label: "Smell Check",
-        detail: "",
-        pass: true,
-        fail: false,
-        photos: [] as string[],
-        rightPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-        wrongPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-      },
-    ],
-    testingPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
+    // 6. Inspection Info
+    inspectionDate: "",
+    inspectorName: "",
+    inspectionStatus: "Approved",
+    inspectorRemarks: "",
 
-    // Final Documentation
-    inspectorSignature: "",
-    documentationPhotos: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-    photocopyDocuments: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
-    companyIdCards: [] as { file?: File; name: string; url: string; id: string | number; uploadedAt: string; uploadedDate: string; uploadedTime: string }[],
+    // 7. Basic Evidence
+    factoryPhotos: [] as any[],
+    documentsUpload: [] as any[]
   })
 
-  // Steps ordered to match PDF report structure exactly
+  // Fetch true inspection data
+  useEffect(() => {
+    async function loadActiveInspection() {
+      try {
+        const response = await qcCheckerService.getInspections()
+        if (response.success && response.inspections) {
+          // Find an active inspection for this vendor
+          const inspection = response.inspections.find(
+            (i: any) =>
+              (vendorId ? i.vendorId === vendorId : i.vendor?.companyName === vendorName) &&
+              (i.status === "IN_PROGRESS" || i.status === "SCHEDULED")
+          )
+
+          if (inspection) {
+            setInspectionId(inspection.id)
+
+            // Extract categories assigned from the backend's itemsToInspect array
+            const assignedCategories = Array.isArray(inspection.itemsToInspect)
+              ? inspection.itemsToInspect.map((i: any) => i.itemName).join(', ')
+              : "";
+
+            setFormData(prev => ({
+              ...prev,
+              factoryName: inspection.factoryName || prev.factoryName,
+              categoryToInspect: assignedCategories || prev.categoryToInspect,
+              // Map any existing attributes here if needed
+            }))
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load active inspection for form", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadActiveInspection()
+  }, [vendorName, vendorId])
+
   const steps: { id: Step; label: string; description: string; pdfSection: string }[] = [
-    { id: "general", label: "General Information", description: "Vendor and service details", pdfSection: "Section A" },
-    { id: "prep", label: "Order Status", description: "PO details and order readiness", pdfSection: "Section B" },
-    { id: "packaging", label: "Packaging & Labeling", description: "Cartons, labels, and protection", pdfSection: "Section C (Items 1-4)" },
-    { id: "measurements", label: "Measurements", description: "Dimensions and weight specs", pdfSection: "Spec Verification" },
-    { id: "defects", label: "AQL Defects", description: "Workmanship and quality analysis", pdfSection: "Section E" },
-    { id: "testing", label: "On-site Tests", description: "Durability and quality checks", pdfSection: "Section C (Item 6)" },
-    { id: "documentation", label: "Documentation", description: "Final sign-off and packing list", pdfSection: "Final Documentation" },
-    { id: "review", label: "Review & Submit", description: "Overall result and final confirmation", pdfSection: "Overall Result" },
+    { id: "factoryDetails", label: "Factory Details", description: "Vendor and factory context", pdfSection: "Section 1" },
+    { id: "legalRegistration", label: "Legal & Reg", description: "Business and tax info", pdfSection: "Section 2" },
+    { id: "productionInfo", label: "Production Info", description: "Capacity and workforce", pdfSection: "Section 3" },
+    { id: "basicInfrastructure", label: "Infrastructure", description: "Facilities availability", pdfSection: "Section 4" },
+    { id: "qualitySafety", label: "Quality & Safety", description: "Processes and environment", pdfSection: "Section 5" },
+    { id: "inspectionInfo", label: "Inspection Info", description: "Status and remarks", pdfSection: "Section 6" },
+    { id: "basicEvidence", label: "Basic Evidence", description: "Photos and documents", pdfSection: "Section 7" },
   ]
 
   const getStepIndex = (step: Step) => steps.findIndex((s) => s.id === step)
@@ -203,96 +139,123 @@ export default function InspectionForm({ vendorName, onComplete }: InspectionFor
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case "general":
-        return <GeneralInformation formData={formData} setFormData={setFormData} />
-      case "prep":
-        return <Preparation formData={formData} setFormData={setFormData} />
-      case "packaging":
-        return <Packaging formData={formData} setFormData={setFormData} />
-      case "measurements":
-        return <Measurements formData={formData} setFormData={setFormData} />
-      case "defects":
-        return <Defects formData={formData} setFormData={setFormData} />
-      case "testing":
-        return <Testing formData={formData} setFormData={setFormData} />
-      case "documentation":
-        return <Documentation formData={formData} setFormData={setFormData} />
-      case "review":
-        return <Review formData={formData} />
+      case "factoryDetails":
+        return <FactoryDetails formData={formData} setFormData={setFormData} />
+      case "legalRegistration":
+        return <LegalRegistration formData={formData} setFormData={setFormData} />
+      case "productionInfo":
+        return <ProductionInfo formData={formData} setFormData={setFormData} />
+      case "basicInfrastructure":
+        return <BasicInfrastructure formData={formData} setFormData={setFormData} />
+      case "qualitySafety":
+        return <QualitySafety formData={formData} setFormData={setFormData} />
+      case "inspectionInfo":
+        return <InspectionInfo formData={formData} setFormData={setFormData} />
+      case "basicEvidence":
+        return <BasicEvidence formData={formData} setFormData={setFormData} />
       default:
         return null
     }
   }
 
+  const handleComplete = async () => {
+    if (!inspectionId) {
+      console.error("No inspection found to complete");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await qcCheckerService.completeInspection(inspectionId, formData);
+      if (res.success) {
+        onComplete();
+      } else {
+        console.error("Failed to complete:", res);
+      }
+    } catch (err) {
+      console.error("Error submitting inspection form:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-xl text-slate-600 font-semibold">Loading assignment details...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen font-sans bg-linear-to-br from-slate-50 to-blue-50/30">
-      <div className="p-8 max-w-420 mx-auto">
+      <div className="p-8 max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
-            <button 
+            <button
               onClick={onComplete}
               className="p-2 hover:bg-white rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-slate-600" />
             </button>
             <div>
-              <h1 className="text-4xl font-bold text-slate-900">Quality Inspection</h1>
+              <h1 className="text-4xl font-bold text-slate-900">Factory Inspection</h1>
               <p className="text-slate-600 text-lg">{vendorName}</p>
             </div>
           </div>
         </div>
 
         {/* Step Indicator */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 mb-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 mb-8 overflow-x-auto">
           {/* Progress Bar */}
-          <div className="relative mb-8">
+          <div className="relative mb-8 min-w-[700px]">
             <div className="flex items-center justify-between">
               {steps.map((step, index) => (
                 <div key={step.id} className="flex flex-col items-center relative z-10 flex-1">
                   {/* Step Circle */}
                   <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 cursor-pointer text-sm border-2 ${
-                      index < currentStepIndex
-                        ? "bg-linear-to-r from-blue-600 to-blue-700 text-white border-blue-600 shadow-lg"
-                        : index === currentStepIndex
+                    className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 cursor-pointer text-sm border-2 ${index < currentStepIndex
+                      ? "bg-linear-to-r from-blue-600 to-blue-700 text-white border-blue-600 shadow-lg"
+                      : index === currentStepIndex
                         ? "bg-linear-to-r from-blue-600 to-blue-700 text-white border-blue-600 shadow-lg ring-4 ring-blue-100"
                         : "bg-white border-slate-300 text-slate-500 hover:border-slate-400"
-                    }`}
+                      }`}
                     onClick={() => setCurrentStep(step.id)}
                   >
                     {index < currentStepIndex ? <Check className="w-5 h-5" /> : index + 1}
                   </div>
-                  
+
                   {/* Step Label */}
                   <div className="mt-3 text-center max-w-24">
-                    <p className={`text-xs font-medium leading-tight ${
-                      index <= currentStepIndex ? "text-slate-900" : "text-slate-500"
-                    }`}>
+                    <p
+                      className={`text-xs font-medium leading-tight ${index <= currentStepIndex ? "text-slate-900" : "text-slate-500"
+                        }`}
+                    >
                       {step.label}
                     </p>
                   </div>
                 </div>
               ))}
             </div>
-            
+
             {/* Progress Line */}
             <div className="absolute top-6 left-6 right-6 h-0.5 bg-slate-200 z-0">
-              <div 
+              <div
                 className="h-full bg-linear-to-r from-blue-600 to-blue-700 transition-all duration-500 ease-out"
-                style={{ 
-                  width: `${(currentStepIndex / (steps.length - 1)) * 100}%` 
+                style={{
+                  width: `${(currentStepIndex / (steps.length - 1)) * 100}%`
                 }}
               />
             </div>
           </div>
-          
+
           {/* Current Step Info */}
           <div className="text-center bg-slate-50 rounded-xl p-6">
             <div className="flex items-center justify-center gap-2 mb-2">
               <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
               <p className="text-slate-600 text-sm font-medium">
-                Step {currentStepIndex + 1} of {steps.length} • {steps[currentStepIndex].pdfSection}
+                Step {currentStepIndex + 1} of {steps.length}
               </p>
               <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
             </div>
@@ -315,27 +278,27 @@ export default function InspectionForm({ vendorName, onComplete }: InspectionFor
           <button
             onClick={goToPrevStep}
             disabled={currentStepIndex === 0}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 ${
-              currentStepIndex === 0 
-                ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
-                : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 ${currentStepIndex === 0
+              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+              : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+              }`}
           >
             <ArrowLeft className="w-4 h-4" />
             Previous
           </button>
 
-          {currentStep === "review" ? (
-            <button 
-              onClick={onComplete} 
-              className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-emerald-600 to-emerald-700 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-200 shadow-md hover:shadow-lg"
+          {currentStepIndex === steps.length - 1 ? (
+            <button
+              onClick={handleComplete}
+              disabled={submitting}
+              className={`flex items-center gap-2 px-6 py-3 bg-linear-to-r from-emerald-600 to-emerald-700 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-200 shadow-md hover:shadow-lg ${submitting ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
               <Check className="w-5 h-5" />
-              Seal & Generate Report
+              {submitting ? "Submitting..." : "Complete Factory Inspection"}
             </button>
           ) : (
-            <button 
-              onClick={goToNextStep} 
+            <button
+              onClick={goToNextStep}
               className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
             >
               Next

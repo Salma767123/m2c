@@ -8,57 +8,37 @@ import Dropdown from "../../UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 
-interface TicketMessage {
-  id: string;
-  sender: "vendor" | "admin";
-  senderName: string;
-  message: string;
-  timestamp: string;
-}
+import supportService, { SupportTicket, TicketMessage } from "@/services/supportService";
+import { useEffect } from "react";
 
 export default function TicketDetail({ ticketId }: { ticketId: string }) {
   const [replyMessage, setReplyMessage] = useState("");
   const [ticketStatus, setTicketStatus] = useState("in-progress");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Mock data - replace with actual API call
-  const ticket = {
-    id: ticketId,
-    ticketId: "TKT-2024-001",
-    vendorName: "Textile Co.",
-    vendorEmail: "vendor@textile.com",
-    subject: "Payment not received for order #12345",
-    description: "I completed an order but haven't received payment yet. The order was delivered 5 days ago.",
-    status: "in-progress",
-    priority: "high",
-    category: "Payment",
-    createdAt: "2024-02-08T10:30:00",
-    updatedAt: "2024-02-08T14:20:00",
-  };
+  const [ticket, setTicket] = useState<SupportTicket | null>(null);
+  const [messages, setMessages] = useState<TicketMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const messages: TicketMessage[] = [
-    {
-      id: "1",
-      sender: "vendor",
-      senderName: "Textile Co.",
-      message: "I completed an order but haven't received payment yet. The order was delivered 5 days ago.",
-      timestamp: "2024-02-08T10:30:00",
-    },
-    {
-      id: "2",
-      sender: "admin",
-      senderName: "Admin Support",
-      message: "Thank you for reaching out. We're looking into your payment issue. Can you please provide the order number?",
-      timestamp: "2024-02-08T11:15:00",
-    },
-    {
-      id: "3",
-      sender: "vendor",
-      senderName: "Textile Co.",
-      message: "The order number is #12345. It was delivered on February 3rd, 2024.",
-      timestamp: "2024-02-08T14:20:00",
-    },
-  ];
+  useEffect(() => {
+    fetchTicket();
+  }, [ticketId]);
+
+  const fetchTicket = async () => {
+    try {
+      setIsLoading(true);
+      const res = await supportService.getTicketById(ticketId);
+      if (res.success && res.data) {
+        setTicket(res.data);
+        setMessages(res.data.messages || []);
+        setTicketStatus(res.data.status || "open");
+      }
+    } catch (error) {
+      showErrorToast("Error", "Failed to load ticket details");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmitReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,13 +46,14 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
 
     setIsSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      showSuccessToast("Reply Sent", "Your response has been sent to the vendor.");
-      setReplyMessage("");
-    } catch (error) {
-      showErrorToast("Failed", "Failed to send reply. Please try again.");
+      const res = await supportService.replyToTicket(ticketId, { message: replyMessage });
+      if (res.success) {
+        showSuccessToast("Reply Sent", "Your response has been sent.");
+        setReplyMessage("");
+        fetchTicket(); // Refresh to get the new message
+      }
+    } catch (error: any) {
+      showErrorToast("Failed", error.message || "Failed to send reply. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -80,14 +61,32 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
 
   const handleStatusChange = async (newStatus: string | string[]) => {
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setTicketStatus(newStatus as string);
-      showSuccessToast("Status Updated", `Ticket status changed to ${newStatus}`);
-    } catch (error) {
-      showErrorToast("Failed", "Failed to update status.");
+      const res = await supportService.updateTicketStatus(ticketId, newStatus as string);
+      if (res.success) {
+        setTicketStatus(newStatus as string);
+        showSuccessToast("Status Updated", `Ticket status changed to ${newStatus}`);
+        fetchTicket(); // Refresh
+      }
+    } catch (error: any) {
+      showErrorToast("Failed", error.message || "Failed to update status.");
     }
   };
+
+  const handleQuickAction = (action: string) => {
+    if (action === "resolved") {
+      handleStatusChange("resolved");
+    } else if (action === "request_info") {
+      setReplyMessage("Could you please provide more information regarding this issue so we can better assist you?");
+    }
+  };
+
+  if (isLoading) {
+    return <div className="p-6 text-center text-gray-500">Loading ticket details...</div>;
+  }
+
+  if (!ticket) {
+    return <div className="p-6 text-center text-red-500">Ticket not found.</div>;
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -177,14 +176,14 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.sender === "admin" ? "justify-end" : "justify-start"}`}
+                    className={`flex ${message.senderType === "admin" || message.senderType === "super_admin" ? "justify-end" : "justify-start"
+                      }`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-lg p-4 ${
-                        message.sender === "admin"
+                      className={`max-w-[80%] rounded-lg p-4 ${message.senderType === "admin" || message.senderType === "super_admin"
                           ? "bg-blue-600 text-white"
                           : "bg-gray-100 text-gray-900"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <User className="w-4 h-4" />
@@ -192,11 +191,10 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
                       </div>
                       <p className="text-sm">{message.message}</p>
                       <p
-                        className={`text-xs mt-2 ${
-                          message.sender === "admin" ? "text-blue-100" : "text-gray-500"
-                        }`}
+                        className={`text-xs mt-2 ${message.senderType === "admin" || message.senderType === "super_admin" ? "text-blue-100" : "text-gray-500"
+                          }`}
                       >
-                        {new Date(message.timestamp).toLocaleString()}
+                        {new Date(message.createdAt).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -242,11 +240,11 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
               <div className="space-y-3">
                 <div>
                   <span className="text-sm text-gray-600">Name:</span>
-                  <p className="font-medium text-gray-900">{ticket.vendorName}</p>
+                  <p className="font-medium text-gray-900">{ticket.creatorName}</p>
                 </div>
                 <div>
                   <span className="text-sm text-gray-600">Email:</span>
-                  <p className="font-medium text-gray-900">{ticket.vendorEmail}</p>
+                  <p className="font-medium text-gray-900">{ticket.creatorEmail}</p>
                 </div>
               </div>
             </CardContent>
@@ -275,11 +273,17 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
             <CardContent className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
               <div className="space-y-2">
-                <button className="w-full flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                <button
+                  onClick={() => handleQuickAction("resolved")}
+                  className="w-full flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
                   <CheckCircle className="w-4 h-4" />
                   Mark as Resolved
                 </button>
-                <button className="w-full flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                <button
+                  onClick={() => handleQuickAction("request_info")}
+                  className="w-full flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
                   <Clock className="w-4 h-4" />
                   Request More Info
                 </button>

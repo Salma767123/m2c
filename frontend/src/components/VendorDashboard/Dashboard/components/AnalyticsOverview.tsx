@@ -21,21 +21,14 @@ interface AnalyticsData {
 
 interface AnalyticsOverviewProps {
   analytics: AnalyticsData;
+  earningsData: { name: string; total: number }[];
 }
 
-const revenueData = [
-  { month: 'Jan', revenue: 8500, orders: 98 },
-  { month: 'Feb', revenue: 9200, orders: 112 },
-  { month: 'Mar', revenue: 10100, orders: 128 },
-  { month: 'Apr', revenue: 11300, orders: 145 },
-  { month: 'May', revenue: 12450, orders: 156 },
-];
-
-export default function AnalyticsOverview({ analytics }: AnalyticsOverviewProps) {
+export default function AnalyticsOverview({ analytics, earningsData }: AnalyticsOverviewProps) {
   return (
     <div>
       <h2 className="text-xl sm:text-2xl font-bold text-[#222222] mb-4 sm:mb-6">Analytics Overview</h2>
-      
+
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Revenue Trend Chart */}
@@ -48,27 +41,27 @@ export default function AnalyticsOverview({ analytics }: AnalyticsOverviewProps)
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={revenueData}>
+              <AreaChart data={earningsData}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="month" 
+                <XAxis
+                  dataKey="name"
                   stroke="#6b7280"
                   style={{ fontSize: '12px' }}
                 />
-                <YAxis 
+                <YAxis
                   stroke="#6b7280"
                   style={{ fontSize: '12px' }}
                   tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
                     border: '1px solid #e5e7eb',
                     borderRadius: '8px',
                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
@@ -78,13 +71,13 @@ export default function AnalyticsOverview({ analytics }: AnalyticsOverviewProps)
                     return [`₹${value.toLocaleString()}`, 'Revenue'];
                   }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke="#10b981" 
+                <Area
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#10b981"
                   strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorRevenue)" 
+                  fillOpacity={1}
+                  fill="url(#colorRevenue)"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -101,20 +94,20 @@ export default function AnalyticsOverview({ analytics }: AnalyticsOverviewProps)
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={revenueData}>
+              <BarChart data={earningsData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="month" 
+                <XAxis
+                  dataKey="name"
                   stroke="#6b7280"
                   style={{ fontSize: '12px' }}
                 />
-                <YAxis 
+                <YAxis
                   stroke="#6b7280"
                   style={{ fontSize: '12px' }}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
                     border: '1px solid #e5e7eb',
                     borderRadius: '8px',
                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
@@ -124,9 +117,9 @@ export default function AnalyticsOverview({ analytics }: AnalyticsOverviewProps)
                     return [`${value} orders`, 'Total'];
                   }}
                 />
-                <Bar 
-                  dataKey="orders" 
-                  fill="#3b82f6" 
+                <Bar
+                  dataKey="total"
+                  fill="#3b82f6"
                   radius={[8, 8, 0, 0]}
                 />
               </BarChart>

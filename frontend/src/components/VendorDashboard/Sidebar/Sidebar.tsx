@@ -41,7 +41,7 @@ const navigation: NavigationItem[] = [
     icon: Warehouse,
     href: "/vendor/dashboard/inventory",
   },
-   {
+  {
     title: "Products",
     icon: Package,
     href: "/vendor/dashboard/products",
@@ -54,10 +54,7 @@ const navigation: NavigationItem[] = [
   {
     title: "Earnings",
     icon: DollarSign,
-    subItems: [
-      { title: "Overview", href: "/vendor/dashboard/earnings" },
-      { title: "Payouts", href: "/vendor/dashboard/earnings/payouts" },
-    ],
+    href: "/vendor/dashboard/earnings/payouts",
   },
   {
     title: "Reports",
@@ -96,25 +93,21 @@ export default function VendorSidebar() {
     if (href === "/vendor/dashboard") {
       return pathname === href;
     }
-    
-    // For earnings routes
-    if (href === "/vendor/dashboard/earnings") {
-      return pathname === "/vendor/dashboard/earnings" || pathname.startsWith("/vendor/dashboard/earnings?") || pathname.startsWith("/vendor/dashboard/earnings#");
-    }
-    
+
+    // For earnings routes (now a direct link, but keep helper logic clean if needed)
     if (href === "/vendor/dashboard/earnings/payouts") {
       return pathname === "/vendor/dashboard/earnings/payouts" || pathname.startsWith("/vendor/dashboard/earnings/payouts/") || pathname.startsWith("/vendor/dashboard/earnings/payouts?") || pathname.startsWith("/vendor/dashboard/earnings/payouts#");
     }
-    
+
     // For settings routes
     if (href === "/vendor/dashboard/settings") {
       return pathname === "/vendor/dashboard/settings" || pathname.startsWith("/vendor/dashboard/settings?") || pathname.startsWith("/vendor/dashboard/settings#");
     }
-    
+
     if (href === "/vendor/dashboard/settings/bank") {
       return pathname === "/vendor/dashboard/settings/bank" || pathname.startsWith("/vendor/dashboard/settings/bank/") || pathname.startsWith("/vendor/dashboard/settings/bank?") || pathname.startsWith("/vendor/dashboard/settings/bank#");
     }
-    
+
     // Default exact match for any other routes
     return pathname === href;
   };
@@ -130,7 +123,7 @@ export default function VendorSidebar() {
   // Auto-expand parent menu if child is active
   useEffect(() => {
     const activeParents: string[] = [];
-    
+
     navigation.forEach((item) => {
       if (item.subItems && hasAnyActiveChild(item.subItems)) {
         activeParents.push(item.title);
@@ -178,7 +171,7 @@ export default function VendorSidebar() {
           // If item has href, render as single link
           if (item.href) {
             const itemIsActive = isMainItemActive(item.href);
-            
+
             return (
               <Link
                 key={item.title}
@@ -203,7 +196,7 @@ export default function VendorSidebar() {
 
           // If item has subItems, render as expandable section
           const parentHasActiveChild = item.subItems ? hasAnyActiveChild(item.subItems) : false;
-          
+
           return (
             <div key={item.title} className="space-y-1">
               {/* Main Menu Item */}
@@ -218,13 +211,13 @@ export default function VendorSidebar() {
                 )}
               >
                 <div className="flex items-center">
-                  <Icon 
+                  <Icon
                     className={cn(
                       "mr-3 h-5 w-5 transition-colors",
-                      parentHasActiveChild 
-                        ? "text-gray-900" 
+                      parentHasActiveChild
+                        ? "text-gray-900"
                         : "text-gray-500 group-hover:text-gray-700"
-                    )} 
+                    )}
                   />
                   <span className="font-medium">{item.title}</span>
                 </div>
@@ -251,7 +244,7 @@ export default function VendorSidebar() {
                 <div className="ml-6 space-y-1 border-l-2 border-gray-100 pl-4 py-1">
                   {item.subItems.map((subItem) => {
                     const subItemIsActive = isSubItemActive(subItem.href);
-                    
+
                     return (
                       <Link
                         key={subItem.href}

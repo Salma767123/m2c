@@ -1,5 +1,5 @@
 const express = require('express');
-const { 
+const {
   registerVendor,
   getVendorProfile,
   updateVendorProfile,
@@ -10,7 +10,9 @@ const {
   rejectVendor,
   suspendVendor,
   vendorLogin,
-  testVendorEmail
+  testVendorEmail,
+  assignQc,
+  verifyVendorBankDetails
 } = require('../controllers/vendorController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { vendorUploadFields, handleUploadError } = require('../middleware/upload');
@@ -32,6 +34,8 @@ router.put('/:vendorId', authenticateToken, requireRole('admin'), vendorUploadFi
 router.put('/:vendorId/approve', authenticateToken, requireRole('admin'), approveVendor);
 router.put('/:vendorId/reject', authenticateToken, requireRole('admin'), rejectVendor);
 router.put('/:vendorId/suspend', authenticateToken, requireRole('admin'), suspendVendor);
+router.put('/:vendorId/verify-bank', authenticateToken, requireRole('admin'), verifyVendorBankDetails);
+router.post('/assign-qc', authenticateToken, requireRole('admin'), assignQc);
 
 // Test email endpoint (development only)
 router.get('/test-email', testVendorEmail);

@@ -130,18 +130,18 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
   // Get the primary image or first image
   let primaryImage: string | undefined;
-  
+
   // Check if images is an array and has items
   if (product.images && Array.isArray(product.images) && product.images.length > 0) {
     const firstImage = product.images[0];
-    
+
     // Check if it's an object with url property (ServiceProduct)
     if (typeof firstImage === 'object' && firstImage !== null && 'url' in firstImage) {
       const images = product.images as Array<{ url: string; isPrimary: boolean }>;
       const primaryImg = images.find(img => img.isPrimary && img.url && img.url.trim() !== '');
       const firstImg = images.find(img => img.url && img.url.trim() !== '');
       primaryImage = primaryImg?.url || firstImg?.url;
-    } 
+    }
     // Check if it's a string (MockProduct)
     else if (typeof firstImage === 'string') {
       const images = product.images as string[];
@@ -151,17 +151,17 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
   // Fallback placeholder image
   const placeholderImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect width="400" height="400" fill="%23f3f4f6"/%3E%3Cpath d="M200 150 L250 200 L200 250 L150 200 Z" fill="%239ca3af"/%3E%3Ccircle cx="200" cy="200" r="60" fill="none" stroke="%239ca3af" stroke-width="4"/%3E%3C/svg%3E';
-  
+
   const imageUrl = primaryImage || placeholderImage;
 
   // Get price - use adminFixedPrice if available, otherwise basePrice or price
   let displayPrice: number | undefined;
-  
+
   if (isServiceProduct(product)) {
     // For API products, prioritize adminFixedPrice, then basePrice
     // Use nullish coalescing to handle 0 values correctly
-    displayPrice = product.adminFixedPrice !== null && product.adminFixedPrice !== undefined 
-      ? product.adminFixedPrice 
+    displayPrice = product.adminFixedPrice !== null && product.adminFixedPrice !== undefined
+      ? product.adminFixedPrice
       : product.basePrice;
   } else {
     // For mock products, use price property
@@ -189,49 +189,47 @@ const ProductCard = ({ product }: ProductCardProps) => {
               {product.discount}% OFF
             </div>
           )}
-          
+
           {/* Wishlist Button */}
           <button
             onClick={handleToggleWishlist}
             disabled={isTogglingWishlist}
-            className={`absolute top-2 ${product.inStock ? 'right-2' : 'right-28'} p-2 rounded-full transition-all duration-200 ${
-              isInWishlist 
-                ? 'bg-red-500 text-white hover:bg-red-600' 
+            className={`absolute top-2 ${product.inStock ? 'right-2' : 'right-28'} p-2 rounded-full transition-all duration-200 ${isInWishlist
+                ? 'bg-red-500 text-white hover:bg-red-600'
                 : 'bg-white/90 text-gray-700 hover:bg-white hover:text-red-500'
-            } disabled:opacity-50 disabled:cursor-not-allowed shadow-md z-10`}
+              } disabled:opacity-50 disabled:cursor-not-allowed shadow-md z-10`}
             title={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
           >
-            <Heart 
-              className={`w-4 h-4 sm:w-5 sm:h-5 ${isInWishlist ? 'fill-current' : ''}`} 
+            <Heart
+              className={`w-4 h-4 sm:w-5 sm:h-5 ${isInWishlist ? 'fill-current' : ''}`}
             />
           </button>
-          
+
           {!product.inStock && (
             <div className="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded text-sm z-0">
               Out of Stock
             </div>
           )}
         </div>
-        
+
         <div className="p-4 flex flex-col grow justify-between">
           {/* Top content - flexible */}
           <div className="grow">
             <div className="mb-1">
               <span className="text-xs sm:text-sm text-gray-600 font-medium">{product.category}</span>
             </div>
-            
+
             <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2 line-clamp-2 min-h-10 sm:min-h-12">
               {product.name}
             </h3>
-            
+
             <div className="flex items-center mb-2">
               <div className="flex items-center">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
-                    className={`w-2 sm:w-4 h-2 sm:h-4 ${
-                      i < Math.floor(product.rating || 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                    }`}
+                    className={`w-2 sm:w-4 h-2 sm:h-4 ${i < Math.floor(product.rating || 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                      }`}
                   />
                 ))}
                 <span className="ml-2 text-xs sm:text-sm text-gray-600">
@@ -240,7 +238,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
               </div>
             </div>
           </div>
-          
+
           {/* Bottom content - fixed at bottom */}
           <div className="shrink-0">
             <div className="flex items-center justify-between mb-3">
@@ -260,7 +258,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
                 </span>
               )}
             </div>
-            
+
             {/* Quantity Selector */}
             {product.inStock && (
               <div className="flex items-center gap-2 mb-2">
@@ -280,16 +278,15 @@ const ProductCard = ({ product }: ProductCardProps) => {
                 </button>
               </div>
             )}
-            
+
             {/* Add to Cart Button */}
             <button
               onClick={handleAddToCart}
               disabled={!product.inStock || isAddingToCart}
-              className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
-                product.inStock
+              className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${product.inStock
                   ? 'bg-gray-800 text-white hover:bg-gray-900 active:scale-95'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <ShoppingCart className="w-4 h-4" />
               {isAddingToCart ? 'Adding...' : product.inStock ? 'Add to Cart' : 'Out of Stock'}

@@ -1,50 +1,50 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Users, Store, ShoppingCart, DollarSign, TrendingUp } from 'lucide-react'
 
-const stats = [
-  {
-    title: 'Total Earnings',
-    value: '$45,231.89',
-    change: '+20.1% from last month',
-    icon: DollarSign,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-  },
-  {
-    title: 'Total Vendors',
-    value: '2,350',
-    change: '+180 new vendors',
-    icon: Store,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-  },
-  {
-    title: 'Total Customers',
-    value: '8,945',
-    change: '+12% from last month',
-    icon: Users,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-  },
-  {
-    title: 'Total Orders',
-    value: '12,234',
-    change: '+19% from last month',
-    icon: ShoppingCart,
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-50',
-  },
-  {
-    title: 'Total Income',
-    value: '$52,450',
-    change: '+15.3% from last month',
-    icon: TrendingUp,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
-  },
-]
+export default function DashboardStats({ summaryData }: { summaryData: any }) {
+  const stats = [
+    {
+      title: 'Total Earnings',
+      value: `$${summaryData.totalEarnings.toLocaleString()}`,
+      change: 'Lifetime earnings',
+      icon: DollarSign,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+    },
+    {
+      title: 'Total Vendors',
+      value: summaryData.totalVendors.toLocaleString(),
+      change: 'Total registered',
+      icon: Store,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+    },
+    {
+      title: 'Total Customers',
+      value: summaryData.totalCustomers.toLocaleString(),
+      change: 'Total registered',
+      icon: Users,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+    },
+    {
+      title: 'Total Orders',
+      value: summaryData.totalOrders.toLocaleString(),
+      change: 'Total orders placed',
+      icon: ShoppingCart,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+    },
+    {
+      title: 'Total Income',
+      value: `$${summaryData.totalIncome.toLocaleString()}`,
+      change: 'Lifetime income',
+      icon: TrendingUp,
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-50',
+    },
+  ]
 
-export default function DashboardStats() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       {stats.map((stat) => {

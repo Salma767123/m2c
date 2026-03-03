@@ -1,17 +1,16 @@
 "use client"
 
-import { Camera, Plus, Trash2, ChevronDown, Upload, X } from "lucide-react"
+import { Camera, ChevronDown, Upload, X } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 
 interface PreparationProps {
   formData: {
-    poNumber: string
     items: Array<{
       id: number
       itemName: string
       itemDescription: string
-      poQuantity: number
-      bookedInspectionQuantity: number
+      totalQuantity: number
+      inspectionQuantity: number
       status: string
     }>
     packedQuantity: number
@@ -30,9 +29,9 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
     const files = e.target.files
     if (files) {
       const fileNames = Array.from(files).map(f => f.name)
-      setFormData({ 
-        ...formData, 
-        warehousePhotoEvidences: [...(formData.warehousePhotoEvidences || []), ...fileNames] 
+      setFormData({
+        ...formData,
+        warehousePhotoEvidences: [...(formData.warehousePhotoEvidences || []), ...fileNames]
       })
     }
   }
@@ -66,27 +65,7 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
       document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [openDropdowns])
-  const addItem = () => {
-    const newItem = {
-      id: Date.now(),
-      itemName: "",
-      itemDescription: "",
-      poQuantity: 0,
-      bookedInspectionQuantity: 0,
-      status: "Pending"
-    }
-    setFormData({
-      ...formData,
-      items: [...formData.items, newItem]
-    })
-  }
 
-  const removeItem = (id: number) => {
-    setFormData({
-      ...formData,
-      items: formData.items.filter(item => item.id !== id)
-    })
-  }
 
   const updateItem = (id: number, field: string, value: string | number) => {
     setFormData({
@@ -110,62 +89,21 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
   return (
     <div className="space-y-8">
       <div className="border-b border-slate-200 pb-6">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">B. Order Status</h2>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">B. Item Quantities & Readiness</h2>
         <p className="text-slate-600">
-          Purchase order information and order items status
+          Review the assigned items to inspect
         </p>
-      </div>
-
-      {/* PO Information */}
-      <div className="bg-slate-50/50 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Purchase Order Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label className="block text-slate-700 font-semibold mb-3 text-sm">PO Number:</label>
-            <input
-              type="text"
-              value={formData.poNumber}
-              onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
-              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-            />
-          </div>
-          <div>
-            <label className="block text-slate-700 font-semibold mb-3 text-sm">Total Packed Quantity:</label>
-            <input
-              type="number"
-              value={formData.packedQuantity}
-              onChange={(e) => setFormData({ ...formData, packedQuantity: Number.parseInt(e.target.value) })}
-              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-            />
-          </div>
-          <div>
-            <label className="block text-slate-700 font-semibold mb-3 text-sm">Carton Count (100% packing):</label>
-            <input
-              type="number"
-              value={formData.cartonCount}
-              onChange={(e) => setFormData({ ...formData, cartonCount: Number.parseInt(e.target.value) })}
-              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-            />
-          </div>
-        </div>
       </div>
 
       {/* Items Section */}
       <div>
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-slate-900">Order Items</h3>
-          <button
-            onClick={addItem}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Item
-          </button>
         </div>
 
         {formData.items.length === 0 ? (
           <div className="text-center py-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-300">
-            <p className="text-slate-600">No items added yet. Click "Add Item" to get started.</p>
+            <p className="text-slate-600">No items assigned yet.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -173,57 +111,51 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
               <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="font-semibold text-slate-900">Item #{index + 1}</h4>
-                  <button
-                    onClick={() => removeItem(item.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-slate-700 font-medium mb-2 text-sm">Item Name:</label>
                     <input
                       type="text"
                       value={item.itemName}
-                      onChange={(e) => updateItem(item.id, 'itemName', e.target.value)}
+                      readOnly
                       placeholder="Enter item name"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
                     />
                   </div>
-                  
+
                   <div className="md:col-span-2">
                     <label className="block text-slate-700 font-medium mb-2 text-sm">Item Description:</label>
                     <input
                       type="text"
                       value={item.itemDescription}
-                      onChange={(e) => updateItem(item.id, 'itemDescription', e.target.value)}
+                      readOnly
                       placeholder="Enter item description"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
                     />
                   </div>
-                  
+
                   <div>
-                    <label className="block text-slate-700 font-medium mb-2 text-sm">PO Quantity:</label>
+                    <label className="block text-slate-700 font-medium mb-2 text-sm">Total Quantity:</label>
                     <input
                       type="number"
-                      value={item.poQuantity}
-                      onChange={(e) => updateItem(item.id, 'poQuantity', Number.parseInt(e.target.value) || 0)}
+                      value={item.totalQuantity}
+                      onChange={(e) => updateItem(item.id, "totalQuantity", Number(e.target.value))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     />
                   </div>
-                  
+
                   <div>
-                    <label className="block text-slate-700 font-medium mb-2 text-sm">Booked Inspection Quantity:</label>
+                    <label className="block text-slate-700 font-medium mb-2 text-sm">Inspection Quantity:</label>
                     <input
                       type="number"
-                      value={item.bookedInspectionQuantity}
-                      onChange={(e) => updateItem(item.id, 'bookedInspectionQuantity', Number.parseInt(e.target.value) || 0)}
+                      value={item.inspectionQuantity}
+                      onChange={(e) => updateItem(item.id, "inspectionQuantity", Number(e.target.value))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-slate-700 font-medium mb-2 text-sm">Status:</label>
                     <div
@@ -243,9 +175,8 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
                       >
                         <span className="text-slate-900">{item.status}</span>
                         <ChevronDown
-                          className={`w-4 h-4 text-slate-600 transition-transform duration-200 ${
-                            openDropdowns[item.id] ? "transform rotate-180" : ""
-                          }`}
+                          className={`w-4 h-4 text-slate-600 transition-transform duration-200 ${openDropdowns[item.id] ? "transform rotate-180" : ""
+                            }`}
                         />
                       </button>
                       {openDropdowns[item.id] && (
@@ -258,11 +189,10 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
                                   updateItem(item.id, "status", status)
                                   setOpenDropdowns({ ...openDropdowns, [item.id]: false })
                                 }}
-                                className={`block w-full px-4 py-2 text-sm text-left transition-colors duration-150 ${
-                                  item.status === status
-                                    ? "bg-blue-50 text-blue-600 font-medium border-l-2 border-blue-600"
-                                    : "text-slate-700 hover:bg-slate-50"
-                                }`}
+                                className={`block w-full px-4 py-2 text-sm text-left transition-colors duration-150 ${item.status === status
+                                  ? "bg-blue-50 text-blue-600 font-medium border-l-2 border-blue-600"
+                                  : "text-slate-700 hover:bg-slate-50"
+                                  }`}
                               >
                                 {status}
                               </button>
@@ -273,7 +203,7 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="mt-4 flex justify-end">
                   <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(item.status)}`}>
                     {item.status}

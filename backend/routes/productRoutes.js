@@ -14,6 +14,7 @@ const {
   deleteProductByAdmin,
   approveProduct,
   rejectProduct,
+  assignQCCheckerToProduct,
   getAllProductsForAdmin,
   updateVariantStocks,
   // Public functions
@@ -36,6 +37,7 @@ router.put('/admin/:id', authenticateToken, requireAdminRole, updateProductByAdm
 router.delete('/admin/:id', authenticateToken, requireAdminRole, deleteProductByAdmin);
 router.put('/:id/approve', authenticateToken, requireAdminRole, approveProduct);
 router.put('/:id/reject', authenticateToken, requireAdminRole, rejectProduct);
+router.post('/admin/:id/assign-qc', authenticateToken, requireAdminRole, assignQCCheckerToProduct);
 router.put('/admin/:id/variants/stock', authenticateToken, requireAdminRole, updateVariantStocks);
 
 // Vendor routes (require vendor authentication)

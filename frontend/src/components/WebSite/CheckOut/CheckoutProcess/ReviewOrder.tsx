@@ -27,23 +27,16 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
       <div className="bg-slate-50 rounded-xl p-6">
         <h3 className="font-semibold text-slate-900 mb-4">Payment Method</h3>
         <div className="text-sm text-slate-600">
-          {formData.paymentMethod === "card" && (
+          {formData.paymentMethod === "razorpay" && (
             <>
-              <p className="font-medium">Credit/Debit Card</p>
-              <p>**** **** **** {formData.cardNumber.slice(-4) || "xxxx"}</p>
-              <p>{formData.cardName}</p>
+              <p className="font-medium">Razorpay</p>
+              <p>Pay securely via Razorpay</p>
             </>
           )}
-          {formData.paymentMethod === "upi" && (
+          {formData.paymentMethod === "payu" && (
             <>
-              <p className="font-medium">UPI</p>
-              <p>{formData.upiId || "No ID provided"}</p>
-            </>
-          )}
-          {formData.paymentMethod === "COD" && (
-            <>
-              <p className="font-medium">Cash on Delivery</p>
-              <p>Pay upon receipt</p>
+              <p className="font-medium">PayU</p>
+              <p>Pay securely via PayU</p>
             </>
           )}
         </div>

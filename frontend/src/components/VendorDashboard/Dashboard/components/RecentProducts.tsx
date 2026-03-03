@@ -14,60 +14,7 @@ interface Product {
   addedDate: string;
   status: 'pending' | 'approved' | 'rejected';
 }
-
-const recentProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Premium Cotton Kitchen Towel Set',
-    sku: 'SKU-001',
-    category: 'Kitchen Towels',
-    price: 599,
-    stock: 50,
-    addedDate: '2024-02-14',
-    status: 'approved',
-  },
-  {
-    id: '2',
-    name: 'Handwoven Bath Towel Collection',
-    sku: 'SKU-002',
-    category: 'Bath Towels',
-    price: 899,
-    stock: 30,
-    addedDate: '2024-02-13',
-    status: 'pending',
-  },
-  {
-    id: '3',
-    name: 'Organic Tea Towel Set',
-    sku: 'SKU-003',
-    category: 'Kitchen Towels',
-    price: 449,
-    stock: 75,
-    addedDate: '2024-02-12',
-    status: 'approved',
-  },
-  {
-    id: '4',
-    name: 'Heritage Table Runner',
-    sku: 'SKU-004',
-    category: 'Table Linen',
-    price: 799,
-    stock: 25,
-    addedDate: '2024-02-11',
-    status: 'approved',
-  },
-  {
-    id: '5',
-    name: 'Artisan Linen Apron',
-    sku: 'SKU-005',
-    category: 'Kitchen Accessories',
-    price: 349,
-    stock: 40,
-    addedDate: '2024-02-10',
-    status: 'pending',
-  },
-];
-
+// mock removed
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'approved':
@@ -81,7 +28,7 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-export default function RecentProducts() {
+export default function RecentProducts({ products }: { products: any[] }) {
   return (
     <Card className="border border-gray-200 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -89,8 +36,8 @@ export default function RecentProducts() {
           <Package className="w-5 h-5 text-purple-600" />
           Recently Added Products
         </CardTitle>
-        <Link 
-          href="/vendor/dashboard/products" 
+        <Link
+          href="/vendor/dashboard/products"
           className="text-sm text-gray-600 hover:text-gray-900 font-medium"
         >
           View All
@@ -98,7 +45,7 @@ export default function RecentProducts() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {recentProducts.map((product) => (
+          {products && products.map((product) => (
             <div
               key={product.id}
               className="flex items-start justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -107,7 +54,7 @@ export default function RecentProducts() {
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <h4 className="font-semibold text-gray-900 mb-1">{product.name}</h4>
-                    <p className="text-sm text-gray-600">{product.sku} • {product.category}</p>
+                    <p className="text-sm text-gray-600">{product.category}</p>
                   </div>
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(product.status)}`}
@@ -120,7 +67,7 @@ export default function RecentProducts() {
                   <span>Stock: {product.stock}</span>
                   <span className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    {new Date(product.addedDate).toLocaleDateString('en-IN')}
+                    {new Date(product.createdAt).toLocaleDateString('en-IN')}
                   </span>
                 </div>
               </div>

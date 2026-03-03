@@ -71,7 +71,7 @@ const navigation: NavigationItem[] = [
   {
     title: "QC Checker",
     icon: ClipboardCheck,
-   href: "/admin/dashboard/qc-checker"
+    href: "/admin/dashboard/qc-checker"
   },
   {
     title: "Categories",
@@ -83,7 +83,7 @@ const navigation: NavigationItem[] = [
     icon: Ticket,
     href: "/admin/dashboard/coupons",
   },
-   {
+  {
     title: "Inventory",
     icon: Warehouse,
     href: "/admin/dashboard/inventory",
@@ -117,15 +117,16 @@ const navigation: NavigationItem[] = [
       { title: "Vendor Product Reviews", href: "/admin/dashboard/reviews/vendor-products" },
     ],
   },
-    {
+  {
     title: "Invoice & Billing",
     icon: FileBarChart,
     subItems: [
       { title: "Invoices", href: "/admin/dashboard/billing/invoices" },
-      { title: "Billings", href: "/admin/dashboard/billing/billings" },
+      // { title: "Billings", href: "/admin/dashboard/billing/billings" }, // commented out
       { title: "Settlement", href: "/admin/dashboard/billing/settlement" },
     ],
   },
+
   {
     title: "Support",
     icon: Headphones,
@@ -135,6 +136,11 @@ const navigation: NavigationItem[] = [
     title: "Reports",
     icon: FileText,
     href: "/admin/dashboard/reports",
+  },
+  {
+    title: "QC Reports",
+    icon: ClipboardCheck,
+    href: "/admin/dashboard/qc-reports",
   },
   {
     title: "Settings",
@@ -171,16 +177,16 @@ export default function AdminSidebar() {
     if (href === "/admin/dashboard") {
       return pathname === href;
     }
-    
+
     // For products routes
     if (href === "/admin/dashboard/products") {
       return pathname === "/admin/dashboard/products" || pathname.startsWith("/admin/dashboard/products?") || pathname.startsWith("/admin/dashboard/products#");
     }
-    
+
     if (href === "/admin/dashboard/products/vendor-requests") {
       return pathname === "/admin/dashboard/products/vendor-requests" || pathname.startsWith("/admin/dashboard/products/vendor-requests/") || pathname.startsWith("/admin/dashboard/products/vendor-requests?") || pathname.startsWith("/admin/dashboard/products/vendor-requests#");
     }
-    
+
     // Default exact match for any other routes
     return pathname === href;
   };
@@ -196,7 +202,7 @@ export default function AdminSidebar() {
   // Auto-expand parent menu if child is active
   useEffect(() => {
     const activeParents: string[] = [];
-    
+
     navigation.forEach((item) => {
       if (item.subItems && hasAnyActiveChild(item.subItems)) {
         activeParents.push(item.title);
@@ -248,7 +254,7 @@ export default function AdminSidebar() {
           // If item has href, render as single link
           if (item.href) {
             const itemIsActive = isMainItemActive(item.href);
-            
+
             return (
               <Link
                 key={item.title}
@@ -273,7 +279,7 @@ export default function AdminSidebar() {
 
           // If item has subItems, render as expandable section
           const parentHasActiveChild = item.subItems ? hasAnyActiveChild(item.subItems) : false;
-          
+
           return (
             <div key={item.title} className="space-y-1">
               {/* Main Menu Item */}
@@ -288,13 +294,13 @@ export default function AdminSidebar() {
                 )}
               >
                 <div className="flex items-center">
-                  <Icon 
+                  <Icon
                     className={cn(
                       "mr-3 h-5 w-5 transition-colors",
-                      parentHasActiveChild 
-                        ? "text-[#222222]" 
+                      parentHasActiveChild
+                        ? "text-[#222222]"
                         : "text-slate-500 group-hover:text-[#222222]"
-                    )} 
+                    )}
                   />
                   <span className="font-medium">{item.title}</span>
                 </div>
@@ -321,7 +327,7 @@ export default function AdminSidebar() {
                 <div className="ml-6 space-y-1 border-l-2 border-gray-100 pl-4 py-1">
                   {item.subItems.map((subItem) => {
                     const subItemIsActive = isSubItemActive(subItem.href);
-                    
+
                     return (
                       <Link
                         key={subItem.href}
@@ -360,7 +366,7 @@ export default function AdminSidebar() {
             <p className="text-xs text-slate-500 truncate" title={adminEmail}>{adminEmail}</p>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => logout()}
           className="mt-3 flex w-full items-center px-3 py-2 text-sm font-medium text-[#222222] rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors"
         >
