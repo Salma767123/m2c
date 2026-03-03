@@ -12,6 +12,14 @@ export interface CartItem {
     basePrice: number;
     description?: string;
     gstPercentage?: number;
+    inStock?: boolean;
+    availableStock?: number;
+    originalPrice?: number;
+    category?: string;
+    rating?: number;
+    reviews?: number;
+    material?: string;
+    discount?: number;
   };
 }
 

@@ -19,6 +19,7 @@ import cartService, { CartItem } from "@/services/cartService"
 import orderService from "@/services/orderService"
 import paymentService from "@/services/paymentService"
 import { userProfileService } from "@/services/userProfileService"
+import { userAuthService } from "@/services/userAuthService"
 import { paymentSettingsService, PublicPaymentSettings } from "@/services/paymentSettingsService"
 
 // Declare Razorpay type for TypeScript
@@ -131,6 +132,13 @@ export default function Checkout() {
       const response = await cartService.getCart()
       if (response.success && response.data) {
         setCartItems(response.data.items)
+        const hasOutOfStock = response.data.items.some((item: any) =>
+          item.product?.inStock === false ||
+          (item.product?.availableStock !== undefined && item.quantity > item.product?.availableStock)
+        );
+        if (hasOutOfStock) {
+          setError("Some items in your cart are out of stock or have insufficient quantity. Please return to the cart to remove them.")
+        }
       }
     } catch (err: any) {
       setError("Failed to load cart items")
@@ -142,6 +150,10 @@ export default function Checkout() {
 
   const fetchUserProfile = async () => {
     try {
+      if (!userAuthService.isAuthenticated()) {
+        return; // Don't fetch profile for guests
+      }
+
       const response = await userProfileService.getProfile()
       if (response.success && response.data) {
         const userData = response.data
@@ -244,6 +256,17 @@ export default function Checkout() {
         setError('No payment gateway is configured. Please contact support.')
         setPlacingOrder(false)
         return
+      }
+
+      // Check for out of stock items
+      const hasOutOfStock = cartItems.some((item) =>
+        item.product?.inStock === false ||
+        (item.product?.availableStock !== undefined && item.quantity > item.product?.availableStock)
+      );
+      if (hasOutOfStock) {
+        setError("Some items in your cart are out of stock. Please return to the cart to remove them.");
+        setPlacingOrder(false);
+        return;
       }
 
       const shippingAddress = {
@@ -490,7 +513,13 @@ export default function Checkout() {
                         handlePlaceOrder()
                       }
                     }}
-                    disabled={placingOrder}
+                    disabled={
+                      placingOrder ||
+                      cartItems.some(item =>
+                        item.product?.inStock === false ||
+                        (item.product?.availableStock !== undefined && item.quantity > item.product?.availableStock)
+                      )
+                    }
                     className="px-8 py-3 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {placingOrder && <Loader2 className="w-4 h-4 animate-spin" />}

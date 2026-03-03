@@ -538,25 +538,26 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                       <div className="bg-linear-to-br from-gray-50 to-white p-4 rounded-xl shadow-lg border border-gray-100">
                         {/* Stock Status */}
                         <div className="mb-3">
-                          {product.inStock && (!selectedVariant || selectedVariant.stock > 0) ? (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                              <span className="text-green-600 font-bold text-base">In stock</span>
-                              {selectedVariant && (
-                                <span className="text-gray-600 text-sm">({selectedVariant.stock} available)</span>
-                              )}
-                              {!selectedVariant && (
-                                <span className="text-gray-600 text-sm">
-                                  ({product.inventory?.currentStock ?? product.totalStock} available)
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
-                              <span className="text-gray-600 font-bold text-base">Out of Stock</span>
-                            </div>
-                          )}
+                          {(() => {
+                            const currentStock = selectedVariant
+                              ? selectedVariant.stock
+                              : (product.inventory?.currentStock ?? (product.hasVariants ? 0 : product.totalStock) ?? 0);
+
+                            const isActuallyInStock = product.inStock && currentStock > 0;
+
+                            return isActuallyInStock ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-green-600 font-bold text-base">In stock</span>
+                                <span className="text-gray-600 text-sm">({currentStock} available)</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+                                <span className="text-red-500 font-bold text-base">Out of Stock</span>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Dispatch Timeline */}
@@ -573,43 +574,50 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                         )}
 
                         {/* Action Buttons */}
-                        {product.inStock && (!selectedVariant || selectedVariant.stock > 0) && (
-                          <>
-                            {/* Quantity Selector */}
-                            <div className="flex items-center justify-center gap-3 mb-3">
-                              <span className="text-sm font-semibold text-gray-700">Quantity:</span>
-                              <button
-                                onClick={handleDecrement}
-                                disabled={quantity <= 1}
-                                className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              >
-                                <span className="text-xl font-semibold">−</span>
-                              </button>
-                              <span className="w-16 text-center font-bold text-lg">{quantity}</span>
-                              <button
-                                onClick={handleIncrement}
-                                className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
-                              >
-                                <span className="text-xl font-semibold">+</span>
-                              </button>
-                            </div>
+                        {(() => {
+                          const currentStock = selectedVariant
+                            ? selectedVariant.stock
+                            : (product.inventory?.currentStock ?? (product.hasVariants ? 0 : product.totalStock) ?? 0);
+                          const isActuallyInStock = product.inStock && currentStock > 0;
 
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={handleAddToCart}
-                                className="flex-1 bg-white text-black border-2 border-gray-700 py-2.5 px-3 rounded-lg hover:bg-gray-700 hover:text-white transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Add to cart
-                              </button>
-                              <button
-                                onClick={handleBuyNow}
-                                className="flex-1 bg-[#1d1d1d] text-white py-2.5 px-3 rounded-lg hover:from-orange-600 hover:to-gray-600 transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Buy Now
-                              </button>
-                            </div>
-                          </>
-                        )}
+                          return isActuallyInStock && (
+                            <>
+                              {/* Quantity Selector */}
+                              <div className="flex items-center justify-center gap-3 mb-3">
+                                <span className="text-sm font-semibold text-gray-700">Quantity:</span>
+                                <button
+                                  onClick={handleDecrement}
+                                  disabled={quantity <= 1}
+                                  className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  <span className="text-xl font-semibold">−</span>
+                                </button>
+                                <span className="w-16 text-center font-bold text-lg">{quantity}</span>
+                                <button
+                                  onClick={handleIncrement}
+                                  className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                                >
+                                  <span className="text-xl font-semibold">+</span>
+                                </button>
+                              </div>
+
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={handleAddToCart}
+                                  className="flex-1 bg-white text-black border-2 border-gray-700 py-2.5 px-3 rounded-lg hover:bg-gray-700 hover:text-white transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Add to cart
+                                </button>
+                                <button
+                                  onClick={handleBuyNow}
+                                  className="flex-1 bg-[#1d1d1d] text-white py-2.5 px-3 rounded-lg hover:from-orange-600 hover:to-gray-600 transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Buy Now
+                                </button>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

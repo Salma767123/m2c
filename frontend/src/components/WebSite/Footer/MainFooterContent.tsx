@@ -1,8 +1,33 @@
+'use client';
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Instagram, Facebook, Youtube } from "lucide-react";
+import { categoryService, Category } from "@/services/categoryService";
 
 const MainFooterContent = () => {
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryService.getAllCategories({
+          status: 'ACTIVE',
+          showRootOnly: 'true'
+        });
+        if (response.success && response.data) {
+          // Take top 5 or 6 categories
+          setCategories(response.data.slice(0, 6));
+        }
+      } catch (error) {
+        console.error("Failed to fetch categories for footer:", error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
   return (
     <div className="bg-[#000000] text-white">
       <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-8 sm:py-10 md:py-12 lg:py-16">
@@ -63,7 +88,7 @@ const MainFooterContent = () => {
                   Products
                 </Link>
               </li>
-               <li>
+              <li>
                 <Link
                   href="/contact"
                   className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
@@ -82,52 +107,22 @@ const MainFooterContent = () => {
             <ul className="space-y-2 sm:space-y-3 md:space-y-4">
               <li>
                 <Link
-                  href="/categories"
+                  href="/products"
                   className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
                 >
-                 All Categories
+                  All Categories
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/categories/towels"
-                  className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
-                >
-                  Towels
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/categories/kitchen-linen"
-                  className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
-                >
-                  Kitchen Linen
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/categories/bath-linen"
-                  className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
-                >
-                  Bath Linen
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/categories/table-linen"
-                  className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
-                >
-                  Table Linen
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/categories/cotton-jute-bags"
-                  className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
-                >
-                  Cotton & Jute Bags
-                </Link>
-              </li>
+              {categories.map((category) => (
+                <li key={category.id}>
+                  <Link
+                    href={`/products?category=${encodeURIComponent(category.name)}`}
+                    className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
+                  >
+                    {category.name}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -149,11 +144,11 @@ const MainFooterContent = () => {
               </div>
               <div>
                 <p className="text-gray-200 text-xs sm:text-sm md:text-base leading-relaxed max-w-xs sm:max-w-sm mx-auto sm:mx-0">
-                  307/A, Gumasta Marg, Pul, Jaipur Disawer, Rajasthan-Jaipur, 
+                  307/A, Gumasta Marg, Pul, Jaipur Disawer, Rajasthan-Jaipur,
                   Rajasthan, Rajasthan 302001
                 </p>
               </div>
-              
+
               {/* Social Media Icons */}
               <div className="flex justify-center sm:justify-start space-x-3 sm:space-x-4 pt-2 sm:pt-4">
                 <a

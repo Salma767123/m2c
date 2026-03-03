@@ -37,6 +37,7 @@ interface OrderItem {
   inStock: boolean
   quantity: number
   description?: string
+  availableStock?: number
   material?: string
   discount?: number
   gstPercentage?: number
@@ -83,6 +84,7 @@ export default function Order() {
                   reviews: product.reviews,
                   inStock: product.inStock,
                   quantity: item.quantity,
+                  availableStock: product.totalStock,
                   description: product.description,
                   material: product.material,
                   discount: product.discount,
@@ -113,6 +115,7 @@ export default function Order() {
               rating: item.product?.rating,
               reviews: item.product?.reviews,
               inStock: item.product?.inStock ?? true,
+              availableStock: item.product?.availableStock,
               quantity: item.quantity,
               description: item.product?.description,
               material: item.product?.material,
@@ -373,9 +376,13 @@ export default function Order() {
                           </div>
 
                           <div className="flex items-center gap-3">
-                            {!item.inStock && (
-                              <span className="text-sm text-gray-600 font-medium">Out of Stock</span>
-                            )}
+                            {!item.inStock ? (
+                              <span className="text-sm text-red-600 font-medium bg-red-50 px-2 py-1 rounded">Out of Stock</span>
+                            ) : (item.availableStock !== undefined && item.quantity > item.availableStock) ? (
+                              <span className="text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
+                                Only {item.availableStock} in stock
+                              </span>
+                            ) : null}
                             <div className="flex items-center border border-slate-300 rounded-lg">
                               <button
                                 onClick={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
@@ -506,13 +513,23 @@ export default function Order() {
                     </div>
                   </div>
 
-                  <Link href="/checkout">
-                    <button className="w-full bg-[#313131] text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2 group mb-4">
+                  {cartItems.some(item => !item.inStock || (item.availableStock !== undefined && item.quantity > item.availableStock)) ? (
+                    <button
+                      disabled
+                      className="w-full bg-slate-300 text-slate-500 font-semibold py-4 px-6 rounded-xl shadow-none flex items-center justify-center gap-2 mb-4 cursor-not-allowed"
+                    >
                       <CreditCard className="w-5 h-5" />
-                      Proceed to Checkout
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      Remove out of stock items to proceed
                     </button>
-                  </Link>
+                  ) : (
+                    <Link href="/checkout">
+                      <button className="w-full bg-[#313131] text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2 group mb-4">
+                        <CreditCard className="w-5 h-5" />
+                        Proceed to Checkout
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </Link>
+                  )}
 
                   {/* Trust Badges */}
                   <div className="space-y-3 pt-4 border-t border-slate-200">

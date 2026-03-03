@@ -50,7 +50,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
       return;
     }
 
-    if (!product.inStock) {
+    if (!isActuallyInStock) {
       showErrorToast('Out of Stock', 'This product is currently out of stock');
       return;
     }
@@ -168,6 +168,13 @@ const ProductCard = ({ product }: ProductCardProps) => {
     displayPrice = (product as any).price;
   }
 
+  // Derive actual stock considering inventory count
+  const currentStock = isServiceProduct(product)
+    ? (product.inventory?.currentStock ?? (product.hasVariants ? 0 : product.totalStock) ?? 0)
+    : (product as any).stock ?? 1; // Default to 1 for mock products without stock specified
+
+  const isActuallyInStock = product.inStock && currentStock > 0;
+
   return (
     <Link href={`/products/${product.id}`} className="block h-full">
       <div className="bg-white font-sans rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col cursor-pointer">
@@ -194,9 +201,9 @@ const ProductCard = ({ product }: ProductCardProps) => {
           <button
             onClick={handleToggleWishlist}
             disabled={isTogglingWishlist}
-            className={`absolute top-2 ${product.inStock ? 'right-2' : 'right-28'} p-2 rounded-full transition-all duration-200 ${isInWishlist
-                ? 'bg-red-500 text-white hover:bg-red-600'
-                : 'bg-white/90 text-gray-700 hover:bg-white hover:text-red-500'
+            className={`absolute top-2 ${isActuallyInStock ? 'right-2' : 'right-28'} p-2 rounded-full transition-all duration-200 ${isInWishlist
+              ? 'bg-red-500 text-white hover:bg-red-600'
+              : 'bg-white/90 text-gray-700 hover:bg-white hover:text-red-500'
               } disabled:opacity-50 disabled:cursor-not-allowed shadow-md z-10`}
             title={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
           >
@@ -205,7 +212,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
             />
           </button>
 
-          {!product.inStock && (
+          {!isActuallyInStock && (
             <div className="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded text-sm z-0">
               Out of Stock
             </div>
@@ -260,7 +267,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
             </div>
 
             {/* Quantity Selector */}
-            {product.inStock && (
+            {isActuallyInStock && (
               <div className="flex items-center gap-2 mb-2">
                 <button
                   onClick={handleDecrement}
@@ -282,14 +289,14 @@ const ProductCard = ({ product }: ProductCardProps) => {
             {/* Add to Cart Button */}
             <button
               onClick={handleAddToCart}
-              disabled={!product.inStock || isAddingToCart}
-              className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${product.inStock
-                  ? 'bg-gray-800 text-white hover:bg-gray-900 active:scale-95'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              disabled={!isActuallyInStock || isAddingToCart || (isActuallyInStock && quantity > currentStock)}
+              className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${isActuallyInStock
+                ? 'bg-gray-800 text-white hover:bg-gray-900 active:scale-95'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <ShoppingCart className="w-4 h-4" />
-              {isAddingToCart ? 'Adding...' : product.inStock ? 'Add to Cart' : 'Out of Stock'}
+              {isAddingToCart ? 'Adding...' : isActuallyInStock ? 'Add to Cart' : 'Out of Stock'}
             </button>
           </div>
         </div>

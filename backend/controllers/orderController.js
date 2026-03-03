@@ -80,6 +80,13 @@ const createOrder = async (req, res) => {
                 });
             }
 
+            if (!product.inStock) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Product is out of stock: ${product.name}`
+                });
+            }
+
             const variant = item.variantId && product.variants?.length > 0 ? product.variants[0] : null;
 
             // Check stock
