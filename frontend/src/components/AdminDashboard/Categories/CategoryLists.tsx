@@ -117,7 +117,7 @@ export default function CategoryLists() {
           )}
           <div className="flex items-center space-x-3">
             {/* Category/Subcategory Image */}
-            <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+            <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0">
               {category.image ? (
                 <img
                   src={category.image}
