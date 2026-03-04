@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Header from '@/components/Checker/CheckerHeader/CheckerHeader'
 import Sidebar from '@/components/Checker/CheckerSidebar/CheckerSidebar'
 import Footer from '@/components/Checker/CheckerFooter/CheckerFooter'
+import { Toaster } from '@/components/UI/Toaster'
 
 export default function DashboardLayout({
   children,
@@ -25,7 +26,7 @@ export default function DashboardLayout({
 
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 transition-opacity lg:hidden z-40"
           onClick={toggleSidebar}
         />
@@ -35,7 +36,7 @@ export default function DashboardLayout({
       <div className="flex flex-col flex-1 overflow-hidden bg-gray-50">
         {/* Header */}
         <Header onMenuToggle={toggleSidebar} isSidebarOpen={isSidebarOpen} />
-        
+
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto bg-white">
           <div className="p-6">
@@ -44,8 +45,9 @@ export default function DashboardLayout({
         </main>
 
         {/* Footer */}
-        <Footer />
+        {/* <Footer /> */}
       </div>
+      <Toaster />
     </div>
   )
 }

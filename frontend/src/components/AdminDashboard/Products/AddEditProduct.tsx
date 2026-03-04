@@ -501,16 +501,33 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 const vendorSubcats = response.data.data.subcategories || []
 
                 // Set categories as names
-                setCategories(vendorCategories.map((c: any) => c.name))
+                const categoryNames = vendorCategories.map((c: any) => c.name)
+                if (product.category && !categoryNames.includes(product.category)) {
+                  categoryNames.push(product.category)
+                }
+                setCategories(categoryNames)
 
                 // Build subcategories map by category name
                 const subcatsMap: Record<string, string[]> = {}
                 vendorCategories.forEach((cat: any) => {
-                  const catSubcats = vendorSubcats.map((sub: any) => sub.name)
+                  const catSubcats = vendorSubcats
+                    .filter((sub: any) => sub.parentId === cat.id)
+                    .map((sub: any) => sub.name)
+
+                  // Ensure product's existing subcategory is in the map for its category
+                  if (product.category === cat.name && product.subCategory && !catSubcats.includes(product.subCategory)) {
+                    catSubcats.push(product.subCategory)
+                  }
+
                   if (catSubcats.length > 0) {
                     subcatsMap[cat.name] = catSubcats
                   }
                 })
+
+                // If product category wasn't found in vendor categories, we still need its subcategory in the map
+                if (product.category && product.subCategory && !subcatsMap[product.category]) {
+                  subcatsMap[product.category] = [product.subCategory]
+                }
 
                 setVendorSubcategories(subcatsMap)
               } catch (error) {
@@ -552,28 +569,50 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       return
     }
 
-    // Find the matching category with case-insensitive comparison
-    const matchedCategory = categories.find(
-      cat => cat.toLowerCase() === inventoryItem.category.toLowerCase()
+    // Field might be subcategory or subCategory in different contexts, handle both
+    const invCategory = inventoryItem.category
+    const invSubcategory = inventoryItem.subcategory || (inventoryItem as any).subCategory
+
+    // Find the matching category with case-insensitive comparison and handle common plural/singular cases
+    let matchedCategory = categories.find(
+      cat => {
+        const c1 = cat.toLowerCase()
+        const c2 = invCategory.toLowerCase()
+        return c1 === c2 || c1 === c2 + 's' || c2 === c1 + 's'
+      }
     )
 
-    console.log('Matched category (case-corrected):', matchedCategory)
+    console.log('Initially matched category:', matchedCategory)
 
-    if (!matchedCategory) {
-      console.warn('⚠️ WARNING: Inventory category not found in loaded categories!')
-      console.warn('Inventory category:', inventoryItem.category)
-      console.warn('Available categories:', categories)
-      showWarningToast('Category Mismatch', `Category "${inventoryItem.category}" not found in vendor's categories.`)
+    // If no match found, we'll use the inventory category but add it to our list so the dropdown shows it
+    if (!matchedCategory && invCategory) {
+      console.log('No matched category found, adding to list:', invCategory)
+      setCategories(prev => [...new Set([...prev, invCategory])])
+      matchedCategory = invCategory
     }
 
     // Find matching subcategory with case-insensitive comparison
-    const categorySubcats = matchedCategory ? vendorSubcategories[matchedCategory] || [] : []
-    const matchedSubcategory = inventoryItem.subcategory
-      ? categorySubcats.find(sub => sub.toLowerCase() === inventoryItem.subcategory?.toLowerCase())
+    const categorySubcats = matchedCategory ? (vendorSubcategories[matchedCategory] || categorySubcategories[matchedCategory] || []) : []
+    let matchedSubcategory = invSubcategory
+      ? categorySubcats.find(sub => {
+        const s1 = sub.toLowerCase()
+        const s2 = invSubcategory.toLowerCase()
+        return s1 === s2 || s1 === s2 + 's' || s2 === s1 + 's'
+      })
       : ''
 
-    console.log('Available subcategories for category:', categorySubcats)
+    console.log('Available subcategories for matching:', categorySubcats)
     console.log('Matched subcategory (case-corrected):', matchedSubcategory)
+
+    // Ensure the inventory subcategory is in our local categories map so it shows in the dropdown
+    if (!matchedSubcategory && invSubcategory && matchedCategory) {
+      console.log('Subcategory mismatch, adding inventory subcategory to map:', invSubcategory)
+      setVendorSubcategories(prev => ({
+        ...prev,
+        [matchedCategory!]: [...new Set([...(prev[matchedCategory!] || []), invSubcategory])]
+      }))
+      matchedSubcategory = invSubcategory
+    }
 
     setSelectedInventoryItem(inventoryItem)
     setFormData(prev => {
@@ -581,18 +620,14 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         ...prev,
         inventoryItemId: inventoryItem.id,
         isFromInventory: true,
-        // Don't auto-fill name - let user create unique product name
-        // name: inventoryItem.name,
         description: inventoryItem.description || '',
-        category: matchedCategory || inventoryItem.category, // Use matched category with correct casing
-        subCategory: matchedSubcategory || inventoryItem.subcategory || '', // Use matched subcategory with correct casing
+        category: matchedCategory || invCategory || '',
+        subCategory: matchedSubcategory || invSubcategory || '',
         baseSku: inventoryItem.sku,
         totalStock: inventoryItem.currentStock
       }
 
-      console.log('New form data after inventory selection:', newData)
-      console.log('Setting category to:', newData.category)
-      console.log('Setting subCategory to:', newData.subCategory)
+      console.log('Final choice - Category:', newData.category, 'SubCategory:', newData.subCategory)
       return newData
     })
   }
@@ -652,10 +687,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
         vendorCategories.forEach((cat: any) => {
           // Find subcategories that belong to this category
           const catSubcats = vendorSubcats
-            .filter((sub: any) => {
-              // Match by parent relationship if available, otherwise include all
-              return true // For now, we'll need to check the actual data structure
-            })
+            .filter((sub: any) => sub.parentId === cat.id)
             .map((sub: any) => sub.name)
 
           if (catSubcats.length > 0) {
@@ -1351,7 +1383,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 : "Select Category"
                         }
                         onChange={(value) => setFormData(prev => ({ ...prev, category: value as string, subCategory: '' }))}
-                        disabled={!formData.vendorId || isLoadingCategories}
+                        disabled={!formData.vendorId || isLoadingCategories || formData.isFromInventory}
                       />
                       {!formData.vendorId && (
                         <p className="text-xs text-gray-500 mt-1 italic">Please select a vendor first</p>

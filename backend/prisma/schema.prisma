@@ -983,6 +983,37 @@ model GSTSetting {
 }
 
 // ============================================
+// SEO SETTINGS
+// ============================================
+
+model SEOSettings {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  metaTitle        String?
+  metaDescription  String?
+  metaKeywords     String?
+  ogTitle          String?
+  ogDescription    String?
+  ogImage          String?
+  twitterCard      String?
+  twitterTitle     String?
+  twitterDescription String?
+  twitterImage     String?
+  
+  googleAnalyticsId String?
+  facebookPixelId   String?
+  
+  robotsTxt         String?
+  sitemapUrl        String?
+  
+  updatedBy         String?   @db.ObjectId
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("seo_settings")
+}
+
+// ============================================
 // HUB MANAGEMENT
 // ============================================
 

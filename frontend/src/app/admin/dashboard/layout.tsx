@@ -30,7 +30,7 @@ export default function DashboardLayout({
 
         {/* Mobile Sidebar Overlay */}
         {isSidebarOpen && (
-          <div 
+          <div
             className="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity lg:hidden z-40"
             onClick={() => setIsSidebarOpen(false)}
           />
@@ -40,7 +40,7 @@ export default function DashboardLayout({
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Header */}
           <Header onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
-          
+
           {/* Main Content Area */}
           <main className="flex-1 overflow-y-auto bg-slate-50">
             <div className="p-4 sm:p-6 lg:p-8 max-w-420 mx-auto">
@@ -49,7 +49,7 @@ export default function DashboardLayout({
           </main>
 
           {/* Footer */}
-          <Footer />
+          {/* <Footer /> */}
         </div>
       </div>
     </ProtectedRoute>

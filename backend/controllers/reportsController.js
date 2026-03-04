@@ -662,11 +662,14 @@ const getFinancialReport = async (req, res) => {
 const getQcFactoryReports = async (req, res) => {
     try {
         const inspections = await prisma.inspection.findMany({
+            where: {
+                status: 'COMPLETED'
+            },
             include: {
                 vendor: true,
                 checker: true
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { completedAt: 'desc' },
         });
 
         res.json({

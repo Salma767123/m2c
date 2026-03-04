@@ -680,6 +680,26 @@ class VendorService {
     }
   }
 
+  // Admin: Get single Inspection by ID
+  static async getInspectionById(inspectionId: string) {
+    const token = this.getAdminToken();
+    if (!token) {
+      throw new Error('No admin authentication token found');
+    }
+
+    try {
+      const response = await axiosInstance.get(`/inspections/${inspectionId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Get Inspection by ID error:', error);
+      throw error;
+    }
+  }
+
   // Admin: Update Inspection
   static async updateInspection(
     inspectionId: string,

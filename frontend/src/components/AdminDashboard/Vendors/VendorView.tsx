@@ -26,7 +26,8 @@ import {
   FileText,
   Download,
   Eye,
-  CreditCard
+  CreditCard,
+  ExternalLink
 } from 'lucide-react'
 import VendorService, { VendorProfile } from '@/services/vendorService'
 import { toast } from '@/hooks/use-toast'
@@ -629,57 +630,88 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
         </CardContent>
       </Card>
 
-      {vendor.warehouseAddress && (
+      {/* Warehouse & Map Details */}
+      {(vendor.warehouseAddress || vendor.mapLink) && (
         <Card>
           <CardHeader>
-            <CardTitle>Warehouse Details</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <MapPin className="h-5 w-5" />
+              <span>Warehouse & Location</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-600">Address</p>
-                <p className="font-medium">{vendor.warehouseAddress}</p>
-                <p className="font-medium">{vendor.warehouseCity}, {vendor.warehouseState}</p>
+              {vendor.warehouseAddress ? (
+                <div>
+                  <p className="text-sm text-gray-600 font-semibold mb-1">Warehouse Address</p>
+                  <p className="font-medium">{vendor.warehouseAddress}</p>
+                  <p className="font-medium">
+                    {vendor.warehouseCity}, {vendor.warehouseState} {vendor.warehouseZipCode}
+                  </p>
+                  {vendor.warehouseCountry && <p className="font-medium">{vendor.warehouseCountry}</p>}
+                </div>
+              ) : (
+                <div className="p-3 bg-blue-50 text-blue-800 rounded-md text-sm border border-blue-200">
+                  No separate warehouse address provided. Using business location.
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {vendor.warehouseSize && (
+                  <div>
+                    <p className="text-sm text-gray-600">Warehouse Size</p>
+                    <p className="font-medium">{vendor.warehouseSize}</p>
+                  </div>
+                )}
+                {vendor.storageCapacity && (
+                  <div>
+                    <p className="text-sm text-gray-600">Storage Capacity</p>
+                    <p className="font-medium">{vendor.storageCapacity}</p>
+                  </div>
+                )}
               </div>
-              {vendor.warehouseSize && (
-                <div>
-                  <p className="text-sm text-gray-600">Size</p>
-                  <p className="font-medium">{vendor.warehouseSize}</p>
-                </div>
-              )}
-              {vendor.storageCapacity && (
-                <div>
-                  <p className="text-sm text-gray-600">Storage Capacity</p>
-                  <p className="font-medium">{vendor.storageCapacity}</p>
-                </div>
-              )}
 
               {/* Google Map Display */}
               {vendor.mapLink && (
                 <div className="mt-6">
                   <p className="text-sm text-gray-600 mb-3 font-semibold">Location Map</p>
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <iframe
-                      src={vendor.mapLink}
-                      width="100%"
-                      height="400"
-                      style={{ border: 0 }}
-                      allowFullScreen
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      title="Warehouse Location"
-                      className="w-full"
-                    />
-                  </div>
-                  <div className="mt-2">
+                  {vendor.mapLink.includes('google.com/maps/embed') || vendor.mapLink.includes('maps.google.com/maps/embed') ? (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <iframe
+                        src={vendor.mapLink}
+                        width="100%"
+                        height="400"
+                        style={{ border: 0 }}
+                        allowFullScreen
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        title="Warehouse Location"
+                        className="w-full"
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-8 border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center bg-gray-50">
+                      <Globe className="h-12 w-12 text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600 text-center mb-4">
+                        A location link is provided but it's not a direct map embed.
+                      </p>
+                      <Button asChild variant="outline">
+                        <a href={vendor.mapLink} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View on Google Maps
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                  <div className="mt-2 text-right">
                     <a
                       href={vendor.mapLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
                     >
-                      <Globe className="h-4 w-4" />
-                      Open in Google Maps
+                      <Globe className="h-3 w-3" />
+                      Open Full Map in New Tab
                     </a>
                   </div>
                 </div>
