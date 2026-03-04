@@ -9,11 +9,11 @@ import Dropdown from '@/components/UI/Dropdown'
 import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon } from 'lucide-react'
 import VariantImageModal from './VariantImageModal'
 import Link from 'next/link'
-import { categories } from '@/components/mockData/products'
 import { useToast } from '@/hooks/use-toast'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 import { productService, type ProductFormData as ServiceProductFormData } from '@/services/productService'
 import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
+import { categoryService, Category } from '@/services/categoryService'
 
 // Mock data for inventory items (these would come from API)
 const mockInventoryItems = [
@@ -51,14 +51,6 @@ const mockInventoryItems = [
     hasProductCreated: true // Already has a product created
   }
 ]
-const categorySubcategories: Record<string, string[]> = {
-  'Kitchen Towels': ['Dish Towels', 'Tea Towels', 'Paper Towel Alternatives', 'Microfiber Towels'],
-  'Bath Towels': ['Large Towels', 'Hand Towels', 'Washcloths', 'Beach Towels'],
-  'Hand Towels': ['Guest Towels', 'Decorative Towels', 'Quick-Dry Towels'],
-  'Aprons': ['Kitchen Aprons', 'Bib Aprons', 'Waist Aprons', 'Chef Aprons'],
-  'Table Linens': ['Table Runners', 'Placemats', 'Napkins', 'Tablecloths'],
-  'Decorative Textiles': ['Wall Hangings', 'Cushion Covers', 'Throws', 'Curtains']
-}
 
 const fabricTypes = [
   'Cotton', 'Linen', 'Silk', 'Polyester', 'Microfiber', 'Bamboo', 'Modal', 'Tencel', 'Wool', 'Cashmere'
@@ -284,8 +276,37 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [gstRates, setGstRates] = useState<GSTSetting[]>([])
   const [isLoadingGst, setIsLoadingGst] = useState(false)
 
+  // Categories State
+  const [categories, setCategories] = useState<string[]>([])
+  const [categorySubcategories, setCategorySubcategories] = useState<Record<string, string[]>>({})
+
   // Auto-save functionality (optional)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  // Load Categories
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await categoryService.getCategoryTree({ status: 'ACTIVE' })
+        if (response.data) {
+          const fetchedCategories = response.data.map((c: Category) => c.name)
+          const subcatsMap: Record<string, string[]> = {}
+          response.data.forEach((c: Category) => {
+            if (c.subcategories && c.subcategories.length > 0) {
+              subcatsMap[c.name] = c.subcategories.map((sub: Category) => sub.name)
+            } else {
+              subcatsMap[c.name] = []
+            }
+          })
+          setCategories(fetchedCategories)
+          setCategorySubcategories(subcatsMap)
+        }
+      } catch (error) {
+        console.error('Failed to load categories', error)
+      }
+    }
+    loadCategories()
+  }, [])
 
   useEffect(() => {
     setHasUnsavedChanges(true)
@@ -804,6 +825,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       return
     }
 
+    if (!isEdit && !formData.inventoryItemId) {
+      showErrorToast('Validation Error', 'Please select an inventory item.')
+      return
+    }
+
     // Pricing validation
     if (!formData.hasVariants && formData.basePrice <= 0) {
       showErrorToast('Validation Error', 'Please enter a valid base price.')
@@ -1014,9 +1040,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       value={formData.name}
                       onChange={handleInputChange}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                      placeholder={formData.isFromInventory ? "Enter a unique product name" : "Enter product name"}
+                      disabled={!isEdit && !formData.inventoryItemId}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${(!isEdit && !formData.inventoryItemId) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                      placeholder={(!isEdit && !formData.inventoryItemId) ? "Please select an inventory item first" : formData.isFromInventory ? "Enter a unique product name" : "Enter product name"}
                     />
+                    {!isEdit && !formData.inventoryItemId && (
+                      <p className="text-xs text-red-500 mt-1">Select an inventory item before entering the product name</p>
+                    )}
                     {formData.isFromInventory && (
                       <p className="text-xs text-gray-500 mt-1">Create a unique product name (can be different from inventory item name)</p>
                     )}

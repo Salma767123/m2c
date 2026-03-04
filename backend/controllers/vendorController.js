@@ -616,8 +616,8 @@ const getVendorById = async (req, res) => {
     res.json({
       vendor: {
         ...vendor,
-        productCategories: categoryNames,
-        productTypes: subCategoryNames,
+        productCategoryNames: categoryNames,
+        productTypeNames: subCategoryNames,
         password: undefined
       }
     });

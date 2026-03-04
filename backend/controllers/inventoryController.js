@@ -685,15 +685,15 @@ const getVendorCategories = async (req, res) => {
     let subcategories = [];
 
     if (vendor.productCategories && vendor.productCategories.length > 0) {
-      // Check if the first item looks like an ObjectId (24 characters, hex)
-      const firstCategory = vendor.productCategories[0];
-      const isObjectId = /^[0-9a-fA-F]{24}$/.test(firstCategory);
+      // Find all valid object IDs inside the categories array
+      const objectIds = vendor.productCategories.filter(cat => /^[0-9a-fA-F]{24}$/.test(cat));
+      const stringNames = vendor.productCategories.filter(cat => !/^[0-9a-fA-F]{24}$/.test(cat));
 
-      if (isObjectId) {
+      if (objectIds.length > 0) {
         // Fetch category details from database
         const categoryData = await prisma.category.findMany({
           where: {
-            id: { in: vendor.productCategories },
+            id: { in: objectIds },
             status: 'ACTIVE'
           },
           select: {
@@ -729,9 +729,14 @@ const getVendorCategories = async (req, res) => {
         }));
 
         subcategories = allSubcategories;
-      } else {
-        // Assume they are category names (legacy format)
-        categories = vendor.productCategories.map(name => ({ name }));
+      }
+
+      // Append any legacy string names that weren't resolved as objectIds
+      if (stringNames.length > 0) {
+        categories = [
+          ...categories,
+          ...stringNames.map(name => ({ id: name, name: name, slug: name }))
+        ];
       }
     }
 
@@ -981,15 +986,15 @@ const getVendorCategoriesByVendorId = async (req, res) => {
     let subcategories = [];
 
     if (vendor.productCategories && vendor.productCategories.length > 0) {
-      // Check if the first item looks like an ObjectId (24 characters, hex)
-      const firstCategory = vendor.productCategories[0];
-      const isObjectId = /^[0-9a-fA-F]{24}$/.test(firstCategory);
+      // Find all valid object IDs inside the categories array
+      const objectIds = vendor.productCategories.filter(cat => /^[0-9a-fA-F]{24}$/.test(cat));
+      const stringNames = vendor.productCategories.filter(cat => !/^[0-9a-fA-F]{24}$/.test(cat));
 
-      if (isObjectId) {
+      if (objectIds.length > 0) {
         // Fetch category details from database
         const categoryData = await prisma.category.findMany({
           where: {
-            id: { in: vendor.productCategories },
+            id: { in: objectIds },
             status: 'ACTIVE'
           },
           select: {
@@ -1025,9 +1030,14 @@ const getVendorCategoriesByVendorId = async (req, res) => {
         }));
 
         subcategories = allSubcategories;
-      } else {
-        // Assume they are category names (legacy format)
-        categories = vendor.productCategories.map(name => ({ name }));
+      }
+
+      // Append any legacy string names that weren't resolved as objectIds
+      if (stringNames.length > 0) {
+        categories = [
+          ...categories,
+          ...stringNames.map(name => ({ id: name, name: name, slug: name }))
+        ];
       }
     }
 

@@ -1035,6 +1035,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       return
     }
 
+    if (!isEdit && !formData.inventoryItemId) {
+      showErrorToast('Validation Error', 'Please select an inventory item.')
+      return
+    }
+
     // Pricing validation
     if (formData.basePrice <= 0) {
       showErrorToast('Validation Error', 'Please enter a valid base price.')
@@ -1297,10 +1302,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       value={formData.name}
                       onChange={handleInputChange}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                      placeholder={formData.isFromInventory ? "Enter a unique product name" : "Enter product name"}
+                      disabled={!formData.vendorId || (!isEdit && !formData.inventoryItemId)}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${(!formData.vendorId || (!isEdit && !formData.inventoryItemId)) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                      placeholder={!formData.vendorId ? "Please select a vendor first" : (!isEdit && !formData.inventoryItemId) ? "Please select an inventory item first" : formData.isFromInventory ? "Enter a unique product name" : "Enter product name"}
                     />
-                    {formData.isFromInventory && (
+                    {!formData.vendorId && (
+                      <p className="text-xs text-red-500 mt-1">Select a vendor before entering the product name</p>
+                    )}
+                    {formData.vendorId && !isEdit && !formData.inventoryItemId && (
+                      <p className="text-xs text-red-500 mt-1">Select an inventory item before entering the product name</p>
+                    )}
+                    {formData.vendorId && formData.isFromInventory && (
                       <p className="text-xs text-gray-500 mt-1">Create a unique product name (can be different from inventory item name)</p>
                     )}
                   </div>

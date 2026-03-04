@@ -713,8 +713,8 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {vendor.productCategories.map((category, index) => (
-                <Badge key={index} className="bg-green-100 text-green-800 capitalize">
+              {Array.from(new Set(vendor.productCategories)).map((category, index) => (
+                <Badge key={`${category}-${index}`} className="bg-green-100 text-green-800 capitalize">
                   {category}
                 </Badge>
               ))}
@@ -747,8 +747,8 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {vendor.productTypes.map((type, index) => (
-                <Badge key={index} className="bg-indigo-100 text-indigo-800">
+              {Array.from(new Set(vendor.productTypes)).map((type, index) => (
+                <Badge key={`${type}-${index}`} className="bg-indigo-100 text-indigo-800">
                   {type}
                 </Badge>
               ))}

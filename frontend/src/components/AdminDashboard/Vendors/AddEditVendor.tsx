@@ -5,14 +5,14 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
-import { 
-  ArrowLeft, 
-  Building2, 
-  Globe, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Image, 
+import {
+  ArrowLeft,
+  Building2,
+  Globe,
+  Mail,
+  Phone,
+  MapPin,
+  Image,
   FileText,
   User,
   Package,
@@ -51,7 +51,7 @@ interface VendorFormData {
   logoFile: File | null
   gstDocument: string | null
   gstFile: File | null
-  
+
   // Warehouse Details
   ownershipType: string
   warehouseAddress: string
@@ -62,25 +62,25 @@ interface VendorFormData {
   factoryImages: any[]
   routeMap: string | null
   mapLink: string
-  
+
   // Owner Profile
   ownerName: string
   ownerEmail: string
   ownerPhone: string
   yearEstablished: string
   employeeCount: string
-  
+
   // Vendor Type & Products
   vendorType: string | string[]
   marketType: string | string[]
   selectedCategories: { [key: string]: string[] }
   expandedCategories: { [key: string]: boolean }
   categoryRemarks?: string
-  
+
   // Manufacturing Facilities (if manufacturer)
   enabledFacilities: { [key: string]: boolean }
   facilityDetails: { [key: string]: any }
-  
+
   // Certifications & Logistics
   selectedCertifications: string[]
   certificationFiles: { [key: string]: any }
@@ -91,7 +91,7 @@ interface VendorFormData {
   shippingMethods: string[]
   qualityControlProcess: string
   complianceStandards: string
-  
+
   // Contact & Trade Info
   mainContact: {
     name: string
@@ -115,7 +115,7 @@ interface VendorFormData {
     swiftCode: string
     iban: string
   }
-  
+
   // Status
   status: 'active' | 'pending' | 'suspended'
   approvalStatus: 'approved' | 'pending' | 'rejected'
@@ -156,7 +156,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     logoFile: null,
     gstDocument: null,
     gstFile: null,
-    
+
     // Warehouse Details
     ownershipType: '',
     warehouseAddress: '',
@@ -167,25 +167,25 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     factoryImages: [],
     routeMap: null,
     mapLink: '',
-    
+
     // Owner Profile
     ownerName: '',
     ownerEmail: '',
     ownerPhone: '',
     yearEstablished: '',
     employeeCount: '',
-    
+
     // Vendor Type & Products
     vendorType: [],
     marketType: [],
     selectedCategories: {},
     expandedCategories: {},
     categoryRemarks: '',
-    
+
     // Manufacturing Facilities
     enabledFacilities: {},
     facilityDetails: {},
-    
+
     // Certifications & Logistics
     selectedCertifications: [],
     certificationFiles: {},
@@ -196,7 +196,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     shippingMethods: [],
     qualityControlProcess: '',
     complianceStandards: '',
-    
+
     // Contact & Trade Info
     mainContact: {
       name: '',
@@ -220,7 +220,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       swiftCode: '',
       iban: ''
     },
-    
+
     // Status
     status: 'pending',
     approvalStatus: 'pending'
@@ -291,15 +291,44 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     try {
       setIsLoadingVendorData(true)
       console.log('Loading vendor data for ID:', id)
-      
+
       // Import VendorService dynamically to avoid circular dependencies
       const VendorService = (await import('@/services/vendorService')).default
-      
+      const { categoryService } = await import('@/services/categoryService')
+
       const response = await VendorService.getVendorById(id)
       const vendor = response.vendor
-      
+
+      let allCategories: any[] = []
+      try {
+        const categoriesResponse = await categoryService.getCategoryTree({ status: 'ACTIVE', includeInactive: false })
+        allCategories = categoriesResponse.data || []
+      } catch (err) {
+        console.error('Failed to load categories for vendor mapping', err)
+      }
+
+      const mappedSelectedCategories: { [key: string]: string[] } = {}
+      if (vendor.productCategories && Array.isArray(vendor.productCategories)) {
+        vendor.productCategories.forEach((catId: string) => {
+          const category = allCategories.find((c: any) => c.id === catId || c.name === catId)
+          if (category) {
+            const categoryId = category.id
+            if (vendor.productTypes && Array.isArray(vendor.productTypes)) {
+              const validSubNames = category.subcategories?.map((s: any) => s.name) || []
+              const subCategoriesForThisCategory = vendor.productTypes.filter((t: string) => validSubNames.includes(t))
+              mappedSelectedCategories[categoryId] = [...new Set(subCategoriesForThisCategory)] as string[]
+            } else {
+              mappedSelectedCategories[categoryId] = []
+            }
+          } else {
+            // Unmapped categories
+            mappedSelectedCategories[catId] = []
+          }
+        })
+      }
+
       console.log('Vendor data loaded:', vendor)
-      
+
       // Map vendor data to form structure
       setFormData({
         // Company Details
@@ -319,7 +348,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         logoFile: null,
         gstDocument: vendor.documents?.find((doc: any) => doc.type === 'GST_CERTIFICATE')?.documentUrl || null,
         gstFile: null,
-        
+
         // Warehouse Details
         ownershipType: 'owned', // Default
         warehouseAddress: vendor.warehouseAddress || '',
@@ -330,28 +359,25 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         factoryImages: vendor.documents?.filter((doc: any) => doc.type === 'OTHER' && doc.name.includes('Factory')).map((doc: any) => doc.documentUrl) || [],
         routeMap: null,
         mapLink: vendor.mapLink || '',
-        
+
         // Owner Profile
         ownerName: vendor.ownerName || '',
         ownerEmail: vendor.ownerEmail || '',
         ownerPhone: vendor.ownerPhone || '',
         yearEstablished: vendor.establishedYear?.toString() || '',
         employeeCount: vendor.annualTurnover || '',
-        
+
         // Vendor Type & Products
         vendorType: vendor.vendorType === 'TEXTILE_MANUFACTURER' ? ['manufacturer'] : ['trader'],
         marketType: vendor.primaryMarkets || [],
-        selectedCategories: vendor.productCategories?.reduce((acc: any, cat: string) => {
-          acc[cat] = vendor.productTypes || []
-          return acc
-        }, {}) || {},
+        selectedCategories: mappedSelectedCategories,
         expandedCategories: {},
         categoryRemarks: '', // categoryRemarks not in interface
-        
+
         // Manufacturing Facilities
         enabledFacilities: {},
         facilityDetails: {},
-        
+
         // Certifications & Logistics
         // Map certification names from backend (UPPERCASE) to frontend IDs (lowercase)
         selectedCertifications: vendor.certifications?.map((cert: any) => {
@@ -373,7 +399,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         shippingMethods: vendor.shippingMethods || [],
         qualityControlProcess: vendor.qualityControl || '',
         complianceStandards: '',
-        
+
         // Contact & Trade Info
         mainContact: {
           name: vendor.ownerName || '',
@@ -402,18 +428,18 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           swiftCode: '',
           iban: ''
         },
-        
+
         // Status
         status: vendor.status?.toLowerCase() as 'active' | 'pending' | 'suspended' || 'pending',
         approvalStatus: vendor.status === 'APPROVED' ? 'approved' : vendor.status === 'REJECTED' ? 'rejected' : 'pending'
       })
-      
+
       // Mark all steps as completed for edit mode
       setCompletedSteps([0, 1, 2, 3, 4, 5, 6, 7])
-      
+
     } catch (error) {
       console.error('Error loading vendor data:', error)
-      
+
       // Show error toast
       const { toast } = await import('@/hooks/use-toast')
       toast({
@@ -437,7 +463,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       if (!completedSteps.includes(currentStep)) {
         setCompletedSteps(prev => [...prev, currentStep])
       }
-      
+
       // Special handling when moving from Vendor Type & Products step
       if (currentStep === 3) {
         // If not a manufacturer, skip Manufacturing Facilities
@@ -467,7 +493,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     // Only allow navigation to current step or completed steps
     // Do NOT allow jumping to next step without completing current one
     const canNavigate = step === currentStep || completedSteps.includes(step)
-    
+
     if (canNavigate) {
       setCurrentStep(step)
     } else {
@@ -484,21 +510,21 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   const handleSubmit = async () => {
     try {
       console.log('Submitting vendor data:', formData)
-      
+
       if (mode === 'edit' && vendorId) {
         // Update existing vendor
         const VendorService = (await import('@/services/vendorService')).default
         console.log('Calling updateVendorById with vendorId:', vendorId)
         const response = await VendorService.updateVendorById(vendorId, formData)
         console.log('Update response:', response)
-        
+
         // Show success message using toast instead of alert
         const { toast } = await import('@/hooks/use-toast')
         toast({
           title: 'Success',
           description: 'Vendor updated successfully!',
         })
-        
+
         // Wait a bit before redirecting so user sees the success message
         await new Promise(resolve => setTimeout(resolve, 1000))
       } else {
@@ -512,26 +538,26 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         })
         return // Don't redirect if not implemented
       }
-      
+
       router.push('/admin/dashboard/vendors')
     } catch (error: any) {
       console.error('Error submitting vendor:', error)
       console.error('Error details:', error.response?.data || error.message)
-      
+
       const { toast } = await import('@/hooks/use-toast')
       toast({
         title: 'Error',
         description: error.response?.data?.error || error.message || 'Failed to save vendor',
         variant: 'destructive'
       })
-      
+
       throw error // Re-throw to let the loading state know there was an error
     }
   }
 
   const renderStepContent = () => {
     const actualStepIndex = getActualStepIndex(currentStep)
-    
+
     switch (actualStepIndex) {
       case 0:
         return <CompanyDetails onNext={nextStep} onUpdateData={updateFormData} data={formData} />
@@ -581,7 +607,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                 {mode === 'add' ? 'Add New Vendor' : 'Edit Vendor'}
               </h2>
             </div>
-            
+
             <div className="space-y-4">
               {filteredSteps.map((step, index) => {
                 const Icon = step.icon
@@ -589,27 +615,25 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                 const isCurrent = index === currentStep
                 const isAccessible = isCurrent || isCompleted
                 const isLocked = !isAccessible
-                
+
                 return (
                   <div
                     key={index}
-                    className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
-                      isCurrent
-                        ? 'bg-gray-200 border-r-4 border-[#313131] cursor-pointer'
-                        : isCompleted
+                    className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${isCurrent
+                      ? 'bg-gray-200 border-r-4 border-[#313131] cursor-pointer'
+                      : isCompleted
                         ? 'bg-green-50 hover:bg-green-100 cursor-pointer'
                         : 'bg-gray-50 opacity-60 cursor-not-allowed'
-                    }`}
+                      }`}
                     onClick={() => goToStep(index)}
                   >
                     <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-                        isCurrent
-                          ? 'bg-[#313131] text-white'
-                          : isCompleted
+                      className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isCurrent
+                        ? 'bg-[#313131] text-white'
+                        : isCompleted
                           ? 'bg-green-600 text-white'
                           : 'bg-gray-300 text-gray-500'
-                      }`}
+                        }`}
                     >
                       {isCompleted ? (
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -623,16 +647,15 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                         <Icon className="w-4 h-4" />
                       )}
                     </div>
-                    
+
                     <div className="flex-1">
                       <p
-                        className={`text-sm font-medium ${
-                          isCurrent
-                            ? 'text-[#313131]'
-                            : isCompleted
+                        className={`text-sm font-medium ${isCurrent
+                          ? 'text-[#313131]'
+                          : isCompleted
                             ? 'text-green-900'
                             : 'text-gray-400'
-                        }`}
+                          }`}
                       >
                         {step.title}
                       </p>
@@ -650,7 +673,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                 )
               })}
             </div>
-            
+
             {/* Progress Summary */}
             <div className="mt-8 p-4 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-center mb-2">
@@ -705,12 +728,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 }
 
 // Admin-specific Review Submit Step
-function AdminReviewSubmitStep({ 
-  formData, 
-  onSubmit, 
+function AdminReviewSubmitStep({
+  formData,
+  onSubmit,
   onGoToStep,
   mode
-}: { 
+}: {
   formData: VendorFormData
   onSubmit: () => void
   onGoToStep: (step: number) => void
@@ -723,7 +746,7 @@ function AdminReviewSubmitStep({
 
   const handleAdminSubmit = async () => {
     if (isSubmitting) return // Prevent double submission
-    
+
     setIsSubmitting(true)
     try {
       // Include admin-specific data
@@ -735,7 +758,7 @@ function AdminReviewSubmitStep({
         createdBy: 'admin', // This would come from auth context
         createdAt: new Date().toISOString()
       }
-      
+
       console.log(`Admin ${mode === 'edit' ? 'updating' : 'creating'} vendor with data:`, adminData)
       await onSubmit()
     } finally {
@@ -748,7 +771,7 @@ function AdminReviewSubmitStep({
       {/* Admin Controls */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-blue-900 mb-4">Admin Controls</h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
@@ -762,7 +785,7 @@ function AdminReviewSubmitStep({
               <option value="suspended">Suspended</option>
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Approval Status</label>
             <select
@@ -776,7 +799,7 @@ function AdminReviewSubmitStep({
             </select>
           </div>
         </div>
-        
+
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Admin Notes</label>
           <textarea
@@ -792,7 +815,7 @@ function AdminReviewSubmitStep({
       {/* Vendor Data Summary - Read Only */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Vendor Information Summary</h3>
-        
+
         <div className="space-y-6">
           {/* Company Details */}
           <div>
@@ -875,16 +898,16 @@ function AdminReviewSubmitStep({
               <div>
                 <span className="text-gray-600">Vendor Type:</span>
                 <span className="ml-2 font-medium capitalize">
-                  {Array.isArray(formData.vendorType) 
-                    ? formData.vendorType.join(', ') 
+                  {Array.isArray(formData.vendorType)
+                    ? formData.vendorType.join(', ')
                     : formData.vendorType || 'Not provided'}
                 </span>
               </div>
               <div>
                 <span className="text-gray-600">Market Type:</span>
                 <span className="ml-2 font-medium capitalize">
-                  {Array.isArray(formData.marketType) 
-                    ? formData.marketType.join(', ') 
+                  {Array.isArray(formData.marketType)
+                    ? formData.marketType.join(', ')
                     : formData.marketType || 'Not provided'}
                 </span>
               </div>
@@ -895,8 +918,8 @@ function AdminReviewSubmitStep({
 
       {/* Admin Submit Button */}
       <div className="flex justify-between pt-4">
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={() => onGoToStep(6)}
           disabled={isSubmitting}
         >

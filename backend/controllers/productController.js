@@ -1351,9 +1351,9 @@ const createProductByAdmin = async (req, res) => {
           weight,
           inStock: inStock !== false,
           status: status ? status.toUpperCase() : 'ACTIVE',
-          approvalStatus: approvalStatus ? approvalStatus.toUpperCase() : 'APPROVED', // Admin products auto-approved
-          approvedAt: approvalStatus === 'APPROVED' || !approvalStatus ? new Date() : null,
-          approvedBy: approvalStatus === 'APPROVED' || !approvalStatus ? adminId : null
+          approvalStatus: approvalStatus ? approvalStatus.toUpperCase() : 'PENDING', // Default to PENDING for admin creations
+          approvedAt: approvalStatus === 'APPROVED' ? new Date() : null,
+          approvedBy: approvalStatus === 'APPROVED' ? adminId : null
         }
       });
 
