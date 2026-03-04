@@ -61,9 +61,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
     }
   };
 
-  const handleUpdateStatus = async (newStatus: string) => {
+  const handleUpdateStatus = async (newStatus: string, assignedHubId?: string) => {
     try {
-      const res = await orderService.updateAdminOrderStatus(orderId, newStatus);
+      const res = await orderService.updateAdminOrderStatus(orderId, newStatus, assignedHubId);
       if (res.success) {
         showSuccessToast(`Order marked as ${newStatus.replace(/_/g, " ")}`);
         setOrder(res.data);
@@ -83,9 +83,8 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       return;
     }
 
-    const hubName = hubs.find((h) => h.id === selectedHub)?.name;
     setShowHubModal(false);
-    handleUpdateStatus("VENDOR_PROCESSING");
+    handleUpdateStatus("VENDOR_PROCESSING", selectedHub);
   };
 
   const handleMarkAsReceived = () => {
@@ -133,7 +132,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
     return <div className="p-6 text-center text-red-500">Order not found</div>;
   }
 
-  const assignedHub = order.status === "ORDER_CREATED" ? "Not Assigned" : "Admin Central Hub";
+  const assignedHub = order.assignedHubId
+    ? (order.hub?.name || hubs.find(h => h.id === order.assignedHubId)?.name || "Assigned Hub")
+    : "Not Assigned";
 
   return (
     <div className="space-y-6">

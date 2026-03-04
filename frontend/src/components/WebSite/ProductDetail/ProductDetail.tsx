@@ -601,18 +601,12 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                 </button>
                               </div>
 
-                              <div className="flex space-x-2">
+                              <div className="mt-4 w-full">
                                 <button
                                   onClick={handleAddToCart}
-                                  className="flex-1 bg-white text-black border-2 border-gray-700 py-2.5 px-3 rounded-lg hover:bg-gray-700 hover:text-white transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="w-full flex justify-center mx-auto bg-gray-900 border border-gray-900 text-white hover:bg-white hover:text-gray-900 shadow-md py-3 px-6 rounded-lg font-bold uppercase transition duration-300 transform active:scale-95 text-xs tracking-[1.5px]"
                                 >
                                   Add to cart
-                                </button>
-                                <button
-                                  onClick={handleBuyNow}
-                                  className="flex-1 bg-[#1d1d1d] text-white py-2.5 px-3 rounded-lg hover:from-orange-600 hover:to-gray-600 transition-all duration-300 font-semibold text-sm shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  Buy Now
                                 </button>
                               </div>
                             </>

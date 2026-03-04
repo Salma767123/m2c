@@ -37,6 +37,8 @@ export interface Order {
     customerName?: string;
     customerPhone?: string;
     trackingReference?: string;
+    assignedHubId?: string;
+    hub?: any;
     estimatedDelivery?: string;
     actualDelivery?: string;
     statusHistory?: any[];
@@ -143,9 +145,9 @@ class OrderService {
         }
     }
 
-    async updateAdminOrderStatus(id: string, status: string): Promise<{ success: boolean; data: Order }> {
+    async updateAdminOrderStatus(id: string, status: string, assignedHubId?: string): Promise<{ success: boolean; data: Order }> {
         try {
-            const response = await axios.put(`/orders/admin/${id}/status`, { status });
+            const response = await axios.put(`/orders/admin/${id}/status`, { status, assignedHubId });
             return response.data;
         } catch (error: any) {
             throw new Error(error.response?.data?.error || 'Failed to update admin order status');

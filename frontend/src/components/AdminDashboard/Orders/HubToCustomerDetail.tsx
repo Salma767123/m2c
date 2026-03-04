@@ -125,8 +125,8 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           <div>
             <p className="text-sm text-gray-600">Status</p>
             <p className={`text-base font-medium mt-1 ${["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB"].includes(status) ? "text-teal-600" :
-                status === "SHIPPED_TO_CUSTOMER" ? "text-orange-600" :
-                  status === "DELIVERED" ? "text-green-600" : "text-gray-600"
+              status === "SHIPPED_TO_CUSTOMER" ? "text-orange-600" :
+                status === "DELIVERED" ? "text-green-600" : "text-gray-600"
               }`}>
               {status.replace(/_/g, " ")}
             </p>
@@ -235,7 +235,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
         </div>
         <div className="bg-teal-50 border border-teal-200 p-4 rounded-lg">
           <p className="text-sm text-teal-800">
-            Order processing from <span className="font-semibold">Admin Central Hub</span>
+            Order processing from <span className="font-semibold">{order.hub?.name || "Admin Central Hub"}</span>
           </p>
         </div>
       </div>

@@ -119,7 +119,12 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           {(status === "ORDER_CREATED" || status === "VENDOR_PROCESSING") && (
             <button
               onClick={handleMarkAsPacked}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+              disabled={!order.assignedHubId}
+              className={`px-6 py-2 rounded-lg transition-colors font-medium ${order.assignedHubId
+                  ? "bg-purple-600 text-white hover:bg-purple-700"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+              title={!order.assignedHubId ? "Wait for admin to assign a hub" : ""}
             >
               Mark as Packed
             </button>
@@ -127,7 +132,12 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           {status === "PACKED_BY_VENDOR" && (
             <button
               onClick={handleOpenShippingModal}
-              className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+              disabled={!order.assignedHubId}
+              className={`px-6 py-2 rounded-lg transition-colors font-medium ${order.assignedHubId
+                  ? "bg-gray-900 text-white hover:bg-gray-800"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                }`}
+              title={!order.assignedHubId ? "Wait for admin to assign a hub" : ""}
             >
               Ship to Hub
             </button>
@@ -219,18 +229,43 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           <h2 className="text-lg font-semibold text-gray-900">Delivery Hub</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-600">Hub Name</p>
-            <p className="text-base font-medium text-gray-900 mt-1">Admin Central Hub</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Contact</p>
-            <p className="text-base font-medium text-gray-900 mt-1">System Generated</p>
-          </div>
-          <div className="md:col-span-2">
-            <p className="text-sm text-gray-600">Address</p>
-            <p className="text-base font-medium text-gray-900 mt-1">Please ship to the designated M2C administrative hub.</p>
-          </div>
+          {order.assignedHubId ? (
+            <>
+              <div>
+                <p className="text-sm text-gray-600">Hub Name</p>
+                <p className="text-base font-medium text-gray-900 mt-1">
+                  {order.hub?.name || "Admin Central Hub"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Contact</p>
+                <p className="text-base font-medium text-gray-900 mt-1">
+                  {order.hub?.phone || order.hub?.email || "System Generated"}
+                </p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm text-gray-600">Address</p>
+                <p className="text-base font-medium text-gray-900 mt-1 leading-relaxed">
+                  {order.hub ? (
+                    <>
+                      {order.hub.address}
+                      <br />
+                      {order.hub.city}, {order.hub.state} {order.hub.zipCode}
+                    </>
+                  ) : (
+                    "Please ship to the designated M2C administrative hub."
+                  )}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="md:col-span-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800 font-medium">Awaiting Admin Hub Assignment</p>
+              <p className="text-xs text-yellow-700 mt-1">
+                You will be able to pack and ship this order once an admin assigns a hub to it.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

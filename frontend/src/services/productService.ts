@@ -239,6 +239,7 @@ class ProductService {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     inStock?: boolean;
+    tag?: string;
   }): Promise<{
     success: boolean;
     data: {

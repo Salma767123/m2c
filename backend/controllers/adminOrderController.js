@@ -8,7 +8,8 @@ const getAllOrdersAdmin = async (req, res) => {
                 items: true,
                 statusHistory: {
                     orderBy: { timestamp: 'desc' }
-                }
+                },
+                hub: true
             },
             orderBy: {
                 createdAt: 'desc'
@@ -42,7 +43,8 @@ const getAdminOrderById = async (req, res) => {
                 items: true,
                 statusHistory: {
                     orderBy: { timestamp: 'desc' }
-                }
+                },
+                hub: true
             }
         });
 
@@ -71,7 +73,7 @@ const updateAdminOrderStatus = async (req, res) => {
     try {
         const adminId = req.userId || req.adminId; // Depends on how admin auth middleware sets it
         const { id } = req.params;
-        const { status } = req.body;
+        const { status, assignedHubId } = req.body;
 
         const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
         const whereClause = isObjectId ? { id } : { orderId: id };
@@ -93,13 +95,14 @@ const updateAdminOrderStatus = async (req, res) => {
         const updatedOrder = await prisma.order.update({
             where: { id: order.id },
             data: {
-                status: status,
+                status: status || order.status,
+                assignedHubId: assignedHubId || order.assignedHubId,
                 statusHistory: {
                     create: {
-                        status: status,
+                        status: status || order.status,
                         updatedBy: adminId,
                         updatedByType: "admin",
-                        comment: `Admin updated status to ${status}`
+                        comment: assignedHubId ? `Admin assigned hub and updated status to ${status || order.status}` : `Admin updated status to ${status || order.status}`
                     }
                 }
             },
@@ -107,7 +110,8 @@ const updateAdminOrderStatus = async (req, res) => {
                 items: true,
                 statusHistory: {
                     orderBy: { timestamp: 'desc' }
-                }
+                },
+                hub: true
             }
         });
 

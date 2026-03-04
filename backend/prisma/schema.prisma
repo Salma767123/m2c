@@ -745,6 +745,8 @@ model Order {
   // Order Status & Tracking
   status                OrderStatus @default(ORDER_CREATED)
   trackingReference     String?   // Internal tracking reference
+  assignedHubId         String?   @db.ObjectId
+  hub                   Hub?      @relation(fields: [assignedHubId], references: [id])
 
   // Vendor Information (for single vendor orders)
   vendorId              String?   @db.ObjectId
@@ -996,6 +998,7 @@ model Hub {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  orders      Order[]
   
   @@map("hubs")
 }

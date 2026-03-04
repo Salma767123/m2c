@@ -1888,7 +1888,8 @@ const getPublicProducts = async (req, res) => {
       maxPrice,
       sortBy = 'createdAt',
       sortOrder = 'desc',
-      inStock
+      inStock,
+      tag
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -1898,6 +1899,10 @@ const getPublicProducts = async (req, res) => {
       status: 'ACTIVE',
       approvalStatus: 'APPROVED'
     };
+
+    if (tag) {
+      where.tags = { has: tag };
+    }
 
     if (search) {
       where.OR = [

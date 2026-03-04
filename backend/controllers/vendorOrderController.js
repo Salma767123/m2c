@@ -16,7 +16,8 @@ const getVendorOrders = async (req, res) => {
                 items: {
                     where: { vendorId: vendorId }
                 },
-                statusHistory: true
+                statusHistory: true,
+                hub: true
             },
             orderBy: {
                 createdAt: 'desc'
@@ -51,7 +52,8 @@ const getVendorOrderById = async (req, res) => {
                 items: {
                     where: { vendorId: vendorId }
                 },
-                statusHistory: true
+                statusHistory: true,
+                hub: true
             }
         });
 
@@ -110,6 +112,14 @@ const updateVendorOrderStatus = async (req, res) => {
             });
         }
 
+        // Restriction: Vendor cannot pack or ship without an assigned hub
+        if (['PACKED_BY_VENDOR', 'IN_TRANSIT_TO_ADMIN_HUB'].includes(status) && !order.assignedHubId) {
+            return res.status(403).json({
+                success: false,
+                error: 'Cannot pack or ship order until an admin assigns a hub to this order.'
+            });
+        }
+
         const updatedOrder = await prisma.order.update({
             where: { id: order.id },
             data: {
@@ -129,7 +139,8 @@ const updateVendorOrderStatus = async (req, res) => {
                 },
                 statusHistory: {
                     orderBy: { timestamp: 'desc' }
-                }
+                },
+                hub: true
             }
         });
 

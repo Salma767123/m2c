@@ -84,11 +84,12 @@ const formatStatus = (status: string) => {
 // Helper to get normalized status for comparison
 const getNormalizedStatus = (status: string) => {
   const s = status.toLowerCase()
-  if (['order_created', 'confirmed', 'pending', 'processing'].includes(s)) return 'processing'
-  if (['dispatched', 'shipped'].includes(s)) return 'shipped'
-  if (['completed', 'delivered', 'received'].includes(s)) return 'received'
-  if (['failed', 'cancelled'].includes(s)) return 'cancelled'
-  return s
+  if (['dispatched', 'shipped', 'shipped_to_customer'].includes(s)) return 'shipped'
+  if (['completed', 'delivered', 'received', 'returned'].includes(s)) return 'received'
+  if (['failed', 'cancelled', 'rejected', 'rejected_by_admin_hub'].includes(s)) return 'cancelled'
+  // Everything else (order_created, vendor_processing, packed_by_vendor,
+  // in_transit_to_admin_hub, received_at_admin_hub, approved_by_admin_hub) → processing
+  return 'processing'
 }
 
 // Helper to get status color class

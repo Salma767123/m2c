@@ -15,11 +15,12 @@ import {
   Star,
   Plus,
   ShoppingCart,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft
 } from "lucide-react"
-import { products } from "@/components/mockData/products"
 import Dropdown from "@/components/UI/Dropdown"
 import orderService, { Order as APIOrder } from "@/services/orderService"
+import productService from "@/services/productService"
 import ReviewModal from "./ReviewModal"
 
 // Interface definitions
@@ -46,19 +47,28 @@ interface Order {
   paymentStatus?: string
 }
 
+// ── Constants ───────────────────────────────────────────
+const ORDERS_PER_PAGE = 5
+
 export default function OrderList() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
   const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pastPage, setPastPage] = useState(1)
 
-  // New state for fetching data
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Sidebar real data
+  const [topSelling, setTopSelling] = useState<any[]>([])
+  const [bestSellers, setBestSellers] = useState<any[]>([])
+
   useEffect(() => {
     fetchOrders()
+    fetchSidebarProducts()
   }, [])
 
   const fetchOrders = async () => {
@@ -73,11 +83,12 @@ export default function OrderList() {
           date: apiOrder.createdAt,
           status: ((s: string) => {
             const normalized = s.toLowerCase();
-            if (['order_created', 'confirmed', 'pending', 'processing'].includes(normalized)) return 'processing';
-            if (['dispatched', 'shipped'].includes(normalized)) return 'shipped';
-            if (['completed', 'delivered', 'received'].includes(normalized)) return 'received';
-            if (['failed', 'cancelled'].includes(normalized)) return 'cancelled';
-            return normalized;
+            if (['dispatched', 'shipped', 'shipped_to_customer'].includes(normalized)) return 'shipped';
+            if (['completed', 'delivered', 'received', 'returned'].includes(normalized)) return 'delivered';
+            if (['cancelled', 'failed', 'rejected', 'rejected_by_admin_hub'].includes(normalized)) return 'cancelled';
+            // Everything else (order_created, vendor_processing, packed_by_vendor,
+            // in_transit_to_admin_hub, received_at_admin_hub, approved_by_admin_hub, etc.) → processing
+            return 'processing';
           })(apiOrder.status),
           total: apiOrder.totalAmount,
           paymentStatus: apiOrder.paymentStatus,
@@ -95,6 +106,7 @@ export default function OrderList() {
           estimatedDelivery: apiOrder.estimatedDelivery
         }))
         setOrders(transformedOrders)
+        setCurrentPage(1)
       } else {
         setError('Failed to fetch orders')
       }
@@ -102,6 +114,19 @@ export default function OrderList() {
       setError(err.message || 'An error occurred while fetching orders')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchSidebarProducts = async () => {
+    try {
+      const [topRes, bestRes] = await Promise.all([
+        productService.getPublicProducts({ sortBy: 'rating', sortOrder: 'desc', limit: 4, inStock: true }),
+        productService.getPublicProducts({ tag: 'Best Seller', limit: 4, inStock: true })
+      ])
+      if (topRes.success) setTopSelling(topRes.data.items)
+      if (bestRes.success) setBestSellers(bestRes.data.items)
+    } catch (err) {
+      // sidebar failing silently is okay
     }
   }
 
@@ -116,6 +141,28 @@ export default function OrderList() {
       return newSet
     })
   }
+
+  const handleDownloadInvoice = async (orderId: string) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+      const token = localStorage.getItem("userToken") || sessionStorage.getItem("userToken") || "";
+      const response = await fetch(`${baseUrl}/orders/${orderId}/invoice`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to generate invoice");
+      const html = await response.text();
+      const win = window.open("", "_blank");
+      if (win) {
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(() => win.print(), 300);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate invoice. Please try again later.");
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     const normalized = status.toLowerCase()
@@ -136,7 +183,17 @@ export default function OrderList() {
   }
 
   const formatStatus = (status: string) => {
-    return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
+    switch (status) {
+      case 'delivered': return 'Delivered'
+      case 'shipped': return 'Shipped'
+      case 'cancelled': return 'Cancelled'
+      default: return 'Processing'
+    }
+  }
+
+  // Strip hex codes like (#ead2d2) from color names stored in DB
+  const cleanColorName = (color: string) => {
+    return color.replace(/\s*\(#[0-9a-fA-F]{3,6}\)/, '').trim()
   }
 
   const filteredOrders = orders.filter(order => {
@@ -150,11 +207,24 @@ export default function OrderList() {
 
   // Categorize orders based on status logic
   const currentOrders = filteredOrders.filter(order =>
-    !['received', 'delivered', 'completed', 'cancelled', 'failed'].includes(order.status.toLowerCase())
+    !['delivered', 'cancelled'].includes(order.status)
   )
 
   const pastOrders = filteredOrders.filter(order =>
-    ['received', 'delivered', 'completed', 'cancelled', 'failed'].includes(order.status.toLowerCase())
+    ['delivered', 'cancelled'].includes(order.status)
+  )
+
+  // Pagination
+  const totalCurrentPages = Math.ceil(currentOrders.length / ORDERS_PER_PAGE)
+  const paginatedCurrentOrders = currentOrders.slice(
+    (currentPage - 1) * ORDERS_PER_PAGE,
+    currentPage * ORDERS_PER_PAGE
+  )
+
+  const totalPastPages = Math.ceil(pastOrders.length / ORDERS_PER_PAGE)
+  const paginatedPastOrders = pastOrders.slice(
+    (pastPage - 1) * ORDERS_PER_PAGE,
+    pastPage * ORDERS_PER_PAGE
   )
 
   if (loading) {
@@ -248,7 +318,7 @@ export default function OrderList() {
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold text-slate-900 mb-6">Current Orders</h2>
                   <div className="space-y-6">
-                    {currentOrders.map((order) => (
+                    {paginatedCurrentOrders.map((order) => (
                       <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
                         {/* Order Header */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
@@ -261,7 +331,7 @@ export default function OrderList() {
                               </div>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                              {formatStatus(order.status)}
                             </span>
                           </div>
                           <div className="text-right">
@@ -293,7 +363,7 @@ export default function OrderList() {
                                 <div className="flex items-center gap-4 text-sm text-slate-600 mt-1">
                                   <span>Qty: {item.quantity}</span>
                                   {item.size && <span>Size: {item.size}</span>}
-                                  {item.color && <span>Color: {item.color}</span>}
+                                  {item.color && <span>Color: {cleanColorName(item.color)}</span>}
                                 </div>
                               </div>
                               <div className="text-right">
@@ -344,9 +414,12 @@ export default function OrderList() {
                               Track Order
                             </button>
                           )}
-                          <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+                          <button
+                            onClick={() => handleDownloadInvoice(order.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                          >
                             <Download className="w-4 h-4" />
-                            Download Invoice /Packing List
+                            Download Invoice / Packing List
                           </button>
                         </div>
 
@@ -362,6 +435,35 @@ export default function OrderList() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Current Orders Pagination */}
+                  {totalCurrentPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 mt-2 border-t border-slate-200">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronLeft className="w-4 h-4" /> Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalCurrentPages }, (_, i) => i + 1).map(page => (
+                          <button key={page} onClick={() => setCurrentPage(page)}
+                            className={`w-9 h-9 text-sm font-medium rounded-lg transition-colors ${currentPage === page ? 'bg-blue-600 text-white' : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
+                              }`}>
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalCurrentPages, p + 1))}
+                        disabled={currentPage === totalCurrentPages}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -370,7 +472,7 @@ export default function OrderList() {
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900 mb-6">Past Orders</h2>
                   <div className="space-y-6">
-                    {pastOrders.map((order) => (
+                    {paginatedPastOrders.map((order) => (
                       <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
                         {/* Order Header */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
@@ -383,7 +485,7 @@ export default function OrderList() {
                               </div>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                              {formatStatus(order.status)}
                             </span>
                           </div>
                           <div className="text-right">
@@ -415,7 +517,7 @@ export default function OrderList() {
                                 <div className="flex items-center gap-4 text-sm text-slate-600 mt-1">
                                   <span>Qty: {item.quantity}</span>
                                   {item.size && <span>Size: {item.size}</span>}
-                                  {item.color && <span>Color: {item.color}</span>}
+                                  {item.color && <span>Color: {cleanColorName(item.color)}</span>}
                                 </div>
                               </div>
                               <div className="text-right">
@@ -475,7 +577,10 @@ export default function OrderList() {
                               Track Order
                             </button>
                           )}
-                          <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+                          <button
+                            onClick={() => handleDownloadInvoice(order.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                          >
                             <Download className="w-4 h-4" />
                             Download Invoice / Packing List
                           </button>
@@ -517,37 +622,32 @@ export default function OrderList() {
                   Top Selling Products
                 </h3>
                 <div className="space-y-4">
-                  {products.slice(0, 4).map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer group">
-                      <div className="relative w-12 h-12 bg-slate-100 rounded-lg overflow-hidden">
-                        <Image
-                          src={item.images[0]}
-                          alt={item.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900 text-sm line-clamp-2 group-hover:text-blue-600 transition-colors">
-                          {item.name}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-slate-900 font-semibold text-sm">${item.price}</span>
-                          {item.originalPrice && (
-                            <span className="text-slate-500 text-xs line-through">${item.originalPrice}</span>
+                  {topSelling.map((item: any) => (
+                    <Link key={item.id} href={`/product/${item.id}`}>
+                      <div className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer group">
+                        <div className="relative w-12 h-12 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
+                          {item.images?.[0] ? (
+                            <Image src={item.images[0].url || item.images[0]} alt={item.name} fill className="object-cover" />
+                          ) : (
+                            <Package className="w-6 h-6 text-slate-400 m-auto" />
                           )}
                         </div>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                          <span className="text-xs text-slate-600">{item.rating}</span>
-                          <span className="text-xs text-slate-500">({item.reviews})</span>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-slate-900 text-sm line-clamp-2 group-hover:text-blue-600 transition-colors">{item.name}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-slate-900 font-semibold text-sm">₹{item.basePrice ?? item.adminFixedPrice}</span>
+                          </div>
+                          {item.rating && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                              <span className="text-xs text-slate-600">{Number(item.rating).toFixed(1)}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <button className="p-1 text-slate-400 hover:text-blue-600 transition-colors">
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
+                    </Link>
                   ))}
+                  {topSelling.length === 0 && <p className="text-sm text-slate-400 text-center py-4">Loading...</p>}
                 </div>
                 <Link href="/products">
                   <button className="w-full mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium py-2 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
@@ -556,53 +656,40 @@ export default function OrderList() {
                 </Link>
               </div>
 
-              {/* New Arrivals */}
+              {/* Best Seller */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Package className="w-5 h-5 text-green-600" />
-                  New Arrivals
+                  Best Seller
                 </h3>
                 <div className="space-y-4">
-                  {products.slice(4, 8).map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer group">
-                      <div className="relative w-12 h-12 bg-slate-100 rounded-lg overflow-hidden">
-                        <Image
-                          src={item.images[0]}
-                          alt={item.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900 text-sm line-clamp-2 group-hover:text-blue-600 transition-colors">
-                          {item.name}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-slate-900 font-semibold text-sm">${item.price}</span>
-                          {item.originalPrice && (
-                            <span className="text-slate-500 text-xs line-through">${item.originalPrice}</span>
-                          )}
-                          {item.discount && (
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                              {item.discount}% OFF
-                            </span>
+                  {bestSellers.map((item: any) => (
+                    <Link key={item.id} href={`/product/${item.id}`}>
+                      <div className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer group">
+                        <div className="relative w-12 h-12 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
+                          {item.images?.[0] ? (
+                            <Image src={item.images[0].url || item.images[0]} alt={item.name} fill className="object-cover" />
+                          ) : (
+                            <Package className="w-6 h-6 text-slate-400 m-auto" />
                           )}
                         </div>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                          <span className="text-xs text-slate-600">{item.rating}</span>
-                          <span className="text-xs text-slate-500">({item.reviews})</span>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-slate-900 text-sm line-clamp-2 group-hover:text-green-600 transition-colors">{item.name}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-slate-900 font-semibold text-sm">₹{item.basePrice ?? item.adminFixedPrice}</span>
+                            {item.discount && (
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{item.discount}% OFF</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <button className="p-1 text-slate-400 hover:text-blue-600 transition-colors">
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
+                    </Link>
                   ))}
+                  {bestSellers.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No Best Sellers found</p>}
                 </div>
                 <Link href="/products">
                   <button className="w-full mt-4 text-sm text-green-600 hover:text-green-800 font-medium py-2 border border-green-200 rounded-lg hover:bg-green-50 transition-colors">
-                    View New Arrivals
+                    View Best Sellers
                   </button>
                 </Link>
               </div>

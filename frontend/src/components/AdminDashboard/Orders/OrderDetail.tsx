@@ -5,6 +5,8 @@ import { ArrowLeft, Package, CreditCard, User, MapPin, Truck, Star, Briefcase, F
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
+import { hubService, Hub } from "@/services/hubService";
+import { MapPin as HubIcon } from "lucide-react";
 import axiosInstance from "@/lib/axios";
 
 interface OrderDetailProps {
@@ -16,10 +18,25 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
     const [order, setOrder] = useState<Order | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [invoiceLoading, setInvoiceLoading] = useState(false);
+    const [hubs, setHubs] = useState<Hub[]>([]);
+    const [isAssigningHub, setIsAssigningHub] = useState(false);
+    const [selectedHubId, setSelectedHubId] = useState<string>("");
 
     useEffect(() => {
         fetchOrderDetails();
+        fetchHubs();
     }, [orderId]);
+
+    const fetchHubs = async () => {
+        try {
+            const res = await hubService.getHubs();
+            if (res.success) {
+                setHubs(res.data.filter(h => h.isActive));
+            }
+        } catch (error) {
+            console.error("Failed to fetch hubs", error);
+        }
+    };
 
     const fetchOrderDetails = async () => {
         try {
@@ -32,6 +49,31 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             showErrorToast(error.message || "Failed to load order details");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleAssignHub = async () => {
+        if (!order || !selectedHubId) {
+            showErrorToast("Order data missing or hub not selected");
+            return;
+        }
+
+        setIsAssigningHub(true);
+        try {
+            // Update order with assignedHubId
+            const res = await axiosInstance.put(`/orders/admin/${order.id}/status`, {
+                assignedHubId: selectedHubId,
+                status: order.status // Keep current status
+            });
+
+            if (res.data.success) {
+                showSuccessToast("Hub assigned successfully");
+                setOrder(res.data.data);
+            }
+        } catch (error: any) {
+            showErrorToast(error.response?.data?.error || "Failed to assign hub");
+        } finally {
+            setIsAssigningHub(false);
         }
     };
 
@@ -111,8 +153,8 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         {invoiceLoading ? 'Generating…' : 'Print Invoice'}
                     </button>
                     <span className={`px-4 py-2 rounded-lg font-medium border ${status === "DELIVERED" ? "bg-green-100 text-green-800 border-green-300" :
-                            ["SHIPPED_TO_CUSTOMER", "IN_TRANSIT_TO_ADMIN_HUB"].includes(status) ? "bg-blue-100 text-blue-800 border-blue-300" :
-                                "bg-yellow-100 text-yellow-800 border-yellow-300"
+                        ["SHIPPED_TO_CUSTOMER", "IN_TRANSIT_TO_ADMIN_HUB"].includes(status) ? "bg-blue-100 text-blue-800 border-blue-300" :
+                            "bg-yellow-100 text-yellow-800 border-yellow-300"
                         }`}>
                         Status: {status.replace(/_/g, " ")}
                     </span>
@@ -259,6 +301,45 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                             </div>
                             {/* Further vendor details would require backend populated fields currently missing from OrderItem */}
                         </div>
+                    </div>
+
+                    {/* Hub Assignment Section */}
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex items-center gap-2 mb-4">
+                            <HubIcon className="h-5 w-5 text-gray-600" />
+                            <h2 className="text-lg font-semibold text-gray-900">Admin Hub Assignment</h2>
+                        </div>
+
+                        {order.assignedHubId ? (
+                            <div className="p-4 bg-teal-50 border border-teal-100 rounded-lg">
+                                <p className="text-xs text-teal-600 uppercase font-semibold">Assigned Hub</p>
+                                <p className="text-sm font-medium text-teal-900 mt-1">
+                                    {order.hub?.name || hubs.find(h => h.id === order.assignedHubId)?.name || "Assigned Hub"}
+                                </p>
+                                <p className="text-xs text-teal-700 mt-1 italic">Vendor can now pack and ship this order.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <p className="text-sm text-gray-600 italic">Assign a hub to allow the vendor to process this order.</p>
+                                <select
+                                    className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                                    value={selectedHubId}
+                                    onChange={(e) => setSelectedHubId(e.target.value)}
+                                >
+                                    <option value="">Select a hub...</option>
+                                    {hubs.map(hub => (
+                                        <option key={hub.id} value={hub.id}>{hub.name} ({hub.city})</option>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={handleAssignHub}
+                                    disabled={isAssigningHub || !selectedHubId}
+                                    className="w-full py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                                >
+                                    {isAssigningHub ? "Assigning..." : "Assign Hub"}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Payment Info */}
