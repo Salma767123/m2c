@@ -1,407 +1,307 @@
 "use client"
 
-import { useState } from "react"
-import { ArrowLeft, Download, FileText, Calendar, Package, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react"
-import { Badge } from "@/components/UI/Badge"
+import { useState, useEffect } from "react"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/UI/Table"
-import PDFPreviewModal from "./PDFPreviewModal"
+  ArrowLeft, FileText, Calendar, CheckCircle, XCircle,
+  Clock, AlertTriangle, Building2, ShieldCheck, Factory,
+  Settings, ClipboardList, Package
+} from "lucide-react"
+import { Badge } from "@/components/UI/Badge"
+import qcCheckerService from "@/services/qcCheckerService"
 
 interface ReportDetailProps {
   reportId: string
   onBack?: () => void
 }
 
+function InfoRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</span>
+      <span className="text-sm font-semibold text-slate-900">{value || "—"}</span>
+    </div>
+  )
+}
+
+function YesNoRow({ label, value }: { label: string; value?: string }) {
+  const v = (value || "").toLowerCase()
+  const isYes = v === "yes" || v === "pass" || v === "passed"
+  const isNo = v === "no" || v === "fail" || v === "failed"
+  const Icon = isYes ? CheckCircle : isNo ? XCircle : AlertTriangle
+  const color = isYes ? "text-emerald-600" : isNo ? "text-red-600" : "text-amber-600"
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0">
+      <span className="text-sm text-slate-700">{label}</span>
+      {value ? (
+        <span className={`flex items-center gap-1.5 text-xs font-semibold ${color}`}>
+          <Icon className="w-4 h-4" />
+          {value}
+        </span>
+      ) : (
+        <span className="text-slate-400 text-xs">—</span>
+      )}
+    </div>
+  )
+}
+
+function Section({ title, icon: Icon, accent, children }: {
+  title: string; icon: any; accent: string; children: React.ReactNode
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className={`flex items-center gap-3 px-6 py-4 border-b border-slate-100 ${accent}`}>
+        <Icon className="w-5 h-5 flex-shrink-0" />
+        <h3 className="font-bold text-sm tracking-wide">{title}</h3>
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  )
+}
+
 export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
-  const [showPDFPreview, setShowPDFPreview] = useState(false)
-  // Mock data - in real app, this would come from API based on reportId
-  const reportData = {
-    id: reportId,
-    vendor: "Nav Nit Group of Textiles",
-    po: "PO-2024-001",
-    inspectionDate: "2024-01-08",
-    result: "PASSED",
-    cartons: 50,
-    inspector: "John Smith",
-    client: "Fashion Forward Inc.",
-    factory: "Nav Nit Manufacturing Unit 1",
-    serviceLocation: "Chennai, Tamil Nadu",
-    serviceType: "Pre-Shipment Inspection",
-    
-    // Items inspected
-    items: [
-      {
-        id: 1,
-        itemName: "Cotton T-Shirt",
-        itemDescription: "100% Cotton Round Neck T-Shirt - Various Colors",
-        poQuantity: 2500,
-        inspectedQuantity: 200,
-        status: "PASSED"
-      },
-      {
-        id: 2,
-        itemName: "Denim Jeans",
-        itemDescription: "Blue Denim Straight Fit Jeans - Size 28-42",
-        poQuantity: 2500,
-        inspectedQuantity: 200,
-        status: "PASSED"
+  const [inspection, setInspection] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await qcCheckerService.getMyInspectionById(reportId)
+        if (res.success) setInspection(res.inspection)
+        else setError("Report not found")
+      } catch (e: any) {
+        setError(e.message || "Failed to load report")
+      } finally {
+        setLoading(false)
       }
-    ],
-
-    // Inspection results
-    packaging: {
-      shipperCartonQuality: ["pass"],
-      retailPackagingQuality: ["pass"],
-      internalProtection: ["pass"],
-      labelingComplete: ["pass"]
-    },
-
-    measurements: [
-      {
-        sampleName: "S1",
-        cartonLength: 45.0,
-        cartonWidth: 30.0,
-        cartonHeight: 25.0,
-        productLength: 45.0,
-        productWidth: 30.0,
-        retailWeight: 0.5,
-        cartonGrossWeight: 25.0,
-        status: "PASSED"
-      },
-      {
-        sampleName: "S2",
-        cartonLength: 45.1,
-        cartonWidth: 30.1,
-        cartonHeight: 25.0,
-        productLength: 45.1,
-        productWidth: 30.1,
-        retailWeight: 0.51,
-        cartonGrossWeight: 25.2,
-        status: "PASSED"
-      }
-    ],
-
-    defects: {
-      majorDefects: 0,
-      minorDefects: 2,
-      majorDefectDetails: "",
-      minorDefectDetails: "Minor stitching irregularities on 2 samples"
-    },
-
-    testing: {
-      dropTestResult: "pass",
-      colorFastnessDry: "pass",
-      colorFastnessWet: "pass",
-      seamStrengthResult: "pass",
-      smellCheck: "pass"
     }
-  }
+    load()
+  }, [reportId])
 
-  const handleDownloadPDF = () => {
-    setShowPDFPreview(true)
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+    </div>
+  )
 
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "passed":
-      case "pass":
-        return <CheckCircle className="w-4 h-4 text-emerald-600" />
-      case "failed":
-      case "fail":
-        return <XCircle className="w-4 h-4 text-red-600" />
-      case "pending":
-        return <Clock className="w-4 h-4 text-amber-600" />
-      default:
-        return <AlertTriangle className="w-4 h-4 text-slate-600" />
-    }
-  }
+  if (error || !inspection) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
+      <AlertTriangle className="w-12 h-12 text-amber-400" />
+      <p className="text-slate-600">{error || "Inspection not found"}</p>
+      {onBack && <button onClick={onBack} className="text-blue-600 underline text-sm">Go back</button>}
+    </div>
+  )
 
-  const getStatusBadge = (status: string) => {
-    const config = {
-      PASSED: { variant: "default" as const, className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-      FAILED: { variant: "destructive" as const, className: "bg-red-100 text-red-800 border-red-200" },
-      PENDING: { variant: "secondary" as const, className: "bg-amber-100 text-amber-800 border-amber-200" },
-    }
-    return config[status as keyof typeof config] || config.PENDING
-  }
+  // After completion, itemsToInspect holds the submitted form data object
+  const fd = inspection.itemsToInspect && !Array.isArray(inspection.itemsToInspect)
+    ? inspection.itemsToInspect : {}
+  // Original items assigned by admin
+  const assignedItems = Array.isArray(inspection.itemsToInspect) ? inspection.itemsToInspect : []
 
-  const badgeConfig = getStatusBadge(reportData.result)
+  const resultColors: Record<string, string> = {
+    PASSED: "bg-emerald-100 text-emerald-800",
+    FAILED: "bg-red-100 text-red-800",
+    CONDITIONALLY_PASSED: "bg-amber-100 text-amber-800",
+  }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto font-sans">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {onBack && (
-                <button 
-                  onClick={onBack}
-                  className="p-2 hover:bg-white rounded-lg transition-colors"
-                >
-                  <ArrowLeft className="w-5 h-5 text-slate-600" />
-                </button>
-              )}
-              <div>
-                <h1 className="text-4xl font-bold text-slate-900 mb-2">Inspection Report</h1>
-                <p className="text-slate-600 text-lg">Report ID: {reportId}</p>
-              </div>
-            </div>
-            <button 
-              onClick={handleDownloadPDF}
-              className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
-            >
-              <Download className="w-4 h-4" />
-              Preview & Download PDF
-            </button>
-          </div>
+    <div className="p-8 max-w-5xl mx-auto font-sans space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        {onBack && (
+          <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+            <ArrowLeft className="w-5 h-5 text-slate-600" />
+          </button>
+        )}
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold text-slate-900">Inspection Report</h1>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {inspection.vendor?.companyName || fd.vendorName} &bull; Ref: {reportId.slice(-8).toUpperCase()}
+          </p>
         </div>
+        {inspection.result && (
+          <Badge className={`${resultColors[inspection.result] || "bg-gray-100 text-gray-700"} text-sm px-4 py-1.5`}>
+            {inspection.result === "PASSED" && <CheckCircle className="w-4 h-4 mr-1.5" />}
+            {inspection.result === "FAILED" && <XCircle className="w-4 h-4 mr-1.5" />}
+            {inspection.result === "CONDITIONALLY_PASSED" && <AlertTriangle className="w-4 h-4 mr-1.5" />}
+            {inspection.result}
+          </Badge>
+        )}
+      </div>
 
-        {/* Report Overview */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <FileText className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">General Information</h2>
-                <p className="text-sm text-slate-600">Basic inspection details</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Vendor</label>
-                  <p className="text-slate-900 font-medium">{reportData.vendor}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-600">PO Number</label>
-                  <p className="font-mono text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-md border border-blue-200 inline-block">
-                    {reportData.po}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Factory</label>
-                  <p className="text-slate-900">{reportData.factory}</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Client</label>
-                  <p className="text-slate-900 font-medium">{reportData.client}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Service Location</label>
-                  <p className="text-slate-900">{reportData.serviceLocation}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Inspector</label>
-                  <p className="text-slate-900">{reportData.inspector}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <Calendar className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Inspection Status</h2>
-                <p className="text-sm text-slate-600">Overall result</p>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="text-center">
-                <Badge 
-                  variant={badgeConfig.variant}
-                  className={`${badgeConfig.className} text-lg px-4 py-2`}
-                >
-                  {getStatusIcon(reportData.result)}
-                  <span className="ml-2">{reportData.result}</span>
-                </Badge>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-2xl font-bold text-slate-900">{reportData.cartons}</p>
-                  <p className="text-sm text-slate-600">Cartons</p>
-                </div>
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-2xl font-bold text-slate-900">{reportData.items.length}</p>
-                  <p className="text-sm text-slate-600">Items</p>
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-slate-600">Inspection Date</p>
-                <p className="font-medium text-slate-900">{reportData.inspectionDate}</p>
-              </div>
-            </div>
-          </div>
+      {/* Summary Banner */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 text-white grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <p className="text-blue-200 text-xs font-medium uppercase mb-1">Vendor</p>
+          <p className="font-semibold text-sm">{inspection.vendor?.companyName || fd.vendorName || "—"}</p>
         </div>
+        <div>
+          <p className="text-blue-200 text-xs font-medium uppercase mb-1">Client</p>
+          <p className="font-semibold text-sm">{inspection.clientName || "—"}</p>
+        </div>
+        <div>
+          <p className="text-blue-200 text-xs font-medium uppercase mb-1">Completed On</p>
+          <p className="font-semibold text-sm">
+            {inspection.completedAt
+              ? new Date(inspection.completedAt).toLocaleDateString("en-IN")
+              : "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-blue-200 text-xs font-medium uppercase mb-1">Priority</p>
+          <p className="font-semibold text-sm">{inspection.priority || "—"}</p>
+        </div>
+      </div>
 
-        {/* Items Inspected */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Package className="w-5 h-5 text-purple-600" />
+      {/* SECTION 1: Factory Details */}
+      <Section title="Section 1 — Factory Details" icon={Factory} accent="bg-blue-50 text-blue-800">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <InfoRow label="Vendor Name" value={fd.vendorName} />
+          <InfoRow label="Factory Name" value={fd.factoryName} />
+          <InfoRow label="Factory Address" value={fd.factoryAddress} />
+          <InfoRow label="Contact Person" value={fd.contactPersonName} />
+          <InfoRow label="Contact Phone" value={fd.contactPhoneNumber} />
+        </div>
+      </Section>
+
+      {/* SECTION 2: Legal */}
+      <Section title="Section 2 — Legal & Registration" icon={ShieldCheck} accent="bg-indigo-50 text-indigo-800">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <InfoRow label="Business Reg. No." value={fd.businessRegistrationNumber} />
+          <InfoRow label="GST / Tax ID" value={fd.gstTaxId} />
+          <InfoRow label="Factory License No." value={fd.factoryLicenseNumber} />
+        </div>
+      </Section>
+
+      {/* SECTION 3: Production */}
+      <Section title="Section 3 — Production Info" icon={Settings} accent="bg-purple-50 text-purple-800">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <InfoRow label="Products Manufactured" value={fd.productsManufactured} />
+          <InfoRow label="Monthly Capacity" value={fd.monthlyProductionCapacity} />
+          <InfoRow label="Production Workers" value={fd.numberOfProductionWorkers} />
+          <InfoRow label="Category to Inspect" value={fd.categoryToInspect} />
+        </div>
+      </Section>
+
+      {/* SECTION 4: Infrastructure */}
+      <Section title="Section 4 — Basic Infrastructure" icon={Building2} accent="bg-teal-50 text-teal-800">
+        <YesNoRow label="Machinery Available" value={fd.machineryAvailable} />
+        <YesNoRow label="Electricity Available" value={fd.electricityAvailable} />
+        <YesNoRow label="Water Available" value={fd.waterAvailable} />
+        <YesNoRow label="Storage Area Available" value={fd.storageAreaAvailable} />
+      </Section>
+
+      {/* SECTION 5: Quality & Safety */}
+      <Section title="Section 5 — Quality & Safety" icon={ShieldCheck} accent="bg-emerald-50 text-emerald-800">
+        <YesNoRow label="Quality Check Process in Place" value={fd.qualityCheckProcess} />
+        <YesNoRow label="Safety Equipment Available" value={fd.safetyEquipment} />
+        <YesNoRow label="Clean Working Environment" value={fd.cleanWorkingEnvironment} />
+      </Section>
+
+      {/* SECTION 6: Inspection Info */}
+      <Section title="Section 6 — Inspection Info" icon={ClipboardList} accent="bg-orange-50 text-orange-800">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+          <InfoRow label="Inspection Date" value={fd.inspectionDate} />
+          <InfoRow label="Inspector Name" value={fd.inspectorName || inspection.checker?.name} />
+          <InfoRow label="Inspection Status" value={fd.inspectionStatus} />
+        </div>
+        {(fd.inspectorRemarks || inspection.notes) && (
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mt-2">
+            <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Remarks</p>
+            <p className="text-sm text-blue-900">{fd.inspectorRemarks || inspection.notes}</p>
+          </div>
+        )}
+      </Section>
+
+      {/* SECTION 7: Evidence */}
+      {((fd.factoryPhotos?.length > 0) || (fd.documentsUpload?.length > 0)) && (
+        <Section title="Section 7 — Evidence" icon={FileText} accent="bg-rose-50 text-rose-800">
+          {fd.factoryPhotos?.length > 0 && (
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-3">
+                Factory Photos ({fd.factoryPhotos.length})
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {fd.factoryPhotos.map((p: any, i: number) => {
+                  const src = p?.data || p?.url || null
+                  return src && typeof src === 'string' && src.startsWith('data:image') ? (
+                    <div key={i} className="relative group">
+                      <img
+                        src={src}
+                        alt={p.name || `Photo ${i + 1}`}
+                        className="w-full h-32 object-cover rounded-xl border border-slate-200 shadow-sm"
+                      />
+                      <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                        {p.name}
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={i} className="flex items-center justify-center h-32 bg-slate-100 rounded-xl border border-dashed border-slate-300">
+                      <span className="text-xs text-slate-500 text-center px-2">{p?.name || `Photo ${i + 1}`}</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
+          )}
+          {fd.documentsUpload?.length > 0 && (
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Items Inspected</h2>
-              <p className="text-sm text-slate-600">Product details and quantities</p>
-            </div>
-          </div>
-          
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Item Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>PO Quantity</TableHead>
-                <TableHead>Inspected</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {reportData.items.map((item) => {
-                const itemBadgeConfig = getStatusBadge(item.status)
-                return (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.itemName}</TableCell>
-                    <TableCell className="text-slate-600">{item.itemDescription}</TableCell>
-                    <TableCell>{item.poQuantity.toLocaleString()}</TableCell>
-                    <TableCell>{item.inspectedQuantity}</TableCell>
-                    <TableCell>
-                      <Badge variant={itemBadgeConfig.variant} className={itemBadgeConfig.className}>
-                        {getStatusIcon(item.status)}
-                        <span className="ml-1">{item.status}</span>
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* Inspection Results Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Packaging Results */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Packaging & Labeling</h3>
-            <div className="space-y-3">
-              {Object.entries(reportData.packaging).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-slate-600 capitalize">{key.replace(/([A-Z])/g, (match) => ` ${match}`).trim()}</span>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(Array.isArray(value) ? value[0] : value)}
-                    <span className="text-sm font-medium capitalize">
-                      {Array.isArray(value) ? value.join(', ') : value}
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-3">
+                Documents ({fd.documentsUpload.length})
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {fd.documentsUpload.map((doc: any, i: number) =>
+                  doc?.data ? (
+                    <a
+                      key={i}
+                      href={doc.data}
+                      download={doc.name || `Document_${i + 1}`}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      {doc.name || `Document ${i + 1}`}
+                    </a>
+                  ) : (
+                    <span key={i} className="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
+                      {doc?.name || `Document ${i + 1}`}
                     </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Testing Results */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Quality Testing</h3>
-            <div className="space-y-3">
-              {Object.entries(reportData.testing).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-slate-600 capitalize">{key.replace(/([A-Z])/g, (match) => ` ${match}`).trim()}</span>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(value)}
-                    <span className="text-sm font-medium capitalize">{value}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Measurements */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 mb-8">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">Physical Measurements</h3>
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Sample</TableHead>
-                <TableHead>Carton L/W/H (cm)</TableHead>
-                <TableHead>Product L/W (cm)</TableHead>
-                <TableHead>Retail Weight (kg)</TableHead>
-                <TableHead>Gross Weight (kg)</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {reportData.measurements.map((measurement, index) => {
-                const measurementBadgeConfig = getStatusBadge(measurement.status)
-                return (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{measurement.sampleName}</TableCell>
-                    <TableCell>
-                      {measurement.cartonLength} × {measurement.cartonWidth} × {measurement.cartonHeight}
-                    </TableCell>
-                    <TableCell>
-                      {measurement.productLength} × {measurement.productWidth}
-                    </TableCell>
-                    <TableCell>{measurement.retailWeight}</TableCell>
-                    <TableCell>{measurement.cartonGrossWeight}</TableCell>
-                    <TableCell>
-                      <Badge variant={measurementBadgeConfig.variant} className={measurementBadgeConfig.className}>
-                        {getStatusIcon(measurement.status)}
-                        <span className="ml-1">{measurement.status}</span>
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* Defects Summary */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">AQL Defects Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
-                <span className="font-medium text-red-800">Major Defects</span>
-                <span className="text-2xl font-bold text-red-600">{reportData.defects.majorDefects}</span>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
-                <span className="font-medium text-amber-800">Minor Defects</span>
-                <span className="text-2xl font-bold text-amber-600">{reportData.defects.minorDefects}</span>
+                  )
+                )}
               </div>
             </div>
-            <div className="space-y-4">
-              {reportData.defects.minorDefectDetails && (
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Minor Defect Details</label>
-                  <p className="text-slate-900 bg-slate-50 p-3 rounded-lg">{reportData.defects.minorDefectDetails}</p>
+          )}
+        </Section>
+      )}
+
+      {/* Assigned items (original admin list) */}
+      {assignedItems.length > 0 && (
+        <Section title="Items Assigned for Inspection" icon={Package} accent="bg-slate-50 text-slate-700">
+          <div className="space-y-3">
+            {assignedItems.map((item: any, i: number) => (
+              <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="flex-1">
+                  <p className="font-semibold text-slate-900 text-sm">{item.itemName}</p>
+                  {item.description && <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>}
                 </div>
-              )}
-            </div>
+                <div className="text-xs text-center flex-shrink-0">
+                  {item.aqlLevel && (
+                    <div><p className="font-bold text-blue-600">{item.aqlLevel}</p><p className="text-slate-500">AQL</p></div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
+        </Section>
+      )}
+
+      {/* Timestamps */}
+      <div className="bg-white rounded-xl border border-slate-200 px-6 py-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <InfoRow label="Scheduled Date" value={inspection.scheduledDate} />
+          <InfoRow label="Started At" value={inspection.startedAt ? new Date(inspection.startedAt).toLocaleString("en-IN") : undefined} />
+          <InfoRow label="Completed At" value={inspection.completedAt ? new Date(inspection.completedAt).toLocaleString("en-IN") : undefined} />
         </div>
-        
-        {/* PDF Preview Modal */}
-        <PDFPreviewModal
-          isOpen={showPDFPreview}
-          onClose={() => setShowPDFPreview(false)}
-          reportData={reportData}
-          reportId={reportId}
-        />
+      </div>
     </div>
   )
 }

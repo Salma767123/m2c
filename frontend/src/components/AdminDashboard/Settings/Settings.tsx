@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff, Percent, Warehouse } from "lucide-react";
+import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCard, Upload, Image as ImageIcon, DollarSign, Key, Eye, EyeOff, Percent, Warehouse, Globe } from "lucide-react";
 import GSTSettingsTab from "./GSTSettingsTab";
 import HubSettingsTab from "./HubSettingsTab";
+import SEOSettingsTab from "./SEOSettingsTab";
 import InvoiceSettings from "../Billing/Settings/InvoiceSettings";
 import { Card, CardContent } from "../../UI/Card";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
@@ -42,7 +43,7 @@ export default function Settings() {
     zipCode: "10001",
   });
 
-  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo">("profile");
 
   // Profile form state
   const [profileData, setProfileData] = useState({
@@ -482,6 +483,16 @@ export default function Settings() {
               >
                 <FileText className="h-4 w-4 inline mr-2" />
                 Invoice Settings
+              </button>
+              <button
+                onClick={() => setActiveTab("seo")}
+                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "seo"
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                <Globe className="h-4 w-4 inline mr-2" />
+                SEO Settings
               </button>
             </>
           )}
@@ -1431,6 +1442,11 @@ export default function Settings() {
       {/* Invoice Settings Tab */}
       {activeTab === "invoice" && canAccessAdminSettings && (
         <InvoiceSettings />
+      )}
+
+      {/* SEO Settings Tab */}
+      {activeTab === "seo" && canAccessAdminSettings && (
+        <SEOSettingsTab />
       )}
     </div>
   );

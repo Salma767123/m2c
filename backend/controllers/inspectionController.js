@@ -144,11 +144,8 @@ const getInspectionByVendorId = async (req, res) => {
             orderBy: { createdAt: 'desc' }
         });
 
-        if (!inspection) {
-            return res.status(404).json({ error: 'No inspection assignment found for this vendor' });
-        }
-
-        res.json({ success: true, inspection });
+        // Return 200 with null inspection if none found (not a 404 - it's a valid "not yet assigned" state)
+        res.json({ success: true, inspection: inspection || null });
     } catch (error) {
         console.error('Error fetching vendor inspection:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -244,11 +241,11 @@ const completeInspection = async (req, res) => {
             }
         });
 
-        // Also update vendor status
+        // Also update vendor status - Keep as UNDER_REVIEW for admin approval even if QC passes
         await prisma.vendor.update({
             where: { id: inspection.vendorId },
             data: {
-                status: resultStatus === 'PASSED' ? 'APPROVED' : (resultStatus === 'FAILED' ? 'REJECTED' : 'UNDER_REVIEW'),
+                status: resultStatus === 'FAILED' ? 'REJECTED' : 'UNDER_REVIEW',
                 assignedQcId: null // Clear inspector once completed
             }
         });
@@ -260,11 +257,95 @@ const completeInspection = async (req, res) => {
     }
 };
 
+// Admin: Get single inspection by ID
+const getInspectionById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const inspection = await prisma.inspection.findUnique({
+            where: { id },
+            include: {
+                vendor: {
+                    select: {
+                        id: true,
+                        companyName: true,
+                        email: true,
+                        ownerName: true,
+                        businessPhone: true,
+                        businessCity: true,
+                        businessState: true,
+                        businessAddress: true,
+                    }
+                },
+                checker: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    }
+                }
+            }
+        });
+
+        if (!inspection) {
+            return res.status(404).json({ error: 'Inspection not found' });
+        }
+
+        res.json({ success: true, inspection });
+    } catch (error) {
+        console.error('Error fetching inspection by ID:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// QC Checker: Get one of their own completed inspections by ID
+const getMyInspectionById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const checkerId = req.user.id;
+
+        const inspection = await prisma.inspection.findUnique({
+            where: { id },
+            include: {
+                vendor: {
+                    select: {
+                        id: true,
+                        companyName: true,
+                        email: true,
+                        ownerName: true,
+                        businessPhone: true,
+                        businessCity: true,
+                        businessState: true,
+                    }
+                },
+                checker: {
+                    select: { id: true, name: true, email: true }
+                }
+            }
+        });
+
+        if (!inspection) {
+            return res.status(404).json({ error: 'Inspection not found' });
+        }
+
+        // Only allow the assigned checker to view
+        if (inspection.checkerId !== checkerId) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        res.json({ success: true, inspection });
+    } catch (error) {
+        console.error('Get My Inspection by ID error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 module.exports = {
     createInspection,
     getInspectionsByChecker,
     startInspection,
     getInspectionByVendorId,
+    getInspectionById,
+    getMyInspectionById,
     updateInspection,
     completeInspection
 };

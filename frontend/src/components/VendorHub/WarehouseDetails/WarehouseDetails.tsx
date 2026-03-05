@@ -69,7 +69,7 @@ export default function WarehouseDetails({
   }, [data]);
 
   // Check if address was copied from company details
-  const isAddressCopied = data.sameAsWarehouse && 
+  const isAddressCopied = data.sameAsWarehouse &&
     data.warehouseAddress === data.address &&
     data.warehouseCity === data.city &&
     data.warehouseState === data.state &&
@@ -124,7 +124,7 @@ export default function WarehouseDetails({
   const handleNext = () => {
     // Validate required fields
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.ownershipType) newErrors.ownershipType = 'Ownership Type is required';
     if (!formData.warehouseAddress) newErrors.warehouseAddress = 'Warehouse Address is required';
     if (!formData.warehouseCity) newErrors.warehouseCity = 'City is required';
@@ -145,7 +145,7 @@ export default function WarehouseDetails({
         allTouched[key] = true;
       });
       setTouched(allTouched);
-      
+
       // Scroll to first error
       const firstErrorField = Object.keys(newErrors)[0];
       const element = document.querySelector(`[name="${firstErrorField}"]`);
@@ -218,13 +218,12 @@ export default function WarehouseDetails({
               <div
                 key={type.id}
                 onClick={() => handleInputChange("ownershipType", type.id)}
-                className={`p-4 rounded-4xl cursor-pointer transition-colors ${
-                  formData.ownershipType === type.id
+                className={`p-4 rounded-4xl cursor-pointer transition-colors ${formData.ownershipType === type.id
                     ? "border-2 border-blue-600 bg-blue-50 text-blue-700 "
                     : errors.ownershipType && touched.ownershipType
-                    ? "border-2 border-red-500 bg-red-50"
-                    : "bg-gray-100 text-gray-500"
-                }`}
+                      ? "border-2 border-red-500 bg-red-50"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
               >
                 <div className="font-semibold text-base">{type.label}</div>
               </div>
@@ -282,11 +281,10 @@ export default function WarehouseDetails({
                 handleInputChange("warehouseAddress", e.target.value)
               }
               onBlur={() => handleBlur("warehouseAddress")}
-              className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                errors.warehouseAddress && touched.warehouseAddress
+              className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.warehouseAddress && touched.warehouseAddress
                   ? 'border-red-500 bg-red-50'
                   : 'border-gray-300'
-              }`}
+                }`}
               placeholder="Enter Street Address"
             />
             {errors.warehouseAddress && touched.warehouseAddress && (
@@ -307,11 +305,10 @@ export default function WarehouseDetails({
                   handleInputChange("warehouseCity", e.target.value)
                 }
                 onBlur={() => handleBlur("warehouseCity")}
-                className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.warehouseCity && touched.warehouseCity
+                className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.warehouseCity && touched.warehouseCity
                     ? 'border-red-500 bg-red-50'
                     : 'border-gray-300'
-                }`}
+                  }`}
                 placeholder="City"
               />
               {errors.warehouseCity && touched.warehouseCity && (
@@ -329,11 +326,10 @@ export default function WarehouseDetails({
                 value={formData.warehouseState}
                 onChange={(e) => handleInputChange("warehouseState", e.target.value)}
                 onBlur={() => handleBlur("warehouseState")}
-                className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.warehouseState && touched.warehouseState
+                className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.warehouseState && touched.warehouseState
                     ? 'border-red-500 bg-red-50'
                     : 'border-gray-300'
-                }`}
+                  }`}
                 placeholder="State"
               />
               {errors.warehouseState && touched.warehouseState && (
@@ -353,11 +349,10 @@ export default function WarehouseDetails({
                   handleInputChange("warehouseZip", e.target.value)
                 }
                 onBlur={() => handleBlur("warehouseZip")}
-                className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.warehouseZip && touched.warehouseZip
+                className={`w-full text-base font-medium px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.warehouseZip && touched.warehouseZip
                     ? 'border-red-500 bg-red-50'
                     : 'border-gray-300'
-                }`}
+                  }`}
                 placeholder="ZIP Code"
               />
               {errors.warehouseZip && touched.warehouseZip && (
@@ -501,11 +496,10 @@ export default function WarehouseDetails({
                 value={formData.mapLink}
                 onChange={(e) => handleInputChange("mapLink", e.target.value)}
                 onBlur={() => handleBlur("mapLink")}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.mapLink && touched.mapLink
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.mapLink && touched.mapLink
                     ? 'border-red-500 bg-red-50'
                     : 'border-gray-300'
-                }`}
+                  }`}
                 placeholder="https://www.google.com/maps/embed?pb=1!1m18!1m12..."
               />
             </div>
@@ -523,32 +517,57 @@ export default function WarehouseDetails({
           </div>
 
           {/* Map Preview */}
-          {isValidEmbedUrl(formData.mapLink) && (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="bg-gray-50 px-4 py-2 border-b">
+          {formData.mapLink && (
+            <div className={`border rounded-lg overflow-hidden ${isValidEmbedUrl(formData.mapLink) ? 'border-gray-200' : 'border-amber-200 bg-amber-50'}`}>
+              <div className="bg-gray-50 px-4 py-2 border-b flex items-center justify-between">
                 <h4 className="text-sm font-medium text-gray-700">
-                  Map Preview
+                  {isValidEmbedUrl(formData.mapLink) ? 'Map Preview' : 'Location Link Provided'}
                 </h4>
+                {!isValidEmbedUrl(formData.mapLink) && (
+                  <span className="text-[10px] bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold uppercase">
+                    Not Embeddable
+                  </span>
+                )}
               </div>
+
               <div className="relative">
-                <iframe
-                  src={formData.mapLink}
-                  width="100%"
-                  height="300"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  className="w-full"
-                  title="Location Map"
-                />
+                {isValidEmbedUrl(formData.mapLink) ? (
+                  <iframe
+                    src={formData.mapLink}
+                    width="100%"
+                    height="300"
+                    style={{ border: 0 }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    className="w-full"
+                    title="Location Map"
+                  />
+                ) : (
+                  <div className="h-[200px] flex flex-col items-center justify-center p-6 text-center">
+                    <Map className="w-12 h-12 text-amber-400 mb-2" />
+                    <p className="text-sm text-gray-600 mb-4">
+                      The link provided is not a direct embed link, so we cannot show a preview here.
+                    </p>
+                    <Button asChild variant="outline" size="sm">
+                      <a href={formData.mapLink} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Test Link in New Tab
+                      </a>
+                    </Button>
+                  </div>
+                )}
               </div>
-              <div className="bg-gray-50 px-4 py-2 border-t">
+
+              <div className="bg-gray-50 px-4 py-2 border-t flex justify-between items-center">
+                <span className="text-xs text-gray-500">
+                  {isValidEmbedUrl(formData.mapLink) ? 'Directly embedded Google Map' : 'External map link'}
+                </span>
                 <a
                   href={formData.mapLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center font-medium"
                 >
                   <ExternalLink className="w-4 h-4 mr-1" />
                   Open in Maps
@@ -559,37 +578,33 @@ export default function WarehouseDetails({
 
           {/* Help Message for Non-Embed URLs */}
           {formData.mapLink && !isValidEmbedUrl(formData.mapLink) && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start">
                 <div className="shrink-0">
                   <svg
-                    className="h-5 w-5 text-yellow-400"
+                    className="h-5 w-5 text-blue-400"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
                     <path
                       fillRule="evenodd"
-                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
                       clipRule="evenodd"
                     />
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">
-                    Please use Google Maps embed link
+                  <h3 className="text-sm font-medium text-blue-800">
+                    Pro Tip: Use the Embed Link for a Live Preview
                   </h3>
-                  <div className="mt-2 text-sm text-yellow-700">
+                  <div className="mt-2 text-sm text-blue-700">
                     <p>
-                      The URL you entered is not an embed link. Please follow
-                      these steps:
+                      To show a live map preview on your profile, use the Google Maps <strong>Embed link</strong>:
                     </p>
                     <ol className="list-decimal list-inside mt-1 space-y-1">
-                      <li>Go to Google Maps and find your location</li>
-                      <li>Click the "Share" button</li>
-                      <li>Select "Embed a map" tab</li>
-                      <li>
-                        Copy the URL from the src="..." part of the HTML code
-                      </li>
+                      <li>Find your location on Google Maps</li>
+                      <li>Click "Share" → "Embed a map"</li>
+                      <li>Copy only the URL (the text inside <code>src="..."</code>)</li>
                     </ol>
                   </div>
                 </div>

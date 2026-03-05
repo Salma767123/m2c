@@ -55,7 +55,7 @@ export default function VendorDashboardLayout({
               {children}
             </div>
           </main>
-          <VendorFooter />
+          {/* <VendorFooter /> */}
         </div>
         <Toaster />
       </div>

@@ -3,7 +3,7 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 
 // Create axios instance with base configuration
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
-  timeout: 10000, // 10 seconds timeout
+  timeout: 30000, // 30 seconds — increased to handle larger payloads (e.g. base64 images)
   withCredentials: true, // Always send httpOnly cookies (enables 7-day admin sessions)
   headers: {
     'Content-Type': 'application/json',

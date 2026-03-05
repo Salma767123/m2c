@@ -286,11 +286,26 @@ class QCCheckerService {
             const response = await axios.post(`/inspections/${inspectionId}/complete`, formData, {
                 headers: {
                     'Authorization': `Bearer ${this.getCheckerToken()}`
-                }
+                },
+                timeout: 120000, // 2 minutes — payload can include multiple base64 images
             });
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to complete inspection');
+        }
+    }
+
+    // Get a single completed inspection report (own only)
+    async getMyInspectionById(inspectionId: string): Promise<{ success: boolean; inspection: any }> {
+        try {
+            const response = await axios.get(`/inspections/${inspectionId}/my-report`, {
+                headers: {
+                    'Authorization': `Bearer ${this.getCheckerToken()}`
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to fetch inspection report');
         }
     }
 

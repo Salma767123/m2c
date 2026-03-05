@@ -62,12 +62,12 @@ app.use((req, res, next) => {
 });
 // app.use(morgan('combined')); // Commented out to reduce console logs
 app.use(express.json({
-  limit: '10mb',
+  limit: '50mb',
   verify: (req, res, buf) => {
     req.rawBody = buf.toString();
   }
 }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Configure express-session for Google OAuth
 app.use(session({
@@ -144,6 +144,7 @@ const vendorReportsRoutes = require('./routes/vendorReportsRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const adminDashboardRoutes = require('./routes/adminDashboardRoutes');
 const vendorDashboardRoutes = require('./routes/vendorDashboardRoutes');
+const seoSettingsRoutes = require('./routes/seoSettingsRoutes');
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -175,6 +176,7 @@ app.use('/api/vendor-reports', vendorReportsRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/admin-dashboard', adminDashboardRoutes);
 app.use('/api/vendor-dashboard', vendorDashboardRoutes);
+app.use('/api/seo-settings', seoSettingsRoutes);
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

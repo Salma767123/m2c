@@ -11,6 +11,7 @@ import InspectionInfo from "./Steps/InspectionInfo"
 import BasicEvidence from "./Steps/BasicEvidence"
 
 import qcCheckerService from "@/services/qcCheckerService"
+import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 
 interface InspectionFormProps {
   vendorName: string
@@ -158,22 +159,45 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
     }
   }
 
+
   const handleComplete = async () => {
     if (!inspectionId) {
-      console.error("No inspection found to complete");
+      showErrorToast("Cannot Submit", "No active inspection found. Please contact your administrator.")
       return;
     }
 
     try {
       setSubmitting(true);
-      const res = await qcCheckerService.completeInspection(inspectionId, formData);
-      if (res.success) {
-        onComplete();
-      } else {
-        console.error("Failed to complete:", res);
+
+      // BasicEvidence already converts files to base64 on pick.
+      // Here we just strip the raw File objects so the payload is clean JSON.
+      const cleanPhotos = (formData.factoryPhotos || []).map((p: any) => ({
+        name: p.name,
+        data: p.data || null,
+      }))
+      const cleanDocs = (formData.documentsUpload || []).map((d: any) => ({
+        name: d.name,
+        data: d.data || null,
+      }))
+
+      const payload = {
+        ...formData,
+        factoryPhotos: cleanPhotos,
+        documentsUpload: cleanDocs,
       }
-    } catch (err) {
+
+      const res = await qcCheckerService.completeInspection(inspectionId, payload);
+      if (res.success) {
+        showSuccessToast("Inspection Submitted! ✅", "Factory inspection report has been submitted successfully.");
+        setTimeout(() => {
+          onComplete();
+        }, 1500);
+      } else {
+        showErrorToast("Submission Failed", "Could not submit the inspection. Please try again.");
+      }
+    } catch (err: any) {
       console.error("Error submitting inspection form:", err);
+      showErrorToast("Submission Error", err?.message || "An unexpected error occurred.");
     } finally {
       setSubmitting(false);
     }
