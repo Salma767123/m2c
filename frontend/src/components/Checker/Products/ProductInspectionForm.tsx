@@ -62,13 +62,11 @@ export default function ProductInspectionForm({
             inspectionQuantity: 0,
             status: "Pending"
         }],
-        packedQuantity: 0,
-        cartonCount: 0,
-        warehousePhotoEvidences: [] as string[],
+        warehousePhotoEvidences: [] as any[],
 
         // Measurements
         measurements: [] as any[],
-        measurementPhotos: [] as string[],
+        measurementPhotos: [] as any[],
 
         // Packaging
         shipperCartonRemark: "",
@@ -77,7 +75,7 @@ export default function ProductInspectionForm({
         productTypeRemark: "",
         aqlWorkmanshipRemark: "",
         onSiteTestsRemark: "",
-        packagingPhotos: [] as string[],
+        packagingPhotos: [] as any[],
 
         // Defects 
         inspectionLevel: "L-II",
@@ -94,10 +92,10 @@ export default function ProductInspectionForm({
         criticalDefectDetails: "",
         majorDefectDetails: "",
         minorDefectDetails: "",
-        defectPhotos: [] as string[],
+        defectPhotos: [] as any[],
 
         // Testing
-        tests: [],
+        tests: [] as any[],
         testingPhotos: [] as any[],
 
         // Documentation
@@ -137,6 +135,15 @@ export default function ProductInspectionForm({
         }
     }
 
+    // Helper to clean photo data before submission
+    const cleanPhotos = (photos: any[]) => {
+        if (!photos) return [];
+        return photos.map(p => ({
+            name: p.name || 'image.jpg',
+            data: p.data || p.url || null // Ensure we send the base64 data
+        }));
+    }
+
     const handleSubmit = async () => {
         if (formData.finalDecision === "Rejected" && !formData.reviewerRemarks) {
             showErrorToast("Error", "Rejection remarks are required.")
@@ -146,10 +153,30 @@ export default function ProductInspectionForm({
         setSubmitting(true)
 
         try {
+            // Clean the entire form data from blob URLs and File objects
+            const cleanedData = {
+                ...formData,
+                warehousePhotoEvidences: cleanPhotos(formData.warehousePhotoEvidences),
+                measurementPhotos: cleanPhotos(formData.measurementPhotos),
+                packagingPhotos: cleanPhotos(formData.packagingPhotos),
+                defectPhotos: cleanPhotos(formData.defectPhotos),
+                testingPhotos: cleanPhotos(formData.testingPhotos),
+                documentationPhotos: cleanPhotos(formData.documentationPhotos),
+                photocopyDocuments: cleanPhotos(formData.photocopyDocuments),
+                companyIdCards: cleanPhotos(formData.companyIdCards),
+                // Also clean nested test photos if they exist
+                tests: (formData.tests || []).map((test: any) => ({
+                    ...test,
+                    photos: cleanPhotos(test.photos),
+                    rightPhotos: cleanPhotos(test.rightPhotos),
+                    wrongPhotos: cleanPhotos(test.wrongPhotos)
+                }))
+            }
+
             if (formData.finalDecision === "Approved" || formData.finalDecision === "Conditionally Approved") {
-                await qcCheckerService.approveProduct(productId, formData)
+                await qcCheckerService.approveProduct(productId, cleanedData)
             } else {
-                await qcCheckerService.rejectProduct(productId, formData.reviewerRemarks, formData)
+                await qcCheckerService.rejectProduct(productId, formData.reviewerRemarks, cleanedData)
             }
             showSuccessToast("Success", "Product inspection completed and submitted successfully.")
             onComplete()

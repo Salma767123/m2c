@@ -131,6 +131,8 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
     switch (status.toLowerCase()) {
       case 'pending':
         return 'bg-yellow-100 text-yellow-800'
+      case 'qc_approved':
+        return 'bg-blue-100 text-blue-800'
       case 'approved':
         return 'bg-green-100 text-green-800'
       case 'rejected':
@@ -208,23 +210,32 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         </div>
         <div className="flex items-center space-x-3">
           <Badge className={getStatusColor(product.approvalStatus)}>
-            {product.approvalStatus.charAt(0).toUpperCase() + product.approvalStatus.slice(1)}
+            {product.approvalStatus.replace('_', ' ').charAt(0).toUpperCase() + product.approvalStatus.replace('_', ' ').slice(1).toLowerCase()}
           </Badge>
-          {product.approvalStatus === 'PENDING' && (
+          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED') && (
             <>
-              <Button
-                onClick={() => setShowApprovalModal(true)}
-                disabled={actionLoading}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                <Check className="h-4 w-4 mr-2" />
-                {actionLoading ? 'Processing...' : 'Approve'}
-              </Button>
+              {product.approvalStatus === 'QC_APPROVED' ? (
+                <Button
+                  onClick={() => setShowApprovalModal(true)}
+                  disabled={actionLoading}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  {actionLoading ? 'Processing...' : 'Approve'}
+                </Button>
+              ) : (
+                <div className="flex flex-col items-end">
+                  <Badge variant="outline" className="text-xs text-yellow-600 mb-1">
+                    Waiting for QC Approval
+                  </Badge>
+                  <span className="text-[10px] text-gray-400 italic">QC must approve first</span>
+                </div>
+              )}
               <Button
                 variant="outline"
                 onClick={() => setShowRejectionModal(true)}
                 disabled={actionLoading}
-                className="border-red-300 text-red-600 hover:bg-red-50"
+                className="border-red-300 text-red-600 hover:bg-red-50 ml-3"
               >
                 <X className="h-4 w-4 mr-2" />
                 Reject

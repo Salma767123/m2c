@@ -20,7 +20,10 @@ const fileFilter = (req, file, cb) => {
   };
 
   // Check file type based on field name
-  if (file.fieldname === 'logo' || file.fieldname === 'ownerPhoto' || file.fieldname.includes('factoryImages')) {
+  if (file.fieldname === 'logo' || 
+      file.fieldname === 'ownerPhoto' || 
+      file.fieldname === 'ogImage' ||
+      file.fieldname.includes('factoryImages')) {
     if (allowedTypes.images.includes(file.mimetype)) {
       cb(null, true);
     } else {

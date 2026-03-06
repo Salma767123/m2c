@@ -1,7 +1,36 @@
 "use client"
 
-import { Camera, Upload, X } from "lucide-react"
+import { Camera, Upload, X, Image as ImageIcon } from "lucide-react"
 import { useRef } from "react"
+
+// Compress image before storing to keep payload manageable
+const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement("canvas")
+        let { width, height } = img
+
+        // Scale down if larger than maxWidth
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width)
+          width = maxWidth
+        }
+
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext("2d")!
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL("image/jpeg", quality))
+      }
+      img.src = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 
 interface PackagingProps {
   formData: {
@@ -11,7 +40,7 @@ interface PackagingProps {
     productTypeRemark: string
     aqlWorkmanshipRemark: string
     onSiteTestsRemark: string
-    packagingPhotos: string[]
+    packagingPhotos: any[]
   }
   setFormData: (data: any) => void
 }
@@ -19,15 +48,22 @@ interface PackagingProps {
 export default function Packaging({ formData, setFormData }: PackagingProps) {
   const packagingPhotoInputRef = useRef<HTMLInputElement | null>(null)
 
-  const handlePackagingPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePackagingPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      const fileNames = Array.from(files).map(f => f.name)
-      setFormData({ 
-        ...formData, 
-        packagingPhotos: [...(formData.packagingPhotos || []), ...fileNames] 
+      const newEntries = await Promise.all(
+        Array.from(files).map(async (file) => {
+          const data = await compressImage(file)
+          return { name: file.name, data, url: data }
+        })
+      )
+      setFormData({
+        ...formData,
+        packagingPhotos: [...(formData.packagingPhotos || []), ...newEntries]
       })
     }
+    // Reset input
+    if (e.target) e.target.value = ""
   }
 
   const removePackagingPhoto = (photoIndex: number) => {
@@ -69,7 +105,7 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
             <label className="block text-slate-900 font-semibold mb-2">{item.label}</label>
             <p className="text-slate-600 text-sm mb-4">{item.detail}</p>
           </div>
-          
+
           <div className="flex flex-col gap-3">
             <label className="text-sm font-medium text-slate-700">Select Remark Code (1-10):</label>
             <div className="flex flex-wrap gap-3">
@@ -80,11 +116,10 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
                     key={num}
                     type="button"
                     onClick={() => handleRemarkNumberSelect(item.remarkKey, num)}
-                    className={`w-12 h-12 rounded-full border-2 font-semibold text-sm transition-all duration-200 ${
-                      isSelected
+                    className={`w-12 h-12 rounded-full border-2 font-semibold text-sm transition-all duration-200 ${isSelected
                         ? "bg-blue-600 text-white border-blue-600 shadow-lg hover:bg-blue-700 transform scale-105"
                         : "bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50 hover:scale-105"
-                    }`}
+                      }`}
                   >
                     {num}
                   </button>
@@ -134,18 +169,28 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
 
         {/* Uploaded Photos List */}
         {formData.packagingPhotos && formData.packagingPhotos.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {formData.packagingPhotos.map((photo, index) => (
-              <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200">
-                <div className="flex items-center gap-2 flex-1">
-                  <Camera className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm text-slate-700 truncate">{photo}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
+            {formData.packagingPhotos.map((photo: any, index: number) => (
+              <div key={index} className="relative group">
+                {photo.data || photo.url ? (
+                  <img
+                    src={photo.data || photo.url}
+                    alt={photo.name}
+                    className="w-full h-28 object-cover rounded-xl border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-full h-28 flex items-center justify-center bg-slate-100 rounded-xl border border-slate-200 text-slate-400">
+                    <ImageIcon className="w-8 h-8" />
+                  </div>
+                )}
+                <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate">
+                  {photo.name}
                 </div>
                 <button
                   onClick={() => removePackagingPhoto(index)}
-                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                  className="absolute top-1.5 right-1.5 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3 h-3" />
                 </button>
               </div>
             ))}

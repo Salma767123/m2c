@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Save, Search, Share2, BarChart2, Globe, Server, Hash } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Save, Edit, Globe, Sparkles, CheckCircle, AlertCircle, Upload, X, Image } from 'lucide-react';
 import { Card, CardContent } from '../../UI/Card';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { seoSettingsService, SEOSettings } from '@/services/seoSettingsService';
@@ -7,36 +7,35 @@ import { seoSettingsService, SEOSettings } from '@/services/seoSettingsService';
 export default function SEOSettingsTab() {
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
-    const [settings, setSettings] = useState<SEOSettings>({
-        metaTitle: '',
-        metaDescription: '',
-        metaKeywords: '',
-        ogTitle: '',
-        ogDescription: '',
-        ogImage: '',
-        twitterCard: 'summary_large_image',
-        twitterTitle: '',
-        twitterDescription: '',
-        twitterImage: '',
-        googleAnalyticsId: '',
-        facebookPixelId: '',
-        robotsTxt: 'User-agent: *\nAllow: /',
-        sitemapUrl: ''
-    });
+    const [allSettings, setAllSettings] = useState<SEOSettings[]>([]);
+    const [editingPage, setEditingPage] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState<Partial<SEOSettings>>({});
+    const [selectedImage, setSelectedImage] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const pageDisplayNames: Record<string, string> = {
+        home: 'Home Page',
+        about: 'About Us',
+        products: 'Products',
+        categories: 'Categories',
+        contact: 'Contact Us',
+        privacy: 'Privacy Policy',
+        terms: 'Terms & Conditions',
+        shipping: 'Shipping Info',
+        returns: 'Returns Policy'
+    };
 
     useEffect(() => {
-        fetchSettings();
+        fetchAllSettings();
     }, []);
 
-    const fetchSettings = async () => {
+    const fetchAllSettings = async () => {
         try {
             setInitialLoading(true);
-            const response = await seoSettingsService.getSettings();
-            if (response.success && response.data) {
-                setSettings({
-                    ...settings,
-                    ...response.data
-                });
+            const response = await seoSettingsService.getAllSettings();
+            if (response.success && Array.isArray(response.data)) {
+                setAllSettings(response.data);
             }
         } catch (error) {
             console.error('Failed to fetch SEO settings', error);
@@ -46,24 +45,94 @@ export default function SEOSettingsTab() {
         }
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setSettings(prev => ({ ...prev, [name]: value }));
+    const handleEditClick = (page: string) => {
+        const pageSettings = allSettings.find(s => s.page === page);
+        setEditForm({
+            metaTitle: pageSettings?.metaTitle || '',
+            metaDescription: pageSettings?.metaDescription || '',
+            metaKeywords: pageSettings?.metaKeywords || '',
+            ogImage: pageSettings?.ogImage || ''
+        });
+        setImagePreview(pageSettings?.ogImage || null);
+        setSelectedImage(null);
+        setEditingPage(page);
     };
 
-    const handleUpdate = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setEditForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                showErrorToast('Invalid File', 'Please select an image file');
+                return;
+            }
+
+            // Validate file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                showErrorToast('File Too Large', 'Image size should be less than 5MB');
+                return;
+            }
+
+            setSelectedImage(file);
+            
+            // Create preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setImagePreview(e.target?.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleRemoveImage = () => {
+        setSelectedImage(null);
+        setImagePreview(editForm.ogImage || null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleSave = async () => {
+        if (!editingPage) return;
+        
         try {
             setLoading(true);
-            const response = await seoSettingsService.updateSettings(settings);
+            const response = await seoSettingsService.updateSettings(editingPage, editForm, selectedImage || undefined);
             if (response.success) {
-                showSuccessToast('SEO Settings Updated', 'Your settings have been saved successfully.');
+                showSuccessToast('SEO Settings Updated', 'Page SEO settings have been saved successfully.');
+                await fetchAllSettings();
+                setEditingPage(null);
+                setEditForm({});
+                setSelectedImage(null);
+                setImagePreview(null);
             }
         } catch (error: any) {
             showErrorToast('Update Failed', error.message || 'Failed to update SEO settings.');
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleCancel = () => {
+        setEditingPage(null);
+        setEditForm({});
+        setSelectedImage(null);
+        setImagePreview(null);
+    };
+
+    const isPageConfigured = (page: string) => {
+        const pageSettings = allSettings.find(s => s.page === page);
+        return pageSettings && (
+            pageSettings.metaTitle || 
+            pageSettings.metaDescription || 
+            pageSettings.metaKeywords || 
+            pageSettings.ogImage
+        );
     };
 
     if (initialLoading) {
@@ -85,274 +154,217 @@ export default function SEOSettingsTab() {
         <div className="space-y-6">
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                    <strong>Tip:</strong> These settings control how your application is represented in search engines and social media networks. Make sure the information is accurate and engaging.
+                    <strong>SEO Management:</strong> Configure meta tags for each page to improve search engine visibility and social media sharing.
                 </p>
             </div>
 
-            <form onSubmit={handleUpdate} className="space-y-6">
-
-                {/* Global SEO Settings */}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <Search className="w-5 h-5 text-blue-600" />
+            {/* Page Management Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(pageDisplayNames).map(([page, displayName]) => (
+                    <Card key={page} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <Globe className="w-4 h-4 text-gray-600" />
+                                    <h3 className="font-medium text-gray-900">{displayName}</h3>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    {isPageConfigured(page) ? (
+                                        <CheckCircle className="w-4 h-4 text-green-500" />
+                                    ) : (
+                                        <AlertCircle className="w-4 h-4 text-orange-500" />
+                                    )}
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Global Settings</h3>
-                                <p className="text-sm text-gray-500">Default meta tags for the site.</p>
+                            
+                            <p className="text-xs text-gray-500 mb-3">
+                                {isPageConfigured(page) ? 'SEO configured' : 'Not configured'}
+                            </p>
+                            
+                            <button
+                                onClick={() => handleEditClick(page)}
+                                className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded-lg text-sm transition-colors"
+                            >
+                                <Edit className="w-3 h-3" />
+                                Configure SEO
+                            </button>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            {/* Edit Modal */}
+            {editingPage && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-gray-200">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-xl font-semibold text-gray-900">
+                                    SEO Settings - {pageDisplayNames[editingPage]}
+                                </h2>
+                                <button
+                                    onClick={handleCancel}
+                                    className="text-gray-400 hover:text-gray-600"
+                                >
+                                    ×
+                                </button>
                             </div>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Default Meta Title</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Meta Title
+                                </label>
                                 <input
                                     type="text"
                                     name="metaTitle"
-                                    value={settings.metaTitle || ''}
-                                    onChange={handleChange}
-                                    placeholder="E.g., M2C Marketplace - Discover B2B Excellence"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                                    value={editForm.metaTitle || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Enter page title for search engines"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
+                                <p className="text-xs text-gray-500 mt-1">Recommended: 50-60 characters</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Default Meta Description</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Meta Description
+                                </label>
                                 <textarea
                                     name="metaDescription"
                                     rows={3}
-                                    value={settings.metaDescription || ''}
-                                    onChange={handleChange}
-                                    placeholder="Enter a brief description of your site..."
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                ></textarea>
+                                    value={editForm.metaDescription || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="Brief description of the page content"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Recommended: 150-160 characters</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Meta Keywords</label>
-                                <div className="relative">
-                                    <Hash className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Meta Keywords
+                                </label>
+                                <input
+                                    type="text"
+                                    name="metaKeywords"
+                                    value={editForm.metaKeywords || ''}
+                                    onChange={handleFormChange}
+                                    placeholder="keyword1, keyword2, keyword3"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Separate keywords with commas</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Open Graph Image
+                                </label>
+                                <div className="space-y-3">
+                                    {/* Hidden file input */}
                                     <input
-                                        type="text"
-                                        name="metaKeywords"
-                                        value={settings.metaKeywords || ''}
-                                        onChange={handleChange}
-                                        placeholder="b2b, marketplace, wholesale, bulk"
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageSelect}
+                                        className="hidden"
                                     />
+                                    
+                                    {/* Image Preview */}
+                                    {imagePreview && (
+                                        <div className="relative inline-block">
+                                            <img
+                                                src={imagePreview}
+                                                alt="OG Image Preview"
+                                                className="w-full max-w-md h-32 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
+                                            />
+                                            {selectedImage && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRemoveImage}
+                                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors shadow-md"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                            <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                                                OG Image Preview
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Upload Area */}
+                                    {!imagePreview && (
+                                        <div 
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
+                                        >
+                                            <Image className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                                            <p className="text-gray-600 font-medium">Click to upload Open Graph image</p>
+                                            <p className="text-sm text-gray-500 mt-1">JPG, PNG, WebP up to 5MB</p>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Upload Button (when image exists) */}
+                                    {imagePreview && (
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                                            >
+                                                <Upload className="w-4 h-4" />
+                                                Change Image
+                                            </button>
+                                            {selectedImage && (
+                                                <span className="text-sm text-green-600 flex items-center gap-1">
+                                                    <CheckCircle className="w-4 h-4" />
+                                                    New image selected
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    <p className="text-xs text-gray-500">
+                                        Recommended: 1200x630px for optimal social media sharing. Max file size: 5MB.
+                                    </p>
                                 </div>
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
 
-                {/* Social Media (Open Graph) */}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-2 bg-purple-100 rounded-lg">
-                                <Share2 className="w-5 h-5 text-purple-600" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Social Media (Open Graph)</h3>
-                                <p className="text-sm text-gray-500">Control how links preview on Facebook, WhatsApp, etc.</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">OG Title</label>
-                                <input
-                                    type="text"
-                                    name="ogTitle"
-                                    value={settings.ogTitle || ''}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">OG Description</label>
-                                <textarea
-                                    name="ogDescription"
-                                    rows={3}
-                                    value={settings.ogDescription || ''}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                ></textarea>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">OG Image URL</label>
-                                <input
-                                    type="url"
-                                    name="ogImage"
-                                    value={settings.ogImage || ''}
-                                    onChange={handleChange}
-                                    placeholder="https://example.com/image.jpg"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Twitter Cards */}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <Globe className="w-5 h-5 text-blue-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Twitter Settings</h3>
-                                <p className="text-sm text-gray-500">Configures Twitter cards for links shared on Twitter.</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Twitter Card Type</label>
-                                <select
-                                    name="twitterCard"
-                                    value={settings.twitterCard || ''}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <button
+                                    type="button"
+                                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
                                 >
-                                    <option value="summary">Summary</option>
-                                    <option value="summary_large_image">Summary with Large Image</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Twitter Title</label>
-                                <input
-                                    type="text"
-                                    name="twitterTitle"
-                                    value={settings.twitterTitle || ''}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Twitter Description</label>
-                                <textarea
-                                    name="twitterDescription"
-                                    rows={2}
-                                    value={settings.twitterDescription || ''}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                ></textarea>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Twitter Image URL</label>
-                                <input
-                                    type="url"
-                                    name="twitterImage"
-                                    value={settings.twitterImage || ''}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Analytics & Tracking */}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-2 bg-green-100 rounded-lg">
-                                <BarChart2 className="w-5 h-5 text-green-600" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Analytics & Tracking</h3>
-                                <p className="text-sm text-gray-500">Connect Google Analytics & Facebook Pixel</p>
+                                    <Sparkles className="w-4 h-4" />
+                                    Generate SEO with AI
+                                </button>
+                                <p className="text-xs text-blue-600 mt-1">
+                                    Let AI help you create optimized SEO content for this page
+                                </p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Google Analytics Tracking ID</label>
-                                <input
-                                    type="text"
-                                    name="googleAnalyticsId"
-                                    value={settings.googleAnalyticsId || ''}
-                                    onChange={handleChange}
-                                    placeholder="G-XXXXXXXXXX"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Facebook Pixel ID</label>
-                                <input
-                                    type="text"
-                                    name="facebookPixelId"
-                                    value={settings.facebookPixelId || ''}
-                                    onChange={handleChange}
-                                    placeholder="123456789012345"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                />
-                            </div>
+                        <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+                            <button
+                                onClick={handleCancel}
+                                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                disabled={loading}
+                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Save className="h-4 w-4" />
+                                {loading ? 'Saving...' : 'Save Settings'}
+                            </button>
                         </div>
-                    </CardContent>
-                </Card>
-
-                {/* Advanced Settings */}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-2 bg-orange-100 rounded-lg">
-                                <Server className="w-5 h-5 text-orange-600" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Advanced SEO</h3>
-                                <p className="text-sm text-gray-500">Configure robots.txt and sitemap</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Robots.txt Content</label>
-                                <textarea
-                                    name="robotsTxt"
-                                    rows={4}
-                                    value={settings.robotsTxt || ''}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                ></textarea>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Sitemap URL</label>
-                                <input
-                                    type="url"
-                                    name="sitemapUrl"
-                                    value={settings.sitemapUrl || ''}
-                                    onChange={handleChange}
-                                    placeholder="https://example.com/sitemap.xml"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <div className="flex justify-end pt-4">
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Save className="h-4 w-4" />
-                        {loading ? 'Saving...' : 'Save Settings'}
-                    </button>
+                    </div>
                 </div>
-            </form>
+            )}
         </div>
     );
 }

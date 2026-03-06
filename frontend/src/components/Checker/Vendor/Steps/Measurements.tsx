@@ -1,8 +1,37 @@
 "use client"
 
-import { Camera, Plus, Trash2, Upload, X } from "lucide-react"
+import { Camera, Plus, Trash2, Upload, X, Image as ImageIcon } from "lucide-react"
 import { useRef } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/UI/Table"
+
+// Compress image before storing to keep payload manageable
+const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement("canvas")
+        let { width, height } = img
+
+        // Scale down if larger than maxWidth
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width)
+          width = maxWidth
+        }
+
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext("2d")!
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL("image/jpeg", quality))
+      }
+      img.src = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 
 interface MeasurementsProps {
   formData: {
@@ -17,7 +46,7 @@ interface MeasurementsProps {
       retailWeight: number
       cartonGrossWeight: number
     }>
-    measurementPhotos: string[]
+    measurementPhotos: any[]
   }
   setFormData: (data: any) => void
 }
@@ -25,15 +54,22 @@ interface MeasurementsProps {
 export default function Measurements({ formData, setFormData }: MeasurementsProps) {
   const measurementPhotoInputRef = useRef<HTMLInputElement | null>(null)
 
-  const handleMeasurementPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMeasurementPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      const fileNames = Array.from(files).map(f => f.name)
-      setFormData({ 
-        ...formData, 
-        measurementPhotos: [...(formData.measurementPhotos || []), ...fileNames] 
+      const newEntries = await Promise.all(
+        Array.from(files).map(async (file) => {
+          const data = await compressImage(file)
+          return { name: file.name, data, url: data }
+        })
+      )
+      setFormData({
+        ...formData,
+        measurementPhotos: [...(formData.measurementPhotos || []), ...newEntries]
       })
     }
+    // Reset input
+    if (e.target) e.target.value = ""
   }
 
   const removeMeasurementPhoto = (photoIndex: number) => {
@@ -42,7 +78,7 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
   }
 
   const updateMeasurement = (id: number, field: string, value: number) => {
-    const updatedMeasurements = formData.measurements.map(m => 
+    const updatedMeasurements = formData.measurements.map(m =>
       m.id === id ? { ...m, [field]: value } : m
     )
     setFormData({ ...formData, measurements: updatedMeasurements })
@@ -98,95 +134,95 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
         </div>
       ) : (
         <div className="overflow-x-auto bg-slate-50/50 rounded-xl p-4">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Sample</TableHead>
-              <TableHead>Carton L/W/H (cm)</TableHead>
-              <TableHead>Product L/W (cm)</TableHead>
-              <TableHead>Retail Wt (kg)</TableHead>
-              <TableHead>Gross Wt (kg)</TableHead>
-              <TableHead>Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {formData.measurements.map((m) => (
-              <TableRow key={m.id}>
-                <TableCell className="font-medium text-slate-900">{m.sampleName}</TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      value={m.cartonLength} 
-                      onChange={(e) => updateMeasurement(m.id, 'cartonLength', parseFloat(e.target.value) || 0)}
-                      className="w-16 px-2 py-1 border border-slate-300 rounded text-xs" 
-                    />
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      value={m.cartonWidth} 
-                      onChange={(e) => updateMeasurement(m.id, 'cartonWidth', parseFloat(e.target.value) || 0)}
-                      className="w-16 px-2 py-1 border border-slate-300 rounded text-xs" 
-                    />
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      value={m.cartonHeight} 
-                      onChange={(e) => updateMeasurement(m.id, 'cartonHeight', parseFloat(e.target.value) || 0)}
-                      className="w-16 px-2 py-1 border border-slate-300 rounded text-xs" 
-                    />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      value={m.productLength} 
-                      onChange={(e) => updateMeasurement(m.id, 'productLength', parseFloat(e.target.value) || 0)}
-                      className="w-16 px-2 py-1 border border-slate-300 rounded text-xs" 
-                    />
-                    <input 
-                      type="number" 
-                      step="0.1" 
-                      value={m.productWidth} 
-                      onChange={(e) => updateMeasurement(m.id, 'productWidth', parseFloat(e.target.value) || 0)}
-                      className="w-16 px-2 py-1 border border-slate-300 rounded text-xs" 
-                    />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    value={m.retailWeight} 
-                    onChange={(e) => updateMeasurement(m.id, 'retailWeight', parseFloat(e.target.value) || 0)}
-                    className="w-20 px-2 py-1 border border-slate-300 rounded text-xs" 
-                  />
-                </TableCell>
-                <TableCell>
-                  <input 
-                    type="number" 
-                    step="0.1" 
-                    value={m.cartonGrossWeight} 
-                    onChange={(e) => updateMeasurement(m.id, 'cartonGrossWeight', parseFloat(e.target.value) || 0)}
-                    className="w-20 px-2 py-1 border border-slate-300 rounded text-xs" 
-                  />
-                </TableCell>
-                <TableCell>
-                  <button
-                    onClick={() => removeSample(m.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </TableCell>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Sample</TableHead>
+                <TableHead>Carton L/W/H (cm)</TableHead>
+                <TableHead>Product L/W (cm)</TableHead>
+                <TableHead>Retail Wt (kg)</TableHead>
+                <TableHead>Gross Wt (kg)</TableHead>
+                <TableHead>Action</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {formData.measurements.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell className="font-medium text-slate-900">{m.sampleName}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={m.cartonLength}
+                        onChange={(e) => updateMeasurement(m.id, 'cartonLength', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={m.cartonWidth}
+                        onChange={(e) => updateMeasurement(m.id, 'cartonWidth', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={m.cartonHeight}
+                        onChange={(e) => updateMeasurement(m.id, 'cartonHeight', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={m.productLength}
+                        onChange={(e) => updateMeasurement(m.id, 'productLength', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={m.productWidth}
+                        onChange={(e) => updateMeasurement(m.id, 'productWidth', parseFloat(e.target.value) || 0)}
+                        className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={m.retailWeight}
+                      onChange={(e) => updateMeasurement(m.id, 'retailWeight', parseFloat(e.target.value) || 0)}
+                      className="w-20 px-2 py-1 border border-slate-300 rounded text-xs"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={m.cartonGrossWeight}
+                      onChange={(e) => updateMeasurement(m.id, 'cartonGrossWeight', parseFloat(e.target.value) || 0)}
+                      className="w-20 px-2 py-1 border border-slate-300 rounded text-xs"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      onClick={() => removeSample(m.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       <div>
@@ -215,18 +251,28 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
 
         {/* Uploaded Photos List */}
         {formData.measurementPhotos && formData.measurementPhotos.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {formData.measurementPhotos.map((photo, index) => (
-              <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200">
-                <div className="flex items-center gap-2 flex-1">
-                  <Camera className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm text-slate-700 truncate">{photo}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
+            {formData.measurementPhotos.map((photo: any, index: number) => (
+              <div key={index} className="relative group">
+                {photo.data || photo.url ? (
+                  <img
+                    src={photo.data || photo.url}
+                    alt={photo.name}
+                    className="w-full h-28 object-cover rounded-xl border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-full h-28 flex items-center justify-center bg-slate-100 rounded-xl border border-slate-200 text-slate-400">
+                    <ImageIcon className="w-8 h-8" />
+                  </div>
+                )}
+                <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate">
+                  {photo.name}
                 </div>
                 <button
                   onClick={() => removeMeasurementPhoto(index)}
-                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                  className="absolute top-1.5 right-1.5 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3 h-3" />
                 </button>
               </div>
             ))}

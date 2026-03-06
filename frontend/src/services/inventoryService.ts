@@ -10,7 +10,8 @@ export interface InventoryItem {
   description?: string;
   manufacturingDate?: string;
   currentStock: number;
-  minStock: number;
+  baseStock: number; // Added baseStock field
+  lowStockAlert: number;
   location?: string;
   status: 'ACTIVE' | 'INACTIVE';
   sourceType?: 'SUPPLIER' | 'MANUFACTURE';
@@ -50,8 +51,7 @@ export interface CreateInventoryData {
   subcategory?: string;
   description?: string;
   manufacturingDate?: string;
-  currentStock: number;
-  minStock: number;
+  lowStockAlert: number;
   location?: string;
   status?: 'ACTIVE' | 'INACTIVE';
   sourceType?: 'SUPPLIER' | 'MANUFACTURE';
@@ -232,7 +232,7 @@ class InventoryService {
       description: item.description || '',
       manufacturingDate: item.manufacturingDate ? item.manufacturingDate.split('T')[0] : '',
       currentStock: item.currentStock,
-      minStock: item.minStock,
+      lowStockAlert: item.lowStockAlert,
       location: item.location || '',
       status: item.status.toLowerCase() as 'active' | 'inactive',
       sourceType: item.sourceType?.toLowerCase() as 'supplier' | 'manufacture' | null,
@@ -253,8 +253,7 @@ class InventoryService {
       subcategory: formData.subcategory || undefined,
       description: formData.description || undefined,
       manufacturingDate: formData.manufacturingDate || undefined,
-      currentStock: parseInt(formData.currentStock),
-      minStock: parseInt(formData.minStock),
+      lowStockAlert: parseInt(formData.lowStockAlert),
       location: formData.location || undefined,
       status: formData.status?.toUpperCase() as 'ACTIVE' | 'INACTIVE',
       sourceType: formData.sourceType?.toUpperCase() as 'SUPPLIER' | 'MANUFACTURE' | undefined,

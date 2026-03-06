@@ -27,7 +27,7 @@ interface Product {
   adminFixedPrice?: number // Admin's fixed price
   totalStock: number
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
-  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED'
+  approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED'
   approvedAt?: string
   rejectionReason?: string
   createdAt: string
@@ -59,6 +59,8 @@ const getApprovalBadge = (status: string) => {
   switch (status) {
     case "APPROVED":
       return <Badge className="bg-green-100 text-green-800">Approved</Badge>
+    case "QC_APPROVED":
+      return <Badge className="bg-blue-100 text-blue-800">QC Approved</Badge>
     case "PENDING":
       return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
     case "REJECTED":
@@ -100,7 +102,7 @@ export default function ProductsTable() {
       }
 
       const response = await adminProductService.getAllProducts(params)
-      
+
       if (response.success) {
         setProducts(response.data.products)
         setPagination(prev => ({
@@ -126,7 +128,7 @@ export default function ProductsTable() {
 
     try {
       const response = await adminProductService.approveProduct(productId, parseFloat(adminPrice))
-      
+
       if (response.success) {
         showSuccessToast('Product Approved', 'Product has been approved successfully')
         loadProducts() // Reload products
@@ -145,7 +147,7 @@ export default function ProductsTable() {
 
     try {
       const response = await adminProductService.rejectProduct(productId, reason.trim())
-      
+
       if (response.success) {
         showSuccessToast('Product Rejected', 'Product has been rejected successfully')
         loadProducts() // Reload products
@@ -161,7 +163,7 @@ export default function ProductsTable() {
 
     try {
       const response = await adminProductService.deleteProduct(productId)
-      
+
       if (response.success) {
         showSuccessToast('Product Deleted', 'Product has been deleted successfully')
         loadProducts() // Reload products
@@ -199,6 +201,7 @@ export default function ProductsTable() {
                 options={[
                   { value: '', label: 'All Approvals' },
                   { value: 'PENDING', label: 'Pending' },
+                  { value: 'QC_APPROVED', label: 'QC Approved' },
                   { value: 'APPROVED', label: 'Approved' },
                   { value: 'REJECTED', label: 'Rejected' }
                 ]}
@@ -247,8 +250,8 @@ export default function ProductsTable() {
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                       {product.images?.[0]?.url ? (
-                        <img 
-                          src={product.images[0].url} 
+                        <img
+                          src={product.images[0].url}
                           alt={product.name}
                           className="w-full h-full object-cover rounded-lg"
                         />
@@ -305,36 +308,41 @@ export default function ProductsTable() {
                         <Eye className="h-4 w-4" />
                       </Button>
                     </Link>
-                    
-                    {product.approvalStatus === 'PENDING' && (
+
+                    {product.approvalStatus === 'QC_APPROVED' && (
                       <>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="hover:bg-green-50 text-green-600"
                           onClick={() => handleApproveProduct(product.id)}
+                          title="Approve & Set Price"
                         >
                           <CheckCircle className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="hover:bg-red-50 text-red-600"
-                          onClick={() => handleRejectProduct(product.id)}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
                       </>
                     )}
-                    
+
+                    {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hover:bg-red-50 text-red-600"
+                        onClick={() => handleRejectProduct(product.id)}
+                        title="Reject"
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+
                     <Link href={`/admin/dashboard/products/edit/${product.id}`}>
                       <Button variant="ghost" size="sm" className="hover:bg-gray-50">
                         <Edit className="h-4 w-4" />
                       </Button>
                     </Link>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="hover:bg-red-50 text-red-600"
                       onClick={() => handleDeleteProduct(product.id, product.name)}
                     >
@@ -346,13 +354,13 @@ export default function ProductsTable() {
             ))}
           </TableBody>
         </Table>
-        
+
         {products.length === 0 && (
           <div className="text-center py-8 text-gray-500">
             No products found
           </div>
         )}
-        
+
         {/* Pagination */}
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between mt-4">

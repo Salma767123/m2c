@@ -17,26 +17,27 @@ interface InventoryFormData {
   subcategory: string
   description: string
   manufacturingDate?: string // New field for manufacturing date
-  
+
   // Vendor Information (NEW)
   vendorId?: string // Link to vendor
   vendorName?: string // Vendor name for display
-  
+
   // Inventory Management
   currentStock: number
-  minStock: number
+  baseStock: number
+  lowStockAlert: number
   location: string
-  
+
   // Product Status
   status: 'active' | 'inactive'
   trackInventory: boolean
-  
+
   // Additional Info - Source Type
   sourceType: 'supplier' | 'manufacture' | null // New field to track source type
   supplier?: string
   lastRestocked?: string
   notes?: string
-  
+
   // Product Creation Status
   hasProductCreated: boolean // Whether this inventory item has been used to create a product
   productId?: string // Link to created product
@@ -74,10 +75,10 @@ interface Category {
 // ]
 
 const locations = [
-  'Main Warehouse - Section A', 
-  'Main Warehouse - Section B', 
-  'Storage Room 1', 
-  'Storage Room 2', 
+  'Main Warehouse - Section A',
+  'Main Warehouse - Section B',
+  'Storage Room 1',
+  'Storage Room 2',
   'Display Area'
 ]
 
@@ -91,10 +92,10 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
   const [subcategories, setSubcategories] = useState<Array<{ id: string; name: string; slug: string }>>([])
   const [selectedCategoryName, setSelectedCategoryName] = useState('')
-  
+
   // Track original stock for edit mode
   const [originalStock, setOriginalStock] = useState<number>(0)
-  
+
   // Stock change reason modal
   const [showStockReasonModal, setShowStockReasonModal] = useState(false)
   const [stockChangeReason, setStockChangeReason] = useState('')
@@ -107,23 +108,24 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     subcategory: '',
     description: '',
     manufacturingDate: '',
-    
+
     // Vendor Information (NEW)
     vendorId: '',
     vendorName: '',
-    
+
     currentStock: 0,
-    minStock: 5,
+    baseStock: 0,
+    lowStockAlert: 5,
     location: '',
-    
+
     status: 'active',
     trackInventory: true,
-    
+
     sourceType: null,
     supplier: '',
     lastRestocked: '',
     notes: '',
-    
+
     hasProductCreated: false,
     productId: ''
   })
@@ -132,16 +134,16 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   useEffect(() => {
     if (isEdit && inventoryId) {
       setIsLoadingData(true)
-      
+
       const loadInventoryData = async () => {
         try {
           console.log('Loading inventory data for ID:', inventoryId)
-          
+
           // Fetch actual inventory data from API
           const response = await axiosInstance.get(`/inventory/admin/all?limit=1000`)
           const inventoryItems = response.data.data.items || []
           const item = inventoryItems.find((inv: any) => inv.id === inventoryId)
-          
+
           if (!item) {
             console.error('Inventory item not found')
             alert('Inventory item not found')
@@ -150,17 +152,17 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           }
 
           console.log('Loaded inventory item:', item)
-          
+
           // Store original stock for comparison
           setOriginalStock(item.currentStock || 0)
-          
+
           // Load vendor-specific categories first
           if (item.vendorId) {
             try {
               const categoriesResponse = await axiosInstance.get(`/inventory/admin/vendor/${item.vendorId}/categories`)
               const vendorCategories = categoriesResponse.data.data.categories || []
               const vendorSubcategories = categoriesResponse.data.data.subcategories || []
-              
+
               // Transform to match Category interface
               const transformedCategories: Category[] = vendorCategories.map((cat: any) => ({
                 id: cat.id,
@@ -168,24 +170,24 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 slug: cat.slug || '',
                 subcategories: vendorSubcategories.filter((sub: any) => sub.parentId === cat.id)
               }))
-              
+
               setCategories(transformedCategories)
               console.log('Loaded vendor categories:', transformedCategories)
-              
+
               // Find the category to get its ID
-              const categoryMatch = transformedCategories.find(c => 
+              const categoryMatch = transformedCategories.find(c =>
                 c.name.toLowerCase() === item.category?.toLowerCase() || c.id === item.category
               )
               const categoryId = categoryMatch?.id || ''
-              
+
               console.log('Category match:', categoryMatch, 'ID:', categoryId)
-              
+
               // If category is found, load its subcategories
               if (categoryMatch && categoryMatch.subcategories) {
                 setSubcategories(categoryMatch.subcategories)
                 setSelectedCategoryName(categoryMatch.name)
               }
-              
+
               // Find subcategory ID if it exists
               let subcategoryId = ''
               if (item.subcategory && vendorSubcategories) {
@@ -195,7 +197,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 subcategoryId = subcategoryMatch?.id || ''
                 console.log('Subcategory match:', subcategoryMatch, 'ID:', subcategoryId)
               }
-              
+
               setFormData({
                 name: item.name || '',
                 sku: item.sku || '',
@@ -203,27 +205,28 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 subcategory: subcategoryId,
                 description: item.description || '',
                 manufacturingDate: item.manufacturingDate ? new Date(item.manufacturingDate).toISOString().split('T')[0] : '',
-                
+
                 // Vendor Information
                 vendorId: item.vendorId || '',
                 vendorName: item.vendor?.companyName || '',
-                
+
                 currentStock: item.currentStock || 0,
-                minStock: item.minStock || 5,
+                baseStock: item.baseStock || 0,
+                lowStockAlert: item.lowStockAlert || item.minStock || 5,
                 location: item.location || '',
-                
+
                 status: item.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
                 trackInventory: true,
-                
+
                 sourceType: item.sourceType?.toLowerCase() as 'supplier' | 'manufacture' | null,
                 supplier: item.supplier || '',
                 lastRestocked: item.lastRestocked ? new Date(item.lastRestocked).toISOString().split('T')[0] : '',
                 notes: item.notes || '',
-                
+
                 hasProductCreated: item.hasProductCreated || false,
                 productId: item.productId || ''
               })
-              
+
               console.log('Form data set with category:', categoryId, 'subcategory:', subcategoryId, 'vendor:', item.vendorId)
             } catch (error) {
               console.error('Error loading vendor categories:', error)
@@ -246,17 +249,17 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     const fetchVendors = async () => {
       try {
         setIsLoadingVendors(true)
-        
+
         const response = await axiosInstance.get('/vendors/all', {
           params: { limit: 1000 }
         })
-        
+
         console.log('Fetched vendors response:', response.data)
-        
+
         // Filter for approved vendors only
         const approvedVendors = (response.data.vendors || []).filter((v: any) => v.status === 'APPROVED')
         console.log('Approved vendors:', approvedVendors)
-        
+
         setVendors(approvedVendors)
       } catch (error: any) {
         console.error('Error fetching vendors:', error)
@@ -314,11 +317,11 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
-    
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : 
-               type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [name]: type === 'number' ? parseFloat(value) || 0 :
+        type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }))
   }
 
@@ -335,7 +338,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           notes: prev.notes // Keep general notes
         }
       }
-      
+
       // If selecting a different type, automatically close previous and open new
       return {
         ...prev,
@@ -351,7 +354,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   const handleDropdownChange = (name: string, value: string) => {
     setFormData(prev => {
       const updated = { ...prev, [name]: value }
-      
+
       // Handle category change
       if (name === 'category') {
         const selectedCategory = categories.find(c => c.id === value)
@@ -361,7 +364,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           updated.subcategory = '' // Reset subcategory when category changes
         }
       }
-      
+
       return updated
     })
   }
@@ -383,21 +386,21 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         setIsLoadingCategories(true)
         const response = await axiosInstance.get(`/inventory/admin/vendor/${vendorId}/categories`)
         console.log('Loaded vendor categories:', response.data.data)
-        
+
         const vendorCategories = response.data.data.categories || []
         const vendorSubcategories = response.data.data.subcategories || []
-        
+
         // Transform to match Category interface
         const transformedCategories: Category[] = vendorCategories.map((cat: any) => ({
           id: cat.id,
           name: cat.name,
           slug: cat.slug || '',
-          subcategories: vendorSubcategories.filter((sub: any) => 
+          subcategories: vendorSubcategories.filter((sub: any) =>
             // Filter subcategories that belong to this category
             sub.parentId === cat.id
           )
         }))
-        
+
         setCategories(transformedCategories)
         setSubcategories([]) // Reset subcategories
         setSelectedCategoryName('')
@@ -418,36 +421,30 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Basic validation
     if (!formData.name.trim()) {
       console.error('Product name is required')
       return
     }
-    
+
     if (!formData.category) {
       console.error('Category is required')
       return
     }
-    
+
     if (!formData.vendorId) {
       console.error('Vendor selection is required')
       return
     }
-    
+
     if (!formData.sku.trim()) {
       console.error('SKU is required')
       return
     }
-    
-    // Check if stock changed in edit mode
-    if (isEdit && formData.currentStock !== originalStock) {
-      // Show reason modal
-      setPendingFormData(formData)
-      setShowStockReasonModal(true)
-      return
-    }
-    
+
+    // Stock is no longer editable during inventory creation (set during product creation)
+
     // Proceed with normal save
     await saveInventory(formData, null)
   }
@@ -459,7 +456,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
       // Get category and subcategory names for submission
       const categoryName = categories.find(c => c.id === data.category)?.name || data.category
       const subcategoryName = subcategories.find(s => s.id === data.subcategory)?.name || data.subcategory
-      
+
       const submitData = {
         ...data,
         category: categoryName,
@@ -467,57 +464,31 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         status: data.status?.toUpperCase() as 'ACTIVE' | 'INACTIVE',
         sourceType: data.sourceType?.toUpperCase() as 'SUPPLIER' | 'MANUFACTURE' | null
       }
-      
+
       if (isEdit && inventoryId) {
         console.log('=== UPDATING INVENTORY ===')
-        console.log('Inventory ID:', inventoryId)
-        console.log('Stock changed:', data.currentStock !== originalStock)
-        console.log('Original stock:', originalStock)
-        console.log('New stock:', data.currentStock)
-        console.log('Stock reason:', stockReason)
-        
-        // If stock changed, update it separately with reason via admin endpoint
-        if (data.currentStock !== originalStock && stockReason) {
-          console.log('Updating stock with reason via PATCH /inventory/admin/' + inventoryId + '/stock')
-          await axiosInstance.patch(`/inventory/admin/${inventoryId}/stock`, {
-            currentStock: data.currentStock,
-            reason: stockReason,
-            notes: data.notes
-          })
-          
-          // Update other fields (excluding stock)
-          const { currentStock, ...otherData } = submitData
-          if (Object.keys(otherData).length > 0) {
-            console.log('Updating other fields via PUT /inventory/admin/' + inventoryId)
-            await axiosInstance.put(`/inventory/admin/${inventoryId}`, otherData)
-          }
-        } else {
-          // No stock change, update normally
-          console.log('Updating all fields via PUT /inventory/admin/' + inventoryId)
-          await axiosInstance.put(`/inventory/admin/${inventoryId}`, submitData)
-        }
-        
+        await axiosInstance.put(`/inventory/admin/${inventoryId}`, submitData)
         console.log('✅ Inventory item updated successfully')
       } else {
         console.log('=== CREATING INVENTORY ===')
         console.log('Submit data:', submitData)
-        
+
         // Ensure vendorId is included for creation
         if (!submitData.vendorId) {
           throw new Error('Vendor ID is required')
         }
-        
+
         console.log('Creating via POST /inventory/admin')
         await axiosInstance.post('/inventory/admin', submitData)
         console.log('✅ Inventory item created successfully')
       }
-      
+
       router.push('/admin/dashboard/inventory')
     } catch (error: any) {
       console.error('❌ Error saving inventory item:', error)
       console.error('Error response:', error.response)
       console.error('Error data:', error.response?.data)
-      
+
       // Better error handling
       if (error.response?.data?.message) {
         alert(error.response.data.message)
@@ -536,9 +507,9 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
       alert('Please provide a reason (minimum 5 characters)')
       return
     }
-    
+
     if (!pendingFormData) return
-    
+
     setShowStockReasonModal(false)
     await saveInventory(pendingFormData, stockChangeReason)
     setStockChangeReason('')
@@ -581,12 +552,12 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
           </h1>
         </div>
       </div>
- 
+
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Basic Product Information */}
             <Card className="border border-gray-200">
               <CardHeader className="bg-gray-50 border-b border-gray-200">
@@ -594,7 +565,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 <p className="text-sm text-slate-600">This will be the master product data</p>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
-                
+
                 {/* Vendor Selection */}
                 <div>
                   <Dropdown
@@ -648,13 +619,13 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                         label: cat.name
                       }))}
                       placeholder={
-                        !formData.vendorId 
-                          ? "Select vendor first" 
-                          : isLoadingCategories 
-                          ? "Loading categories..." 
-                          : categories.length === 0 
-                          ? "No categories available" 
-                          : "Select Category"
+                        !formData.vendorId
+                          ? "Select vendor first"
+                          : isLoadingCategories
+                            ? "Loading categories..."
+                            : categories.length === 0
+                              ? "No categories available"
+                              : "Select Category"
                       }
                       onChange={(value) => handleDropdownChange('category', value as string)}
                       disabled={!formData.vendorId || isLoadingCategories}
@@ -716,54 +687,32 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
               </CardContent>
             </Card>
 
-            {/* Stock Management */}
+            {/* Stock Management Card - Only Low Stock Alert */}
             <Card className="border border-gray-200">
               <CardHeader className="bg-gray-50 border-b border-gray-200">
-                <CardTitle className="text-[#222222]">Stock Management</CardTitle>
+                <CardTitle className="text-[#222222]">Stock Settings</CardTitle>
+                <p className="text-sm text-slate-600">Opening stock is set when a product is created.</p>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Current Stock *
-                    </label>
-                    <input
-                      type="number"
-                      name="currentStock"
-                      value={formData.currentStock}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Minimum Stock *
-                    </label>
-                    <input
-                      type="number"
-                      name="minStock"
-                      value={formData.minStock}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
-                    />
-                  </div>
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    ℹ️ Opening stock is set when creating a product from this inventory item. Manage stock thereafter via the <strong>Update Stock</strong> action.
+                  </p>
                 </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      name="trackInventory"
-                      checked={formData.trackInventory}
-                      onChange={handleInputChange}
-                      className="rounded border-gray-300 text-[#222222] focus:ring-[#222222]"
-                    />
-                    <label className="ml-2 text-sm text-slate-700">
-                      Track inventory for this item
-                    </label>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Low Stock Alert *
+                  </label>
+                  <input
+                    type="number"
+                    name="lowStockAlert"
+                    value={formData.lowStockAlert}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
+                    placeholder="e.g. 5"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Alert threshold when stock falls below this level.</p>
                 </div>
               </CardContent>
             </Card>
@@ -774,29 +723,27 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 <CardTitle className="text-[#222222]">Additional Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
-                
+
                 {/* Source Type Selection */}
                 <div className="space-y-3">
                   <label className="block text-sm font-medium text-slate-700 mb-3">
                     Product Source Type
                     <span className="text-xs text-slate-500 ml-2">(Select one option)</span>
                   </label>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div 
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                        formData.sourceType === 'supplier' 
-                          ? 'border-gray-800 bg-gray-100 shadow-sm' 
-                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
-                      }`}
+                    <div
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.sourceType === 'supplier'
+                        ? 'border-gray-800 bg-gray-100 shadow-sm'
+                        : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                        }`}
                       onClick={() => handleSourceTypeChange('supplier')}
                     >
                       <div className="flex items-center space-x-3">
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          formData.sourceType === 'supplier' 
-                            ? 'border-gray-800 bg-gray-800' 
-                            : 'border-gray-300'
-                        }`}>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${formData.sourceType === 'supplier'
+                          ? 'border-gray-800 bg-gray-800'
+                          : 'border-gray-300'
+                          }`}>
                           {formData.sourceType === 'supplier' && (
                             <div className="w-2 h-2 rounded-full bg-white"></div>
                           )}
@@ -808,20 +755,18 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       </div>
                     </div>
 
-                    <div 
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                        formData.sourceType === 'manufacture' 
-                          ? 'border-gray-800 bg-gray-100 shadow-sm' 
-                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
-                      }`}
+                    <div
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.sourceType === 'manufacture'
+                        ? 'border-gray-800 bg-gray-100 shadow-sm'
+                        : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                        }`}
                       onClick={() => handleSourceTypeChange('manufacture')}
                     >
                       <div className="flex items-center space-x-3">
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          formData.sourceType === 'manufacture' 
-                            ? 'border-gray-800 bg-gray-800' 
-                            : 'border-gray-300'
-                        }`}>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${formData.sourceType === 'manufacture'
+                          ? 'border-gray-800 bg-gray-800'
+                          : 'border-gray-300'
+                          }`}>
                           {formData.sourceType === 'manufacture' && (
                             <div className="w-2 h-2 rounded-full bg-white"></div>
                           )}
@@ -853,11 +798,10 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           value={formData.supplier}
                           onChange={handleInputChange}
                           required={formData.sourceType === 'supplier'}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors ${
-                            formData.sourceType === 'supplier' && !formData.supplier 
-                              ? 'border-red-300 bg-red-50' 
-                              : 'border-gray-200'
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-colors ${formData.sourceType === 'supplier' && !formData.supplier
+                            ? 'border-red-300 bg-red-50'
+                            : 'border-gray-200'
+                            }`}
                           placeholder="Enter supplier name"
                         />
                         {formData.sourceType === 'supplier' && !formData.supplier && (
@@ -896,7 +840,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                         <span>Full control over quality and production timeline</span>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -997,10 +941,10 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       After saving this inventory item, you can create a detailed product with variants.
                     </p>
                     {isEdit && (
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         className="w-full"
                         onClick={handleCreateProduct}
                       >
@@ -1013,19 +957,12 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
               </CardContent>
             </Card>
 
-            {/* Stock Alert */}
-            {formData.currentStock <= formData.minStock && (
-              <Card className="border border-yellow-200">
-                <CardHeader className="bg-yellow-50 border-b border-yellow-200">
-                  <CardTitle className="flex items-center text-yellow-700">
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    Stock Alert
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <p className="text-sm text-yellow-700">
-                    Current stock ({formData.currentStock}) is at or below minimum threshold ({formData.minStock}).
-                    Consider restocking soon.
+            {/* Low Stock Alert Notice */}
+            {formData.lowStockAlert > 0 && (
+              <Card className="border border-blue-100">
+                <CardContent className="p-4">
+                  <p className="text-sm text-blue-700">
+                    📋 You will be alerted when stock drops below <strong>{formData.lowStockAlert}</strong> units.
                   </p>
                 </CardContent>
               </Card>
@@ -1044,15 +981,15 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Current Stock:</span>
+                  <span className="text-slate-600">Low Stock Alert:</span>
                   <span className="font-medium text-[#222222]">
-                    {formData.currentStock} units
+                    {formData.lowStockAlert} units
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Min Stock Level:</span>
-                  <span className="font-medium text-[#222222]">
-                    {formData.minStock} units
+                  <span className="text-slate-600">Current Stock:</span>
+                  <span className={`font-medium ${formData.currentStock <= formData.lowStockAlert ? 'text-red-600 font-bold' : 'text-[#222222]'}`}>
+                    {formData.currentStock} units
                   </span>
                 </div>
                 {formData.sourceType && (

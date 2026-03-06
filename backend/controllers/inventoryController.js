@@ -21,8 +21,7 @@ const createInventoryItem = async (req, res) => {
       subcategory,
       description,
       manufacturingDate,
-      currentStock,
-      minStock,
+      lowStockAlert,
       location,
       status,
       sourceType,
@@ -32,10 +31,10 @@ const createInventoryItem = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!name || !sku || !category || currentStock === undefined || minStock === undefined) {
+    if (!name || !sku || !category || lowStockAlert === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Name, SKU, category, current stock, and minimum stock are required'
+        message: 'Name, SKU, category, and low stock alert are required'
       });
     }
 
@@ -69,8 +68,9 @@ const createInventoryItem = async (req, res) => {
         subcategory,
         description,
         manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null,
-        currentStock: parseInt(currentStock),
-        minStock: parseInt(minStock),
+        currentStock: 0,
+        baseStock: 0, // Initialize base stock
+        lowStockAlert: parseInt(lowStockAlert) || 5,
         location,
         status: status || 'ACTIVE',
         sourceType: sourceType || null,
@@ -176,6 +176,11 @@ const getInventoryItem = async (req, res) => {
             companyName: true,
             email: true
           }
+        },
+        products: {
+          include: {
+            variants: true
+          }
         }
       }
     });
@@ -215,8 +220,7 @@ const updateInventoryItem = async (req, res) => {
       subcategory,
       description,
       manufacturingDate,
-      currentStock,
-      minStock,
+      lowStockAlert,
       location,
       status,
       sourceType,
@@ -271,8 +275,7 @@ const updateInventoryItem = async (req, res) => {
       ...(manufacturingDate !== undefined && {
         manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null
       }),
-      ...(currentStock !== undefined && { currentStock: parseInt(currentStock) }),
-      ...(minStock !== undefined && { minStock: parseInt(minStock) }),
+      ...(lowStockAlert !== undefined && { lowStockAlert: parseInt(lowStockAlert) }),
       ...(location !== undefined && { location }),
       ...(status && { status }),
       ...(sourceType !== undefined && { sourceType }),
@@ -448,50 +451,66 @@ const updateStock = async (req, res) => {
       //   }
       // }
 
-      // Update inventory stock
+      // 1. First, find linked products to calculate the aggregate stock
+      const linkedProducts = await tx.product.findMany({
+        where: { inventoryItemId: id },
+        include: { variants: true }
+      });
+
+      let totalAggregateStock = parseInt(currentStock);
+      let baseStockUpdate = parseInt(currentStock);
+
+      if (linkedProducts.length > 0) {
+        let variantStockSum = 0;
+        // Assume first linked product defines the variants for this inventory item
+        // This matches the typical 1:1 relationship
+        const mainProduct = linkedProducts[0];
+        if (mainProduct.variants && mainProduct.variants.length > 0) {
+          variantStockSum = mainProduct.variants.reduce((sum, v) => sum + v.stock, 0);
+        }
+        // Total stock = base stock + variant stocks
+        totalAggregateStock = baseStockUpdate + variantStockSum;
+      }
+
+      // 2. Update inventory stock with both base and total stock
       const updatedItem = await tx.inventory.update({
         where: { id },
         data: {
-          currentStock: newStock,
+          baseStock: baseStockUpdate, // Store the base stock separately
+          currentStock: totalAggregateStock, // Store the total stock
           ...(notes && { notes }),
           lastRestocked: new Date()
         }
       });
 
-      // Create stock history record
+      // 3. Sync with all linked products
+      if (linkedProducts.length > 0) {
+        for (const product of linkedProducts) {
+          let variantSum = 0;
+          if (product.variants && product.variants.length > 0) {
+            variantSum = product.variants.reduce((sum, v) => sum + v.stock, 0);
+          }
+
+          await tx.product.update({
+            where: { id: product.id },
+            data: { totalStock: baseStockUpdate + variantSum }
+          });
+        }
+      }
+
+      // 4. Create stock history record
       const historyRecord = await tx.stockChangeHistory.create({
         data: {
           inventoryId: id,
           previousStock,
-          newStock,
-          changeAmount,
+          newStock: totalAggregateStock,
+          changeAmount: totalAggregateStock - previousStock,
           reason: reason.trim(),
           changedBy: req.user.id,
           changedByType: isAdmin ? 'admin' : 'vendor',
           changedByName
         }
       });
-
-      // Sync stock with all linked products (including the main one if set)
-      const linkedProducts = await tx.product.findMany({
-        where: { inventoryItemId: id },
-        include: { variants: true }
-      });
-
-      if (linkedProducts.length > 0) {
-        for (const product of linkedProducts) {
-          let variantStockSum = 0;
-          if (product.variants && product.variants.length > 0) {
-            variantStockSum = product.variants.reduce((sum, v) => sum + v.stock, 0);
-          }
-
-          await tx.product.update({
-            where: { id: product.id },
-            data: { totalStock: newStock + variantStockSum }
-          });
-          console.log(`✅ Synced stock with product ${product.id}: Base(${newStock}) + Variants(${variantStockSum}) = ${newStock + variantStockSum}`);
-        }
-      }
 
       return { updatedItem, historyRecord };
     });
@@ -615,11 +634,11 @@ const getInventoryStats = async (req, res) => {
       select: {
         id: true,
         currentStock: true,
-        minStock: true
+        lowStockAlert: true
       }
     });
 
-    const lowStockCount = lowStockItems.filter(item => item.currentStock <= item.minStock).length;
+    const lowStockCount = lowStockItems.filter(item => item.currentStock <= item.lowStockAlert).length;
 
     // Get out of stock items
     const outOfStockItems = await prisma.inventory.count({
@@ -859,11 +878,11 @@ const getAllInventoryStats = async (req, res) => {
       select: {
         id: true,
         currentStock: true,
-        minStock: true
+        lowStockAlert: true
       }
     });
 
-    const lowStockCount = lowStockItems.filter(item => item.currentStock <= item.minStock).length;
+    const lowStockCount = lowStockItems.filter(item => item.currentStock <= item.lowStockAlert).length;
 
     // Get out of stock items
     const outOfStockItems = await prisma.inventory.count({

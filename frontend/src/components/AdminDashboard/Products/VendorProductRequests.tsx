@@ -21,7 +21,7 @@ interface VendorProductRequest {
   basePrice: number
   totalStock: number
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
-  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED'
+  approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED'
   approvedAt?: string
   rejectionReason?: string
   createdAt: string
@@ -52,7 +52,7 @@ export default function VendorProductRequests() {
   const [requests, setRequests] = useState<VendorProductRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED'>('PENDING')
   const [selectedRequest, setSelectedRequest] = useState<VendorProductRequest | null>(null)
   const [showRejectionModal, setShowRejectionModal] = useState(false)
   const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null)
@@ -188,6 +188,8 @@ export default function VendorProductRequests() {
     switch (status) {
       case 'PENDING':
         return 'bg-yellow-100 text-yellow-800'
+      case 'QC_APPROVED':
+        return 'bg-blue-100 text-blue-800'
       case 'APPROVED':
         return 'bg-green-100 text-green-800'
       case 'REJECTED':
@@ -253,8 +255,9 @@ export default function VendorProductRequests() {
                 value={statusFilter}
                 options={[
                   { value: 'all', label: 'All Status' },
-                  { value: 'PENDING', label: 'Pending Approval' },
-                  { value: 'APPROVED', label: 'Approved' },
+                  { value: 'PENDING', label: 'Pending QC' },
+                  { value: 'QC_APPROVED', label: 'QC Approved (Ready)' },
+                  { value: 'APPROVED', label: 'Final Approved' },
                   { value: 'REJECTED', label: 'Rejected' }
                 ]}
                 onChange={(value) => setStatusFilter(value as any)}
@@ -370,16 +373,19 @@ export default function VendorProductRequests() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {request.approvalStatus === 'PENDING' && (
+                        {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED') && (
                           <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleApprove(request.id)}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
+                            {request.approvalStatus === 'QC_APPROVED' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleApprove(request.id)}
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                title="Final Approve & Set Price"
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -389,15 +395,17 @@ export default function VendorProductRequests() {
                             >
                               <X className="h-4 w-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleAssignClick(request.id)}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              title="Assign QC Checker"
-                            >
-                              <UserPlus className="h-4 w-4" />
-                            </Button>
+                            {request.approvalStatus === 'PENDING' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleAssignClick(request.id)}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                title="Assign QC Checker"
+                              >
+                                <UserPlus className="h-4 w-4" />
+                              </Button>
+                            )}
                           </>
                         )}
                       </div>

@@ -18,7 +18,8 @@ interface InventoryItem {
   category: string
   subcategory?: string
   currentStock: number
-  minStock: number
+  baseStock: number // Now required field for base stock
+  lowStockAlert: number
   status: string
   lastRestocked: string | null
   hasProductCreated: boolean
@@ -47,6 +48,7 @@ interface Product {
   hasVariants: boolean
   variants: ProductVariant[]
   totalStock: number
+  baseStock?: number
   singleUnitSize?: string
   singleUnitColor?: string
   singleUnitColorHex?: string
@@ -86,7 +88,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
       if (inventoryResponse.data.success) {
         const item = inventoryResponse.data.data
         setInventoryItem(item)
-        setNewStock(item.currentStock.toString())
+        // Use baseStock from backend
+        setNewStock(item.baseStock.toString())
 
         // If product exists, fetch product details with variants
         if (item.hasProductCreated && item.productId) {
@@ -97,14 +100,29 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
             setProduct(productData)
 
             // Initialize variant stocks
-            if (productData.hasVariants && productData.variants) {
+            if (productData.hasVariants && productData.variants && productData.variants.length > 0) {
               const initialStocks: Record<string, number> = {}
-              productData.variants.forEach((variant: ProductVariant) => {
-                initialStocks[variant.id] = variant.stock
+              let variantSum = 0
+              productData.variants.forEach((v: ProductVariant) => {
+                const s = parseInt(v.stock?.toString()) || 0
+                initialStocks[v.id] = s
+                variantSum += s
               })
               setVariantStocks(initialStocks)
+
+              // Use the backend baseStock
+              const bStockValue = item.baseStock
+
+              setNewStock(bStockValue.toString())
+            } else {
+              // Use baseStock from backend
+              setNewStock(item.baseStock.toString())
+              setVariantStocks({})
             }
           }
+        } else {
+          // Use baseStock from backend
+          setNewStock(item.baseStock.toString())
         }
       }
     } catch (error: any) {
@@ -126,8 +144,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
     // If hasVariants, we might want to allow empty base stock update if it hasn't changed.
     // But for simplicity, let's validate it if it's visible.
 
-    // Actually, we should check if base stock has changed
-    const baseStockChanged = inventoryItem && parseInt(newStock) !== inventoryItem.currentStock
+    // Check if base stock has changed
+    const baseStockChanged = inventoryItem && parseInt(newStock) !== inventoryItem.baseStock
 
     if (baseStockChanged || !product?.hasVariants) {
       if (!newStock || newStock.trim() === '') {
@@ -171,8 +189,11 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
         })
       }
 
-      // 2. Update Inventory (Base) Stock if changed OR if no variants (must update)
-      const baseStockChanged = parseInt(newStock) !== inventoryItem.currentStock
+      // 2. Update base inventory stock
+      // Use baseStock from database
+      const currentBaseStock = inventoryItem.baseStock
+      const baseStockChanged = parseInt(newStock) !== currentBaseStock
+
       if (baseStockChanged || !product?.hasVariants) {
         await inventoryService.updateStock(inventoryId, {
           currentStock: parseInt(newStock),
@@ -216,9 +237,15 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
     return Object.values(variantStocks).reduce((sum, stock) => sum + stock, 0)
   }
 
-  const stockDifference = product?.hasVariants
-    ? calculateTotalVariantStock() - (product?.totalStock || 0)
-    : parseInt(newStock || '0') - (inventoryItem?.currentStock || 0)
+  const getAggregateStock = () => {
+    const vSum = calculateTotalVariantStock()
+    const bStock = parseInt(newStock) || 0
+    return vSum + bStock
+  }
+
+  // Calculate the difference from the ORIGINAL aggregate stock
+  // This ensures that when the page loads, the difference is 0.
+  const stockDifference = getAggregateStock() - (inventoryItem?.currentStock || 0)
 
   const isIncrease = stockDifference > 0
   const isDecrease = stockDifference < 0
@@ -314,7 +341,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-sm font-medium text-slate-500">Min Stock</span>
-                  <span className="text-base text-slate-600">{inventoryItem.minStock}</span>
+                  <span className="text-base text-slate-600">{inventoryItem.lowStockAlert}</span>
                 </div>
               </div>
 
@@ -453,8 +480,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                   <p className="mt-1 text-sm text-red-600">{errors.newStock}</p>
                 )}
 
-                {/* Stock Change Indicator for Base Stock */}
-                {stockDifference !== 0 && !isNaN(stockDifference) && !product?.hasVariants && (
+                {/* Stock Change Indicator for Total Aggregate Stock */}
+                {stockDifference !== 0 && !isNaN(stockDifference) && (
                   <div
                     className={`flex items-center space-x-2 p-3 mt-2 rounded-lg ${isIncrease ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                       }`}

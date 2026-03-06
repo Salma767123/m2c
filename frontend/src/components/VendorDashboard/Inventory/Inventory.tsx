@@ -18,11 +18,11 @@ import Dropdown from '@/components/UI/Dropdown'
 import inventoryService, { InventoryItem as APIInventoryItem, InventoryStats } from '@/services/inventoryService'
 import StockHistoryModal from '@/components/Shared/StockHistoryModal'
 
-const getStatusBadge = (status: string, currentStock: number, minStock: number) => {
+const getStatusBadge = (status: string, currentStock: number, lowStockAlert: number) => {
   if (currentStock === 0) {
     return <Badge className="bg-red-100 text-red-800">Out of Stock</Badge>
   }
-  if (currentStock <= minStock) {
+  if (currentStock <= lowStockAlert) {
     return <Badge className="bg-yellow-100 text-yellow-800">Low Stock</Badge>
   }
   return <Badge className="bg-green-100 text-green-800">In Stock</Badge>
@@ -38,7 +38,7 @@ export default function Inventory() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  
+
   // Stock history modal state
   const [stockHistoryModal, setStockHistoryModal] = useState<{
     isOpen: boolean
@@ -59,29 +59,29 @@ export default function Inventory() {
     const loadData = async () => {
       try {
         setIsLoading(true)
-        
+
         // Check if vendor is logged in
         if (typeof window === 'undefined') return;
-        
+
         const vendorToken = localStorage.getItem('vendorToken')
         if (!vendorToken) {
           console.log('No vendor token found, redirecting to login')
           window.location.href = '/vendor'
           return
         }
-        
+
         // Load vendor categories and stats in parallel
         const [categoriesData, statsData] = await Promise.all([
           inventoryService.getVendorCategories(),
           inventoryService.getStats()
         ])
-        
+
         setVendorCategories(categoriesData.categories.map(cat => cat.name))
         setInventoryStats(statsData)
-        
+
         // Load inventory items
         await loadInventoryItems()
-        
+
       } catch (error: any) {
         console.error('Error loading data:', error)
         if (error.response?.status === 401) {
@@ -108,7 +108,7 @@ export default function Inventory() {
         ...(statusFilter !== 'all' && { status: statusFilter }),
         ...(categoryFilter !== 'all' && { category: categoryFilter })
       }
-      
+
       const data = await inventoryService.getItems(filters)
       setInventoryItems(data.items)
       setTotalPages(data.pagination.totalPages)
@@ -153,6 +153,11 @@ export default function Inventory() {
         }
       }
     }
+  }
+
+  const handleCreateProduct = (item: APIInventoryItem) => {
+    // Navigate to product creation with inventory pre-selected
+    window.location.href = `/vendor/dashboard/products/add?inventoryId=${item.id}`
   }
 
   if (isLoading) {
@@ -271,9 +276,9 @@ export default function Inventory() {
               <Dropdown
                 id="categoryFilter"
                 value={categoryFilter}
-                options={categories.map(cat => ({ 
-                  value: cat, 
-                  label: cat === 'all' ? 'All Categories' : cat 
+                options={categories.map(cat => ({
+                  value: cat,
+                  label: cat === 'all' ? 'All Categories' : cat
                 }))}
                 onChange={(value) => setCategoryFilter(value as string)}
               />
@@ -293,10 +298,10 @@ export default function Inventory() {
               <TableRow>
                 <TableHead>Product</TableHead>
                 <TableHead>SKU</TableHead>
-                <TableHead>Linked Product</TableHead>
+                <TableHead>Product Status</TableHead>
                 <TableHead>Current Stock</TableHead>
-                <TableHead>Min/Max</TableHead>
-                <TableHead>Cost Price</TableHead>
+                <TableHead>Base Stock</TableHead>
+                <TableHead>Min Stock</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Restocked</TableHead>
                 <TableHead>Actions</TableHead>
@@ -329,7 +334,7 @@ export default function Inventory() {
                         {item.hasProductCreated ? (
                           <>
                             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span className="text-sm text-slate-600">Product Linked</span>
+                            <span className="text-sm text-green-600">Product Created</span>
                           </>
                         ) : (
                           <>
@@ -340,48 +345,62 @@ export default function Inventory() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className={item.currentStock <= item.minStock ? 'text-red-600 font-bold' : 'text-[#222222] font-semibold'}>
+                      <span className={item.currentStock <= item.lowStockAlert ? 'text-red-600 font-bold' : 'text-[#222222] font-semibold'}>
                         {item.currentStock}
                       </span>
                     </TableCell>
+                    <TableCell>
+                      <span className="text-[#222222] font-medium">
+                        {item.baseStock || 0}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-sm text-slate-600">
-                      {item.minStock} / -
+                      {item.lowStockAlert}
                     </TableCell>
-                    <TableCell className="font-medium text-[#222222]">
-                      -
-                    </TableCell>
-                    <TableCell>{getStatusBadge(item.status, item.currentStock, item.minStock)}</TableCell>
+                    <TableCell>{getStatusBadge(item.status, item.currentStock, item.lowStockAlert)}</TableCell>
                     <TableCell className="text-sm text-slate-600">
                       {item.lastRestocked ? new Date(item.lastRestocked).toLocaleDateString() : 'Never'}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           className="hover:bg-gray-50 hover:border-gray-200"
                           onClick={() => handleRestock(item)}
                         >
                           Update Stock
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           className="hover:bg-gray-50 hover:border-gray-200"
                           onClick={() => handleViewHistory(item)}
                         >
                           <History className="h-4 w-4" />
                         </Button>
+                        {!item.hasProductCreated && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="hover:bg-gray-50 hover:border-gray-200 text-blue-600 hover:text-blue-700"
+                            onClick={() => handleCreateProduct(item)}
+                          >
+                            <Package className="w-4 h-4 mr-1" />
+                            Create Product
+                          </Button>
+                        )}
                         <Link href={`/vendor/dashboard/inventory/edit/${item.id}`}>
                           <Button variant="outline" size="sm" className="hover:bg-gray-50 hover:border-gray-200">
                             <Edit className="w-4 h-4" />
                           </Button>
                         </Link>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="hover:bg-gray-50 hover:border-gray-200 text-red-600 hover:text-red-700"
                           onClick={() => handleDelete(item.id)}
+                          disabled={item.hasProductCreated}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

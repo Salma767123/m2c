@@ -32,7 +32,7 @@ export interface AdminProduct {
   weight?: string;
   inStock: boolean;
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
-  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED';
   approvedAt?: string;
   approvedBy?: string;
   rejectionReason?: string;
@@ -98,7 +98,7 @@ class AdminProductService {
   async getAllProducts(params?: {
     page?: number;
     limit?: number;
-    approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+    approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED';
     status?: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
     search?: string;
     vendorId?: string;

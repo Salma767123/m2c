@@ -1,6 +1,6 @@
 "use client"
 
-import { CheckCircle, AlertTriangle } from "lucide-react"
+import { CheckCircle, AlertTriangle, Camera } from "lucide-react"
 
 interface ReviewProps {
   formData: {
@@ -20,8 +20,6 @@ interface ReviewProps {
       inspectionQuantity: number
       status: string
     }>
-    packedQuantity: number
-    cartonCount: number
     // Packaging Remarks (single selection 1-10)
     shipperCartonRemark: string
     innerCartonRemark: string
@@ -164,19 +162,9 @@ export default function Review({ formData }: ReviewProps) {
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
             Order Information
           </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b border-slate-200">
-              <span className="text-slate-600">Total Items:</span>
-              <span className="text-slate-900">{formData.items.length}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-slate-200">
-              <span className="text-slate-600">Total Quantity:</span>
-              <span className="text-slate-900">{formData.packedQuantity} units</span>
-            </div>
-            <div className="flex justify-between py-2">
-              <span className="text-slate-600">Cartons:</span>
-              <span className="text-slate-900">{formData.cartonCount} cartons</span>
-            </div>
+          <div className="flex justify-between py-2">
+            <span className="text-slate-600">Total Items:</span>
+            <span className="text-slate-900">{formData.items.length} products</span>
           </div>
         </div>
       </div>
@@ -217,7 +205,8 @@ export default function Review({ formData }: ReviewProps) {
             </table>
           </div>
         </div>
-      )}
+      )
+      }
 
       {/* Inspection Result Summary */}
       <div className="bg-white rounded-xl p-6 border-2 border-slate-300">
@@ -428,6 +417,79 @@ export default function Review({ formData }: ReviewProps) {
           {overallResult.totalRemarks > 0 && ` (${overallResult.totalRemarks} remarks)`}
         </div>
       </div>
-    </div>
+
+      {/* Photo Evidence Overview */}
+      <div className="bg-white rounded-xl p-6 border border-slate-200">
+        <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+          <Camera className="w-5 h-5 text-blue-600" />
+          Photo Evidence Overview
+        </h3>
+
+        <div className="space-y-8">
+          {/* Preparation Photos */}
+          {(formData as any).warehousePhotoEvidences?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Preparation Photos</h4>
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                {(formData as any).warehousePhotoEvidences.map((photo: any, i: number) => (
+                  <div key={i} className="aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                    <img src={photo.url || photo.data} alt="Prep" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Measurement Photos */}
+          {(formData as any).measurementPhotos?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Measurement Photos</h4>
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                {(formData as any).measurementPhotos.map((photo: any, i: number) => (
+                  <div key={i} className="aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                    <img src={photo.url || photo.data} alt="Meas" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Packaging Photos */}
+          {(formData as any).packagingPhotos?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Packaging Photos</h4>
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                {(formData as any).packagingPhotos.map((photo: any, i: number) => (
+                  <div key={i} className="aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                    <img src={photo.url || photo.data} alt="Pack" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Defect Photos */}
+          {(formData as any).defectPhotos?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Defect Photos</h4>
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                {(formData as any).defectPhotos.map((photo: any, i: number) => (
+                  <div key={i} className="aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                    <img src={photo.url || photo.data} alt="Defect" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {!(formData as any).warehousePhotoEvidences?.length &&
+          !(formData as any).measurementPhotos?.length &&
+          !(formData as any).packagingPhotos?.length &&
+          !(formData as any).defectPhotos?.length && (
+            <p className="text-slate-500 text-sm text-center py-4 bg-slate-50 rounded-lg">No photos uploaded for this inspection.</p>
+          )}
+      </div>
+    </div >
   )
 }

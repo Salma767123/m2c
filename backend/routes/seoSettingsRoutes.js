@@ -1,12 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const { getSEOSettings, updateSEOSettings } = require('../controllers/seoSettingsController');
+const { getAllSEOSettings, getSEOSettings, updateSEOSettings } = require('../controllers/seoSettingsController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { upload } = require('../middleware/upload');
 
-// Get SEO settings
-router.get('/', authenticateToken, requireRole(['super_admin', 'admin', 'ADMIN', 'Super Admin']), getSEOSettings);
+// Get all SEO settings (for page management)
+router.get('/', authenticateToken, requireRole(['super_admin', 'admin', 'ADMIN', 'Super Admin']), getAllSEOSettings);
 
-// Update SEO settings
-router.put('/', authenticateToken, requireRole(['super_admin', 'ADMIN', 'Super Admin']), updateSEOSettings);
+// Get SEO settings for a specific page
+router.get('/:page', authenticateToken, requireRole(['super_admin', 'admin', 'ADMIN', 'Super Admin']), getSEOSettings);
+
+// Update SEO settings for a specific page (with optional image upload)
+router.put('/:page', 
+    authenticateToken, 
+    requireRole(['super_admin', 'ADMIN', 'Super Admin']), 
+    upload.single('ogImage'),
+    updateSEOSettings
+);
 
 module.exports = router;

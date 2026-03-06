@@ -19,7 +19,8 @@ interface InventoryItem {
   category: string
   subcategory?: string
   currentStock: number
-  minStock: number
+  baseStock: number // Now required field for base stock
+  lowStockAlert: number
   status: string
   lastRestocked: string | null
   vendor: {
@@ -92,7 +93,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
       if (inventoryResponse.data.success) {
         const item = inventoryResponse.data.data
         setInventoryItem(item)
-        setNewStock(item.currentStock.toString())
+        // Use baseStock from backend
+        setNewStock(item.baseStock.toString())
 
         // If product exists, fetch product details with variants
         if (item.hasProductCreated && item.productId) {
@@ -132,8 +134,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
     // If hasVariants, we might want to allow empty base stock update if it hasn't changed.
     // But for simplicity, let's validate it if it's visible.
 
-    // Actually, we should check if base stock has changed
-    const baseStockChanged = inventoryItem && parseInt(newStock) !== inventoryItem.currentStock
+    // Check if base stock has changed
+    const baseStockChanged = inventoryItem && parseInt(newStock) !== inventoryItem.baseStock
 
     if (baseStockChanged || !product?.hasVariants) {
       if (!newStock || newStock.trim() === '') {
@@ -178,7 +180,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
       }
 
       // Update inventory stock (Base Stock)
-      const baseStockChanged = parseInt(newStock) !== inventoryItem.currentStock
+      const baseStockChanged = parseInt(newStock) !== inventoryItem.baseStock
       if (baseStockChanged || !product?.hasVariants) {
         await inventoryService.adminUpdateStock(inventoryId, {
           currentStock: parseInt(newStock),
@@ -224,7 +226,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
 
   const stockDifference = product?.hasVariants
     ? calculateTotalVariantStock() - (product?.totalStock || 0)
-    : parseInt(newStock || '0') - (inventoryItem?.currentStock || 0)
+    : parseInt(newStock || '0') - inventoryItem?.baseStock
 
   const isIncrease = stockDifference > 0
   const isDecrease = stockDifference < 0
@@ -327,7 +329,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                 </div>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-sm font-medium text-gray-500">Min Stock</span>
-                  <span className="text-base text-gray-600">{inventoryItem.minStock}</span>
+                  <span className="text-base text-gray-600">{inventoryItem.lowStockAlert}</span>
                 </div>
               </div>
 

@@ -1,7 +1,35 @@
 "use client"
 
-import { Camera, Upload, X } from "lucide-react"
+import { Camera, Upload, X, Image as ImageIcon } from "lucide-react"
 import { useRef, useState } from "react"
+
+// Compress image before storing to keep payload manageable
+const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement("canvas")
+        let { width, height } = img
+
+        // Scale down if larger than maxWidth
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width)
+          width = maxWidth
+        }
+
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext("2d")!
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL("image/jpeg", quality))
+      }
+      img.src = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 interface TestingProps {
   formData: {
@@ -11,30 +39,30 @@ interface TestingProps {
       detail: string
       pass: boolean
       fail: boolean
-      photos: string[]
-      rightPhotos: Array<{ 
-        file?: File; 
-        name: string; 
-        url: string; 
+      photos: any[]
+      rightPhotos: Array<{
+        file?: File;
+        name: string;
+        url: string;
         id: string | number;
         uploadedAt: string;
         uploadedDate: string;
         uploadedTime: string;
       }>
-      wrongPhotos: Array<{ 
-        file?: File; 
-        name: string; 
-        url: string; 
+      wrongPhotos: Array<{
+        file?: File;
+        name: string;
+        url: string;
         id: string | number;
         uploadedAt: string;
         uploadedDate: string;
         uploadedTime: string;
       }>
     }>
-    testingPhotos: Array<{ 
-      file?: File; 
-      name: string; 
-      url: string; 
+    testingPhotos: Array<{
+      file?: File;
+      name: string;
+      url: string;
       id: string | number;
       uploadedAt: string;
       uploadedDate: string;
@@ -45,60 +73,58 @@ interface TestingProps {
 }
 
 export default function Testing({ formData, setFormData }: TestingProps) {
-  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
   const rightPhotoRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
   const wrongPhotoRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
   const generalTestingPhotoInputRef = useRef<HTMLInputElement | null>(null)
-  const [loadingPhotos, setLoadingPhotos] = useState<{ [key: string]: boolean }>({})
 
   // Helper function to create timestamp data
   const createTimestamp = () => {
     const now = new Date()
     return {
       uploadedAt: now.toISOString(),
-      uploadedDate: now.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit' 
+      uploadedDate: now.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
       }),
-      uploadedTime: now.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
+      uploadedTime: now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
         second: '2-digit',
-        hour12: true 
+        hour12: true
       })
     }
   }
 
-  const handleGeneralTestingPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGeneralTestingPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    
+
     // Create preview URLs for the new files with timestamp
-    const newImages = files.map((file) => ({
-      file,
-      name: file.name,
-      url: URL.createObjectURL(file),
-      id: Date.now() + Math.random(),
-      ...createTimestamp()
-    }))
+    const newImages = await Promise.all(
+      files.map(async (file) => {
+        const data = await compressImage(file)
+        return {
+          file,
+          name: file.name,
+          url: data,
+          data: data,
+          id: Date.now() + Math.random(),
+          ...createTimestamp()
+        }
+      })
+    )
 
     setFormData({
       ...formData,
       testingPhotos: [...(formData.testingPhotos || []), ...newImages]
     })
+    if (e.target) e.target.value = ""
   }
 
-  const removeGeneralTestingPhoto = (imageId: number) => {
+  const removeGeneralTestingPhoto = (imageId: string | number) => {
     const updatedPhotos = formData.testingPhotos.filter(
       (img: any) => img.id !== imageId
     )
-    // Clean up the URL to prevent memory leaks
-    const imageToRemove = formData.testingPhotos.find(
-      (img: any) => img.id === imageId
-    )
-    if (imageToRemove && imageToRemove.url) {
-      URL.revokeObjectURL(imageToRemove.url)
-    }
     setFormData({ ...formData, testingPhotos: updatedPhotos })
   }
 
@@ -126,94 +152,72 @@ export default function Testing({ formData, setFormData }: TestingProps) {
     setFormData({ ...formData, tests: updatedTests })
   }
 
-  const handleTestPhotoUpload = (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      const fileNames = Array.from(files).map(f => f.name)
-      const test = tests.find(t => t.id === testId)
-      if (test) {
-        const updatedPhotos = [...(test.photos || []), ...fileNames]
-        updateTest(testId, 'photos', updatedPhotos)
-      }
-    }
-  }
-
-  const removeTestPhoto = (testId: string, photoIndex: number) => {
-    const test = tests.find(t => t.id === testId)
-    if (test) {
-      const updatedPhotos = test.photos.filter((_, i) => i !== photoIndex)
-      updateTest(testId, 'photos', updatedPhotos)
-    }
-  }
-
-  const handleRightPhotoUpload = (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRightPhotoUpload = async (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    
-    // Create preview URLs for the new files with timestamp
-    const newImages = files.map((file) => ({
-      file,
-      name: file.name,
-      url: URL.createObjectURL(file),
-      id: Date.now() + Math.random(),
-      ...createTimestamp()
-    }))
+
+    const newImages = await Promise.all(
+      files.map(async (file) => {
+        const data = await compressImage(file)
+        return {
+          file,
+          name: file.name,
+          url: data,
+          data: data,
+          id: Date.now() + Math.random(),
+          ...createTimestamp()
+        }
+      })
+    )
 
     const test = tests.find(t => t.id === testId)
     if (test) {
       const updatedPhotos = [...(test.rightPhotos || []), ...newImages]
       updateTest(testId, 'rightPhotos', updatedPhotos)
     }
+    if (e.target) e.target.value = ""
   }
 
-  const handleWrongPhotoUpload = (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWrongPhotoUpload = async (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    
-    // Create preview URLs for the new files with timestamp
-    const newImages = files.map((file) => ({
-      file,
-      name: file.name,
-      url: URL.createObjectURL(file),
-      id: Date.now() + Math.random(),
-      ...createTimestamp()
-    }))
+
+    const newImages = await Promise.all(
+      files.map(async (file) => {
+        const data = await compressImage(file)
+        return {
+          file,
+          name: file.name,
+          url: data,
+          data: data,
+          id: Date.now() + Math.random(),
+          ...createTimestamp()
+        }
+      })
+    )
 
     const test = tests.find(t => t.id === testId)
     if (test) {
       const updatedPhotos = [...(test.wrongPhotos || []), ...newImages]
       updateTest(testId, 'wrongPhotos', updatedPhotos)
     }
+    if (e.target) e.target.value = ""
   }
 
-  const removeRightPhoto = (testId: string, imageId: number) => {
+  const removeRightPhoto = (testId: string, imageId: string | number) => {
     const test = tests.find(t => t.id === testId)
     if (test && test.rightPhotos) {
       const updatedPhotos = test.rightPhotos.filter(
         (img: any) => img.id !== imageId
       )
-      // Clean up the URL to prevent memory leaks
-      const imageToRemove = test.rightPhotos.find(
-        (img: any) => img.id === imageId
-      )
-      if (imageToRemove && imageToRemove.url) {
-        URL.revokeObjectURL(imageToRemove.url)
-      }
       updateTest(testId, 'rightPhotos', updatedPhotos)
     }
   }
 
-  const removeWrongPhoto = (testId: string, imageId: number) => {
+  const removeWrongPhoto = (testId: string, imageId: string | number) => {
     const test = tests.find(t => t.id === testId)
     if (test && test.wrongPhotos) {
       const updatedPhotos = test.wrongPhotos.filter(
         (img: any) => img.id !== imageId
       )
-      // Clean up the URL to prevent memory leaks
-      const imageToRemove = test.wrongPhotos.find(
-        (img: any) => img.id === imageId
-      )
-      if (imageToRemove && imageToRemove.url) {
-        URL.revokeObjectURL(imageToRemove.url)
-      }
       updateTest(testId, 'wrongPhotos', updatedPhotos)
     }
   }
@@ -230,8 +234,7 @@ export default function Testing({ formData, setFormData }: TestingProps) {
           <div className="mb-4">
             <label className="block text-slate-900 font-semibold mb-2">{test.label}</label>
             <p className="text-slate-600 text-sm mb-4">{test.detail}</p>
-            
-            {/* Checkboxes for Pass/Fail */}
+
             <div className="flex items-center gap-6 mb-6">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -239,7 +242,6 @@ export default function Testing({ formData, setFormData }: TestingProps) {
                   checked={test.pass}
                   onChange={(e) => {
                     updateTest(test.id, 'pass', e.target.checked)
-                    // Auto-uncheck fail if pass is checked
                     if (e.target.checked && test.fail) {
                       updateTest(test.id, 'fail', false)
                     }
@@ -248,14 +250,13 @@ export default function Testing({ formData, setFormData }: TestingProps) {
                 />
                 <span className="text-slate-700 font-medium">Pass</span>
               </label>
-              
+
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={test.fail}
                   onChange={(e) => {
                     updateTest(test.id, 'fail', e.target.checked)
-                    // Auto-uncheck pass if fail is checked
                     if (e.target.checked && test.pass) {
                       updateTest(test.id, 'pass', false)
                     }
@@ -266,13 +267,11 @@ export default function Testing({ formData, setFormData }: TestingProps) {
               </label>
             </div>
 
-            {/* Photo Upload Section - Left: Right Photos, Right: Wrong Photos */}
             <div className="mb-4">
               <label className="block text-slate-700 font-medium mb-3 text-sm">Test Photos:</label>
-              <div className="grid grid-cols-2 gap-6">
-                {/* Left Side - Right Photos */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-slate-600 font-medium mb-2 text-sm  p-2 rounded">✓ Right/Correct Photo</label>
+                  <label className="block text-slate-600 font-medium mb-2 text-sm p-2 rounded">✓ Right/Correct Photo</label>
                   <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-400 transition-colors cursor-pointer bg-green-50">
                     <input
                       ref={(el) => {
@@ -290,73 +289,33 @@ export default function Testing({ formData, setFormData }: TestingProps) {
                     >
                       <Upload className="w-6 h-6 text-green-400 mb-2" />
                       <p className="text-slate-600 text-sm font-medium">Upload right photos</p>
-                      <p className="text-slate-500 text-xs mt-1">Click to browse</p>
                     </button>
                   </div>
 
-                  {/* Right Photos List */}
                   {test.rightPhotos && test.rightPhotos.length > 0 && (
-                    <div className="mt-6">
-                      <h4 className="font-medium text-gray-900 mb-2">
-                        Uploaded Images ({test.rightPhotos.length}):
-                      </h4>
-                      {test.rightPhotos.length > 0 && test.rightPhotos[test.rightPhotos.length - 1].uploadedDate && (
-                        <p className="text-xs text-gray-500 mb-4">
-                          Last uploaded: {test.rightPhotos[test.rightPhotos.length - 1].uploadedDate} at {test.rightPhotos[test.rightPhotos.length - 1].uploadedTime}
-                        </p>
-                      )}
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {test.rightPhotos.map((image: any, index: number) => (
-                          <div key={image.id || index} className="relative group">
-                            <div className="aspect-square bg-green-100 rounded-lg overflow-hidden border border-green-200">
-                              {image.url ? (
-                                <img
-                                  src={image.url}
-                                  alt={`Right photo ${index + 1}`}
-                                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                  <Camera className="w-8 h-8" />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Remove button */}
-                            <button
-                              type="button"
-                              onClick={() => removeRightPhoto(test.id, image.id)}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
-                              title="Remove image"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-
-                            {/* Image name and timestamp */}
-                            <div className="mt-2">
-                              <p
-                                className="text-xs text-gray-600 truncate font-medium"
-                                title={image.name}
-                              >
-                                {image.name}
-                              </p>
-                              {image.uploadedDate && image.uploadedTime && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  <div>{image.uploadedDate}</div>
-                                  <div>{image.uploadedTime}</div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="grid grid-cols-2 gap-2 mt-4">
+                      {test.rightPhotos.map((image: any, index: number) => (
+                        <div key={image.id || index} className="relative group">
+                          <img
+                            src={image.url}
+                            alt={`Right photo ${index + 1}`}
+                            className="w-full h-24 object-cover rounded-lg border border-green-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeRightPhoto(test.id, image.id)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
 
-                {/* Right Side - Wrong Photos */}
                 <div>
-                  <label className="block text-slate-600 font-medium mb-2 text-sm  p-2 rounded">✗ Wrong/Incorrect Photo</label>
+                  <label className="block text-slate-600 font-medium mb-2 text-sm p-2 rounded">✗ Wrong/Incorrect Photo</label>
                   <div className="border-2 border-dashed border-red-300 bg-red-50 rounded-lg p-4 text-center hover:border-red-400 transition-colors cursor-pointer">
                     <input
                       ref={(el) => {
@@ -374,66 +333,27 @@ export default function Testing({ formData, setFormData }: TestingProps) {
                     >
                       <Upload className="w-6 h-6 text-red-400 mb-2" />
                       <p className="text-slate-600 text-sm font-medium">Upload wrong photos</p>
-                      <p className="text-slate-500 text-xs mt-1">Click to browse</p>
                     </button>
                   </div>
 
-                  {/* Wrong Photos List */}
                   {test.wrongPhotos && test.wrongPhotos.length > 0 && (
-                    <div className="mt-6">
-                      <h4 className="font-medium text-gray-900 mb-2">
-                        Uploaded Images ({test.wrongPhotos.length}):
-                      </h4>
-                      {test.wrongPhotos.length > 0 && test.wrongPhotos[test.wrongPhotos.length - 1].uploadedDate && (
-                        <p className="text-xs text-gray-500 mb-4">
-                          Last uploaded: {test.wrongPhotos[test.wrongPhotos.length - 1].uploadedDate} at {test.wrongPhotos[test.wrongPhotos.length - 1].uploadedTime}
-                        </p>
-                      )}
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {test.wrongPhotos.map((image: any, index: number) => (
-                          <div key={image.id || index} className="relative group">
-                            <div className="aspect-square bg-red-100 rounded-lg overflow-hidden border border-red-200">
-                              {image.url ? (
-                                <img
-                                  src={image.url}
-                                  alt={`Wrong photo ${index + 1}`}
-                                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                  <Camera className="w-8 h-8" />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Remove button */}
-                            <button
-                              type="button"
-                              onClick={() => removeWrongPhoto(test.id, image.id)}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
-                              title="Remove image"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-
-                            {/* Image name and timestamp */}
-                            <div className="mt-2">
-                              <p
-                                className="text-xs text-gray-600 truncate font-medium"
-                                title={image.name}
-                              >
-                                {image.name}
-                              </p>
-                              {image.uploadedDate && image.uploadedTime && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  <div>{image.uploadedDate}</div>
-                                  <div>{image.uploadedTime}</div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="grid grid-cols-2 gap-2 mt-4">
+                      {test.wrongPhotos.map((image: any, index: number) => (
+                        <div key={image.id || index} className="relative group">
+                          <img
+                            src={image.url}
+                            alt={`Wrong photo ${index + 1}`}
+                            className="w-full h-24 object-cover rounded-lg border border-red-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeWrongPhoto(test.id, image.id)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -445,9 +365,6 @@ export default function Testing({ formData, setFormData }: TestingProps) {
 
       <div>
         <label className="block text-slate-700 font-semibold mb-3">General Testing Photos:</label>
-        <p className="text-slate-600 text-sm mb-4">
-          Drop test, color rubbing, seam strength, factory reference samples
-        </p>
         <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50/50">
           <input
             ref={generalTestingPhotoInputRef}
@@ -463,66 +380,27 @@ export default function Testing({ formData, setFormData }: TestingProps) {
           >
             <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
             <p className="text-slate-700 font-medium">Upload test photos</p>
-            <p className="text-slate-500 text-sm mt-1">Drag & drop or click to browse</p>
           </button>
         </div>
 
-        {/* Uploaded Photos List */}
         {formData.testingPhotos && formData.testingPhotos.length > 0 && (
-          <div className="mt-6">
-            <h4 className="font-medium text-gray-900 mb-2">
-              Uploaded Images ({formData.testingPhotos.length}):
-            </h4>
-            {formData.testingPhotos.length > 0 && formData.testingPhotos[formData.testingPhotos.length - 1].uploadedDate && (
-              <p className="text-xs text-gray-500 mb-4">
-                Last uploaded: {formData.testingPhotos[formData.testingPhotos.length - 1].uploadedDate} at {formData.testingPhotos[formData.testingPhotos.length - 1].uploadedTime}
-              </p>
-            )}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {formData.testingPhotos.map((image: any, index: number) => (
-                <div key={image.id || index} className="relative group">
-                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-                    {image.url ? (
-                      <img
-                        src={image.url}
-                        alt={`Testing photo ${index + 1}`}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <Camera className="w-8 h-8" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Remove button */}
-                  <button
-                    type="button"
-                    onClick={() => removeGeneralTestingPhoto(image.id)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
-                    title="Remove image"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-
-                  {/* Image name and timestamp */}
-                  <div className="mt-2">
-                    <p
-                      className="text-xs text-gray-600 truncate font-medium"
-                      title={image.name}
-                    >
-                      {image.name}
-                    </p>
-                    {image.uploadedDate && image.uploadedTime && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        <div>{image.uploadedDate}</div>
-                        <div>{image.uploadedTime}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-6">
+            {formData.testingPhotos.map((image: any, index: number) => (
+              <div key={image.id || index} className="relative group">
+                <img
+                  src={image.url}
+                  alt={`Testing photo ${index + 1}`}
+                  className="w-full h-28 object-cover rounded-xl border border-slate-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeGeneralTestingPhoto(image.id)}
+                  className="absolute top-1.5 right-1.5 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>

@@ -233,9 +233,17 @@ const createProduct = async (req, res) => {
           productId: product.id
         };
 
-        // If has variants, sync calculated stock to inventory
+        // Set base stock and total stock properly
         if (hasVariants && variants && variants.length > 0) {
-          inventoryUpdateData.currentStock = productStock;
+          // For products with variants:
+          // - baseStock remains the original inventory stock (or gets set to a specific base variant stock)
+          // - currentStock becomes total of base + variants
+          const variantStockSum = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+          inventoryUpdateData.baseStock = inventoryItem.currentStock; // Preserve original as base stock
+          inventoryUpdateData.currentStock = inventoryItem.currentStock + variantStockSum; // Total stock
+        } else {
+          // For products without variants, base stock equals current stock
+          inventoryUpdateData.baseStock = inventoryItem.currentStock;
         }
 
         await tx.inventory.update({
@@ -260,7 +268,8 @@ const createProduct = async (req, res) => {
             id: true,
             name: true,
             sku: true,
-            currentStock: true
+            currentStock: true,
+            baseStock: true
           }
         }
       }
@@ -382,14 +391,17 @@ const getVendorProducts = async (req, res) => {
 // Get single product
 const getProduct = async (req, res) => {
   try {
-    const vendorId = req.user.vendorId || req.user.id;
     const { id } = req.params;
+    const whereCondition = { id };
+
+    // Only vendors should be restricted to their own products
+    if (req.user.role === 'VENDOR') {
+      const vendorId = req.user.vendorId || req.user.id;
+      whereCondition.vendorId = vendorId;
+    }
 
     const product = await prisma.product.findFirst({
-      where: {
-        id,
-        vendorId
-      },
+      where: whereCondition,
       include: {
         variants: {
           orderBy: { createdAt: 'asc' }
@@ -918,24 +930,35 @@ const approveProduct = async (req, res) => {
       });
     }
 
+    // Ensure the product was approved by QC first
+    if (product.approvalStatus !== 'QC_APPROVED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Product must be approved by QC (QC_APPROVED) before Admin approval'
+      });
+    }
+
     // Prepare update data
     const updateData = {
       approvalStatus: 'APPROVED',
+      status: 'ACTIVE', // Product becomes ACTIVE for sale once Admin approves it
       approvedAt: new Date(),
       approvedBy: adminId,
       rejectionReason: null // Clear any previous rejection reason
     };
 
-    // If admin price is provided, store it in adminFixedPrice field
-    if (adminPrice !== undefined && adminPrice !== null) {
-      if (adminPrice <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Admin price must be greater than 0'
-        });
-      }
-      updateData.adminFixedPrice = parseFloat(adminPrice);
+    // Requirement: Must have an admin price for approval
+    const finalAdminPrice = adminPrice !== undefined && adminPrice !== null ? adminPrice : product.adminFixedPrice;
+
+    if (!finalAdminPrice || finalAdminPrice <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin price is required for approval and must be greater than 0'
+      });
     }
+
+    // Store the finalized price
+    updateData.adminFixedPrice = parseFloat(finalAdminPrice);
 
     // Update product approval status
     const updatedProduct = await prisma.product.update({
@@ -1398,9 +1421,17 @@ const createProductByAdmin = async (req, res) => {
           productId: product.id
         };
 
-        // If has variants, sync calculated stock to inventory
+        // Set base stock and total stock properly
         if (hasVariants && variants && variants.length > 0) {
-          inventoryUpdateData.currentStock = productStock;
+          // For products with variants:
+          // - baseStock remains the original inventory stock (or gets set to a specific base variant stock)
+          // - currentStock becomes total of base + variants
+          const variantStockSum = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+          inventoryUpdateData.baseStock = inventoryItem.currentStock; // Preserve original as base stock
+          inventoryUpdateData.currentStock = inventoryItem.currentStock + variantStockSum; // Total stock
+        } else {
+          // For products without variants, base stock equals current stock
+          inventoryUpdateData.baseStock = inventoryItem.currentStock;
         }
 
         await tx.inventory.update({
@@ -1433,7 +1464,8 @@ const createProductByAdmin = async (req, res) => {
             id: true,
             name: true,
             sku: true,
-            currentStock: true
+            currentStock: true,
+            baseStock: true
           }
         }
       }

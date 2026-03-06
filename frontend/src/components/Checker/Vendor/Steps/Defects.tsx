@@ -1,7 +1,36 @@
 "use client"
 
-import { ChevronDown, ChevronUp, Camera, CheckCircle, AlertTriangle, Upload, X } from "lucide-react"
+import { ChevronDown, ChevronUp, Camera, CheckCircle, AlertTriangle, Upload, X, Image as ImageIcon } from "lucide-react"
 import { useRef } from "react"
+
+// Compress image before storing to keep payload manageable
+const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement("canvas")
+        let { width, height } = img
+
+        // Scale down if larger than maxWidth
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width)
+          width = maxWidth
+        }
+
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext("2d")!
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL("image/jpeg", quality))
+      }
+      img.src = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 
 interface DefectsProps {
   formData: {
@@ -21,7 +50,7 @@ interface DefectsProps {
     criticalDefectDetails: string
     majorDefectDetails: string
     minorDefectDetails: string
-    defectPhotos: string[]
+    defectPhotos: any[]
   }
   setFormData: (data: any) => void
 }
@@ -29,15 +58,22 @@ interface DefectsProps {
 export default function Defects({ formData, setFormData }: DefectsProps) {
   const defectPhotoInputRef = useRef<HTMLInputElement | null>(null)
 
-  const handleDefectPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDefectPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      const fileNames = Array.from(files).map(f => f.name)
-      setFormData({ 
-        ...formData, 
-        defectPhotos: [...(formData.defectPhotos || []), ...fileNames] 
+      const newEntries = await Promise.all(
+        Array.from(files).map(async (file) => {
+          const data = await compressImage(file)
+          return { name: file.name, data, url: data }
+        })
+      )
+      setFormData({
+        ...formData,
+        defectPhotos: [...(formData.defectPhotos || []), ...newEntries]
       })
     }
+    // Reset input
+    if (e.target) e.target.value = ""
   }
 
   const removeDefectPhoto = (photoIndex: number) => {
@@ -275,40 +311,38 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             <p className="text-sm text-slate-600">AQL Comment</p>
             <p className="text-lg font-bold text-slate-900">
               {formData.criticalDefects <= formData.maxAllowedCritical &&
-              formData.majorDefects <= formData.maxAllowedMajor &&
-              formData.minorDefects <= formData.maxAllowedMinor ? "PASS" : "FAIL"}
+                formData.majorDefects <= formData.maxAllowedMajor &&
+                formData.minorDefects <= formData.maxAllowedMinor ? "PASS" : "FAIL"}
             </p>
           </div>
         </div>
         <div
-          className={`p-4 rounded-lg border-2 ${
-            formData.criticalDefects <= formData.maxAllowedCritical &&
-            formData.majorDefects <= formData.maxAllowedMajor &&
-            formData.minorDefects <= formData.maxAllowedMinor
+          className={`p-4 rounded-lg border-2 ${formData.criticalDefects <= formData.maxAllowedCritical &&
+              formData.majorDefects <= formData.maxAllowedMajor &&
+              formData.minorDefects <= formData.maxAllowedMinor
               ? "bg-emerald-50 border-emerald-200"
               : "bg-red-50 border-red-200"
-          }`}
+            }`}
         >
           <div className="flex items-center gap-3">
             {formData.criticalDefects <= formData.maxAllowedCritical &&
-            formData.majorDefects <= formData.maxAllowedMajor &&
-            formData.minorDefects <= formData.maxAllowedMinor ? (
+              formData.majorDefects <= formData.maxAllowedMajor &&
+              formData.minorDefects <= formData.maxAllowedMinor ? (
               <CheckCircle className="w-6 h-6 text-emerald-600" />
             ) : (
               <AlertTriangle className="w-6 h-6 text-red-600" />
             )}
             <p
-              className={`font-bold text-lg ${
-                formData.criticalDefects <= formData.maxAllowedCritical &&
-                formData.majorDefects <= formData.maxAllowedMajor &&
-                formData.minorDefects <= formData.maxAllowedMinor
+              className={`font-bold text-lg ${formData.criticalDefects <= formData.maxAllowedCritical &&
+                  formData.majorDefects <= formData.maxAllowedMajor &&
+                  formData.minorDefects <= formData.maxAllowedMinor
                   ? "text-emerald-800"
                   : "text-red-800"
-              }`}
+                }`}
             >
               {formData.criticalDefects <= formData.maxAllowedCritical &&
-              formData.majorDefects <= formData.maxAllowedMajor &&
-              formData.minorDefects <= formData.maxAllowedMinor
+                formData.majorDefects <= formData.maxAllowedMajor &&
+                formData.minorDefects <= formData.maxAllowedMinor
                 ? "AQL Status: PASS"
                 : "AQL Status: FAIL"}
             </p>
@@ -340,18 +374,28 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
 
         {/* Uploaded Photos List */}
         {formData.defectPhotos && formData.defectPhotos.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {formData.defectPhotos.map((photo, index) => (
-              <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200">
-                <div className="flex items-center gap-2 flex-1">
-                  <Camera className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm text-slate-700 truncate">{photo}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
+            {formData.defectPhotos.map((photo: any, index: number) => (
+              <div key={index} className="relative group">
+                {photo.data || photo.url ? (
+                  <img
+                    src={photo.data || photo.url}
+                    alt={photo.name}
+                    className="w-full h-28 object-cover rounded-xl border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-full h-28 flex items-center justify-center bg-slate-100 rounded-xl border border-slate-200 text-slate-400">
+                    <ImageIcon className="w-8 h-8" />
+                  </div>
+                )}
+                <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate">
+                  {photo.name}
                 </div>
                 <button
                   onClick={() => removeDefectPhoto(index)}
-                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                  className="absolute top-1.5 right-1.5 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3 h-3" />
                 </button>
               </div>
             ))}

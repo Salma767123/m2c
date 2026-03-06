@@ -21,7 +21,7 @@ const {
   getPublicProducts,
   getPublicProduct
 } = require('../controllers/productController');
-const { authenticateToken, requireVendorRole, requireAdminRole } = require('../middleware/auth');
+const { authenticateToken, requireVendorRole, requireAdminRole, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -40,6 +40,9 @@ router.put('/:id/reject', authenticateToken, requireAdminRole, rejectProduct);
 router.post('/admin/:id/assign-qc', authenticateToken, requireAdminRole, assignQCCheckerToProduct);
 router.put('/admin/:id/variants/stock', authenticateToken, requireAdminRole, updateVariantStocks);
 
+// Get a single product (Admins, Vendors, and QC Checkers can view)
+router.get('/:id', authenticateToken, requireRole(['ADMIN', 'VENDOR', 'QC_CHECKER']), getProduct);
+
 // Vendor routes (require vendor authentication)
 router.use(authenticateToken);
 router.use(requireVendorRole);
@@ -53,7 +56,6 @@ router.get('/available-inventory', getAvailableInventoryItems);
 // CRUD operations
 router.post('/', createProduct);
 router.get('/', getVendorProducts);
-router.get('/:id', getProduct);
 router.put('/:id', updateProduct);
 router.delete('/:id', deleteProduct);
 

@@ -1,10 +1,11 @@
+'use client'
+
+import { useSearchParams } from 'next/navigation'
 import AddProduct from '@/components/VendorDashboard/Products/AddEditProduct';
 
 export default function AddProductPage() {
-  return <AddProduct />;
-}
+  const searchParams = useSearchParams()
+  const inventoryId = searchParams.get('inventoryId')
 
-export const metadata = {
-  title: 'Add Product - Vendor Dashboard',
-  description: 'Add a new product to your catalog',
-};
+  return <AddProduct inventoryId={inventoryId || undefined} />;
+}

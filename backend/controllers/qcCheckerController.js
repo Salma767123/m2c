@@ -661,7 +661,7 @@ const approveVendorByQc = async (req, res) => {
         const updatedVendor = await prisma.vendor.update({
             where: { id: vendorId },
             data: {
-                status: 'APPROVED',
+                status: 'UNDER_REVIEW', // Keep as UNDER_REVIEW for admin approval
                 approvedAt: new Date(),
             },
         });
@@ -820,8 +820,8 @@ const approveProductByQc = async (req, res) => {
         const updatedProduct = await prisma.product.update({
             where: { id: productId },
             data: {
-                approvalStatus: 'APPROVED',
-                status: 'ACTIVE',
+                approvalStatus: 'QC_APPROVED',
+                status: 'INACTIVE', // Keep as INACTIVE until Admin finalizes with a price
                 qcInspectionData: formData || null
             }
         });

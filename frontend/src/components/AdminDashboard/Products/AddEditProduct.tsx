@@ -2010,56 +2010,84 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     </>
                   )}
 
-                  {!formData.hasVariants && (
-                    <div className="border-2 border-gray-300 rounded-lg p-6 bg-gray-50">
-                      <h4 className="font-semibold text-gray-900 mb-4">Single Unit Pricing</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Base Price *
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-2 text-gray-500">₹</span>
-                            <input
-                              type="number"
-                              name="basePrice"
-                              value={formData.basePrice}
-                              onChange={handleInputChange}
-                              required
-                              min="0"
-                              step="0.01"
-                              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                              placeholder="0.00"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Stock Quantity *
-                          </label>
+                  {/* Base / Single Unit Pricing Section */}
+                  <div className="border-2 border-gray-300 rounded-lg p-6 bg-gray-50">
+                    <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Package className="h-5 w-5 text-gray-700" />
+                      {formData.hasVariants ? 'Base Unit Pricing & Stock' : 'Single Unit Pricing & Stock'}
+                    </h4>
+                    <p className="text-sm text-gray-600 mb-6">
+                      {formData.hasVariants
+                        ? 'Set the price and stock for the base/default unit of this product (not covered by variants).'
+                        : 'Set the price and stock for this product.'}
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Base Price *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-gray-500">₹</span>
                           <input
                             type="number"
-                            name="totalStock"
-                            value={formData.totalStock}
+                            name="basePrice"
+                            value={formData.basePrice}
                             onChange={handleInputChange}
                             required
                             min="0"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="0"
+                            step="0.01"
+                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            placeholder="0.00"
                           />
                         </div>
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {formData.hasVariants ? 'Base Unit Stock *' : 'Stock Quantity *'}
+                        </label>
+                        <input
+                          type="number"
+                          name="totalStock"
+                          value={formData.totalStock}
+                          onChange={handleInputChange}
+                          required
+                          readOnly={isEdit}
+                          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent ${isEdit ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                          placeholder="0"
+                        />
+                        {isEdit && (
+                          <p className="text-[10px] text-amber-600 mt-1">Manage stock via Inventory</p>
+                        )}
+                      </div>
+                    </div>
 
-                      {formData.basePrice > 0 && (
-                        <div className="mt-4 p-4 bg-white border border-gray-300 rounded-lg">
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-700">Selling Price:</span>
-                            <span className="text-2xl font-bold text-gray-900">₹{formData.basePrice.toFixed(2)}</span>
+                    {formData.hasVariants && (
+                      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
+                        <div className="flex justify-between items-center">
+                          <div className="space-y-1">
+                            <span className="text-blue-800 font-semibold block">Total Aggregate Stock:</span>
+                            <span className="text-xs text-blue-600">Base Unit ({formData.totalStock}) + All Variants ({formData.variants.reduce((sum, v) => sum + v.stock, 0)})</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-3xl font-bold text-blue-900">
+                              {formData.totalStock + formData.variants.reduce((sum, v) => sum + v.stock, 0)}
+                            </span>
+                            <span className="text-sm font-medium text-blue-800 ml-1">Units</span>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+
+                    {!formData.hasVariants && formData.basePrice > 0 && (
+                      <div className="mt-4 p-4 bg-white border border-gray-300 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700">Selling Price:</span>
+                          <span className="text-2xl font-bold text-gray-900">₹{formData.basePrice.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -2219,16 +2247,36 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Total Stock Quantity *
+                            {formData.hasVariants ? 'Total Aggregate Stock (Autofilled)' : 'Total Stock Quantity'} {!isEdit && '*'}
                           </label>
                           <input
                             type="number"
                             name="totalStock"
-                            value={formData.totalStock}
+                            value={formData.hasVariants
+                              ? formData.totalStock + formData.variants.reduce((sum, v) => sum + v.stock, 0)
+                              : formData.totalStock
+                            }
                             onChange={handleInputChange}
-                            required
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                            required={!isEdit}
+                            readOnly={isEdit || formData.hasVariants}
+                            min="0"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${isEdit || formData.hasVariants ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                              }`}
                           />
+                          {formData.hasVariants && !isEdit && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              Calculated as: Base ({formData.totalStock}) + Variants ({formData.variants.reduce((sum, v) => sum + v.stock, 0)})
+                            </p>
+                          )}
+                          {isEdit ? (
+                            <p className="text-xs text-amber-600 mt-1">
+                              🔒 Stock cannot be changed here. Use <strong>Inventory → Update Stock</strong>.
+                            </p>
+                          ) : !formData.hasVariants && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              Opening stock for this product.
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">

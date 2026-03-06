@@ -27,7 +27,7 @@ interface InventoryItem {
   category: string
   subcategory?: string
   currentStock: number
-  minStock: number
+  lowStockAlert: number
   status: string
   lastRestocked: string | null
   vendor: {
@@ -40,11 +40,11 @@ interface InventoryItem {
   hasProductCreated: boolean
 }
 
-const getStatusBadge = (currentStock: number, minStock: number) => {
+const getStatusBadge = (currentStock: number, lowStockAlert: number) => {
   if (currentStock === 0) {
     return <Badge className="bg-red-100 text-red-800">Out of Stock</Badge>
   }
-  if (currentStock <= minStock) {
+  if (currentStock <= lowStockAlert) {
     return <Badge className="bg-yellow-100 text-yellow-800">Low Stock</Badge>
   }
   return <Badge className="bg-green-100 text-green-800">In Stock</Badge>
@@ -127,8 +127,8 @@ export default function Inventory() {
   const filteredItems = inventoryItems.filter(item => {
     if (statusFilter === 'all') return true
     if (statusFilter === 'out_of_stock') return item.currentStock === 0
-    if (statusFilter === 'low_stock') return item.currentStock <= item.minStock && item.currentStock > 0
-    if (statusFilter === 'in_stock') return item.currentStock > item.minStock
+    if (statusFilter === 'low_stock') return item.currentStock <= item.lowStockAlert && item.currentStock > 0
+    if (statusFilter === 'in_stock') return item.currentStock > item.lowStockAlert
     return true
   })
 
@@ -345,14 +345,14 @@ export default function Inventory() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className={item.currentStock <= item.minStock ? 'text-red-600 font-bold' : 'text-gray-900'}>
+                          <span className={item.currentStock <= item.lowStockAlert ? 'text-red-600 font-bold' : 'text-gray-900'}>
                             {item.currentStock}
                           </span>
                         </TableCell>
                         <TableCell className="text-sm text-gray-600">
-                          {item.minStock}
+                          {item.lowStockAlert}
                         </TableCell>
-                        <TableCell>{getStatusBadge(item.currentStock, item.minStock)}</TableCell>
+                        <TableCell>{getStatusBadge(item.currentStock, item.lowStockAlert)}</TableCell>
                         <TableCell className="text-sm text-gray-600">
                           {item.lastRestocked ? new Date(item.lastRestocked).toLocaleDateString() : 'Never'}
                         </TableCell>

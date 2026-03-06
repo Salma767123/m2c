@@ -142,7 +142,7 @@ export default function QCReports() {
                                         </TableCell>
                                         <TableCell>
                                             <button
-                                                onClick={() => router.push(`/admin/dashboard/qc-reports/${report.id}`)}
+                                                onClick={() => router.push(`/admin/dashboard/qc-reports/${report.id}?type=factory`)}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
                                             >
                                                 <Eye className="w-3.5 h-3.5" />
@@ -171,6 +171,7 @@ export default function QCReports() {
                                     <TableHead>Status</TableHead>
                                     <TableHead>Decision</TableHead>
                                     <TableHead>Date</TableHead>
+                                    <TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -202,6 +203,15 @@ export default function QCReports() {
                                             </TableCell>
                                             <TableCell className="text-sm text-gray-500">
                                                 {formatDate(product.updatedAt)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <button
+                                                    onClick={() => router.push(`/admin/dashboard/qc-reports/${product.id}?type=product`)}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                                >
+                                                    <Eye className="w-3.5 h-3.5" />
+                                                    View Details
+                                                </button>
                                             </TableCell>
                                         </TableRow>
                                     )

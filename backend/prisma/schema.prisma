@@ -521,7 +521,8 @@ model Inventory {
   
   // Inventory Management
   currentStock      Int       @default(0)
-  minStock          Int       @default(5)
+  baseStock         Int       @default(0) // Stock for base/default variant
+  lowStockAlert     Int       @default(5)
   location          String?
   
   // Product Status
@@ -705,6 +706,7 @@ enum ProductStatus {
 
 enum ProductApprovalStatus {
   PENDING
+  QC_APPROVED
   APPROVED
   REJECTED
 }
@@ -989,26 +991,16 @@ model GSTSetting {
 model SEOSettings {
   id               String   @id @default(auto()) @map("_id") @db.ObjectId
   
+  // Page-specific SEO settings
+  page             String   @unique // e.g., "home", "about", "products", etc.
   metaTitle        String?
   metaDescription  String?
   metaKeywords     String?
-  ogTitle          String?
-  ogDescription    String?
   ogImage          String?
-  twitterCard      String?
-  twitterTitle     String?
-  twitterDescription String?
-  twitterImage     String?
   
-  googleAnalyticsId String?
-  facebookPixelId   String?
-  
-  robotsTxt         String?
-  sitemapUrl        String?
-  
-  updatedBy         String?   @db.ObjectId
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  updatedBy        String?   @db.ObjectId
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@map("seo_settings")
 }
