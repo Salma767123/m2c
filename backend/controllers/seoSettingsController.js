@@ -40,6 +40,46 @@ const getAllSEOSettings = async (req, res) => {
     }
 };
 
+// Get SEO settings for a specific page (PUBLIC - no auth required)
+const getPublicSEOSettings = async (req, res) => {
+    try {
+        const { page } = req.params;
+        
+        let settings = await prisma.sEOSettings.findUnique({
+            where: { page },
+            select: {
+                page: true,
+                metaTitle: true,
+                metaDescription: true,
+                metaKeywords: true,
+                ogImage: true
+            }
+        });
+
+        if (!settings) {
+            // Return default empty settings
+            settings = {
+                page,
+                metaTitle: null,
+                metaDescription: null,
+                metaKeywords: null,
+                ogImage: null
+            };
+        }
+
+        res.json({
+            success: true,
+            data: settings
+        });
+    } catch (error) {
+        console.error('Get public SEO settings error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch SEO settings'
+        });
+    }
+};
+
 // Get SEO settings for a specific page
 const getSEOSettings = async (req, res) => {
     try {
@@ -163,5 +203,6 @@ const updateSEOSettings = async (req, res) => {
 module.exports = {
     getAllSEOSettings,
     getSEOSettings,
+    getPublicSEOSettings,
     updateSEOSettings
 };

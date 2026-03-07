@@ -10,6 +10,7 @@ import FeaturedProducts from '@/components/WebSite/Featured/Products';
 import TopSelling from '@/components/WebSite/Featured/TopSelling';
 import BestSeller from '@/components/WebSite/Featured/BestSeller';
 import ValueSection from '@/components/WebSite/Footer/ValueSection';
+import SEOHead from '@/components/SEO/SEOHead';
 import { isAuthenticated } from '@/lib/auth';
 import VendorService from '@/services/vendorService';
 
@@ -50,6 +51,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEOHead 
+        pageName="home" 
+        defaultTitle="M2C Marketplace - Your B2B Partner"
+        defaultDescription="Discover quality products and reliable suppliers on M2C Marketplace"
+      />
       <Header />
       <HeroSection />
       <Category />
