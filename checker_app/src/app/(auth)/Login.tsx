@@ -13,14 +13,13 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import { User, Lock, LogIn, Shield } from 'lucide-react-native';
-
-const MOCK_CHECKERS = ['CHECKER_001', 'CHECKER_002', 'CHECKER_003', 'CHECKER_004'];
-const DEMO_PASSWORD = 'demo123';
+import { User, Lock, LogIn, Shield, Eye, EyeOff } from 'lucide-react-native';
+import { qcCheckerService } from '../../services/qcCheckerService';
 
 export default function LoginScreen() {
   const [checkerId, setCheckerId] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [checkerIdError, setCheckerIdError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -32,9 +31,9 @@ export default function LoginScreen() {
       return false;
     }
 
-    const regex = /^CHECKER_\d{3}$/;
+    const regex = /^QC-\d{3}$/;
     if (!regex.test(value.toUpperCase())) {
-      setCheckerIdError('Invalid format. Use CHECKER_XXX format');
+      setCheckerIdError('Invalid format. Use QC-XXX format');
       return false;
     }
 
@@ -66,17 +65,22 @@ export default function LoginScreen() {
       return;
     }
 
-    if (!MOCK_CHECKERS.includes(normalizedId) || password.trim() !== DEMO_PASSWORD) {
-      Alert.alert('Invalid credentials', 'Please check your Checker ID and password.');
-      return;
-    }
-
     try {
       setSubmitting(true);
-      await AsyncStorage.setItem('checkerID', normalizedId);
-      router.replace('/(tabs)');
-    } catch (error) {
-      Alert.alert('Error', 'Unable to save session. Please try again.');
+      const result = await qcCheckerService.login({
+        checkerId: normalizedId,
+        password: password.trim(),
+      });
+
+      if (result.success && result.data) {
+        await qcCheckerService.storeCheckerAuth(result.data.token, result.data.checker);
+        router.replace('/(tabs)');
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Invalid credentials',
+        error.message || 'Please check your Checker ID and password.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -141,7 +145,7 @@ export default function LoginScreen() {
                     }
                   }}
                   onBlur={() => validateCheckerId(checkerId)}
-                  placeholder="e.g. CHECKER_001"
+                  placeholder="e.g. QC-001"
                   placeholderTextColor="#9ca3af"
                   className="flex-1 ml-3 text-sm text-black"
                 />
@@ -165,7 +169,7 @@ export default function LoginScreen() {
                 <Lock size={18} color="#6b7280" strokeWidth={2} />
                 <TextInput
                   value={password}
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
                   onChangeText={(value) => {
                     setPassword(value);
                     if (passwordError) {
@@ -177,6 +181,13 @@ export default function LoginScreen() {
                   placeholderTextColor="#9ca3af"
                   className="flex-1 ml-3 text-sm text-black"
                 />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="pl-3 py-1">
+                  {showPassword ? (
+                    <EyeOff size={18} color="#6b7280" />
+                  ) : (
+                    <Eye size={18} color="#6b7280" />
+                  )}
+                </TouchableOpacity>
               </View>
               {!!passwordError && (
                 <View className="flex-row items-center mt-1.5">
@@ -200,30 +211,6 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-
-          {/* Demo Credentials */}
-          {/* <View className="mt-6 bg-gray-900 rounded-2xl p-4 border border-gray-800">
-            <View className="flex-row items-center mb-2.5">
-              <View className="bg-blue-500 rounded-full w-1.5 h-1.5 mr-2" />
-              <Text className="text-xs font-bold text-gray-300">
-                Demo Credentials
-              </Text>
-            </View>
-            <View>
-              <View className="mb-2">
-                <Text className="text-xs text-gray-500 mb-1">Checker IDs:</Text>
-                <Text className="text-xs text-gray-400 leading-4">
-                  {MOCK_CHECKERS.join(', ')}
-                </Text>
-              </View>
-              <View className="flex-row items-center">
-                <Text className="text-xs text-gray-500 mr-2">Password:</Text>
-                <View className="bg-gray-800 px-2 py-1 rounded">
-                  <Text className="text-xs text-white font-bold">demo123</Text>
-                </View>
-              </View>
-            </View>
-          </View> */}
 
           {/* Footer */}
           <View className="mt-5 items-center pb-2">

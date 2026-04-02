@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { Star, ShoppingCart, Heart, Plus, Minus } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { ShoppingCart, Heart, Plus, Minus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
@@ -9,7 +9,7 @@ import { Product as ServiceProduct } from '@/services/productService';
 import { PublicProduct } from '@/services/publicProductService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
-// Type definitions matching frontend
+// ─── Types ─────────────────────────────────────────────────────────────────────
 interface MockProduct {
   id: string;
   name: string;
@@ -26,11 +26,47 @@ interface MockProduct {
 
 type Product = ServiceProduct | MockProduct | PublicProduct;
 
-interface ProductCardProps {
-  product: Product;
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+const isServiceProduct = (p: any): p is ServiceProduct =>
+  'basePrice' in p || 'adminFixedPrice' in p;
+
+function getPrimaryImage(product: Product): string | undefined {
+  if (!product.images || !Array.isArray(product.images) || product.images.length === 0)
+    return undefined;
+  const first = product.images[0];
+  if (typeof first === 'object' && first !== null && 'url' in first) {
+    const imgs = product.images as Array<{ url: string; isPrimary: boolean }>;
+    return (
+      imgs.find(i => i.isPrimary && i.url?.trim())?.url ||
+      imgs.find(i => i.url?.trim())?.url
+    );
+  }
+  if (typeof first === 'string') {
+    return (product.images as string[]).find(i => i?.trim());
+  }
+  return undefined;
 }
 
-export default function ProductCard({ product }: ProductCardProps) {
+function getDisplayPrice(product: Product): number {
+  if (isServiceProduct(product)) {
+    return product.adminFixedPrice != null ? product.adminFixedPrice : product.basePrice;
+  }
+  return (product as any).price ?? 0;
+}
+
+function getCurrentStock(product: Product): number {
+  if (isServiceProduct(product)) {
+    return (
+      product.inventory?.currentStock ??
+      (product.hasVariants ? 0 : product.totalStock) ??
+      0
+    );
+  }
+  return (product as any).stock ?? 1;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+export default function ProductCard({ product }: { product: Product }) {
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
@@ -39,55 +75,44 @@ export default function ProductCard({ product }: ProductCardProps) {
   const router = useRouter();
 
   useEffect(() => {
-    checkAuthStatus();
-    checkWishlistStatus();
+    let mounted = true;
+    (async () => {
+      try {
+        const auth = await userAuthService.isAuthenticated();
+        if (!mounted) return;
+        setIsAuthenticated(auth);
+        const inWl = auth
+          ? await wishlistService.isInWishlist(product.id)
+          : await wishlistService.isInLocalWishlist(product.id);
+        if (mounted) setIsInWishlist(inWl);
+      } catch { /* ignore */ }
+    })();
+    return () => { mounted = false; };
   }, [product.id]);
 
-  const checkAuthStatus = async () => {
-    try {
-      const authenticated = await userAuthService.isAuthenticated();
-      setIsAuthenticated(authenticated);
-    } catch (error) {
-      console.error('Error checking auth status:', error);
-    }
-  };
+  const imageUrl = getPrimaryImage(product);
+  const displayPrice = getDisplayPrice(product);
+  const currentStock = getCurrentStock(product);
+  const isActuallyInStock = product.inStock && currentStock > 0;
 
-  const checkWishlistStatus = async () => {
-    try {
-      if (isAuthenticated) {
-        const inWishlist = await wishlistService.isInWishlist(product.id);
-        setIsInWishlist(inWishlist);
-      } else {
-        const inLocalWishlist = await wishlistService.isInLocalWishlist(product.id);
-        setIsInWishlist(inLocalWishlist);
-      }
-    } catch (error) {
-      console.error('Error checking wishlist status:', error);
-    }
-  };
-
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
       showErrorToast('Login Required', 'Please login to add items to cart');
-      setTimeout(() => {
-        router.push('/(auth)/Login' as any);
-      }, 1500);
+      setTimeout(() => router.push('/(auth)/Login' as any), 1200);
       return;
     }
-
-    if (!product.inStock) {
+    if (!isActuallyInStock) {
       showErrorToast('Out of Stock', 'This product is currently out of stock');
       return;
     }
-
     setIsAddingToCart(true);
     try {
       await cartService.addToCart(product.id, quantity);
-      showSuccessToast('Added to Cart', `${quantity} x ${product.name} added to your cart`);
+      showSuccessToast('Added to Cart', `${quantity} × ${product.name} added`);
       setQuantity(1);
-    } catch (error: any) {
-      console.error('Error adding to cart:', error);
-      showErrorToast('Failed', error.message || 'Unable to add item to cart');
+    } catch (e: any) {
+      showErrorToast('Failed', e.message || 'Unable to add item to cart');
     } finally {
       setIsAddingToCart(false);
     }
@@ -95,13 +120,10 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   const handleToggleWishlist = async () => {
     if (!isAuthenticated) {
-      showErrorToast('Login Required', 'Please login to add items to wishlist');
-      setTimeout(() => {
-        router.push('/(auth)/Login' as any);
-      }, 1500);
+      showErrorToast('Login Required', 'Please login to use wishlist');
+      setTimeout(() => router.push('/(auth)/Login' as any), 1200);
       return;
     }
-
     setIsTogglingWishlist(true);
     try {
       if (isInWishlist) {
@@ -111,219 +133,249 @@ export default function ProductCard({ product }: ProductCardProps) {
       } else {
         await wishlistService.addToWishlist(product.id);
         setIsInWishlist(true);
-        showSuccessToast('Added', `${product.name} added to wishlist`);
+        showSuccessToast('Saved', `${product.name} added to wishlist`);
       }
-    } catch (error: any) {
-      console.error('Error toggling wishlist:', error);
-      showErrorToast('Failed', error.message || 'Unable to update wishlist');
+    } catch (e: any) {
+      showErrorToast('Failed', e.message || 'Unable to update wishlist');
     } finally {
       setIsTogglingWishlist(false);
     }
   };
 
-  const handleProductPress = () => {
-    router.push(`(any)/products/${product.id}` as any);
-  };
-
-  const handleIncrement = () => {
-    setQuantity(prev => prev + 1);
-  };
-
-  const handleDecrement = () => {
-    if (quantity > 1) {
-      setQuantity(prev => prev - 1);
-    }
-  };
-
-  // Type guard to check if it's a ServiceProduct (from API)
-  const isServiceProduct = (p: any): p is ServiceProduct => {
-    return 'basePrice' in p || 'adminFixedPrice' in p;
-  };
-
-  // Get the primary image or first image
-  let primaryImage: string | undefined;
-  
-  if (product.images && Array.isArray(product.images) && product.images.length > 0) {
-    const firstImage = product.images[0];
-    
-    // Check if it's an object with url property (ServiceProduct)
-    if (typeof firstImage === 'object' && firstImage !== null && 'url' in firstImage) {
-      const images = product.images as Array<{ url: string; isPrimary: boolean }>;
-      const primaryImg = images.find(img => img.isPrimary && img.url && img.url.trim() !== '');
-      const firstImg = images.find(img => img.url && img.url.trim() !== '');
-      primaryImage = primaryImg?.url || firstImg?.url;
-    } 
-    // Check if it's a string (MockProduct)
-    else if (typeof firstImage === 'string') {
-      const images = product.images as string[];
-      primaryImage = images.find(img => img && img.trim() !== '');
-    }
-  }
-
-  // Fallback placeholder image
-  const placeholderImage = 'https://via.placeholder.com/400x400?text=No+Image';
-  const imageUrl = primaryImage || placeholderImage;
-
-  // Get price - use adminFixedPrice if available, otherwise basePrice or price
-  let displayPrice: number | undefined;
-  
-  if (isServiceProduct(product)) {
-    // For API products, prioritize adminFixedPrice, then basePrice
-    displayPrice = product.adminFixedPrice !== null && product.adminFixedPrice !== undefined 
-      ? product.adminFixedPrice 
-      : product.basePrice;
-  } else {
-    // For mock products, use price property
-    displayPrice = (product as any).price;
-  }
-
-  const reviewCount = product.reviews || 0;
-
   return (
     <TouchableOpacity
-      onPress={handleProductPress}
-      className="bg-white rounded-xl shadow-md overflow-hidden"
-      activeOpacity={0.7}
+      onPress={() => router.push(`(any)/products/${product.id}` as any)}
+      activeOpacity={0.93}
+      style={{
+        backgroundColor: '#ffffff',
+        borderRadius: 14,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e5e5e5',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 3,
+        flex: 1,
+      }}
     >
-      {/* Product Image */}
-      <View className="relative h-48 bg-gray-100">
-        <Image
-          source={{ uri: imageUrl }}
-          className="w-full h-full"
-          resizeMode="cover"
-          defaultSource={{ uri: placeholderImage }}
-        />
-        
-        {/* Discount Badge */}
-        {product.discount && (
-          <View className="absolute top-2 left-2 bg-gray-800 rounded px-2 py-1">
-            <Text className="text-xs font-bold text-white">
-              {product.discount}% OFF
-            </Text>
+      {/* ── Image Area ──────────────────────────────────────────────────────── */}
+      <View style={{ position: 'relative', height: 150, backgroundColor: '#f5f5f5' }}>
+        {imageUrl ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ShoppingCart size={40} color="#d4d4d4" />
           </View>
         )}
-        
-        {/* Wishlist Button */}
+
+
+        {/* Wishlist button — top RIGHT */}
         <TouchableOpacity
           onPress={handleToggleWishlist}
           disabled={isTogglingWishlist}
-          className={`absolute top-2 ${product.inStock ? 'right-2' : 'right-24'} p-2 rounded-full shadow-md ${
-            isInWishlist 
-              ? 'bg-red-500' 
-              : 'bg-white'
-          }`}
+          activeOpacity={0.8}
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            backgroundColor: 'rgba(255,255,255,0.94)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: isInWishlist ? '#fca5a5' : '#e5e5e5',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.12,
+            shadowRadius: 4,
+            elevation: 3,
+          }}
         >
           <Heart
-            size={18}
-            color={isInWishlist ? '#ffffff' : '#6b7280'}
-            fill={isInWishlist ? '#ffffff' : 'transparent'}
+            size={15}
+            color={isInWishlist ? '#ef4444' : '#737373'}
+            fill={isInWishlist ? '#ef4444' : 'transparent'}
           />
         </TouchableOpacity>
 
-        {/* Out of Stock Badge */}
-        {!product.inStock && (
-          <View className="absolute top-2 right-2 bg-gray-500 rounded px-2 py-1">
-            <Text className="text-xs font-semibold text-white">
-              Out of Stock
+        {/* Bottom strip — OUT OF STOCK or DISCOUNT */}
+        {(!isActuallyInStock || (product.discount && product.discount > 0)) && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: !isActuallyInStock ? 'rgba(0,0,0,0.80)' : 'rgba(0,0,0,0.68)',
+              paddingVertical: 5,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800', letterSpacing: 0.6 }}>
+              {!isActuallyInStock ? 'OUT OF STOCK' : `${product.discount}% OFF`}
             </Text>
           </View>
+        )}
+
+        {/* Out of stock dim overlay */}
+        {!isActuallyInStock && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(255,255,255,0.4)',
+            }}
+          />
         )}
       </View>
 
-      {/* Product Info */}
-      <View className="p-4">
+      {/* ── Info Area ───────────────────────────────────────────────────────── */}
+      <View style={{ padding: 11, flex: 1 }}>
         {/* Category */}
-        {product.category && (
-          <Text className="text-xs text-gray-600 font-medium mb-1">
+        {product.category ? (
+          <Text
+            style={{
+              fontSize: 9,
+              fontWeight: '600',
+              color: '#a3a3a3',
+              marginBottom: 3,
+              textTransform: 'uppercase',
+              letterSpacing: 0.8,
+            }}
+          >
             {product.category}
           </Text>
-        )}
+        ) : null}
 
-        {/* Product Name */}
-        <Text className="text-sm font-bold text-gray-900 mb-2 min-h-[40px]" numberOfLines={2}>
+        {/* Product name */}
+        <Text
+          numberOfLines={2}
+          style={{
+            fontSize: 13,
+            fontWeight: '700',
+            color: '#0a0a0a',
+            lineHeight: 18,
+            minHeight: 36,
+            marginBottom: 8,
+          }}
+        >
           {product.name}
         </Text>
 
-        {/* Rating */}
-        {product.rating && (
-          <View className="mb-2">
-            <View className="flex-row items-center mb-1">
-              <View className="flex-row">
-                {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    size={12}
-                    color={i < Math.floor(product.rating || 0) ? '#fbbf24' : '#d1d5db'}
-                    fill={i < Math.floor(product.rating || 0) ? '#fbbf24' : 'transparent'}
-                  />
-                ))}
-              </View>
-              <Text className="text-sm font-bold text-gray-900 ml-2">
-                {product.rating.toFixed(1)}
-              </Text>
-            </View>
-            <Text className="text-xs text-gray-600">
-              ({reviewCount} reviews)
-            </Text>
-          </View>
-        )}
+        {/* Price row */}
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
+          {/* Sale price */}
+          <Text style={{ fontSize: 17, fontWeight: '800', color: '#0a0a0a' }}>
+            ₹{displayPrice.toFixed(2)}
+          </Text>
 
-        {/* Price */}
-        <View className="flex-row items-center justify-between mb-3">
-          <View className="flex-row items-center">
-            <Text className="text-xl font-bold text-gray-900">
-              ${displayPrice?.toFixed(2) || '0.00'}
+          {/* Original price — red, strikethrough */}
+          {product.originalPrice && product.originalPrice > displayPrice && (
+            <Text
+              style={{
+                fontSize: 12,
+                color: '#dc2626',
+                textDecorationLine: 'line-through',
+                fontWeight: '500',
+              }}
+            >
+              ₹{product.originalPrice.toFixed(2)}
             </Text>
-            {product.originalPrice && (
-              <Text className="text-sm text-red-600 line-through ml-2">
-                ${product.originalPrice.toFixed(2)}
-              </Text>
-            )}
-          </View>
-          {product.discount && (
-            <View className="bg-gray-800 rounded px-2 py-1">
-              <Text className="text-xs font-bold text-white">
-                {product.discount}% OFF
-              </Text>
-            </View>
           )}
         </View>
 
-        {/* Quantity Selector */}
-        {product.inStock && (
-          <View className="flex-row items-center gap-2 mb-2">
-            <TouchableOpacity
-              onPress={handleDecrement}
-              disabled={quantity <= 1}
-              className="w-8 h-8 items-center justify-center border border-gray-300 rounded"
+        {/* Quantity stepper — only when in stock */}
+        {/* {isActuallyInStock && (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 10,
+              gap: 6,
+            }}
+          >
+            <Text style={{ fontSize: 11, color: '#737373', fontWeight: '600' }}>Qty:</Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#f5f5f5',
+                borderRadius: 7,
+                borderWidth: 1,
+                borderColor: '#e5e5e5',
+                overflow: 'hidden',
+              }}
             >
-              <Minus size={16} color={quantity <= 1 ? '#d1d5db' : '#374151'} />
-            </TouchableOpacity>
-            <Text className="w-12 text-center font-semibold text-gray-900">
-              {quantity}
-            </Text>
-            <TouchableOpacity
-              onPress={handleIncrement}
-              className="w-8 h-8 items-center justify-center border border-gray-300 rounded"
-            >
-              <Plus size={16} color="#374151" />
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setQuantity(q => Math.max(1, q - 1))}
+                disabled={quantity <= 1}
+                style={{ paddingHorizontal: 9, paddingVertical: 5 }}
+              >
+                <Minus size={12} color={quantity <= 1 ? '#d4d4d4' : '#404040'} />
+              </TouchableOpacity>
+              <Text
+                style={{
+                  paddingHorizontal: 10,
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: '#0a0a0a',
+                  borderLeftWidth: 1,
+                  borderRightWidth: 1,
+                  borderColor: '#e5e5e5',
+                }}
+              >
+                {quantity}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setQuantity(q => q + 1)}
+                style={{ paddingHorizontal: 9, paddingVertical: 5 }}
+              >
+                <Plus size={12} color="#404040" />
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
+        )} */}
 
-        {/* Add to Cart Button */}
+        {/* Add to Cart button */}
         <TouchableOpacity
           onPress={handleAddToCart}
-          disabled={!product.inStock || isAddingToCart}
-          className={`flex-row items-center justify-center py-3 rounded-xl ${
-            product.inStock && !isAddingToCart
-              ? 'bg-gray-800'
-              : 'bg-gray-300'
-          }`}
+          disabled={!isActuallyInStock || isAddingToCart}
+          activeOpacity={0.85}
+          style={{
+            backgroundColor: isActuallyInStock ? '#0a0a0a' : '#e5e5e5',
+            borderRadius: 9,
+            paddingVertical: 11,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
         >
-          <ShoppingCart size={16} color="#ffffff" />
-          <Text className="text-white font-bold text-sm ml-2">
-            {isAddingToCart ? 'Adding...' : product.inStock ? 'Add to Cart' : 'Out of Stock'}
+          {isAddingToCart ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <ShoppingCart size={14} color={isActuallyInStock ? '#ffffff' : '#a3a3a3'} />
+          )}
+          <Text
+            style={{
+              color: isActuallyInStock ? '#ffffff' : '#a3a3a3',
+              fontSize: 12,
+              fontWeight: '700',
+              letterSpacing: 0.3,
+            }}
+          >
+            {isAddingToCart ? 'Adding…' : isActuallyInStock ? 'Add to Cart' : 'Out of Stock'}
           </Text>
         </TouchableOpacity>
       </View>

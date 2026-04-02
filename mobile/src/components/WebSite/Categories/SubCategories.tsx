@@ -1,10 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import { Package, ArrowRight, Grid3X3 } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  StatusBar,
+  Platform,
+} from 'react-native';
+import {
+  Package,
+  ArrowRight,
+  Grid3X3,
+  Search,
+  ShoppingCart,
+  ArrowLeft,
+  ChevronRight,
+  Layers,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { categoryService, Category } from '@/services/categoryService';
-import { Search, ShoppingCart,ArrowLeft } from 'lucide-react-native';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Subcategory {
   id: string;
   name: string;
@@ -18,6 +36,64 @@ interface SubCategoriesProps {
   categorySlug: string;
 }
 
+// ─── Subcategory Card ─────────────────────────────────────────────────────────
+function SubcategoryCard({
+  subcategory,
+  onPress,
+}: {
+  subcategory: Subcategory;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="w-[48%] mb-4 bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100"
+      activeOpacity={0.75}
+    >
+      {/* Image */}
+      <View className="h-40 bg-gray-100 relative">
+        {subcategory.image ? (
+          <Image
+            source={{ uri: subcategory.image }}
+            className="w-full h-full"
+            resizeMode="cover"
+          />
+        ) : (
+          <View className="w-full h-full items-center justify-center">
+            <Package size={36} color="#d1d5db" />
+          </View>
+        )}
+
+        {/* Product count badge */}
+        {subcategory.productCount !== undefined && (
+          <View className="absolute top-2.5 right-2.5 bg-black/70 rounded-full px-2.5 py-1">
+            <Text className="text-white text-[10px] font-bold">
+              {subcategory.productCount} items
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Info */}
+      <View className="px-3 pt-2.5 pb-3">
+        <Text className="text-sm font-bold text-gray-900 mb-0.5" numberOfLines={1}>
+          {subcategory.name}
+        </Text>
+        {subcategory.description ? (
+          <Text className="text-[11px] text-gray-500 leading-4 mb-2" numberOfLines={2}>
+            {subcategory.description}
+          </Text>
+        ) : null}
+        <View className="flex-row items-center gap-1 mt-1">
+          <Text className="text-[11px] font-semibold text-gray-700">Explore</Text>
+          <ChevronRight size={11} color="#6b7280" />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export function SubCategories({ categorySlug }: SubCategoriesProps) {
   const [category, setCategory] = useState<Category | null>(null);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -34,26 +110,23 @@ export function SubCategories({ categorySlug }: SubCategoriesProps) {
       setLoading(true);
       setError(null);
 
-      // Get all categories to find the one with matching slug
       const categoriesResponse = await categoryService.getAllCategories({
         status: 'ACTIVE',
         showRootOnly: 'true',
-        includeSubcategories: 'true'
+        includeSubcategories: 'true',
       });
-      
+
       if (categoriesResponse.success && categoriesResponse.data) {
         const foundCategory = categoriesResponse.data.find(
           (cat: Category) => cat.slug === categorySlug
         );
-        
+
         if (foundCategory) {
           setCategory(foundCategory);
-          
-          // If category has subcategories, use them
+
           if (foundCategory.subcategories && foundCategory.subcategories.length > 0) {
             setSubcategories(foundCategory.subcategories);
           } else {
-            // Otherwise, fetch subcategories separately
             const subcategoriesResponse = await categoryService.getSubcategories(foundCategory.id);
             if (subcategoriesResponse.success && subcategoriesResponse.data) {
               setSubcategories(subcategoriesResponse.data);
@@ -77,6 +150,8 @@ export function SubCategories({ categorySlug }: SubCategoriesProps) {
     router.push({
       pathname: '/(any)/products',
       params: {
+        categoryName: category?.name,
+        subcategoryName: subcategory.name,
         category: category?.slug,
         subcategory: subcategory.slug,
       },
@@ -95,197 +170,196 @@ export function SubCategories({ categorySlug }: SubCategoriesProps) {
     router.push('/(any)/products' as any);
   };
 
+  // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View className="flex-1 bg-white">
-        {/* Banner Skeleton */}
-        <View className="h-52 bg-gray-200">
-          <View className="absolute inset-0 bg-black/50 items-center justify-center">
-            <ActivityIndicator size="large" color="#ffffff" />
-            <Text className="text-white text-xl font-bold mt-4">Loading...</Text>
-          </View>
-        </View>
+      <View className="flex-1 bg-gray-50 items-center justify-center">
+        <StatusBar barStyle="dark-content" backgroundColor="#f9fafb" />
+        <ActivityIndicator size="large" color="#000000" />
+        <Text className="text-gray-500 mt-3 text-sm font-medium">Loading…</Text>
       </View>
     );
   }
 
+  // ── Error ────────────────────────────────────────────────────────────────────
   if (error || !category) {
     return (
-      <View className="flex-1 bg-white">
-        {/* Error Banner */}
-        <View className="h-52 bg-gray-200">
-          <View className="absolute inset-0 bg-black/50 items-center justify-center px-4">
-            <Text className="text-white text-3xl font-bold mb-4 text-center">
-              {error || 'Category Not Found'}
-            </Text>
-            <TouchableOpacity
-              onPress={handleBackToCategories}
-              className="bg-white px-6 py-3 rounded-lg"
-            >
-              <Text className="text-gray-900 font-semibold">Back to Categories</Text>
-            </TouchableOpacity>
+      <View className="flex-1 bg-gray-50">
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        {/* Minimal header */}
+        <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-4 px-5`}>
+          <TouchableOpacity onPress={() => router.back()} className="flex-row items-center gap-2">
+            <ArrowLeft size={20} color="#ffffff" />
+            <Text className="text-white font-semibold text-sm">Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View className="flex-1 items-center justify-center px-8">
+          <View className="w-16 h-16 rounded-full bg-gray-100 items-center justify-center mb-4">
+            <Package size={32} color="#9ca3af" />
           </View>
+          <Text className="text-lg font-extrabold text-gray-900 mb-1 text-center">
+            {error || 'Category Not Found'}
+          </Text>
+          <Text className="text-sm text-gray-500 text-center mb-6">
+            We couldn't find the category you're looking for.
+          </Text>
+          <TouchableOpacity
+            onPress={handleBackToCategories}
+            className="bg-black px-6 py-3 rounded-xl"
+            activeOpacity={0.85}
+          >
+            <Text className="text-white font-bold text-sm">Back to Categories</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
   }
 
+  // ── Main ──────────────────────────────────────────────────────────────────────
   return (
     <View className="flex-1 bg-gray-50">
-          {/* Header */}
- <View className="bg-white p-4 flex-row items-center justify-between border-b border-gray-200">
-          <View className="flex-row items-center">
-            <TouchableOpacity onPress={() => router.back()} className="mr-3">
-              <ArrowLeft size={24} color="#111827" />
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-4 px-5`}>
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-3 flex-1">
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="w-8 h-8 rounded-xl bg-white/10 items-center justify-center"
+              activeOpacity={0.7}
+            >
+              <ArrowLeft size={18} color="#ffffff" />
             </TouchableOpacity>
-            <Text className="text-xl font-bold text-gray-800">{category.name}</Text>
+            <View className="flex-1">
+              <Text className="text-white text-lg font-extrabold tracking-tight" numberOfLines={1}>
+                {category.name}
+              </Text>
+              <Text className="text-gray-400 text-xs mt-0.5">
+                {subcategories.length} subcategories
+              </Text>
+            </View>
           </View>
-          <View className="flex-row items-center space-x-4 gap-4">
-            <TouchableOpacity onPress={() => router.push("/(any)/search" as any)}>
-              <Search size={24} color="#374151" />
+          <View className="flex-row items-center gap-2">
+            <TouchableOpacity
+              onPress={handleSearchProducts}
+              className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center"
+              activeOpacity={0.7}
+            >
+              <Search size={17} color="#ffffff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/cart" as any)}>
-              <ShoppingCart size={24} color="#374151" />
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/cart' as any)}
+              className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center"
+              activeOpacity={0.7}
+            >
+              <ShoppingCart size={17} color="#ffffff" />
             </TouchableOpacity>
-          </View>
-        </View>
-    
-    <ScrollView className="flex-1 bg-white" contentContainerStyle={{ paddingBottom: 96 }}>
-      {/* Banner Header Section */}
-      <View className="h-52 relative">
-        {category.image ? (
-          <Image
-            source={{ uri: category.image }}
-            className="w-full h-full"
-            resizeMode="cover"
-          />
-        ) : (
-          <View className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800" />
-        )}
-        <View className="absolute inset-0 bg-black/50 items-center justify-center px-4">
-          <Text className="text-white text-3xl font-bold text-center mb-3">
-            {category.name}
-          </Text>
-          {/* <Text className="text-white text-base text-center mb-4 px-2">
-            {category.description || `Explore our curated collection of ${category.name.toLowerCase()} with premium quality and craftsmanship`}
-          </Text> */}
-          <View className="flex-row items-center bg-white/30 rounded-full px-4 py-2">
-            <Package size={16} color="#ffffff" />
-            <Text className="text-white text-sm font-semibold ml-2">
-              {subcategories.length} Subcategories Available
-            </Text>
           </View>
         </View>
       </View>
 
-      {/* Main Content */}
-      <View className="px-4 py-6">
-        {/* Subcategories Grid */}
-        {subcategories.length > 0 ? (
-          <View className="flex-row flex-wrap justify-between">
-            {subcategories.map((subcategory) => (
-              <TouchableOpacity
-                key={subcategory.id}
-                onPress={() => handleSubcategoryPress(subcategory)}
-                className="w-[48%] mb-6 bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100"
-                activeOpacity={0.7}
-              >
-                {/* Image Section */}
-                <View className="h-44 bg-gradient-to-br from-gray-100 to-orange-200 relative">
-                  {subcategory.image ? (
-                    <Image
-                      source={{ uri: subcategory.image }}
-                      className="w-full h-full"
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View className="w-full h-full items-center justify-center">
-                      <Package size={48} color="#6b7280" style={{ opacity: 0.5 }} />
-                    </View>
-                  )}
-                  
-                  {/* Product Count Badge */}
-                  {subcategory.productCount !== undefined && (
-                    <View className="absolute top-3 right-3 bg-white/95 rounded-full px-3 py-1 shadow-lg">
-                      <Text className="text-xs font-semibold text-gray-700">
-                        {subcategory.productCount} items
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Content Section */}
-                <View className="p-4">
-                  <Text className="text-lg font-bold text-gray-900 mb-2" numberOfLines={2}>
-                    {subcategory.name}
-                  </Text>
-                  {subcategory.description && (
-                    <Text className="text-sm text-gray-600 leading-relaxed mb-3" numberOfLines={3}>
-                      {subcategory.description}
-                    </Text>
-                  )}
-
-                  {/* Action Button */}
-                  <View className="flex-row items-center">
-                    <Text className="text-sm text-gray-600 font-semibold">
-                      Explore Collection
-                    </Text>
-                    <ArrowRight size={16} color="#4b5563" style={{ marginLeft: 8 }} />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 96 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Banner ────────────────────────────────────────────────────────── */}
+        <View className="h-48 relative">
+          {category.image ? (
+            <Image
+              source={{ uri: category.image }}
+              className="w-full h-full"
+              resizeMode="cover"
+            />
+          ) : (
+            <View className="w-full h-full bg-gray-300" />
+          )}
+          {/* Overlay */}
+          <View
+            className="absolute inset-0 items-center justify-end pb-5 px-5"
+            style={{ backgroundColor: 'rgba(0,0,0,0.50)' }}
+          >
+            <View className="flex-row items-center gap-2 bg-white/20 rounded-full px-4 py-1.5">
+              <Layers size={13} color="#ffffff" />
+              <Text className="text-white text-xs font-semibold">
+                {subcategories.length} Subcategories Available
+              </Text>
+            </View>
           </View>
-        ) : (
-          /* Empty State */
-          <View className="items-center py-12">
-            <View className="bg-white rounded-2xl shadow-lg p-8 items-center max-w-md">
-              <Package size={64} color="#d1d5db" />
-              <Text className="text-2xl font-bold text-gray-900 mt-6 mb-4 text-center">
+        </View>
+
+        {/* ── Grid ──────────────────────────────────────────────────────────── */}
+        <View className="px-4 pt-5">
+          {/* Section label */}
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-base font-extrabold text-gray-900">Subcategories</Text>
+            <Text className="text-xs text-gray-400">{subcategories.length} available</Text>
+          </View>
+
+          {subcategories.length > 0 ? (
+            <View className="flex-row flex-wrap justify-between">
+              {subcategories.map((subcategory) => (
+                <SubcategoryCard
+                  key={subcategory.id}
+                  subcategory={subcategory}
+                  onPress={() => handleSubcategoryPress(subcategory)}
+                />
+              ))}
+            </View>
+          ) : (
+            /* Empty state */
+            <View className="items-center py-12">
+              <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-4">
+                <Package size={36} color="#d1d5db" />
+              </View>
+              <Text className="text-lg font-extrabold text-gray-900 mb-1 text-center">
                 No Subcategories Found
               </Text>
-              <Text className="text-gray-600 text-center mb-6">
-                This category doesn't have any subcategories yet. Check back later for updates.
+              <Text className="text-sm text-gray-500 text-center mb-6 px-6">
+                This category doesn't have any subcategories yet. Check back later.
               </Text>
               <TouchableOpacity
                 onPress={handleBackToCategories}
-                className="bg-amber-600 px-6 py-3 rounded-lg"
+                className="bg-black px-6 py-3 rounded-xl"
+                activeOpacity={0.85}
               >
-                <Text className="text-white font-semibold">Browse All Categories</Text>
+                <Text className="text-white font-bold text-sm">Browse All Categories</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Call to Action Section */}
-        <View className="mt-8 bg-gray-700 rounded-2xl shadow-2xl overflow-hidden">
-          <View className="px-6 py-8 items-center">
-            <Text className="text-2xl font-bold text-white mb-3 text-center">
-              Can't Find What You're Looking For?
-            </Text>
-            <Text className="text-lg text-gray-100 mb-6 text-center px-2">
-              Discover more products with our advanced search or browse our complete collection
-            </Text>
-            <View className="w-full gap-3">
-              <TouchableOpacity
-                onPress={handleSearchProducts}
-                className="flex-row items-center justify-center bg-white px-6 py-4 rounded-xl shadow-lg"
-              >
-                <Package size={20} color="#4b5563" />
-                <Text className="text-gray-600 font-bold ml-2">Search Products</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleBrowseAllProducts}
-                className="flex-row items-center justify-center border-2 border-white px-6 py-4 rounded-xl"
-              >
-                <Grid3X3 size={20} color="#ffffff" />
-                <Text className="text-white font-bold ml-2">Browse All Products</Text>
-              </TouchableOpacity>
+          {/* ── CTA Section ─────────────────────────────────────────────────── */}
+          <View className="mt-6 bg-black rounded-2xl overflow-hidden">
+            <View className="px-6 py-7 items-center">
+              <Text className="text-lg font-extrabold text-white mb-1.5 text-center">
+                Can't Find What You're Looking For?
+              </Text>
+              <Text className="text-sm text-gray-400 text-center mb-5 leading-5">
+                Use search or browse our complete collection to discover more.
+              </Text>
+              <View className="w-full gap-3">
+                <TouchableOpacity
+                  onPress={handleSearchProducts}
+                  className="flex-row items-center justify-center bg-white px-6 py-3.5 rounded-xl gap-2"
+                  activeOpacity={0.85}
+                >
+                  <Search size={16} color="#111827" />
+                  <Text className="text-gray-900 font-bold text-sm">Search Products</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleBrowseAllProducts}
+                  className="flex-row items-center justify-center border border-white/30 bg-white/10 px-6 py-3.5 rounded-xl gap-2"
+                  activeOpacity={0.85}
+                >
+                  <Grid3X3 size={16} color="#ffffff" />
+                  <Text className="text-white font-bold text-sm">Browse All Products</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
     </View>
   );
 }

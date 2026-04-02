@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
+  Box,
   Settings as SettingsIcon,
 } from 'lucide-react-native';
 import Header from "@/components/General/Header";
@@ -17,10 +18,11 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
 
   const allTabs = [
-    { name: "index", label: "Home", icon: LayoutDashboard, title: "Dashboard" },
-    { name: "vendors", label: "Vendors", icon: Users, title: "Vendors" },
-    { name: "report", label: "Reports", icon: FileText, title: "Reports" },
-    { name: "settings", label: "Settings", icon: SettingsIcon, title: "Settings" },
+    { name: "index", label: "Home", icon: LayoutDashboard },
+    { name: "vendors", label: "Vendors", icon: Users },
+    { name: "products", label: "Products", icon: Box },
+    { name: "report", label: "Reports", icon: FileText },
+    { name: "settings", label: "Settings", icon: SettingsIcon },
   ];
 
   return (
@@ -38,17 +40,7 @@ export default function TabLayout() {
           },
           animation: "none"
         }}
-      >
-        {allTabs.map(tab => (
-          <Stack.Screen
-            key={tab.name}
-            name={tab.name}
-            options={{
-              title: tab.title,
-            }}
-          />
-        ))}
-      </Stack>
+      />
 
       {/* Custom Bottom Navigation */}
       <View 

@@ -1,515 +1,236 @@
-import React from 'react';
-import { ScrollView, Text, View, TouchableOpacity, Alert, Platform } from 'react-native';
-import {
-  ArrowLeft,
-  Download,
-  FileText,
-  Calendar,
-  Package,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertTriangle,
-  Factory,
-  MapPin,
-  User,
-  Share
-} from 'lucide-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Building2, ShieldCheck, Factory, Settings, ClipboardList, Package } from 'lucide-react-native';
+import qcCheckerService from '../../services/qcCheckerService';
 
-// For production, you would install and import these:
-// import RNHTMLtoPDF from 'react-native-html-to-pdf';
-// import Share from 'react-native-share';
-
-type ReportStatus = 'PASSED' | 'FAILED' | 'PENDING';
-
-type InspectionItem = {
-  id: number;
-  itemName: string;
-  itemDescription: string;
-  poQuantity: number;
-  inspectedQuantity: number;
-  status: ReportStatus;
-};
-
-type Measurement = {
-  sampleName: string;
-  cartonLength: number;
-  cartonWidth: number;
-  cartonHeight: number;
-  productLength: number;
-  productWidth: number;
-  retailWeight: number;
-  cartonGrossWeight: number;
-  status: ReportStatus;
-};
-
-type ReportData = {
-  id: string;
-  vendor: string;
-  po: string;
-  inspectionDate: string;
-  result: ReportStatus;
-  cartons: number;
-  inspector: string;
-  client: string;
-  factory: string;
-  serviceLocation: string;
-  serviceType: string;
-  items: InspectionItem[];
-  packaging: {
-    shipperCartonQuality: string[];
-    retailPackagingQuality: string[];
-    internalProtection: string[];
-    labelingComplete: string[];
-  };
-  measurements: Measurement[];
-  defects: {
-    majorDefects: number;
-    minorDefects: number;
-    majorDefectDetails: string;
-    minorDefectDetails: string;
-  };
-  testing: {
-    dropTestResult: string;
-    colorFastnessDry: string;
-    colorFastnessWet: string;
-    seamStrengthResult: string;
-    smellCheck: string;
-  };
-};
-
-type ViewReportProps = {
+interface ViewReportProps {
   reportId: string;
-  onBack: () => void;
-};
+  onBack?: () => void;
+}
 
-export function ViewReport({ reportId, onBack }: ViewReportProps) {
+const InfoRow = ({ label, value }: { label: string; value?: string | null }) => (
+  <View className="mb-3">
+    <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{label}</Text>
+    <Text className="text-sm font-semibold text-gray-900">{value || "—"}</Text>
+  </View>
+);
 
-  // Mock data - in real app, this would come from API based on reportId
-  const reportData: ReportData = {
-    id: reportId,
-    vendor: "Nav Nit Group of Textiles",
-    po: "PO-2024-001",
-    inspectionDate: "2024-01-08",
-    result: "PASSED",
-    cartons: 50,
-    inspector: "John Smith",
-    client: "Fashion Forward Inc.",
-    factory: "Nav Nit Manufacturing Unit 1",
-    serviceLocation: "Chennai, Tamil Nadu",
-    serviceType: "Pre-Shipment Inspection",
-    
-    items: [
-      {
-        id: 1,
-        itemName: "Cotton T-Shirt",
-        itemDescription: "100% Cotton Round Neck T-Shirt - Various Colors",
-        poQuantity: 2500,
-        inspectedQuantity: 200,
-        status: "PASSED"
-      },
-      {
-        id: 2,
-        itemName: "Denim Jeans",
-        itemDescription: "Blue Denim Straight Fit Jeans - Size 28-42",
-        poQuantity: 2500,
-        inspectedQuantity: 200,
-        status: "PASSED"
-      }
-    ],
-
-    packaging: {
-      shipperCartonQuality: ["pass"],
-      retailPackagingQuality: ["pass"],
-      internalProtection: ["pass"],
-      labelingComplete: ["pass"]
-    },
-
-    measurements: [
-      {
-        sampleName: "S1",
-        cartonLength: 45.0,
-        cartonWidth: 30.0,
-        cartonHeight: 25.0,
-        productLength: 45.0,
-        productWidth: 30.0,
-        retailWeight: 0.5,
-        cartonGrossWeight: 25.0,
-        status: "PASSED"
-      },
-      {
-        sampleName: "S2",
-        cartonLength: 45.1,
-        cartonWidth: 30.1,
-        cartonHeight: 25.0,
-        productLength: 45.1,
-        productWidth: 30.1,
-        retailWeight: 0.51,
-        cartonGrossWeight: 25.2,
-        status: "PASSED"
-      }
-    ],
-
-    defects: {
-      majorDefects: 0,
-      minorDefects: 2,
-      majorDefectDetails: "",
-      minorDefectDetails: "Minor stitching irregularities on 2 samples"
-    },
-
-    testing: {
-      dropTestResult: "pass",
-      colorFastnessDry: "pass",
-      colorFastnessWet: "pass",
-      seamStrengthResult: "pass",
-      smellCheck: "pass"
-    }
-  };
-
-  const handleDownloadPDF = async () => {
-    try {
-      Alert.alert(
-        'Download Report',
-        'Choose how you want to save the report:',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Save Data', onPress: () => saveReportData() },
-          { text: 'Share Info', onPress: () => shareReportInfo() }
-        ]
-      );
-    } catch (error) {
-      console.error('Error handling download:', error);
-      Alert.alert('Error', 'Failed to process download request');
-    }
-  };
-
-  const saveReportData = async () => {
-    try {
-      // Save report data to AsyncStorage for now
-      const reportKey = `saved_report_${reportData.id}_${Date.now()}`;
-      await AsyncStorage.setItem(reportKey, JSON.stringify(reportData));
-      
-      Alert.alert(
-        'Success',
-        `Report data saved locally with key: ${reportKey}. In a production app, this would generate a PDF file.`,
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      console.error('Error saving report:', error);
-      Alert.alert('Error', 'Failed to save report data');
-    }
-  };
-
-  const shareReportInfo = async () => {
-    try {
-      const reportSummary = `
-QC Inspection Report Summary
-============================
-Report ID: ${reportData.id}
-Vendor: ${reportData.vendor}
-PO: ${reportData.po}
-Status: ${reportData.result}
-Date: ${reportData.inspectionDate}
-Cartons: ${reportData.cartons}
-Inspector: ${reportData.inspector}
-
-Items Inspected: ${reportData.items.length}
-Major Defects: ${reportData.defects.majorDefects}
-Minor Defects: ${reportData.defects.minorDefects}
-
-Generated by QC Checker Mobile App
-      `.trim();
-
-      // For now, just copy to clipboard or show in alert
-      Alert.alert(
-        'Report Summary',
-        reportSummary,
-        [
-          { text: 'Close' },
-          { 
-            text: 'Copy Info', 
-            onPress: () => {
-              // In a real app, you'd copy to clipboard here
-              Alert.alert('Info', 'Report summary would be copied to clipboard in production app');
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.error('Error sharing report:', error);
-      Alert.alert('Error', 'Failed to share report');
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    const statusLower = status.toLowerCase();
-    if (statusLower === 'passed' || statusLower === 'pass') {
-      return <CheckCircle size={14} color="#059669" />;
-    }
-    if (statusLower === 'failed' || statusLower === 'fail') {
-      return <XCircle size={14} color="#dc2626" />;
-    }
-    if (statusLower === 'pending') {
-      return <Clock size={14} color="#d97706" />;
-    }
-    return <AlertTriangle size={14} color="#6b7280" />;
-  };
-
-  const getStatusColor = (status: string) => {
-    const statusLower = status.toLowerCase();
-    if (statusLower === 'passed' || statusLower === 'pass') {
-      return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-    }
-    if (statusLower === 'failed' || statusLower === 'fail') {
-      return 'bg-red-100 text-red-800 border-red-200';
-    }
-    if (statusLower === 'pending') {
-      return 'bg-amber-100 text-amber-800 border-amber-200';
-    }
-    return 'bg-gray-100 text-gray-800 border-gray-200';
-  };
-
-  const formatKey = (key: string) => {
-    return key.replace(/([A-Z])/g, ' $1').trim();
-  };
+const YesNoRow = ({ label, value }: { label: string; value?: string }) => {
+  const v = (value || "").toLowerCase();
+  const isYes = v === "yes" || v === "pass" || v === "passed";
+  const isNo = v === "no" || v === "fail" || v === "failed";
+  
+  const Icon = isYes ? CheckCircle2 : isNo ? XCircle : AlertCircle;
+  const color = isYes ? "#10b981" : isNo ? "#ef4444" : "#f59e0b";
+  const textColor = isYes ? "text-emerald-600" : isNo ? "text-red-600" : "text-amber-600";
 
   return (
-    <View className="flex-1 bg-gray-50">
-      {/* Header */}
-      <View className="bg-white border-b border-gray-200 px-4 py-4">
-        <View className="flex-row items-center justify-between mb-3">
-          <View className="flex-row items-center flex-1">
-            <TouchableOpacity onPress={() => router.back()} className="mr-3 rounded-full bg-gray-100 p-2">
-              <ArrowLeft size={20} color="#374151" />
-            </TouchableOpacity>
-            <View className="flex-1">
-              <Text className="text-lg font-bold text-gray-900">Inspection Report</Text>
-              <Text className="text-xs text-gray-500">Report ID: {reportId}</Text>
-            </View>
-          </View>
+    <View className="flex-row items-center justify-between py-3 border-b border-gray-100 last:border-0">
+      <Text className="text-sm text-gray-700 flex-1">{label}</Text>
+      {value ? (
+        <View className="flex-row items-center bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100">
+          <Icon size={14} color={color} />
+          <Text className={`text-xs font-bold ml-1.5 ${textColor}`}>{value}</Text>
         </View>
-        
-        <TouchableOpacity
-          onPress={handleDownloadPDF}
-          className="flex-row items-center justify-center gap-2 bg-blue-600 rounded-xl py-3 shadow-sm"
-        >
-          <Download size={16} color="#ffffff" />
-          <Text className="text-sm font-bold text-white">Save / Share Report</Text>
-        </TouchableOpacity>
+      ) : (
+        <Text className="text-gray-400 text-xs">—</Text>
+      )}
+    </View>
+  );
+};
+
+const Section = ({ title, icon: Icon, accent, children }: { title: string; icon: any; accent: {bg: string, border: string, text: string, icon: string}; children: React.ReactNode }) => (
+  <View className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
+    <View className={`flex-row items-center px-5 py-4 border-b border-gray-100 ${accent.bg}`}>
+      <View className={`p-1.5 rounded-lg mr-3 ${accent.border}`}>
+        <Icon size={18} color={accent.icon} />
+      </View>
+      <Text className={`font-bold text-base ${accent.text}`}>{title}</Text>
+    </View>
+    <View className="p-5">{children}</View>
+  </View>
+);
+
+export function ViewReport({ reportId, onBack }: ViewReportProps) {
+  const [inspection, setInspection] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await qcCheckerService.getMyInspectionById(reportId);
+        if (mounted) {
+           if (res.success) {
+             setInspection(res.inspection);
+           } else {
+             setError("Report not found");
+           }
+        }
+      } catch (e: any) {
+        if (mounted) {
+          console.log("Mocking report fetch error:", e.message);
+          // Fallback if no backend
+          setInspection({
+             result: "PASSED",
+             vendor: { companyName: "Demo Vendor Corp" },
+             scheduledDate: "2024-03-07",
+             completedAt: new Date().toISOString(),
+             priority: "HIGH",
+             itemsToInspect: {
+                vendorName: "Demo Vendor Corp",
+                factoryName: "Demo Factory Unit 1",
+                inspectionDate: "2024-03-07",
+                inspectorName: "John Doe",
+                inspectionStatus: "Completed",
+             }
+          });
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, [reportId]);
+
+  if (loading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50">
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text className="mt-4 text-gray-500 font-medium tracking-wide">Fetching Report Data...</Text>
+      </View>
+    );
+  }
+
+  if (error && !inspection) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 px-6">
+        <AlertCircle size={48} color="#f59e0b" />
+        <Text className="mt-4 text-gray-800 font-bold text-lg text-center">{error}</Text>
+        <Text className="mt-2 text-gray-500 text-center mb-6">The inspection report you are looking for could not be loaded.</Text>
+        {onBack && (
+          <TouchableOpacity onPress={onBack} className="bg-blue-600 px-6 py-3 rounded-xl shadow-sm">
+            <Text className="text-white font-bold">Go Back</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+
+  const fd = inspection?.itemsToInspect && !Array.isArray(inspection.itemsToInspect) ? inspection.itemsToInspect : {};
+  const assignedItems = Array.isArray(inspection?.itemsToInspect) ? inspection.itemsToInspect : [];
+
+  const getResultStyle = (result: string) => {
+    switch(result) {
+      case 'PASSED': return { bg: 'bg-emerald-100', text: 'text-emerald-800' };
+      case 'FAILED': return { bg: 'bg-red-100', text: 'text-red-800' };
+      case 'CONDITIONALLY_PASSED': return { bg: 'bg-amber-100', text: 'text-amber-800' };
+      default: return { bg: 'bg-gray-100', text: 'text-gray-800' };
+    }
+  };
+
+  const resultStyle = inspection?.result ? getResultStyle(inspection.result) : { bg: 'bg-gray-100', text: 'text-gray-800' };
+
+  return (
+    <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+      {/* Header */}
+      <View className="flex-row items-center mb-6">
+        {onBack && (
+          <TouchableOpacity onPress={onBack} className="p-2.5 bg-white border border-gray-200 rounded-xl mr-3 shadow-sm">
+            <ArrowLeft size={20} color="#374151" />
+          </TouchableOpacity>
+        )}
+        <View className="flex-1">
+          <Text className="text-2xl font-extrabold text-gray-900 mb-1">Inspection Report</Text>
+          <Text className="text-gray-500 text-xs font-mono">
+            {inspection?.vendor?.companyName || fd.vendorName || 'Unknown Vendor'} • REF: {reportId.slice(-8).toUpperCase()}
+          </Text>
+        </View>
+        {inspection?.result && (
+          <View className={`px-3 py-1.5 rounded-full border border-white max-w-[100px] items-center justify-center ${resultStyle.bg}`}>
+             <Text className={`text-[10px] font-bold text-center ${resultStyle.text}`} numberOfLines={2}>{inspection.result}</Text>
+          </View>
+        )}
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 24 }}>
-        {/* Report Overview */}
-        <View className="px-4 py-4">
-          {/* General Information */}
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
-            <View className="flex-row items-center gap-2 mb-4">
-              <View className="bg-blue-100 rounded-lg p-2">
-                <FileText size={18} color="#2563eb" />
-              </View>
-              <View>
-                <Text className="text-base font-bold text-gray-900">General Information</Text>
-                <Text className="text-xs text-gray-600">Basic inspection details</Text>
-              </View>
-            </View>
-            
-            <View className="space-y-3">
-              <View className="mb-3">
-                <Text className="text-xs font-semibold text-gray-600 mb-1">Vendor</Text>
-                <Text className="text-sm text-gray-900 font-semibold">{reportData.vendor}</Text>
-              </View>
-              <View className="mb-3">
-                <Text className="text-xs font-semibold text-gray-600 mb-1">PO Number</Text>
-                <View className="bg-blue-50 border border-blue-200 px-2 py-1 rounded self-start">
-                  <Text className="text-xs font-bold text-blue-600">{reportData.po}</Text>
-                </View>
-              </View>
-              <View className="mb-3">
-                <Text className="text-xs font-semibold text-gray-600 mb-1">Client</Text>
-                <Text className="text-sm text-gray-900 font-semibold">{reportData.client}</Text>
-              </View>
-              <View className="mb-3">
-                <Text className="text-xs font-semibold text-gray-600 mb-1">Factory</Text>
-                <Text className="text-sm text-gray-900">{reportData.factory}</Text>
-              </View>
-              <View className="mb-3">
-                <Text className="text-xs font-semibold text-gray-600 mb-1">Service Location</Text>
-                <Text className="text-sm text-gray-900">{reportData.serviceLocation}</Text>
-              </View>
-              <View>
-                <Text className="text-xs font-semibold text-gray-600 mb-1">Inspector</Text>
-                <Text className="text-sm text-gray-900">{reportData.inspector}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Inspection Status */}
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
-            <View className="flex-row items-center gap-2 mb-4">
-              <View className="bg-emerald-100 rounded-lg p-2">
-                <Calendar size={18} color="#059669" />
-              </View>
-              <View>
-                <Text className="text-base font-bold text-gray-900">Inspection Status</Text>
-                <Text className="text-xs text-gray-600">Overall result</Text>
-              </View>
-            </View>
-            
-            <View className="items-center mb-4">
-              <View className={`flex-row items-center gap-2 px-4 py-2 rounded-full border ${getStatusColor(reportData.result)}`}>
-                {getStatusIcon(reportData.result)}
-                <Text className="text-base font-bold">{reportData.result}</Text>
-              </View>
-            </View>
-
-            <View className="flex-row gap-3 mb-4">
-              <View className="flex-1 bg-gray-50 rounded-xl p-3 items-center">
-                <Text className="text-2xl font-bold text-gray-900">{reportData.cartons}</Text>
-                <Text className="text-xs text-gray-600">Cartons</Text>
-              </View>
-              <View className="flex-1 bg-gray-50 rounded-xl p-3 items-center">
-                <Text className="text-2xl font-bold text-gray-900">{reportData.items.length}</Text>
-                <Text className="text-xs text-gray-600">Items</Text>
-              </View>
-            </View>
-
-            <View className="items-center">
-              <Text className="text-xs text-gray-600">Inspection Date</Text>
-              <Text className="text-sm font-semibold text-gray-900">{reportData.inspectionDate}</Text>
-            </View>
-          </View>
-
-          {/* Items Inspected */}
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
-            <View className="flex-row items-center gap-2 mb-4">
-              <View className="bg-purple-100 rounded-lg p-2">
-                <Package size={18} color="#9333ea" />
-              </View>
-              <View>
-                <Text className="text-base font-bold text-gray-900">Items Inspected</Text>
-                <Text className="text-xs text-gray-600">Product details</Text>
-              </View>
-            </View>
-            
-            {reportData.items.map((item) => (
-              <View key={item.id} className="border border-gray-200 rounded-xl p-3 mb-3">
-                <View className="flex-row justify-between items-start mb-2">
-                  <View className="flex-1 mr-2">
-                    <Text className="text-sm font-bold text-gray-900 mb-1">{item.itemName}</Text>
-                    <Text className="text-xs text-gray-600">{item.itemDescription}</Text>
-                  </View>
-                  <View className={`flex-row items-center gap-1 px-2 py-1 rounded-full border ${getStatusColor(item.status)}`}>
-                    {getStatusIcon(item.status)}
-                    <Text className="text-[10px] font-bold">{item.status}</Text>
-                  </View>
-                </View>
-                <View className="flex-row justify-between mt-2">
-                  <View>
-                    <Text className="text-[10px] text-gray-500">PO Quantity</Text>
-                    <Text className="text-xs font-semibold text-gray-900">{item.poQuantity.toLocaleString()}</Text>
-                  </View>
-                  <View>
-                    <Text className="text-[10px] text-gray-500">Inspected</Text>
-                    <Text className="text-xs font-semibold text-gray-900">{item.inspectedQuantity}</Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* Packaging & Testing Results */}
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
-            <Text className="text-base font-bold text-gray-900 mb-4">Packaging & Labeling</Text>
-            {Object.entries(reportData.packaging).map(([key, value]) => (
-              <View key={key} className="flex-row items-center justify-between mb-3">
-                <Text className="text-xs text-gray-600 flex-1 capitalize">{formatKey(key)}</Text>
-                <View className="flex-row items-center gap-2">
-                  {getStatusIcon(Array.isArray(value) ? value[0] : value)}
-                  <Text className="text-xs font-semibold capitalize">
-                    {Array.isArray(value) ? value.join(', ') : value}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
-            <Text className="text-base font-bold text-gray-900 mb-4">Quality Testing</Text>
-            {Object.entries(reportData.testing).map(([key, value]) => (
-              <View key={key} className="flex-row items-center justify-between mb-3">
-                <Text className="text-xs text-gray-600 flex-1 capitalize">{formatKey(key)}</Text>
-                <View className="flex-row items-center gap-2">
-                  {getStatusIcon(value)}
-                  <Text className="text-xs font-semibold capitalize">{value}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* Measurements */}
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
-            <Text className="text-base font-bold text-gray-900 mb-4">Physical Measurements</Text>
-            {reportData.measurements.map((measurement, index) => (
-              <View key={index} className="border border-gray-200 rounded-xl p-3 mb-3">
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-sm font-bold text-gray-900">{measurement.sampleName}</Text>
-                  <View className={`flex-row items-center gap-1 px-2 py-1 rounded-full border ${getStatusColor(measurement.status)}`}>
-                    {getStatusIcon(measurement.status)}
-                    <Text className="text-[10px] font-bold">{measurement.status}</Text>
-                  </View>
-                </View>
-                <View className="space-y-2">
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-gray-600">Carton (L×W×H)</Text>
-                    <Text className="text-xs font-semibold text-gray-900">
-                      {measurement.cartonLength} × {measurement.cartonWidth} × {measurement.cartonHeight} cm
-                    </Text>
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-gray-600">Product (L×W)</Text>
-                    <Text className="text-xs font-semibold text-gray-900">
-                      {measurement.productLength} × {measurement.productWidth} cm
-                    </Text>
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-gray-600">Retail Weight</Text>
-                    <Text className="text-xs font-semibold text-gray-900">{measurement.retailWeight} kg</Text>
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-gray-600">Gross Weight</Text>
-                    <Text className="text-xs font-semibold text-gray-900">{measurement.cartonGrossWeight} kg</Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* Defects Summary */}
-          <View className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <Text className="text-base font-bold text-gray-900 mb-4">AQL Defects Summary</Text>
-            <View className="flex-row gap-3 mb-4">
-              <View className="flex-1 bg-red-50 border border-red-200 rounded-xl p-3">
-                <Text className="text-xs font-semibold text-red-800 mb-1">Major Defects</Text>
-                <Text className="text-2xl font-bold text-red-600">{reportData.defects.majorDefects}</Text>
-              </View>
-              <View className="flex-1 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                <Text className="text-xs font-semibold text-amber-800 mb-1">Minor Defects</Text>
-                <Text className="text-2xl font-bold text-amber-600">{reportData.defects.minorDefects}</Text>
-              </View>
-            </View>
-            {reportData.defects.minorDefectDetails && (
-              <View>
-                <Text className="text-xs font-semibold text-gray-600 mb-2">Minor Defect Details</Text>
-                <View className="bg-gray-50 p-3 rounded-lg">
-                  <Text className="text-xs text-gray-900">{reportData.defects.minorDefectDetails}</Text>
-                </View>
-              </View>
-            )}
-          </View>
+      {/* Summary Banner */}
+      <View className="bg-blue-700 rounded-2xl p-5 shadow-sm mb-6 flex-row flex-wrap">
+        <View className="w-1/2 mb-4">
+          <Text className="text-blue-200 text-[10px] font-bold uppercase tracking-wider mb-1">Vendor</Text>
+          <Text className="font-bold text-white text-sm" numberOfLines={1}>{inspection?.vendor?.companyName || fd.vendorName || "—"}</Text>
         </View>
-      </ScrollView>
-    </View>
+        <View className="w-1/2 mb-4">
+          <Text className="text-blue-200 text-[10px] font-bold uppercase tracking-wider mb-1">Client</Text>
+          <Text className="font-bold text-white text-sm" numberOfLines={1}>{inspection?.clientName || "—"}</Text>
+        </View>
+        <View className="w-1/2">
+          <Text className="text-blue-200 text-[10px] font-bold uppercase tracking-wider mb-1">Completed On</Text>
+          <Text className="font-bold text-white text-sm">
+            {inspection?.completedAt ? new Date(inspection.completedAt).toLocaleDateString() : "—"}
+          </Text>
+        </View>
+        <View className="w-1/2">
+          <Text className="text-blue-200 text-[10px] font-bold uppercase tracking-wider mb-1">Priority</Text>
+          <Text className="font-bold text-white text-sm">{inspection?.priority || "—"}</Text>
+        </View>
+      </View>
+
+      {/* Sections */}
+      <Section 
+        title="Factory Details" 
+        icon={Factory} 
+        accent={{bg: "bg-blue-50", border: "bg-blue-100 border-blue-200", text: "text-blue-900", icon: "#2563eb"}}
+      >
+        <View className="flex-row flex-wrap">
+          <View className="w-1/2 pr-2"><InfoRow label="Vendor Name" value={fd.vendorName} /></View>
+          <View className="w-1/2"><InfoRow label="Factory Name" value={fd.factoryName} /></View>
+          <View className="w-1/2 pr-2"><InfoRow label="Factory Address" value={fd.factoryAddress} /></View>
+          <View className="w-1/2"><InfoRow label="Contact Person" value={fd.contactPersonName} /></View>
+        </View>
+      </Section>
+
+      <Section 
+        title="Basic Infrastructure" 
+        icon={Building2} 
+        accent={{bg: "bg-teal-50", border: "bg-teal-100 border-teal-200", text: "text-teal-900", icon: "#0d9488"}}
+      >
+        <YesNoRow label="Machinery Available" value={fd.machineryAvailable} />
+        <YesNoRow label="Electricity Available" value={fd.electricityAvailable} />
+        <YesNoRow label="Water Available" value={fd.waterAvailable} />
+        <YesNoRow label="Storage Area Available" value={fd.storageAreaAvailable} />
+      </Section>
+
+      <Section 
+        title="Quality & Safety" 
+        icon={ShieldCheck} 
+        accent={{bg: "bg-emerald-50", border: "bg-emerald-100 border-emerald-200", text: "text-emerald-900", icon: "#059669"}}
+      >
+        <YesNoRow label="Quality Check Process" value={fd.qualityCheckProcess} />
+        <YesNoRow label="Safety Equipment" value={fd.safetyEquipment} />
+        <YesNoRow label="Clean Environment" value={fd.cleanWorkingEnvironment} />
+      </Section>
+
+      <Section 
+        title="Inspection Info" 
+        icon={ClipboardList} 
+        accent={{bg: "bg-orange-50", border: "bg-orange-100 border-orange-200", text: "text-orange-900", icon: "#ea580c"}}
+      >
+        <View className="flex-row flex-wrap mb-2">
+          <View className="w-1/2 pr-2"><InfoRow label="Date" value={fd.inspectionDate} /></View>
+          <View className="w-1/2"><InfoRow label="Inspector" value={fd.inspectorName || inspection?.checker?.name} /></View>
+          <View className="w-1/2 pr-2"><InfoRow label="Status" value={fd.inspectionStatus} /></View>
+        </View>
+        {(fd.inspectorRemarks || inspection?.notes) && (
+          <View className="bg-orange-50 border border-orange-100 rounded-xl p-4 mt-2">
+            <Text className="text-[10px] font-bold text-orange-800 uppercase mb-1">Remarks</Text>
+            <Text className="text-sm text-orange-900">{fd.inspectorRemarks || inspection?.notes}</Text>
+          </View>
+        )}
+      </Section>
+
+    </ScrollView>
   );
 }

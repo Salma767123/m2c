@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface CartItem {
   id: string;
   productId: string;
+  variantId?: string;
   quantity: number;
   price: number;
   product?: {
@@ -13,6 +14,22 @@ export interface CartItem {
     basePrice: number;
     description?: string;
     gstPercentage?: number;
+    inStock?: boolean;
+    availableStock?: number;
+    originalPrice?: number;
+    category?: string;
+    rating?: number;
+    reviews?: number;
+    material?: string;
+    discount?: number;
+  };
+  variant?: {
+    size: string;
+    color: string;
+    colorHex?: string;
+    sku: string;
+    stock: number;
+    images?: string[];
   };
 }
 
@@ -28,9 +45,9 @@ export interface CartResponse {
 }
 
 class CartService {
-  async addToCart(productId: string, quantity: number = 1): Promise<CartResponse> {
+  async addToCart(productId: string, quantity: number = 1, variantId?: string): Promise<CartResponse> {
     try {
-      const response = await axios.post('/cart/add', { productId, quantity });
+      const response = await axios.post('/cart/add', { productId, quantity, variantId });
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to add item to cart');
@@ -91,16 +108,17 @@ class CartService {
     }
   }
 
-  async addToLocalCart(productId: string, quantity: number = 1): Promise<void> {
+  async addToLocalCart(productId: string, quantity: number = 1, variantId?: string): Promise<void> {
     const cart = await this.getLocalCart();
-    const existingItem = cart.find(item => item.productId === productId);
+    const existingItem = cart.find(item => item.productId === productId && item.variantId === variantId);
 
     if (existingItem) {
       existingItem.quantity += quantity;
     } else {
       cart.push({
-        id: Date.now().toString(),
+        id: Date.now().toString() + Math.random().toString(36).substring(7),
         productId,
+        variantId,
         quantity,
         price: 0
       });
@@ -109,15 +127,16 @@ class CartService {
     await this.saveLocalCart(cart);
   }
 
-  async removeFromLocalCart(productId: string): Promise<void> {
+  async removeFromLocalCart(id: string): Promise<void> {
     const cart = await this.getLocalCart();
-    const updatedCart = cart.filter(item => item.productId !== productId);
+    // Remove by the unique cart item 'id' to support multiple variants
+    const updatedCart = cart.filter(item => item.id !== id);
     await this.saveLocalCart(updatedCart);
   }
 
-  async updateLocalCartItem(productId: string, quantity: number): Promise<void> {
+  async updateLocalCartItem(id: string, quantity: number): Promise<void> {
     const cart = await this.getLocalCart();
-    const existingItem = cart.find(item => item.productId === productId);
+    const existingItem = cart.find(item => item.id === id);
 
     if (existingItem) {
       existingItem.quantity = quantity;
