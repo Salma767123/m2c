@@ -2,7 +2,7 @@
 
 import ProductCard from '../ProductCard/ProductCard';
 import Category from '@/components/WebSite/CategoryCopy/Category';
-import { Search, Filter, Grid, List, ChevronDown, Star } from 'lucide-react';
+import { Search, Filter, ChevronDown, Star } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { productService, Product } from '@/services/productService';
@@ -22,7 +22,6 @@ const Products = () => {
   const [categoryName, setCategoryName] = useState('');
   const [subcategoryName, setSubcategoryName] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
@@ -57,17 +56,21 @@ const Products = () => {
           setCategoriesList(categoriesResponse.data);
 
           if (categoryParam) {
+            console.log('Looking for category with slug:', categoryParam);
+            console.log('Available categories:', categoriesResponse.data.map((c: any) => ({ name: c.name, slug: c.slug })));
+            
             const foundCategory = categoriesResponse.data.find(
-              (cat: any) => cat.slug === categoryParam
+              (cat: any) => cat.slug.toLowerCase() === categoryParam.toLowerCase()
             );
 
             if (foundCategory) {
+              console.log('Found category:', foundCategory.name);
               setCategoryName(foundCategory.name);
               setSelectedCategory(foundCategory.name);
 
               if (subcategoryParam && foundCategory.subcategories) {
                 const foundSubcategory = foundCategory.subcategories.find(
-                  (sub: any) => sub.slug === subcategoryParam
+                  (sub: any) => sub.slug.toLowerCase() === subcategoryParam.toLowerCase()
                 );
 
                 if (foundSubcategory) {
@@ -75,6 +78,8 @@ const Products = () => {
                   setSelectedSubcategory(foundSubcategory.name);
                 }
               }
+            } else {
+              console.log('Category not found for slug:', categoryParam);
             }
           }
         }
@@ -93,7 +98,8 @@ const Products = () => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await productService.getPublicProducts({
+        
+        const params = {
           page: currentPage,
           limit: 12,
           search: searchTerm || undefined,
@@ -104,7 +110,11 @@ const Products = () => {
           sortBy: sortBy === 'price-low' || sortBy === 'price-high' ? 'basePrice' : sortBy,
           sortOrder: sortBy === 'price-low' ? 'asc' : 'desc',
           inStock: inStockOnly || undefined
-        });
+        };
+        
+        console.log('Fetching products with params:', params);
+        
+        const response = await productService.getPublicProducts(params);
 
         if (!ignore && response.success && response.data) {
           setProducts(response.data.items);
@@ -318,24 +328,6 @@ const Products = () => {
                   </div>
                 )}
               </div>
-
-              {/* View Mode */}
-              <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 ${viewMode === 'grid' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                  title="Grid View"
-                >
-                  <Grid className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 ${viewMode === 'list' ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                  title="List View"
-                >
-                  <List className="w-5 h-5" />
-                </button>
-              </div>
             </div>
           </div>
 
@@ -513,10 +505,7 @@ const Products = () => {
                 </div>
               ) : (
                 <>
-                  <div className={`${viewMode === 'grid'
-                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-                    : 'space-y-4'
-                    }`}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProducts.map((product) => (
                       <ProductCard key={product.id} product={product} />
                     ))}

@@ -144,6 +144,17 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
 
       {/* Main Content */}
       <div className="max-w-7xl 2xl:max-w-420 mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* View All Products Button */}
+        <div className="mb-8 flex justify-center">
+          <Link
+            href={`/products?category=${category.slug}`}
+            className="inline-flex items-center px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-1 duration-300"
+          >
+            <Grid3X3 className="mr-2 w-5 h-5" />
+            View All {category.name} Products
+          </Link>
+        </div>
+
         {/* Subcategories Grid */}
         {subcategories.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
@@ -218,16 +229,25 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
           <div className="text-center py-20">
             <div className="bg-white rounded-2xl shadow-lg p-12 max-w-md mx-auto">
               <Package className="mx-auto h-20 w-20 text-gray-300 mb-6" />
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">No Subcategories Found</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">No Subcategories</h3>
               <p className="text-gray-600 mb-6">
-                This category doesn't have any subcategories yet. Check back later for updates.
+                This category doesn't have subcategories. View all products in this category instead.
               </p>
-              <Link
-                href="/categories"
-                className="inline-flex items-center px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-semibold"
-              >
-                Browse All Categories
-              </Link>
+              <div className="flex flex-col gap-3">
+                <Link
+                  href={`/products?category=${category.slug}`}
+                  className="inline-flex items-center justify-center px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-semibold"
+                >
+                  <Grid3X3 className="mr-2 w-5 h-5" />
+                  View All {category.name} Products
+                </Link>
+                <Link
+                  href="/categories"
+                  className="inline-flex items-center justify-center px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+                >
+                  Browse All Categories
+                </Link>
+              </div>
             </div>
           </div>
         )}

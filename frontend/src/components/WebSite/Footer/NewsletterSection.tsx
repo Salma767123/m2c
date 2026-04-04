@@ -17,7 +17,7 @@ const NewsletterSection = () => {
       <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-10 lg:py-12">
         <div className="text-center">
           <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 md:mb-4">
-            Join the Haven Home Family
+            Join the M2C MarkDowns Family
           </h3>
           <p className="text-gray-300 text-xs sm:text-sm md:text-base mb-4 sm:mb-6 md:mb-8 max-w-2xl mx-auto px-2">
             Subscribe for exclusive offers, styling tips, and 10% off your first order.

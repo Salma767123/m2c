@@ -2002,11 +2002,11 @@ const getPublicProducts = async (req, res) => {
     }
 
     if (category) {
-      where.category = category;
+      where.category = { equals: category, mode: 'insensitive' };
     }
 
     if (subCategory) {
-      where.subCategory = subCategory;
+      where.subCategory = { equals: subCategory, mode: 'insensitive' };
     }
 
     // Price filtering should use adminFixedPrice if available, otherwise basePrice

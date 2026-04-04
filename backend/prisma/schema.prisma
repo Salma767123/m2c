@@ -1050,6 +1050,27 @@ model VendorEnquiry {
 }
 
 // ============================================
+// CONTACT/WEBSITE ENQUIRIES
+// ============================================
+
+model ContactEnquiry {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  status    String   @default("new") // new | read | replied | closed
+  repliedAt DateTime?
+  closedAt  DateTime?
+  notes     String?  // Admin notes
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contact_enquiries")
+}
+
+// ============================================
 // SUPPORT SYSTEM
 // ============================================
 

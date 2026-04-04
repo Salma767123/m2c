@@ -14,6 +14,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   // Multi-tab logout synchronization
   useStorageSync('adminToken', () => {
@@ -24,8 +25,8 @@ export default function DashboardLayout({
     <ProtectedRoute>
       <div className="flex h-screen bg-slate-50 font-sans">
         {/* Sidebar */}
-        <div className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
-          <Sidebar />
+        <div className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isSidebarCollapsed ? 'lg:w-20' : 'lg:w-64'} fixed inset-y-0 left-0 z-50 w-64 transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
+          <Sidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} />
         </div>
 
         {/* Mobile Sidebar Overlay */}

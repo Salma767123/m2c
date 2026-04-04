@@ -327,11 +327,15 @@ const CouponManagement = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Percent className="w-4 h-4 text-gray-500" />
+                        {coupon.discountType === 'PERCENTAGE' ? (
+                          <Percent className="w-4 h-4 text-gray-500" />
+                        ) : (
+                          <span className="text-gray-500 font-semibold">₹</span>
+                        )}
                         <span className="font-medium">
                           {coupon.discountType === 'PERCENTAGE'
                             ? `${coupon.discountValue}%`
-                            : `₹${coupon.discountValue}`}
+                            : `${coupon.discountValue}`}
                         </span>
                       </div>
                       <div className="text-xs text-gray-500 mt-1">

@@ -107,7 +107,7 @@ const MainFooterContent = () => {
             <ul className="space-y-2 sm:space-y-3 md:space-y-4">
               <li>
                 <Link
-                  href="/products"
+                  href="/categories"
                   className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
                 >
                   All Categories
@@ -116,7 +116,7 @@ const MainFooterContent = () => {
               {categories.map((category) => (
                 <li key={category.id}>
                   <Link
-                    href={`/products?category=${encodeURIComponent(category.name)}`}
+                    href={`/categories/${category.slug}`}
                     className="text-gray-200 text-xs sm:text-sm md:text-base hover:text-white transition-colors block py-1"
                   >
                     {category.name}
