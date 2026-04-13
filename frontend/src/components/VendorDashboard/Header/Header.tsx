@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useVendorAuth } from '@/hooks/useVendorAuth'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
