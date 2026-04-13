@@ -3,6 +3,9 @@ import { View, TouchableOpacity, Image, ScrollView, Dimensions } from 'react-nat
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
+// Banner images are 2872x1152 — calculate proportional height
+const IMAGE_ASPECT_RATIO = 2872 / 1152;
+const imageHeight = width / IMAGE_ASPECT_RATIO;
 
 // Hero slides data
 const heroSlides = [
@@ -75,7 +78,7 @@ export default function HeroSection() {
 
   return (
     <View className="relative bg-white">
-      <View className="h-64 overflow-hidden">
+      <View style={{ height: imageHeight }} className="overflow-hidden">
         <ScrollView
           ref={scrollViewRef}
           horizontal
@@ -89,8 +92,8 @@ export default function HeroSection() {
             <View key={slide.id} style={{ width }} className="relative">
               <Image
                 source={slide.image}
-                style={{ width, height: 256 }}
-                resizeMode="cover"
+                style={{ width, height: imageHeight }}
+                resizeMode="contain"
               />
             </View>
           ))}

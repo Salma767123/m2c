@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { 
@@ -19,11 +20,14 @@ interface ForgotPasswordData {
 }
 
 export default function Forgot() {
+  const searchParams = useSearchParams()
+  const prefillEmail = searchParams.get('email') || ''
+
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [emailError, setEmailError] = useState("")
   const [formData, setFormData] = useState<ForgotPasswordData>({
-    email: ''
+    email: prefillEmail
   })
   const emailInputRef = useRef<HTMLInputElement>(null)
 

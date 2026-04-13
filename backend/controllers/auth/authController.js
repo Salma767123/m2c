@@ -343,10 +343,11 @@ const login = async (req, res) => {
     }
 
     // For Google OAuth users without password
-    if (!user.password && user.provider === "google") {
-      return res.status(401).json({
+    if (user.provider === "google" && !user.password) {
+      return res.status(409).json({
         success: false,
-        error: "Please sign in with Google",
+        code: "GOOGLE_ACCOUNT",
+        error: "This account uses Google sign-in. Please continue with Google, or use 'Forgot Password' to set a password for email login.",
       });
     }
 
@@ -1423,6 +1424,15 @@ const googleAuthSuccess = async (req, res) => {
       );
     }
 
+    // Check if login was initiated from admin page but user is not admin
+    const loginSource = req.query.state;
+    if (loginSource === 'admin' && req.user.role !== 'admin') {
+      console.log(`⚠️ Non-admin user ${req.user.email} tried Google login from admin page`);
+      return res.redirect(
+        `${process.env.FRONTEND_URL}/admin/login?error=access_denied`
+      );
+    }
+
     // Generate JWT token
     const token = generateToken(req.user.id);
 
@@ -2091,11 +2101,12 @@ const superAdminLogin = async (req, res) => {
     }
 
     // For Google OAuth admins without password
-    if (!admin.password && admin.provider === "google") {
+    if (admin.provider === "google" && !admin.password) {
       console.log("❌ Google OAuth admin trying to login with password");
-      return res.status(401).json({
+      return res.status(409).json({
         success: false,
-        error: "Please sign in with Google",
+        code: "GOOGLE_ACCOUNT",
+        error: "This admin account uses Google sign-in. Please continue with Google, or use 'Forgot Password' to set a password for email login.",
       });
     }
 

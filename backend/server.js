@@ -146,6 +146,7 @@ const roleRoutes = require('./routes/roleRoutes');
 const adminDashboardRoutes = require('./routes/adminDashboardRoutes');
 const vendorDashboardRoutes = require('./routes/vendorDashboardRoutes');
 const seoSettingsRoutes = require('./routes/seoSettingsRoutes');
+const bannerRoutes = require('./routes/bannerRoutes');
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -179,6 +180,7 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/admin-dashboard', adminDashboardRoutes);
 app.use('/api/vendor-dashboard', vendorDashboardRoutes);
 app.use('/api/seo-settings', seoSettingsRoutes);
+app.use('/api/banners', bannerRoutes);
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

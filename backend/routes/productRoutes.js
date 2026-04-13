@@ -40,26 +40,23 @@ router.put('/:id/reject', authenticateToken, requireAdminRole, rejectProduct);
 router.post('/admin/:id/assign-qc', authenticateToken, requireAdminRole, assignQCCheckerToProduct);
 router.put('/admin/:id/variants/stock', authenticateToken, requireAdminRole, updateVariantStocks);
 
-// Get a single product (Admins, Vendors, and QC Checkers can view)
-router.get('/:id', authenticateToken, requireRole(['ADMIN', 'VENDOR', 'QC_CHECKER']), getProduct);
-
-// Vendor routes (require vendor authentication)
-router.use(authenticateToken);
-router.use(requireVendorRole);
-
+// Vendor routes - specific named routes MUST come before /:id
 // Product statistics
-router.get('/stats', getProductStats);
+router.get('/stats', authenticateToken, requireVendorRole, getProductStats);
 
 // Get available inventory items for product creation
-router.get('/available-inventory', getAvailableInventoryItems);
+router.get('/available-inventory', authenticateToken, requireVendorRole, getAvailableInventoryItems);
 
-// CRUD operations
-router.post('/', createProduct);
-router.get('/', getVendorProducts);
-router.put('/:id', updateProduct);
-router.delete('/:id', deleteProduct);
+// Vendor CRUD operations
+router.post('/', authenticateToken, requireVendorRole, createProduct);
+router.get('/', authenticateToken, requireVendorRole, getVendorProducts);
+router.put('/:id', authenticateToken, requireVendorRole, updateProduct);
+router.delete('/:id', authenticateToken, requireVendorRole, deleteProduct);
 
 // Update variant stocks (vendors can update their own products)
-router.put('/:id/variants/stock', updateVariantStocks);
+router.put('/:id/variants/stock', authenticateToken, requireVendorRole, updateVariantStocks);
+
+// Get a single product - MUST BE LAST (Admins, Vendors, and QC Checkers can view)
+router.get('/:id', authenticateToken, requireRole(['ADMIN', 'VENDOR', 'QC_CHECKER']), getProduct);
 
 module.exports = router;

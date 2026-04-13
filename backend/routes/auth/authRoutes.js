@@ -40,8 +40,12 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 
 // Google OAuth routes
-router.get('/google', 
-  passport.authenticate('google', { scope: ['profile', 'email'] })
+router.get('/google',
+  (req, res, next) => {
+    // Pass login source via OAuth state parameter
+    const state = req.query.source === 'admin' ? 'admin' : 'user';
+    passport.authenticate('google', { scope: ['profile', 'email'], state })(req, res, next);
+  }
 );
 
 router.get('/google/callback',
