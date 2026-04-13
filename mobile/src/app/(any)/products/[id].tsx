@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StatusBar, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Search, ShoppingCart, ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Search, ShoppingCart, Package } from 'lucide-react-native';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
 import { showErrorToast } from '@/lib/toast-utils';
 import ProductDetail from '@/components/WebSite/Home/ProductDetail';
+
+// Truncate to N words, append "..." if excess
+function truncateWords(text: string, maxWords = 10): string {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text;
+  return words.slice(0, maxWords).join(' ') + '…';
+}
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -13,9 +20,7 @@ export default function ProductDetailScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (id) {
-      fetchProduct();
-    }
+    if (id) fetchProduct();
   }, [id]);
 
   const fetchProduct = async () => {
@@ -27,100 +32,95 @@ export default function ProductDetailScreen() {
       } else {
         showErrorToast('Error', 'Failed to load product details');
       }
-    } catch (error) {
-      console.error('Failed to fetch product:', error);
+    } catch {
       showErrorToast('Error', 'Failed to load product details');
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Shared top bar ────────────────────────────────────────────────────────
+  const TopBar = ({ title = 'Product Details' }: { title?: string }) => (
+    <View
+      className={`bg-[#1a1a2e] ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-3.5 px-4 flex-row items-center justify-between`}
+    >
+      {/* Back button + truncated title */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        activeOpacity={0.7}
+        className="flex-row items-center gap-2 flex-1 mr-3"
+      >
+        <ArrowLeft size={22} color="#ffffff" />
+        <Text
+          className="text-white text-base font-bold flex-shrink"
+          numberOfLines={1}
+        >
+          {truncateWords(title, 15)}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Action icons */}
+      <View className="flex-row items-center gap-3">
+     
+        <TouchableOpacity
+          onPress={() => router.push('/(tabs)/cart' as any)}
+          activeOpacity={0.7}
+          className="p-1.5"
+        >
+          <ShoppingCart size={22} color="#e5e7eb" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View className="flex-1 bg-white">
-        {/* Header */}
-        <View className="bg-white p-4 flex-row items-center justify-between border-b border-gray-200">
-          <View className="flex-row items-center">
-            <TouchableOpacity onPress={() => router.back()} className="mr-3">
-              <ArrowLeft size={24} color="#111827" />
-            </TouchableOpacity>
-            <Text className="text-xl font-bold text-gray-800">Product Details</Text>
-          </View>
-          <View className="flex-row items-center space-x-4 gap-4">
-            <TouchableOpacity onPress={() => router.push("/(any)/search" as any)}>
-              <Search size={24} color="#374151" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/cart" as any)}>
-              <ShoppingCart size={24} color="#374151" />
-            </TouchableOpacity>
-          </View>
-        </View>
-        
+      <View className="flex-1 bg-slate-50">
+        <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+        <TopBar />
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#374151" />
-          <Text className="mt-4 text-gray-600">Loading product...</Text>
+          <ActivityIndicator size="large" color="#1a1a2e" />
+          <Text className="text-gray-500 mt-3 text-sm">Loading product…</Text>
         </View>
       </View>
     );
   }
 
+  // ── Not found ─────────────────────────────────────────────────────────────
   if (!product) {
     return (
-      <View className="flex-1 bg-white">
-        {/* Header */}
-        <View className="bg-white p-4 flex-row items-center justify-between border-b border-gray-200">
-          <View className="flex-row items-center">
-            <TouchableOpacity onPress={() => router.back()} className="mr-3">
-              <ArrowLeft size={24} color="#111827" />
-            </TouchableOpacity>
-            <Text className="text-xl font-bold text-gray-800">Product Details</Text>
+      <View className="flex-1 bg-slate-50">
+        <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+        <TopBar />
+        <View className="flex-1 items-center justify-center px-8">
+          <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-5">
+            <Package size={40} color="#d1d5db" />
           </View>
-          <View className="flex-row items-center space-x-4 gap-4">
-            <TouchableOpacity onPress={() => router.push("/(any)/search" as any)}>
-              <Search size={24} color="#374151" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/cart" as any)}>
-              <ShoppingCart size={24} color="#374151" />
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        <View className="flex-1 items-center justify-center px-4">
-          <Text className="text-2xl font-bold text-gray-900 mb-4">Product Not Found</Text>
-          <Text className="text-gray-600 mb-8 text-center">
+          <Text className="text-[20px] font-extrabold text-gray-900 mb-2.5 text-center">
+            Product Not Found
+          </Text>
+          <Text className="text-sm text-gray-500 text-center leading-[22px] mb-7">
             The product you're looking for doesn't exist or is no longer available.
           </Text>
           <TouchableOpacity
             onPress={() => router.back()}
-            className="bg-gray-800 px-6 py-3 rounded-lg"
+            activeOpacity={0.85}
+            className="bg-[#1a1a2e] rounded-2xl px-7 py-3.5 flex-row items-center gap-2"
           >
-            <Text className="text-white font-bold">Go Back</Text>
+            <ArrowLeft size={16} color="#ffffff" />
+            <Text className="text-white font-bold text-[15px]">Go Back</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
+  // ── Main ──────────────────────────────────────────────────────────────────
   return (
-    <View className="flex-1 bg-white">
-      {/* Header */}
-      <View className="bg-white p-4 flex-row items-center justify-between border-b border-gray-200">
-        <View className="flex-row items-center">
-          <TouchableOpacity onPress={() => router.back()} className="mr-3">
-            <ArrowLeft size={24} color="#111827" />
-          </TouchableOpacity>
-          <Text className="text-xl font-bold text-gray-800">Product Details</Text>
-        </View>
-        <View className="flex-row items-center space-x-4 gap-4">
-          <TouchableOpacity onPress={() => router.push("/(any)/search" as any)}>
-            <Search size={24} color="#374151" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push("/(tabs)/cart" as any)}>
-            <ShoppingCart size={24} color="#374151" />
-          </TouchableOpacity>
-        </View>
-      </View>
-      
+    <View className="flex-1 bg-slate-50">
+      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+      <TopBar title={product.name} />
       <ProductDetail product={product} productId={id as string} />
     </View>
   );

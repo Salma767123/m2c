@@ -1,7 +1,8 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, ScrollView, Image, Dimensions, StyleSheet } from 'react-native';
-import { CheckCircle } from 'lucide-react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { View, Text, ScrollView, Image, Dimensions, StyleSheet, TouchableOpacity } from 'react-native';
+import { CheckCircle, ArrowLeft } from 'lucide-react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useRouter } from 'expo-router';
 
 interface AboutSection {
   title: string;
@@ -36,6 +37,8 @@ const aboutContent: AboutSection[] = [
     image: require('../../../../assets/images/about/a5.jpg'),
   },
 ];
+
+  const router = useRouter();
 
 const missionStatement = {
   title: "Our Mission",
@@ -117,24 +120,28 @@ const styles = StyleSheet.create({
 });
 
 export default function About() {
-  const videoRef = useRef<Video>(null);
-
-  useEffect(() => {
-    // Auto-play video when component mounts
-    const playVideo = async () => {
-      if (videoRef.current) {
-        try {
-          await videoRef.current.playAsync();
-        } catch (error) {
-          console.log('Auto-play error:', error);
-        }
-      }
-    };
-
-    playVideo();
-  }, []);
+  const videoSource = require('../../../../assets/videos/About1.mp4');
+  
+  const player = useVideoPlayer(videoSource, player => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
 
   return (
+    <>
+          {/* Header */}
+      <View className="bg-black px-4 py-6 border-b border-gray-200">
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center flex-1">
+            <TouchableOpacity onPress={() => router.back()} className="mr-3">
+              <ArrowLeft size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <Text className="text-xl font-bold text-white">About Us</Text>
+          </View>
+        </View>
+      </View>
+      
     <ScrollView className="flex-1 bg-white">
       {/* Mission Statement */}
       <View className="relative bg-gray-900 px-6 py-12">
@@ -172,15 +179,13 @@ export default function About() {
 
         <View className="items-center">
           <View style={styles.videoWrapper}>
-            <Video
-              ref={videoRef}
-              source={require('../../../../assets/videos/About1.mp4')}
+            <VideoView
               style={styles.video}
-              resizeMode={ResizeMode.COVER}
-              isLooping
-              isMuted={true}
-              shouldPlay={true}
-              useNativeControls={false}
+              player={player}
+              allowsFullscreen={false}
+              allowsPictureInPicture={false}
+              nativeControls={false}
+              contentFit="cover"
             />
             <View style={styles.overlayContainer} pointerEvents="none">
               <View style={styles.overlay} />
@@ -239,5 +244,6 @@ export default function About() {
 
     
     </ScrollView>
+    </>
   );
 }
