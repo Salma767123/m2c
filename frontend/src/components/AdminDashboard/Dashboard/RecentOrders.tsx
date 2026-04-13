@@ -26,61 +26,52 @@ export default function RecentOrders({ orders }: { orders: any[] }) {
         <CardTitle>Recent Orders</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-hidden">
+          <table className="w-full divide-y divide-gray-200">
             <thead className="bg-gray-800">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                   Order ID
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                   Customer
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                <th scope="col" className="hidden md:table-cell px-3 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                   Date
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                   Amount
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                   Status
-                </th>
-                <th scope="col" className="relative px-6 py-3">
-                  <span className="sr-only">Actions</span>
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {orders && orders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                    #{order.orderId}
+                <tr 
+                  key={order.id} 
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => router.push(`/admin/dashboard/orders/view/${order.id}`)}
+                >
+                  <td className="px-3 sm:px-6 py-4 text-sm font-medium text-blue-600">
+                    <div className="truncate max-w-[120px] sm:max-w-none">
+                      #{order.orderId}
+                    </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {order.customerName}
+                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">
+                    <div className="truncate max-w-[100px] sm:max-w-none">
+                      {order.customerName}
+                    </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="hidden md:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(order.date).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                     ${order.totalAmount.toFixed(2)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(order.status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => router.push(`/admin/dashboard/orders/view/${order.id}`)}
-                      className="text-blue-600 hover:text-blue-900 mr-3"
-                    >
-                      View
-                    </button>
-                    <button
-                      onClick={() => router.push(`/admin/dashboard/orders/view/${order.id}`)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                    >
-                      Edit
-                    </button>
                   </td>
                 </tr>
               ))}

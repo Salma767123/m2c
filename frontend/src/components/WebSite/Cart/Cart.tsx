@@ -479,9 +479,11 @@ export default function Order() {
                   <ShoppingCart className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-slate-900 mb-2">Your cart is empty</h3>
                   <p className="text-slate-600 mb-6">Add some items to get started</p>
-                  <button className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
-                    Continue Shopping
-                  </button>
+                  <Link href="/products">
+                    <button className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+                      Continue Shopping
+                    </button>
+                  </Link>
                 </div>
               )}
             </div>

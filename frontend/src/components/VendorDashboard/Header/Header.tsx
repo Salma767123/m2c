@@ -312,18 +312,18 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
                     </div>
                   </div>
                   <div className="py-2">
-                    <button className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                    <Link href="/vendor/dashboard/profile" className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
                       <User className="mr-3 h-4 w-4" />
                       <span className="text-sm">Profile</span>
-                    </button>
-                    <button className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                    </Link>
+                    <Link href="/vendor/dashboard/settings" className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
                       <Settings className="mr-3 h-4 w-4" />
                       <span className="text-sm">Settings</span>
-                    </button>
-                    <button className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                    </Link>
+                    <Link href="/vendor/dashboard/support" className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
                       <HelpCircle className="mr-3 h-4 w-4" />
                       <span className="text-sm">Help & Support</span>
-                    </button>
+                    </Link>
                   </div>
                   <div className="border-t border-gray-200 p-2 bg-gray-50">
                     <button 

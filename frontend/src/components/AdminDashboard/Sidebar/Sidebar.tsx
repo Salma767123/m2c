@@ -18,6 +18,7 @@ import {
   Warehouse,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Shield,
   Headphones,
   ClipboardCheck,
@@ -57,7 +58,8 @@ const navigation: NavigationItem[] = [
     title: "General",
     icon: Layers,
     subItems: [
-      { title: "Enquiry Form", href: "/admin/dashboard/general/enquiry-form" },
+      { title: "Vendor Enquiries", href: "/admin/dashboard/general/enquiry-form" },
+      { title: "Website Enquiries", href: "/admin/dashboard/general/website-enquiries" },
     ],
   },
   {
@@ -149,7 +151,7 @@ const navigation: NavigationItem[] = [
   },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: { isCollapsed?: boolean; onToggleCollapse?: () => void }) {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [adminEmail, setAdminEmail] = useState<string>("admin@example.com");
@@ -226,23 +228,45 @@ export default function AdminSidebar() {
   };
 
   return (
-    <div className="flex h-full w-64 flex-col font-sans bg-white border-r border-gray-200 shadow-sm">
+    <div className={`flex h-full ${isCollapsed ? 'w-20' : 'w-64'} flex-col font-sans bg-white border-r border-gray-200 shadow-sm transition-all duration-300`}>
       {/* Logo */}
-      <div className="flex h-16 items-center justify-center border-b border-gray-200 px-4">
-        <Link
-          href="/admin/dashboard"
-          className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
-        >
-          <div className="h-9 w-9 rounded-lg bg-[#222222] flex items-center justify-center shadow-md">
-            <Shield className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <span className="text-lg font-bold text-[#222222] block">
-              Admin Panel
-            </span>
-            <span className="text-xs text-slate-500">Control Center</span>
-          </div>
-        </Link>
+      <div className="flex h-16 items-center justify-center border-b border-gray-200 px-4 relative">
+        {!isCollapsed ? (
+          <Link
+            href="/admin/dashboard"
+            className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
+          >
+            <div className="h-9 w-9 rounded-lg bg-[#222222] flex items-center justify-center shadow-md">
+              <Shield className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <span className="text-lg font-bold text-[#222222] block">
+                Admin Panel
+              </span>
+              <span className="text-xs text-slate-500">Control Center</span>
+            </div>
+          </Link>
+        ) : (
+          <Link
+            href="/admin/dashboard"
+            className="flex items-center justify-center hover:opacity-80 transition-opacity"
+          >
+            <div className="h-9 w-9 rounded-lg bg-[#222222] flex items-center justify-center shadow-md">
+              <Shield className="h-5 w-5 text-white" />
+            </div>
+          </Link>
+        )}
+        
+        {/* Collapse Toggle Button - Desktop Only */}
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="hidden lg:flex absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-[#222222] text-white rounded-full items-center justify-center hover:bg-[#444444] transition-colors shadow-md z-10"
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <ChevronLeft className={`h-4 w-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -264,20 +288,47 @@ export default function AdminSidebar() {
                   itemIsActive
                     ? "bg-[#222222] text-white shadow-sm"
                     : "text-slate-700 hover:bg-gray-100 hover:text-[#222222]",
+                  isCollapsed && "justify-center"
                 )}
+                title={isCollapsed ? item.title : undefined}
               >
                 <Icon
                   className={cn(
-                    "mr-3 h-5 w-5 transition-colors",
+                    "h-5 w-5 transition-colors",
                     itemIsActive ? "text-white" : "text-slate-500 group-hover:text-[#222222]",
+                    !isCollapsed && "mr-3"
                   )}
                 />
-                <span className="font-medium">{item.title}</span>
+                {!isCollapsed && <span className="font-medium">{item.title}</span>}
               </Link>
             );
           }
 
-          // If item has subItems, render as expandable section
+          // If item has subItems, render as expandable section (hide when collapsed)
+          if (isCollapsed) {
+            // In collapsed mode, show only icon with tooltip
+            const parentHasActiveChild = item.subItems ? hasAnyActiveChild(item.subItems) : false;
+            return (
+              <div
+                key={item.title}
+                className={cn(
+                  "w-full flex items-center justify-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
+                  parentHasActiveChild
+                    ? "bg-gray-100 text-[#222222]"
+                    : "text-slate-700 hover:bg-gray-100 hover:text-[#222222]"
+                )}
+                title={item.title}
+              >
+                <Icon
+                  className={cn(
+                    "h-5 w-5 transition-colors",
+                    parentHasActiveChild ? "text-[#222222]" : "text-slate-500"
+                  )}
+                />
+              </div>
+            );
+          }
+
           const parentHasActiveChild = item.subItems ? hasAnyActiveChild(item.subItems) : false;
 
           return (
@@ -355,24 +406,43 @@ export default function AdminSidebar() {
 
       {/* Footer */}
       <div className="border-t border-gray-200 p-4">
-        <div className="flex items-center">
-          <div className="h-10 w-10 rounded-full bg-linear-to-br from-[#222222] to-[#444444] flex items-center justify-center shadow-md">
-            <span className="text-sm font-semibold text-white">
-              {adminName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-            </span>
+        {!isCollapsed ? (
+          <>
+            <div className="flex items-center">
+              <div className="h-10 w-10 rounded-full bg-linear-to-br from-[#222222] to-[#444444] flex items-center justify-center shadow-md">
+                <span className="text-sm font-semibold text-white">
+                  {adminName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                </span>
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-semibold text-[#222222]">{adminName}</p>
+                <p className="text-xs text-slate-500 truncate" title={adminEmail}>{adminEmail}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => logout()}
+              className="mt-3 flex w-full items-center px-3 py-2 text-sm font-medium text-[#222222] rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            >
+              <LogOut className="mr-3 h-4 w-4" />
+              Sign out
+            </button>
+          </>
+        ) : (
+          <div className="flex flex-col items-center space-y-3">
+            <div className="h-10 w-10 rounded-full bg-linear-to-br from-[#222222] to-[#444444] flex items-center justify-center shadow-md" title={adminName}>
+              <span className="text-sm font-semibold text-white">
+                {adminName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+              </span>
+            </div>
+            <button
+              onClick={() => logout()}
+              className="flex items-center justify-center p-2 text-[#222222] rounded-lg hover:bg-gray-100 transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
           </div>
-          <div className="ml-3 flex-1">
-            <p className="text-sm font-semibold text-[#222222]">{adminName}</p>
-            <p className="text-xs text-slate-500 truncate" title={adminEmail}>{adminEmail}</p>
-          </div>
-        </div>
-        <button
-          onClick={() => logout()}
-          className="mt-3 flex w-full items-center px-3 py-2 text-sm font-medium text-[#222222] rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors"
-        >
-          <LogOut className="mr-3 h-4 w-4" />
-          Sign out
-        </button>
+        )}
       </div>
     </div>
   );

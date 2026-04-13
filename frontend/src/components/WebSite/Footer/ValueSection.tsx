@@ -35,7 +35,7 @@ export default function WhyChooseUs() {
         {/* Section header */}
         <div className="text-center mb-12 md:mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Why Choose Haven Home
+            Why Choose M2C MarkDowns
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             We're committed to quality, sustainability, and your comfort. Every product is crafted with care and attention to detail.

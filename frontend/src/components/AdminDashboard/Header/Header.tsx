@@ -409,18 +409,18 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
                     </div>
                   </div>
                   <div className="py-2">
-                    <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    <Link href="/admin/dashboard/settings" className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
                       <User className="h-4 w-4 mr-3" />
                       Profile Settings
-                    </button>
-                    <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    </Link>
+                    <Link href="/admin/dashboard/settings" className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
                       <Shield className="h-4 w-4 mr-3" />
                       Admin Settings
-                    </button>
-                    <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    </Link>
+                    <Link href="/admin/dashboard/settings" className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
                       <Settings className="h-4 w-4 mr-3" />
                       Preferences
-                    </button>
+                    </Link>
                   </div>
                   <div className="border-t border-gray-200 py-2 bg-gray-50">
                     <button 

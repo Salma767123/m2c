@@ -178,12 +178,11 @@ const ProductCard = ({ product }: ProductCardProps) => {
   return (
     <Link href={`/products/${product.id}`} className="block h-full">
       <div className="bg-white font-sans rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col cursor-pointer">
-        <div className="relative h-45 sm:h-75 w-full overflow-hidden shrink-0 bg-linear-to-br from-gray-100 to-gray-200">
+        <div className="relative h-48 sm:h-64 md:h-72 w-full overflow-hidden shrink-0 bg-linear-to-br from-gray-100 to-gray-200">
           <Image
             src={imageUrl}
             alt={product.name}
-            width={400}
-            height={400}
+            fill
             className="object-cover"
             unoptimized={!primaryImage} // Don't optimize placeholder SVG
             onError={(e) => {
@@ -192,7 +191,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
             }}
           />
           {product.discount && (
-            <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-sm font-semibold">
+            <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-xs sm:text-sm font-semibold">
               {product.discount}% OFF
             </div>
           )}
@@ -201,7 +200,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
           <button
             onClick={handleToggleWishlist}
             disabled={isTogglingWishlist}
-            className={`absolute top-2 ${isActuallyInStock ? 'right-2' : 'right-28'} p-2 rounded-full transition-all duration-200 ${isInWishlist
+            className={`absolute top-2 right-2 p-1.5 sm:p-2 rounded-full transition-all duration-200 ${isInWishlist
               ? 'bg-red-500 text-white hover:bg-red-600'
               : 'bg-white/90 text-gray-700 hover:bg-white hover:text-red-500'
               } disabled:opacity-50 disabled:cursor-not-allowed shadow-md z-10`}
@@ -213,34 +212,34 @@ const ProductCard = ({ product }: ProductCardProps) => {
           </button>
 
           {!isActuallyInStock && (
-            <div className="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded text-sm z-0">
+            <div className="absolute top-2 right-12 sm:right-14 bg-gray-500 text-white px-2 py-1 rounded text-xs sm:text-sm z-0">
               Out of Stock
             </div>
           )}
         </div>
 
-        <div className="p-4 flex flex-col grow justify-between">
+        <div className="p-3 sm:p-4 flex flex-col grow justify-between">
           {/* Top content - flexible */}
           <div className="grow">
             <div className="mb-1">
-              <span className="text-xs sm:text-sm text-gray-600 font-medium">{product.category}</span>
+              <span className="text-xs text-gray-600 font-medium">{product.category}</span>
             </div>
 
-            <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2 line-clamp-2 min-h-10 sm:min-h-12">
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
               {product.name}
             </h3>
 
             <div className="flex items-center mb-2">
-              <div className="flex items-center">
+              <div className="flex items-center flex-wrap gap-1">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
-                    className={`w-2 sm:w-4 h-2 sm:h-4 ${i < Math.floor(product.rating || 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                    className={`w-3 h-3 sm:w-4 sm:h-4 ${i < Math.floor(product.rating || 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'
                       }`}
                   />
                 ))}
-                <span className="ml-2 text-xs sm:text-sm text-gray-600">
-                  {product.rating || 0} ({product.reviews || 0} reviews)
+                <span className="ml-1 text-xs text-gray-600">
+                  {product.rating || 0} ({product.reviews || 0})
                 </span>
               </div>
             </div>
@@ -248,19 +247,19 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
           {/* Bottom content - fixed at bottom */}
           <div className="shrink-0">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-xl font-bold text-gray-900">
+            <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-1">
+              <div className="flex items-center space-x-1 sm:space-x-2">
+                <span className="text-lg sm:text-xl font-bold text-gray-900">
                   ${displayPrice?.toFixed(2) || '0.00'}
                 </span>
                 {product.originalPrice && (
-                  <span className="text-xs sm:text-sm text-red-600 line-through">
+                  <span className="text-xs text-red-600 line-through">
                     ${product.originalPrice.toFixed(2)}
                   </span>
                 )}
               </div>
               {product.discount && (
-                <span className="text-xs bg-[#1A2830] text-white px-2 py-1 rounded-md font-semibold">
+                <span className="text-xs bg-[#1A2830] text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md font-semibold">
                   {product.discount}% OFF
                 </span>
               )}
@@ -272,16 +271,16 @@ const ProductCard = ({ product }: ProductCardProps) => {
                 <button
                   onClick={handleDecrement}
                   disabled={quantity <= 1}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <span className="text-lg font-semibold">−</span>
+                  <span className="text-base sm:text-lg font-semibold">−</span>
                 </button>
-                <span className="w-12 text-center font-semibold">{quantity}</span>
+                <span className="w-8 sm:w-12 text-center font-semibold text-sm sm:text-base">{quantity}</span>
                 <button
                   onClick={handleIncrement}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                  className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-100 transition-colors"
                 >
-                  <span className="text-lg font-semibold">+</span>
+                  <span className="text-base sm:text-lg font-semibold">+</span>
                 </button>
               </div>
             )}
@@ -290,12 +289,12 @@ const ProductCard = ({ product }: ProductCardProps) => {
             <button
               onClick={handleAddToCart}
               disabled={!isActuallyInStock || isAddingToCart || (isActuallyInStock && quantity > currentStock)}
-              className={`w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${isActuallyInStock
+              className={`w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 ${isActuallyInStock
                 ? 'bg-gray-800 text-white hover:bg-gray-900 active:scale-95'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              <ShoppingCart className="w-4 h-4" />
+              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
               {isAddingToCart ? 'Adding...' : isActuallyInStock ? 'Add to Cart' : 'Out of Stock'}
             </button>
           </div>

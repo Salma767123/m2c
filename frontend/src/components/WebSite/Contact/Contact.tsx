@@ -4,6 +4,7 @@ import { Mail, Phone, MapPin, Clock, Send, Store, X, Building2, FileText, Globe 
 import { useState } from 'react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { enquiryService } from '@/services/enquiryService';
+import { contactEnquiryService } from '@/services/contactEnquiryService';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -25,16 +26,22 @@ const Contact = () => {
   const [isSubmittingVendor, setIsSubmittingVendor] = useState(false);
   const [gstError, setGstError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Handle form submission here
-      console.log('Form submitted:', formData);
+      await contactEnquiryService.submitEnquiry({
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        message: formData.message
+      });
+      
       // Reset form
       setFormData({ name: '', email: '', subject: '', message: '' });
       showSuccessToast('Message Sent!', 'Thank you for your message! We will get back to you soon.');
-    } catch (error) {
-      showErrorToast('Send Failed', 'Unable to send message. Please try again.');
+    } catch (error: any) {
+      console.error('Contact form error:', error);
+      showErrorToast('Send Failed', error.message || 'Unable to send message. Please try again.');
     }
   };
 
