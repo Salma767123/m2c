@@ -79,7 +79,14 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
   useEffect(() => {
     async function loadActiveInspection() {
       try {
-        const response = await qcCheckerService.getInspections()
+        const [response, profile] = await Promise.all([
+          qcCheckerService.getInspections(),
+          qcCheckerService.getCheckerProfile().catch(() => null),
+        ])
+
+        if (profile?.data?.name) {
+          setFormData(prev => ({ ...prev, inspectorName: profile.data.name }))
+        }
         if (response.success && response.inspections) {
           // Find an active inspection for this vendor
           let inspection = response.inspections.find(

@@ -231,6 +231,11 @@ const completeInspection = async (req, res) => {
 
         const resultStatus = formData.inspectionStatus ? mapStatusToResult(formData.inspectionStatus) : 'PASSED';
 
+        const sanitizedFormData = {
+            ...formData,
+            inspectorName: req.user.name,
+        };
+
         const updatedInspection = await prisma.inspection.update({
             where: { id },
             data: {
@@ -239,7 +244,7 @@ const completeInspection = async (req, res) => {
                 completedAt: new Date(),
                 result: resultStatus,
                 notes: formData.inspectorRemarks || '',
-                itemsToInspect: formData
+                itemsToInspect: sanitizedFormData
             },
             include: {
                 vendor: true
