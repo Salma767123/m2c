@@ -3,12 +3,14 @@ import axios, {
   InternalAxiosRequestConfig,
   AxiosResponse,
 } from "axios";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Prefer EXPO_PUBLIC_API_URL so it's available at runtime in Expo.
+// Fallback chain: env var → LAN dev IP → localhost.
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL:
-    process.env.API_URL || "http://192.168.29.32:5000/api" || "http://192.168.29.33:5000/api",
-  timeout: 10000,
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -28,7 +30,7 @@ axiosInstance.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      console.error("Error getting auth token:", error);
     }
 
     return config;
@@ -58,10 +60,10 @@ axiosInstance.interceptors.response.use(
                 "vendorToken",
                 "vendorData",
                 "userToken",
-                "userData"
+                "userData",
               ]);
             } catch (e) {
-              console.error('Error clearing auth data:', e);
+              console.error("Error clearing auth data:", e);
             }
           }
           break;
@@ -93,7 +95,14 @@ axiosInstance.interceptors.response.use(
     }
 
     if (error.request) {
-      console.error("Network error:", error.message);
+      // Network-unreachable: handled by callers (empty lists, fallbacks).
+      // Avoid console.error to prevent dev red-box spam when backend is down.
+      if (__DEV__) {
+        console.warn(
+          "Network unreachable:",
+          error.config?.url || error.message,
+        );
+      }
       return Promise.reject({
         message: "Network error. Please check your connection.",
         status: 0,
@@ -101,7 +110,9 @@ axiosInstance.interceptors.response.use(
       });
     }
 
-    console.error("Request error:", error.message);
+    if (__DEV__) {
+      console.warn("Request error:", error.message);
+    }
     return Promise.reject({
       message: error.message || "Request failed",
       status: 0,
@@ -112,4 +123,3 @@ axiosInstance.interceptors.response.use(
 
 export default axiosInstance;
 export type { AxiosResponse, InternalAxiosRequestConfig };
-

@@ -90,6 +90,8 @@ class PublicProductService {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     inStock?: boolean;
+    colors?: string;
+    minRating?: number;
   }): Promise<ProductsResponse> {
     try {
       const response = await axios.get('/products/public', { params });
@@ -115,7 +117,9 @@ class PublicProductService {
       });
       return response.data;
     } catch (error: any) {
-      console.error('Error fetching products by tag:', error);
+      if (error?.status !== 0) {
+        console.error('Error fetching products by tag:', error);
+      }
       return {
         success: false,
         message: error.message || 'Failed to fetch products'
@@ -128,7 +132,9 @@ class PublicProductService {
       const response = await axios.get(`/products/public/${id}`);
       return response.data;
     } catch (error: any) {
-      console.error('Error fetching product:', error);
+      if (error?.status !== 0) {
+        console.error('Error fetching product:', error);
+      }
       return {
         success: false,
         message: error.message || 'Failed to fetch product'

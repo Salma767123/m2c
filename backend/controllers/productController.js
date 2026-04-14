@@ -1978,7 +1978,9 @@ const getPublicProducts = async (req, res) => {
       sortBy = 'createdAt',
       sortOrder = 'desc',
       inStock,
-      tag
+      tag,
+      colors,
+      minRating
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -2048,6 +2050,22 @@ const getPublicProducts = async (req, res) => {
     if (inStock === 'true') {
       where.inStock = true;
       where.totalStock = { gt: 0 };
+    }
+
+    // Color filter - match against tags, singleUnitColor, or variant colors
+    if (colors) {
+      const colorList = colors.split(',').map(c => c.trim().toLowerCase());
+      where.OR = [
+        ...(where.OR || []),
+        { tags: { hasSome: colorList } },
+        { singleUnitColor: { in: colorList, mode: 'insensitive' } },
+        { variants: { some: { color: { in: colorList, mode: 'insensitive' } } } }
+      ];
+    }
+
+    // Rating filter
+    if (minRating) {
+      where.rating = { gte: parseFloat(minRating) };
     }
 
     // Get total count

@@ -1,80 +1,98 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, TouchableOpacity, Image, ScrollView, Dimensions } from 'react-native';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
+import { bannerService, BannerImage } from '@/services/bannerService';
 
-const { width } = Dimensions.get('window');
-// Banner images are 2872x1152 — calculate proportional height
 const IMAGE_ASPECT_RATIO = 2872 / 1152;
-const imageHeight = width / IMAGE_ASPECT_RATIO;
 
-// Hero slides data
-const heroSlides = [
-  {
-    id: 1,
-    image: require('../../../../assets/images/hero/hs1.webp'),
-  },
-  {
-    id: 2,
-    image: require('../../../../assets/images/hero/hs2.webp'),
-  },
-  {
-    id: 3,
-    image: require('../../../../assets/images/hero/hs3.webp'),
-  },
-  {
-    id: 4,
-    image: require('../../../../assets/images/hero/hs4.webp'),
-  },
+type Slide = {
+  id: string | number;
+  uri?: string;
+  source?: number;
+  altText?: string;
+};
+
+const fallbackSlides: Slide[] = [
+  { id: 1, source: require('../../../../assets/images/hero/hs1.webp'), altText: 'Hero slide 1' },
+  { id: 2, source: require('../../../../assets/images/hero/hs2.webp'), altText: 'Hero slide 2' },
+  { id: 3, source: require('../../../../assets/images/hero/hs3.webp'), altText: 'Hero slide 3' },
+  { id: 4, source: require('../../../../assets/images/hero/hs4.webp'), altText: 'Hero slide 4' },
 ];
 
+const pressableOpacity = ({ pressed }: { pressed: boolean }) => ({
+  opacity: pressed ? 0.8 : 1,
+});
+
 export default function HeroSection() {
+  const { width } = useWindowDimensions();
+  const imageHeight = width / IMAGE_ASPECT_RATIO;
+
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [slides, setSlides] = useState<Slide[]>(fallbackSlides);
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Fetch dynamic banners on mount
   useEffect(() => {
-    if (!isAutoPlaying) return;
+    let isMounted = true;
+    const fetchBanners = async () => {
+      try {
+        const response = await bannerService.getActiveBanners();
+        if (isMounted && response.success && Array.isArray(response.data) && response.data.length > 0) {
+          const dynamicSlides: Slide[] = response.data.map((banner: BannerImage) => ({
+            id: banner.id,
+            uri: banner.imageUrl,
+            altText: banner.altText,
+          }));
+          setSlides(dynamicSlides);
+        }
+      } catch (error) {
+        console.error('Failed to fetch banners:', error);
+      }
+    };
+    fetchBanners();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Auto-play
+  useEffect(() => {
+    if (!isAutoPlaying || slides.length <= 1) return;
 
     const interval = setInterval(() => {
       setCurrentSlide((prev) => {
-        const nextSlide = (prev + 1) % heroSlides.length;
-        scrollViewRef.current?.scrollTo({
-          x: nextSlide * width,
-          animated: true,
-        });
-        return nextSlide;
+        const nextIndex = (prev + 1) % slides.length;
+        scrollViewRef.current?.scrollTo({ x: nextIndex * width, animated: true });
+        return nextIndex;
       });
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isAutoPlaying]);
+  }, [isAutoPlaying, slides.length, width]);
 
-  const nextSlide = () => {
-    const nextIndex = (currentSlide + 1) % heroSlides.length;
-    setCurrentSlide(nextIndex);
-    scrollViewRef.current?.scrollTo({
-      x: nextIndex * width,
-      animated: true,
-    });
-    setIsAutoPlaying(false);
-  };
-
-  const prevSlide = () => {
-    const prevIndex = (currentSlide - 1 + heroSlides.length) % heroSlides.length;
-    setCurrentSlide(prevIndex);
-    scrollViewRef.current?.scrollTo({
-      x: prevIndex * width,
-      animated: true,
-    });
-    setIsAutoPlaying(false);
-  };
-
-  const handleScroll = (event: any) => {
-    const index = Math.round(event.nativeEvent.contentOffset.x / width);
-    if (index !== currentSlide) {
+  const goToSlide = useCallback(
+    (index: number) => {
       setCurrentSlide(index);
-    }
-  };
+      scrollViewRef.current?.scrollTo({ x: index * width, animated: true });
+      setIsAutoPlaying(false);
+    },
+    [width],
+  );
+
+  const handleMomentumScrollEnd = useCallback(
+    (event: any) => {
+      const index = Math.round(event.nativeEvent.contentOffset.x / width);
+      if (index !== currentSlide) {
+        setCurrentSlide(index);
+      }
+    },
+    [currentSlide, width],
+  );
+
+  if (slides.length === 0) return null;
+
+  const hasMultipleSlides = slides.length > 1;
 
   return (
     <View className="relative bg-white">
@@ -84,61 +102,42 @@ export default function HeroSection() {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          onScroll={handleScroll}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
           scrollEventThrottle={16}
-          onMomentumScrollEnd={handleScroll}
         >
-          {heroSlides.map((slide) => (
-            <View key={slide.id} style={{ width }} className="relative">
+          {slides.map((slide) => (
+            <View key={slide.id} style={{ width }}>
               <Image
-                source={slide.image}
+                source={slide.uri ? { uri: slide.uri } : slide.source}
                 style={{ width, height: imageHeight }}
-                resizeMode="contain"
+                contentFit="cover"
+                transition={200}
+                accessibilityLabel={slide.altText}
               />
             </View>
           ))}
         </ScrollView>
 
-        {/* Navigation Arrows */}
-        <TouchableOpacity
-          onPress={prevSlide}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-90 rounded-full p-2 shadow-lg"
-          activeOpacity={0.8}
-        >
-          <ChevronLeft size={20} color="#374151" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={nextSlide}
-          className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-90 rounded-full p-2 shadow-lg"
-          activeOpacity={0.8}
-        >
-          <ChevronRight size={20} color="#374151" />
-        </TouchableOpacity>
-
-        {/* Slide Indicators */}
-        <View className="absolute bottom-4 left-0 right-0 flex-row justify-center">
-          {heroSlides.map((_, index) => (
-            <TouchableOpacity
-              key={index}
-              onPress={() => {
-                setCurrentSlide(index);
-                scrollViewRef.current?.scrollTo({
-                  x: index * width,
-                  animated: true,
-                });
-                setIsAutoPlaying(false);
-              }}
-              activeOpacity={0.8}
-            >
-              <View
-                className={`h-2 rounded-full mx-1 ${
-                  index === currentSlide ? 'w-6 bg-white' : 'w-2 bg-white bg-opacity-60'
-                }`}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
+        {hasMultipleSlides ? (
+          <View className="absolute bottom-3 left-0 right-0 flex-row justify-center">
+            {slides.map((slide, index) => (
+              <Pressable
+                key={slide.id}
+                onPress={() => goToSlide(index)}
+                accessibilityLabel={`Go to slide ${index + 1}`}
+                accessibilityRole="button"
+                hitSlop={10}
+                style={pressableOpacity}
+              >
+                <View
+                  className={`h-2 rounded-full mx-1 ${
+                    index === currentSlide ? 'w-6 bg-white' : 'w-2 bg-white/60'
+                  }`}
+                />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </View>
     </View>
   );

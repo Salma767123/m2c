@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Linking, Image } from 'react-native';
+import { View, Text, Pressable, Linking, Image } from 'react-native';
 import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, ChevronRight } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -29,10 +29,9 @@ export default function Footer() {
   ];
 
   const legalLinks = [
-    { label: 'Privacy Policy', href: '/privacy' },
-    { label: 'Terms of Service', href: '/terms' },
-    { label: 'Return Policy', href: '/returns' },
-  
+    { label: 'Privacy Policy', href: '/(any)/privacy' },
+    { label: 'Terms of Service', href: '/(any)/terms' },
+    { label: 'Return Policy', href: '/(any)/returns' },
   ];
 
   const socialLinks = [
@@ -67,14 +66,17 @@ export default function Footer() {
               <Text className="text-lg font-bold text-white mb-4">Quick Links</Text>
               <View className="space-y-2">
                 {quickLinks.map((link) => (
-                  <TouchableOpacity
+                  <Pressable
                     key={link.label}
                     onPress={() => handleLinkPress(link.href)}
+                    accessibilityLabel={`Go to ${link.label}`}
+                    accessibilityRole="button"
+                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                     className="flex-row items-center py-2"
                   >
                     <ChevronRight size={14} color="#9ca3af" />
                     <Text className="text-gray-300 text-sm ml-2">{link.label}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 ))}
               </View>
             </View>
@@ -84,16 +86,19 @@ export default function Footer() {
               <Text className="text-lg font-bold text-white mb-4">Legal</Text>
               <View className="space-y-2">
                 {legalLinks.map((link) => (
-                  <TouchableOpacity
+                  <Pressable
                     key={link.label}
                     onPress={() => handleLinkPress(link.href)}
+                    accessibilityLabel={`Go to ${link.label}`}
+                    accessibilityRole="button"
+                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                     className="flex-row items-center py-2"
                   >
                     <ChevronRight size={14} color="#9ca3af" />
                     <Text className="text-gray-300 text-sm ml-2" numberOfLines={2}>
                       {link.label}
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 ))}
               </View>
             </View>
@@ -104,8 +109,11 @@ export default function Footer() {
         <View className="mb-8 bg-gray-800 rounded-2xl p-5">
           <Text className="text-lg font-bold text-white mb-4">Get In Touch</Text>
           <View className="space-y-4 gap-2">
-            <TouchableOpacity
+            <Pressable
               onPress={handleEmailPress}
+              accessibilityLabel="Send email"
+              accessibilityRole="button"
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
               className="flex-row items-center bg-gray-700 rounded-xl p-3"
             >
               <View className="bg-blue-500 rounded-full p-2">
@@ -114,10 +122,13 @@ export default function Footer() {
               <Text className="text-gray-200 text-sm ml-3 flex-1">
                 info@m2cmarkdowns.com
               </Text>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity
+            <Pressable
               onPress={handlePhonePress}
+              accessibilityLabel="Call us"
+              accessibilityRole="button"
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
               className="flex-row items-center bg-gray-700 rounded-xl p-3"
             >
               <View className="bg-green-500 rounded-full p-2">
@@ -126,7 +137,7 @@ export default function Footer() {
               <Text className="text-gray-200 text-sm ml-3 flex-1">
                 +1 (234) 567-8900
               </Text>
-            </TouchableOpacity>
+            </Pressable>
 
             <View className="flex-row items-start bg-gray-700 rounded-xl p-3">
               <View className="bg-red-500 rounded-full p-2">
@@ -144,14 +155,19 @@ export default function Footer() {
           <Text className="text-lg font-bold text-white mb-4 text-center">Follow Us</Text>
           <View className="flex-row justify-center space-x-3">
             {socialLinks.map((social, index) => (
-              <TouchableOpacity
+              <Pressable
                 key={index}
                 onPress={() => handleLinkPress(social.url)}
-                className="bg-gray-800 p-4 rounded-full shadow-lg"
-                style={{ backgroundColor: social.color + '20' }}
+                accessibilityLabel="Open social media"
+                accessibilityRole="button"
+                className="p-4 rounded-full shadow-lg"
+                style={({ pressed }) => ({
+                  backgroundColor: social.color + '20',
+                  opacity: pressed ? 0.7 : 1,
+                })}
               >
                 <social.icon size={22} color={social.color} />
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
         </View>
