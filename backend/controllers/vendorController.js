@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const { prisma } = require('../config/database');
+const { normalizeCategoryValues } = require('../utils/categoryResolver');
 const {
   sendVendorApprovalEmail,
   sendVendorRejectionEmail,
@@ -220,6 +221,15 @@ const registerVendor = async (req, res) => {
     const parsedExportCountries = typeof exportCountries === 'string' ? JSON.parse(exportCountries) : exportCountries;
     const parsedBankingDetails = typeof bankingDetails === 'string' ? JSON.parse(bankingDetails) : bankingDetails;
 
+    // Normalize category values to names (drop unresolvable IDs) so the DB
+    // never stores raw ObjectIds that would later leak into the UI.
+    const normalizedProductCategories = await normalizeCategoryValues(
+      Object.keys(parsedSelectedCategories || {})
+    );
+    const normalizedProductTypes = await normalizeCategoryValues(
+      Object.values(parsedSelectedCategories || {}).flat()
+    );
+
     // Create vendor record
     const vendor = await prisma.vendor.create({
       data: {
@@ -284,8 +294,8 @@ const registerVendor = async (req, res) => {
 
         // Vendor Type & Products
         vendorType: getVendorTypeEnum(parsedVendorType),
-        productCategories: Object.keys(parsedSelectedCategories || {}),
-        productTypes: Object.values(parsedSelectedCategories || {}).flat(),
+        productCategories: normalizedProductCategories,
+        productTypes: normalizedProductTypes,
         specializations: parsedSelectedCertifications || [],
         categoryRemarks: categoryRemarks || null,
 
@@ -544,15 +554,20 @@ const getAllVendors = async (req, res) => {
       }, {});
     }
 
-    // Map Category IDs to Category Names
+    // Map Category IDs to Category Names, dropping any unresolved ObjectIds so
+    // raw 24-hex strings never leak into the API response.
+    const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
+    const resolveAndClean = (values) =>
+      (values || [])
+        .map(v => categoryMap[v] || v)
+        .filter(v => !OBJECT_ID_RE.test(v));
+
     const formattedVendors = vendors.map(vendor => {
-      const categoryNames = (vendor.productCategories || []).map(id => categoryMap[id] || id);
-      const subCategoryNames = (vendor.productTypes || []).map(id => categoryMap[id] || id);
       const { inspections, ...rest } = vendor;
       return {
         ...rest,
-        productCategories: categoryNames,
-        productTypes: subCategoryNames,
+        productCategories: resolveAndClean(vendor.productCategories),
+        productTypes: resolveAndClean(vendor.productTypes),
         latestInspection: inspections?.[0] || null,
         password: undefined,
       };
@@ -598,33 +613,37 @@ const getVendorById = async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    let categoryNames = vendor.productCategories;
-    let subCategoryNames = vendor.productTypes;
+    const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
 
     const idsToFetch = [...new Set([
       ...(vendor.productCategories || []),
       ...(vendor.productTypes || [])
-    ])].filter(id => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id));
+    ])].filter(id => typeof id === 'string' && OBJECT_ID_RE.test(id));
 
+    let categoryMap = {};
     if (idsToFetch.length > 0) {
       const categories = await prisma.category.findMany({
         where: { id: { in: idsToFetch } },
         select: { id: true, name: true }
       });
-      const categoryMap = categories.reduce((acc, cat) => {
+      categoryMap = categories.reduce((acc, cat) => {
         acc[cat.id] = cat.name;
         return acc;
       }, {});
-
-      categoryNames = (vendor.productCategories || []).map(id => categoryMap[id] || id);
-      subCategoryNames = (vendor.productTypes || []).map(id => categoryMap[id] || id);
     }
+
+    // Resolve IDs to names and drop any unresolved ObjectIds so raw 24-hex
+    // strings never leak into the API response.
+    const resolveAndClean = (values) =>
+      (values || [])
+        .map(v => categoryMap[v] || v)
+        .filter(v => !OBJECT_ID_RE.test(v));
 
     res.json({
       vendor: {
         ...vendor,
-        productCategoryNames: categoryNames,
-        productTypeNames: subCategoryNames,
+        productCategories: resolveAndClean(vendor.productCategories),
+        productTypes: resolveAndClean(vendor.productTypes),
         password: undefined
       }
     });
@@ -707,6 +726,14 @@ const updateVendorById = async (req, res) => {
       ? JSON.parse(updateData.exportCountries)
       : updateData.exportCountries;
 
+    // Normalize categories to names so the DB never stores raw ObjectIds.
+    const normalizedProductCategories = await normalizeCategoryValues(
+      Object.keys(parsedSelectedCategories || {})
+    );
+    const normalizedProductTypes = await normalizeCategoryValues(
+      Object.values(parsedSelectedCategories || {}).flat()
+    );
+
     // Prepare update data - map form fields to database fields
     const vendorUpdateData = {
       // Company Details
@@ -742,8 +769,8 @@ const updateVendorById = async (req, res) => {
         ? 'TEXTILE_MANUFACTURER'
         : 'TRADING_COMPANY',
       primaryMarkets: parsedMarketType || [],
-      productCategories: Object.keys(parsedSelectedCategories || {}),
-      productTypes: Object.values(parsedSelectedCategories || {}).flat(),
+      productCategories: normalizedProductCategories,
+      productTypes: normalizedProductTypes,
 
       // Logistics
       shippingMethods: parsedShippingMethods || [],

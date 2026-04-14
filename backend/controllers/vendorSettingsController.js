@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const { prisma } = require('../config/database');
+const { normalizeCategoryValues } = require('../utils/categoryResolver');
 
 // ============================================
 // VENDOR PROFILE SETTINGS
@@ -515,6 +516,8 @@ const updateVendorPreferences = async (req, res) => {
       specializations
     } = req.body;
 
+    const normalizedProductCategories = await normalizeCategoryValues(productCategories);
+
     const updatedVendor = await prisma.vendor.update({
       where: { id: vendorId },
       data: {
@@ -522,7 +525,7 @@ const updateVendorPreferences = async (req, res) => {
         deliveryTime,
         minimumOrderQuantity,
         paymentTerms: paymentTerms || [],
-        productCategories: productCategories || [],
+        productCategories: normalizedProductCategories,
         specializations: specializations || [],
         updatedAt: new Date()
       }

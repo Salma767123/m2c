@@ -659,6 +659,11 @@ model Product {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  @@index([approvalStatus])
+  @@index([status])
+  @@index([vendorId])
+  @@index([createdAt])
+  @@index([approvalStatus, status, createdAt])
   @@map("products")
 }
 
@@ -681,6 +686,7 @@ model ProductVariant {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  @@index([productId])
   @@map("product_variants")
 }
 
@@ -698,6 +704,7 @@ model ProductImage {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  @@index([productId, isPrimary])
   @@map("product_images")
 }
 

@@ -103,43 +103,42 @@ const authenticateToken = async (req, res, next) => {
       return;
     }
 
-    // Check if session is valid in MongoDB for regular users
-    const isValidSession = await sessionManager.isSessionValid(decoded.userId, token);
-    if (!isValidSession) {
-      console.log('❌ Session validation failed for user:', decoded.userId);
+    // Look up user and validate session in parallel
+    const userId = decoded.userId || decoded.id;
+
+    const [sessionValid, regularUser, adminUser] = await Promise.all([
+      sessionManager.isSessionValid(userId, token),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          isActive: true,
+          isVerified: true
+        }
+      }),
+      prisma.admin.findUnique({
+        where: { id: userId },
+        include: {
+          role: true
+        }
+      })
+    ]);
+
+    if (!sessionValid) {
       return res.status(401).json({
         success: false,
         error: 'Session expired or invalid. Please login again.'
       });
     }
 
-    // Check if user exists and is active in all collections
-    let user = await prisma.user.findUnique({
-      where: { id: decoded.userId || decoded.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        isActive: true,
-        isVerified: true
-      }
-    });
+    let user = regularUser;
     let userType = 'USER';
 
     if (!user) {
-      user = await prisma.admin.findUnique({
-        where: { id: decoded.userId || decoded.id },
-        include: {
-          role: true
-        }
-      });
+      user = adminUser;
       userType = 'ADMIN';
-    }
-
-    // Check for delivery partner
-    if (!user) {
-      // No delivery partner model available
-      console.log('❌ User not found in any collection');
     }
 
     if (!user) {

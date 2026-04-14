@@ -76,7 +76,7 @@ const addToCart = async (req, res) => {
 
     let price = product.adminFixedPrice || product.basePrice;
     if (variantId && product.variants && product.variants.length > 0) {
-      price = product.variants[0].adminFixedPrice || product.variants[0].price;
+      price = product.variants[0].price;
     }
 
     if (existingItem) {
@@ -199,7 +199,7 @@ const getCart = async (req, res) => {
             },
             variants: item.variantId ? {
               where: { id: item.variantId },
-              select: { id: true, size: true, color: true, colorHex: true, images: true, stock: true, price: true, adminFixedPrice: true }
+              select: { id: true, size: true, color: true, colorHex: true, images: true, stock: true }
             } : false
           }
         });

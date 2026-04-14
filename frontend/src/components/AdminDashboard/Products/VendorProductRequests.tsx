@@ -60,6 +60,10 @@ export default function VendorProductRequests() {
   const [assigningRequestId, setAssigningRequestId] = useState<string | null>(null)
   const [qcCheckers, setQcCheckers] = useState<{ id: string; name: string }[]>([])
   const [selectedQcChecker, setSelectedQcChecker] = useState<string>('')
+  const [showApprovalModal, setShowApprovalModal] = useState(false)
+  const [approvingRequest, setApprovingRequest] = useState<VendorProductRequest | null>(null)
+  const [adminPrice, setAdminPrice] = useState<string>('')
+  const [variantPrices, setVariantPrices] = useState<Record<string, string>>({})
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -113,27 +117,67 @@ export default function VendorProductRequests() {
     }
   }
 
-  const handleApprove = async (requestId: string) => {
-    // Check if the product has variants - if so, redirect to detail view for per-variant pricing
+  const handleApproveClick = (requestId: string) => {
     const request = requests.find(r => r.id === requestId)
-    if (request?.variants && request.variants.length > 0) {
-      showErrorToast('Variant Product', 'This product has variants. Please set individual variant prices from the detail view.')
-      router.push(`/admin/dashboard/products/vendor-requests/view/${requestId}`)
-      return
+    if (!request) return
+
+    setApprovingRequest(request)
+    setAdminPrice(request.basePrice.toString())
+
+    // Initialize variant prices if product has variants
+    if (request.variants && request.variants.length > 0) {
+      const initialPrices: Record<string, string> = {}
+      request.variants.forEach(v => {
+        initialPrices[v.id] = v.price.toString()
+      })
+      setVariantPrices(initialPrices)
+    } else {
+      setVariantPrices({})
     }
 
-    const adminPrice = prompt('Enter the admin fixed price for this product:')
-    if (!adminPrice || adminPrice.trim() === '' || parseFloat(adminPrice) <= 0) {
-      showErrorToast('Invalid Price', 'Please enter a valid admin price')
+    setShowApprovalModal(true)
+  }
+
+  const handleApproveSubmit = async () => {
+    if (!approvingRequest) return
+
+    const hasVariants = approvingRequest.variants && approvingRequest.variants.length > 0
+
+    if (hasVariants) {
+      // Validate all variant prices
+      const invalidVariants = approvingRequest.variants!.filter(v =>
+        !variantPrices[v.id] || parseFloat(variantPrices[v.id]) <= 0
+      )
+      if (invalidVariants.length > 0) {
+        showErrorToast('Invalid Prices', 'Please enter valid admin prices for all variants')
+        return
+      }
+    }
+
+    // Validate base admin price
+    if (!adminPrice || parseFloat(adminPrice) <= 0) {
+      showErrorToast('Invalid Price', 'Please enter a valid admin base price')
       return
     }
 
     try {
-      const response = await adminProductService.approveProduct(requestId, parseFloat(adminPrice))
+      const variantPricesNum = hasVariants
+        ? Object.fromEntries(
+            Object.entries(variantPrices).map(([id, price]) => [id, parseFloat(price)])
+          )
+        : undefined
+
+      const response = await adminProductService.approveProduct(
+        approvingRequest.id,
+        hasVariants ? undefined : parseFloat(adminPrice),
+        variantPricesNum
+      )
 
       if (response.success) {
         showSuccessToast('Product Approved', 'The vendor product has been approved successfully.')
-        loadRequests() // Reload the list
+        setShowApprovalModal(false)
+        setApprovingRequest(null)
+        loadRequests()
       }
     } catch (error: any) {
       showErrorToast('Approval Failed', error.message || 'Unable to approve product.')
@@ -390,7 +434,7 @@ export default function VendorProductRequests() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleApprove(request.id)}
+                                onClick={() => handleApproveClick(request.id)}
                                 className="text-green-600 hover:text-green-700 hover:bg-green-50"
                                 title="Final Approve & Set Price"
                               >
@@ -455,6 +499,104 @@ export default function VendorProductRequests() {
             >
               Next
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Approval Modal */}
+      {showApprovalModal && approvingRequest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Approve Product</h3>
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm font-medium text-gray-700">Product: {approvingRequest.name}</p>
+              <p className="text-sm text-gray-600">Vendor: {approvingRequest.vendor.companyName}</p>
+              <p className="text-sm text-gray-500">Vendor Base Price: ₹{approvingRequest.basePrice}</p>
+            </div>
+
+            {/* Base Admin Price */}
+            {!(approvingRequest.variants && approvingRequest.variants.length > 0) && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Admin Fixed Price (₹)
+                </label>
+                <input
+                  type="number"
+                  value={adminPrice}
+                  onChange={(e) => setAdminPrice(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  placeholder="Enter admin price"
+                  step="0.01"
+                  min="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">This will be the final price customers see.</p>
+              </div>
+            )}
+
+            {/* Variant Prices */}
+            {approvingRequest.variants && approvingRequest.variants.length > 0 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Set Admin Prices for Each Variant
+                </label>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {approvingRequest.variants.map((variant) => (
+                    <div key={variant.id} className="p-3 border border-gray-200 rounded-lg bg-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {variant.size} - {variant.color}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Vendor Price: ₹{variant.price} | Stock: {variant.stock}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Admin Price (₹)
+                        </label>
+                        <input
+                          type="number"
+                          value={variantPrices[variant.id] || ''}
+                          onChange={(e) => setVariantPrices(prev => ({
+                            ...prev,
+                            [variant.id]: e.target.value
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                          placeholder="Enter admin price"
+                          step="0.01"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Set individual prices for each variant. These will be the final prices customers see.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowApprovalModal(false)
+                  setApprovingRequest(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleApproveSubmit}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Approve Product
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -232,8 +232,6 @@ const completeInspection = async (req, res) => {
 
         const resultStatus = formData.inspectionStatus ? mapStatusToResult(formData.inspectionStatus) : 'PASSED';
 
-        const cleanFormData = await resolveBase64InValue(formData, { folder: 'inspections' });
-
         const updatedInspection = await prisma.inspection.update({
             where: { id },
             data: {
@@ -242,7 +240,7 @@ const completeInspection = async (req, res) => {
                 completedAt: new Date(),
                 result: resultStatus,
                 notes: formData.inspectorRemarks || '',
-                itemsToInspect: cleanFormData
+                itemsToInspect: formData
             },
             include: {
                 vendor: true

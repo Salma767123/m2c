@@ -46,42 +46,20 @@ class SessionManager {
   // Check if session is valid
   async isSessionValid(userId, token) {
     try {
-      console.log(`🔍 Checking session validity for user ${userId}`);
-      console.log(`🔍 Token: ${token.substring(0, 20)}...`);
-      
-      // Find session in MongoDB
       const session = await prisma.session.findFirst({
         where: {
           userId,
           token,
           expiresAt: {
-            gt: new Date(), // Not expired
+            gt: new Date(),
           },
         },
+        select: { id: true },
       });
-      
-      const isValid = !!session;
-      console.log(`📝 Session found: ${isValid ? 'Yes' : 'No'}`);
-      if (session) {
-        console.log(`📝 Session expires at: ${session.expiresAt}`);
-        console.log(`📝 Current time: ${new Date()}`);
-        console.log(`📝 Time until expiry: ${Math.round((session.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60))} hours`);
-      } else {
-        // Check if session exists but is expired
-        const expiredSession = await prisma.session.findFirst({
-          where: { userId, token },
-        });
-        if (expiredSession) {
-          console.log(`⏰ Session found but expired at: ${expiredSession.expiresAt}`);
-        } else {
-          console.log(`❌ No session found for this token`);
-        }
-      }
-      console.log(`✅ Session valid: ${isValid}`);
-      
-      return isValid;
+
+      return !!session;
     } catch (error) {
-      console.error('❌ Error checking session validity:', error);
+      console.error('Error checking session validity:', error);
       return false;
     }
   }

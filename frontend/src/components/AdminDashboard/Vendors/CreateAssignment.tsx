@@ -122,23 +122,22 @@ export default function CreateAssignment() {
     }
   }, [preSelectedVendorId])
 
-  // Dynamically generate inspection items based on the selected vendor
+  // Dynamically generate inspection items based on the selected vendor.
+  // Factory/vendor inspections audit capability at the category level, so we
+  // source from productCategories (not productTypes, which are subcategories).
   const selectedVendor = vendors.find((v) => v.id === formData.vendorId);
 
-  const vendorInspectionItems = selectedVendor ? [
-    ...(selectedVendor.productTypes || []).map((type, idx) => ({
-      id: `type-${idx}`,
-      itemName: type,
-      description: `Subcategory Selected during Registration: ${type}`,
-      quantity: 0,
-      inspectionQuantity: 'TBD',
-      specifications: "Standard QC",
-      aqlLevel: "2.5",
-    }))
-  ] : [];
-
-  // Fallback to empty items if no vendor selected or category data is missing
-  const displayItems = vendorInspectionItems.length > 0 ? vendorInspectionItems : [];
+  const displayItems = selectedVendor
+    ? Array.from(new Set(selectedVendor.productCategories || [])).map((category, idx) => ({
+        id: `category-${idx}`,
+        itemName: category,
+        description: `Category Selected during Registration: ${category}`,
+        quantity: 0,
+        inspectionQuantity: 'TBD',
+        specifications: "Standard QC",
+        aqlLevel: "2.5",
+      }))
+    : [];
 
   const handleVendorChange = (value: string | string[]) => {
     const selectedId = value as string;
@@ -404,6 +403,14 @@ export default function CreateAssignment() {
                 <p className="text-sm text-gray-600 mb-4">Select the categories that will be inspected</p>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {formData.vendorId && displayItems.length === 0 && (
+                    <div className="p-6 text-center border border-dashed border-gray-300 rounded-lg">
+                      <p className="text-sm text-gray-600">
+                        This vendor has no product categories on record. Ask them to update their
+                        registration before scheduling an inspection.
+                      </p>
+                    </div>
+                  )}
                   {displayItems.map((item) => (
                     <label
                       key={item.id}

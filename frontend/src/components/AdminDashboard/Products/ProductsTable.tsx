@@ -25,6 +25,7 @@ interface Product {
   category: string
   basePrice: number
   adminFixedPrice?: number // Admin's fixed price
+  hasVariants?: boolean
   totalStock: number
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
   approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION'
@@ -39,6 +40,13 @@ interface Product {
   images?: Array<{
     url: string
     isPrimary: boolean
+  }>
+  variants?: Array<{
+    id: string
+    size: string
+    color: string
+    price: number
+    stock: number
   }>
 }
 
@@ -87,12 +95,22 @@ export default function ProductsTable() {
     totalCount: 0,
     limit: 10
   })
+  const [showApprovalModal, setShowApprovalModal] = useState(false)
+  const [approvingProduct, setApprovingProduct] = useState<Product | null>(null)
+  const [adminPrice, setAdminPrice] = useState<string>('')
+  const [variantPrices, setVariantPrices] = useState<Record<string, string>>({})
 
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
-      setFilters(prev => ({ ...prev, search: searchInput }))
-      setPagination(prev => ({ ...prev, currentPage: 1 })) // Reset to first page on search
+      setFilters(prev => {
+        if (prev.search === searchInput) return prev // avoid new reference if unchanged
+        return { ...prev, search: searchInput }
+      })
+      setPagination(prev => {
+        if (prev.currentPage === 1) return prev
+        return { ...prev, currentPage: 1 }
+      })
     }, 500) // 500ms delay
 
     return () => clearTimeout(timer)
@@ -132,19 +150,64 @@ export default function ProductsTable() {
     }
   }
 
-  const handleApproveProduct = async (productId: string) => {
-    const adminPrice = prompt('Enter the admin fixed price for this product:')
-    if (!adminPrice || adminPrice.trim() === '' || parseFloat(adminPrice) <= 0) {
+  const handleApproveClick = (productId: string) => {
+    const product = products.find(p => p.id === productId)
+    if (!product) return
+
+    setApprovingProduct(product)
+    setAdminPrice(product.basePrice.toString())
+
+    if (product.variants && product.variants.length > 0) {
+      const initialPrices: Record<string, string> = {}
+      product.variants.forEach(v => {
+        initialPrices[v.id] = v.price.toString()
+      })
+      setVariantPrices(initialPrices)
+    } else {
+      setVariantPrices({})
+    }
+
+    setShowApprovalModal(true)
+  }
+
+  const handleApproveSubmit = async () => {
+    if (!approvingProduct) return
+
+    const hasVariants = approvingProduct.variants && approvingProduct.variants.length > 0
+
+    if (hasVariants) {
+      const invalidVariants = approvingProduct.variants!.filter(v =>
+        !variantPrices[v.id] || parseFloat(variantPrices[v.id]) <= 0
+      )
+      if (invalidVariants.length > 0) {
+        showErrorToast('Invalid Prices', 'Please enter valid admin prices for all variants')
+        return
+      }
+    }
+
+    if (!hasVariants && (!adminPrice || parseFloat(adminPrice) <= 0)) {
       showErrorToast('Invalid Price', 'Please enter a valid admin price')
       return
     }
 
     try {
-      const response = await adminProductService.approveProduct(productId, parseFloat(adminPrice))
+      const variantPricesNum = hasVariants
+        ? Object.fromEntries(
+            Object.entries(variantPrices).map(([id, price]) => [id, parseFloat(price)])
+          )
+        : undefined
+
+      const response = await adminProductService.approveProduct(
+        approvingProduct.id,
+        hasVariants ? undefined : parseFloat(adminPrice),
+        variantPricesNum
+      )
 
       if (response.success) {
         showSuccessToast('Product Approved', 'Product has been approved successfully')
-        loadProducts() // Reload products
+        setShowApprovalModal(false)
+        setApprovingProduct(null)
+        loadProducts()
       }
     } catch (error: any) {
       showErrorToast('Approval Failed', error.message || 'Unable to approve product')
@@ -184,19 +247,6 @@ export default function ProductsTable() {
     } catch (error: any) {
       showErrorToast('Delete Failed', error.message || 'Unable to delete product')
     }
-  }
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-8">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700"></div>
-            <span className="ml-3 text-gray-600">Loading products...</span>
-          </div>
-        </CardContent>
-      </Card>
-    )
   }
 
   return (
@@ -296,7 +346,22 @@ export default function ProductsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products.map((product) => (
+            {isLoading && products.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-8">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-700"></div>
+                    <span className="ml-3 text-gray-500">Loading products...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : products.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                  No products found
+                </TableCell>
+              </TableRow>
+            ) : products.map((product) => (
               <TableRow key={product.id}>
                 <TableCell>
                   <div className="flex items-center space-x-3">
@@ -367,7 +432,7 @@ export default function ProductsTable() {
                           variant="ghost"
                           size="sm"
                           className="hover:bg-green-50 text-green-600"
-                          onClick={() => handleApproveProduct(product.id)}
+                          onClick={() => handleApproveClick(product.id)}
                           title="Approve & Set Price"
                         >
                           <CheckCircle className="h-4 w-4" />
@@ -407,12 +472,6 @@ export default function ProductsTable() {
           </TableBody>
         </Table>
 
-        {products.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            No products found
-          </div>
-        )}
-
         {/* Pagination */}
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between mt-4">
@@ -443,6 +502,102 @@ export default function ProductsTable() {
           </div>
         )}
       </CardContent>
+
+      {/* Approval Modal */}
+      {showApprovalModal && approvingProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Approve Product</h3>
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm font-medium text-gray-700">Product: {approvingProduct.name}</p>
+              <p className="text-sm text-gray-600">Vendor: {approvingProduct.vendor.companyName}</p>
+              <p className="text-sm text-gray-500">Vendor Base Price: ₹{approvingProduct.basePrice}</p>
+            </div>
+
+            {/* Non-variant: single admin price */}
+            {!(approvingProduct.variants && approvingProduct.variants.length > 0) && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Admin Fixed Price (₹)
+                </label>
+                <input
+                  type="number"
+                  value={adminPrice}
+                  onChange={(e) => setAdminPrice(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  placeholder="Enter admin price"
+                  step="0.01"
+                  min="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">This will be the final price customers see.</p>
+              </div>
+            )}
+
+            {/* Variant: per-variant admin prices */}
+            {approvingProduct.variants && approvingProduct.variants.length > 0 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Set Admin Prices for Each Variant
+                </label>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {approvingProduct.variants.map((variant) => (
+                    <div key={variant.id} className="p-3 border border-gray-200 rounded-lg bg-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {variant.size} - {variant.color}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Vendor Price: ₹{variant.price} | Stock: {variant.stock}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Admin Price (₹)
+                        </label>
+                        <input
+                          type="number"
+                          value={variantPrices[variant.id] || ''}
+                          onChange={(e) => setVariantPrices(prev => ({
+                            ...prev,
+                            [variant.id]: e.target.value
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                          placeholder="Enter admin price"
+                          step="0.01"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Set individual prices for each variant. These will be the final prices customers see.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowApprovalModal(false)
+                  setApprovingProduct(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleApproveSubmit}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Approve Product
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }
