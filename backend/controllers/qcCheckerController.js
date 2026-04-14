@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { prisma } = require('../config/database');
 const { sendQCCheckerCredentialsEmail } = require('../utils/emailService');
+const { resolveBase64InValue } = require('../config/cloudinary');
 
 // Generate a random password
 const generateRandomPassword = (length = 10) => {
@@ -964,12 +965,16 @@ const approveProductByQc = async (req, res) => {
             }
         }
 
+        const cleanFormData = formData
+            ? await resolveBase64InValue(formData, { folder: 'qc-inspections' })
+            : null;
+
         const updatedProduct = await prisma.product.update({
             where: { id: productId },
             data: {
                 approvalStatus,
                 status: productStatus,
-                qcInspectionData: formData || null
+                qcInspectionData: cleanFormData
             }
         });
 
@@ -1018,13 +1023,17 @@ const rejectProductByQc = async (req, res) => {
             });
         }
 
+        const cleanFormData = formData
+            ? await resolveBase64InValue(formData, { folder: 'qc-inspections' })
+            : null;
+
         const updatedProduct = await prisma.product.update({
             where: { id: productId },
             data: {
                 approvalStatus: 'REJECTED',
                 rejectionReason: reason,
                 status: 'INACTIVE',
-                qcInspectionData: formData || null
+                qcInspectionData: cleanFormData
             }
         });
 

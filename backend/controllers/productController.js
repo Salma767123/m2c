@@ -1,5 +1,26 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const {
+  resolveProductImageUrls,
+  resolveVariantImageUrls,
+} = require('../config/cloudinary');
+
+// Uploads any base64 data URIs in `images` and `variants[].images` to
+// Cloudinary and replaces them with secure URLs. Mutates and returns input.
+const ensureImageUrls = async ({ images, variants }) => {
+  const [resolvedImages, resolvedVariants] = await Promise.all([
+    images ? resolveProductImageUrls(images) : Promise.resolve(images),
+    Array.isArray(variants)
+      ? Promise.all(
+          variants.map(async (v) => ({
+            ...v,
+            images: await resolveVariantImageUrls(v?.images),
+          })),
+        )
+      : Promise.resolve(variants),
+  ]);
+  return { images: resolvedImages, variants: resolvedVariants };
+};
 
 // Create new product
 const createProduct = async (req, res) => {
@@ -57,6 +78,8 @@ const createProduct = async (req, res) => {
       inStock,
       status
     } = req.body;
+
+    ({ images, variants } = await ensureImageUrls({ images, variants }));
 
     // Validate required fields
     if (!name || !description || !category || !baseSku) {
@@ -452,6 +475,13 @@ const updateProduct = async (req, res) => {
     const vendorId = req.user.vendorId || req.user.id;
     const { id } = req.params;
     const updateData = req.body;
+
+    const resolved = await ensureImageUrls({
+      images: updateData.images,
+      variants: updateData.variants,
+    });
+    if (updateData.images !== undefined) updateData.images = resolved.images;
+    if (updateData.variants !== undefined) updateData.variants = resolved.variants;
 
     // Check if product exists and belongs to vendor
     const existingProduct = await prisma.product.findFirst({
@@ -1286,6 +1316,8 @@ const createProductByAdmin = async (req, res) => {
       approvalStatus // Admin can set approval status directly
     } = req.body;
 
+    ({ images, variants } = await ensureImageUrls({ images, variants }));
+
     // Validate required fields
     if (!vendorId) {
       return res.status(400).json({
@@ -1558,6 +1590,13 @@ const updateProductByAdmin = async (req, res) => {
     const adminId = req.user.id;
     const { id } = req.params;
     const updateData = req.body;
+
+    const resolved = await ensureImageUrls({
+      images: updateData.images,
+      variants: updateData.variants,
+    });
+    if (updateData.images !== undefined) updateData.images = resolved.images;
+    if (updateData.variants !== undefined) updateData.variants = resolved.variants;
 
     // Check if product exists
     const existingProduct = await prisma.product.findUnique({

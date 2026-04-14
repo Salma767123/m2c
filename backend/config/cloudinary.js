@@ -40,8 +40,70 @@ const deleteFromCloudinary = async (publicId) => {
   }
 };
 
+// If `url` is a data URI (data:image/...;base64,...), upload it to Cloudinary
+// and return the secure URL. Otherwise returns the input unchanged.
+const uploadDataUriIfBase64 = async (url, options = {}) => {
+  if (typeof url !== 'string' || !url.startsWith('data:')) return url;
+  const match = url.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return url;
+  const buffer = Buffer.from(match[2], 'base64');
+  const result = await uploadToCloudinary(buffer, {
+    folder: 'products',
+    resource_type: 'image',
+    ...options,
+  });
+  return result.secure_url;
+};
+
+// Resolve an array of product image objects ({ url, ... }) — uploads any
+// base64 data URIs and replaces with Cloudinary URLs.
+const resolveProductImageUrls = async (images) => {
+  if (!Array.isArray(images)) return images;
+  return Promise.all(
+    images.map(async (img) => {
+      if (!img || typeof img !== 'object') return img;
+      const url = await uploadDataUriIfBase64(img.url);
+      return { ...img, url };
+    }),
+  );
+};
+
+// Resolve an array of URL strings (any data URIs get uploaded and replaced).
+const resolveVariantImageUrls = async (urls, options = {}) => {
+  if (!Array.isArray(urls)) return urls;
+  return Promise.all(urls.map((u) => uploadDataUriIfBase64(u, options)));
+};
+
+// Deep-walks any JSON-ish value and replaces every base64 data URI string it
+// encounters with the uploaded Cloudinary secure URL. Handles string, array,
+// plain object. Heavy keys like `data`, `url`, `image`, `photo` etc. are
+// covered implicitly since any string value is checked.
+const resolveBase64InValue = async (value, options = {}) => {
+  if (value == null) return value;
+  if (typeof value === 'string') {
+    return uploadDataUriIfBase64(value, options);
+  }
+  if (Array.isArray(value)) {
+    return Promise.all(value.map((v) => resolveBase64InValue(v, options)));
+  }
+  if (typeof value === 'object') {
+    const entries = await Promise.all(
+      Object.entries(value).map(async ([k, v]) => [
+        k,
+        await resolveBase64InValue(v, options),
+      ]),
+    );
+    return Object.fromEntries(entries);
+  }
+  return value;
+};
+
 module.exports = {
   cloudinary,
   uploadToCloudinary,
-  deleteFromCloudinary
+  deleteFromCloudinary,
+  uploadDataUriIfBase64,
+  resolveProductImageUrls,
+  resolveVariantImageUrls,
+  resolveBase64InValue,
 };

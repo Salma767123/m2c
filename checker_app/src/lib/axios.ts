@@ -3,12 +3,10 @@ import axios, {
   InternalAxiosRequestConfig,
   AxiosResponse,
 } from "axios";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL:
-    process.env.API_URL || "http://192.168.29.32:5000/api" || "http://192.168.29.33:5000/api",
-  timeout: 10000,
+  baseURL: process.env.EXPO_PUBLIC_API_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -29,7 +27,7 @@ axiosInstance.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      console.error("Error getting auth token:", error);
     }
 
     return config;
@@ -63,10 +61,10 @@ axiosInstance.interceptors.response.use(
                 "userData",
                 "checkerToken",
                 "checkerData",
-                "checkerID"
+                "checkerID",
               ]);
             } catch (e) {
-              console.error('Error clearing auth data:', e);
+              console.error("Error clearing auth data:", e);
             }
           }
           break;
@@ -117,4 +115,3 @@ axiosInstance.interceptors.response.use(
 
 export default axiosInstance;
 export type { AxiosResponse, InternalAxiosRequestConfig };
-

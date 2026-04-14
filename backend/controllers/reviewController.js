@@ -1,10 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { resolveVariantImageUrls } = require('../config/cloudinary');
 
 // Create a review
 exports.createReview = async (req, res) => {
     try {
-        const { productId, orderId, rating, comment, images } = req.body;
+        let { productId, orderId, rating, comment, images } = req.body;
+        images = await resolveVariantImageUrls(images, { folder: 'reviews' });
         const userId = req.user.id;
 
         // Validate inputs
