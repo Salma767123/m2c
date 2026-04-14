@@ -101,7 +101,6 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
   const resultColors: Record<string, string> = {
     PASSED: "bg-emerald-100 text-emerald-800",
     FAILED: "bg-red-100 text-red-800",
-    CONDITIONALLY_PASSED: "bg-amber-100 text-amber-800",
   }
 
   return (
@@ -123,7 +122,6 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
           <Badge className={`${resultColors[inspection.result] || "bg-gray-100 text-gray-700"} text-sm px-4 py-1.5`}>
             {inspection.result === "PASSED" && <CheckCircle className="w-4 h-4 mr-1.5" />}
             {inspection.result === "FAILED" && <XCircle className="w-4 h-4 mr-1.5" />}
-            {inspection.result === "CONDITIONALLY_PASSED" && <AlertTriangle className="w-4 h-4 mr-1.5" />}
             {inspection.result}
           </Badge>
         )}

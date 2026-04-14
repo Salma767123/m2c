@@ -42,8 +42,6 @@ export default function ReportsPage() {
         return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Passed</Badge>
       case "FAILED":
         return <Badge className="bg-red-100 text-red-800 border-red-200 flex items-center gap-1"><XCircle className="w-3 h-3" />Failed</Badge>
-      case "CONDITIONALLY_PASSED":
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-200 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Conditional</Badge>
       default:
         return <Badge className="bg-slate-100 text-slate-700">{result || "—"}</Badge>
     }

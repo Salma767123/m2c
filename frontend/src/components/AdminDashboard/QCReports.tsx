@@ -50,7 +50,6 @@ export default function QCReports() {
             case "PASSED":
             case "APPROVED":
                 return <Badge className="bg-green-100 text-green-800">Passed / Approved</Badge>
-            case "CONDITIONALLY_APPROVED":
             case "RE_INSPECTION":
                 return <Badge className="bg-yellow-100 text-yellow-800">Review Required</Badge>
             case "FAILED":

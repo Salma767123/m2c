@@ -100,7 +100,6 @@ export default function VendorDetail({
       completed: "bg-slate-100 text-slate-800 border-slate-200",
       passed: "bg-emerald-100 text-emerald-800 border-emerald-200",
       failed: "bg-red-100 text-red-800 border-red-200",
-      conditionally_passed: "bg-amber-100 text-amber-800 border-amber-200",
     }
     return colors[status?.toLowerCase()] || colors.active
   }

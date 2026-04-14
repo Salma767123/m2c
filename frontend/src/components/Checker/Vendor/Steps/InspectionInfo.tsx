@@ -6,7 +6,7 @@ interface StepProps {
 }
 
 export default function InspectionInfo({ formData, setFormData }: StepProps) {
-    const statusOptions = ["Approved", "Conditionally Approved", "Rejected"]
+    const statusOptions = ["Approved", "Rejected"]
 
     return (
         <div className="space-y-8">

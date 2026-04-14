@@ -117,8 +117,6 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-base px-4 py-2"><CheckCircle className="w-4 h-4 mr-2" />Passed</Badge>;
       case 'FAILED':
         return <Badge className="bg-red-100 text-red-800 border-red-200 text-base px-4 py-2"><XCircle className="w-4 h-4 mr-2" />Failed</Badge>;
-      case 'CONDITIONALLY_PASSED':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-base px-4 py-2"><AlertTriangle className="w-4 h-4 mr-2" />Conditionally Passed</Badge>;
       default:
         return <Badge className="bg-gray-100 text-gray-800 text-base px-4 py-2"><Clock className="w-4 h-4 mr-2" />Pending</Badge>;
     }

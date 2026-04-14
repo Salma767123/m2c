@@ -17,7 +17,7 @@ interface Props {
 // ── Helper Components ──────────────────────────────────────────────────────────
 function StatusChip({ value }: { value: string }) {
     const v = (value || '').toLowerCase()
-    const isPass = ['yes', 'pass', 'passed', 'approved', 'conditionally approved'].includes(v)
+    const isPass = ['yes', 'pass', 'passed', 'approved'].includes(v)
     const isFail = ['no', 'fail', 'failed', 'rejected'].includes(v)
     const color = isPass
         ? 'text-green-700 bg-green-50 border-green-200'

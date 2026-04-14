@@ -224,7 +224,6 @@ const completeInspection = async (req, res) => {
         const mapStatusToResult = (formStatus) => {
             switch (formStatus) {
                 case 'Approved': return 'PASSED';
-                case 'Conditionally Approved': return 'CONDITIONALLY_PASSED';
                 case 'Rejected': return 'FAILED';
                 default: return 'PASSED';
             }

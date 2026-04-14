@@ -105,7 +105,7 @@ export default function ProductInspectionForm({
         companyIdCards: [] as any[],
 
         // Review / Final Decision
-        finalDecision: "Approved", // Approved, Conditionally Approved, Rejected
+        finalDecision: "Approved", // Approved, Rejected
         reviewerRemarks: ""
     })
 
@@ -173,7 +173,7 @@ export default function ProductInspectionForm({
                 }))
             }
 
-            if (formData.finalDecision === "Approved" || formData.finalDecision === "Conditionally Approved") {
+            if (formData.finalDecision === "Approved") {
                 await qcCheckerService.approveProduct(productId, cleanedData)
             } else {
                 await qcCheckerService.rejectProduct(productId, formData.reviewerRemarks, cleanedData)
