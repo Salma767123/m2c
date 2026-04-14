@@ -1,5 +1,14 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { uploadDataUriIfBase64 } = require('../config/cloudinary');
+
+const resolveCategoryImage = (img) => uploadDataUriIfBase64(img, { folder: 'categories' });
+const resolveSubcategoryImages = async (subs) => {
+  if (!Array.isArray(subs)) return subs;
+  return Promise.all(
+    subs.map(async (s) => ({ ...s, image: await resolveCategoryImage(s?.image) })),
+  );
+};
 
 // Helper function to generate slug
 const generateSlug = (name) => {
@@ -199,7 +208,7 @@ const getCategoryById = async (req, res) => {
 // Create new category
 const createCategory = async (req, res) => {
   try {
-    const {
+    let {
       name,
       description,
       slug: customSlug,
@@ -211,6 +220,9 @@ const createCategory = async (req, res) => {
       sortOrder = 0,
       subcategories = []
     } = req.body;
+
+    image = await resolveCategoryImage(image);
+    subcategories = await resolveSubcategoryImages(subcategories);
 
     // Validation
     if (!name || !description) {
@@ -336,7 +348,7 @@ const createCategory = async (req, res) => {
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
+    let {
       name,
       description,
       slug: customSlug,
@@ -348,6 +360,9 @@ const updateCategory = async (req, res) => {
       sortOrder,
       subcategories = []
     } = req.body;
+
+    image = await resolveCategoryImage(image);
+    subcategories = await resolveSubcategoryImages(subcategories);
 
     // Check if category exists
     const existingCategory = await prisma.category.findUnique({
@@ -745,7 +760,7 @@ const getSubcategories = async (req, res) => {
 const createSubcategory = async (req, res) => {
   try {
     const { parentId } = req.params;
-    const {
+    let {
       name,
       description,
       slug: customSlug,
@@ -753,6 +768,8 @@ const createSubcategory = async (req, res) => {
       image,
       sortOrder = 0
     } = req.body;
+
+    image = await resolveCategoryImage(image);
 
     // Validation
     if (!name || !description) {
@@ -838,7 +855,7 @@ const createSubcategory = async (req, res) => {
 const updateSubcategory = async (req, res) => {
   try {
     const { parentId, subcategoryId } = req.params;
-    const {
+    let {
       name,
       description,
       slug: customSlug,
@@ -846,6 +863,8 @@ const updateSubcategory = async (req, res) => {
       image,
       sortOrder
     } = req.body;
+
+    image = await resolveCategoryImage(image);
 
     // Verify parent category exists
     const parentCategory = await prisma.category.findUnique({

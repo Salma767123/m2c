@@ -193,6 +193,21 @@ class QCCheckerService {
     }
   }
 
+  // Get full vendor details (full vendor record + stats + recent inspections)
+  async getVendorDetails(vendorId: string): Promise<{ success: boolean; data: { vendor: any; stats: any; recentInspections: any[] } }> {
+    try {
+      const token = await this.getCheckerToken();
+      const response = await axios.get(`/qc-checkers/vendors/${vendorId}/details`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to fetch vendor details');
+    }
+  }
+
   // Reject Vendor
   async rejectVendor(vendorId: string, reason: string): Promise<{ success: boolean; message: string; data: any }> {
     try {

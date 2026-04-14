@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { uploadDataUriIfBase64 } = require('../config/cloudinary');
 
 // Get company info
 const getCompanyInfo = async (req, res) => {
@@ -225,7 +226,8 @@ const updateBankDetails = async (req, res) => {
 // Update company logo
 const updateLogo = async (req, res) => {
   try {
-    const { companyLogo } = req.body;
+    let { companyLogo } = req.body;
+    companyLogo = await uploadDataUriIfBase64(companyLogo, { folder: 'company' });
     
     // Get existing company info
     let companyInfo = await prisma.companyInfo.findFirst();

@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { resolveBase64InValue } = require('../config/cloudinary');
 
 // Create an Inspection Assignment
 const createInspection = async (req, res) => {
@@ -43,7 +44,7 @@ const createInspection = async (req, res) => {
                 scheduledTime,
                 priority,
                 estimatedDuration: estimatedDuration || '1 Hour',
-                itemsToInspect, // Storing json directly
+                itemsToInspect: await resolveBase64InValue(itemsToInspect, { folder: 'inspections' }),
                 status: 'SCHEDULED'
             }
         });
@@ -178,7 +179,7 @@ const updateInspection = async (req, res) => {
                 scheduledTime,
                 priority,
                 estimatedDuration,
-                itemsToInspect
+                itemsToInspect: await resolveBase64InValue(itemsToInspect, { folder: 'inspections' })
             }
         });
 
@@ -231,6 +232,8 @@ const completeInspection = async (req, res) => {
 
         const resultStatus = formData.inspectionStatus ? mapStatusToResult(formData.inspectionStatus) : 'PASSED';
 
+        const cleanFormData = await resolveBase64InValue(formData, { folder: 'inspections' });
+
         const updatedInspection = await prisma.inspection.update({
             where: { id },
             data: {
@@ -239,7 +242,7 @@ const completeInspection = async (req, res) => {
                 completedAt: new Date(),
                 result: resultStatus,
                 notes: formData.inspectorRemarks || '',
-                itemsToInspect: formData
+                itemsToInspect: cleanFormData
             },
             include: {
                 vendor: true

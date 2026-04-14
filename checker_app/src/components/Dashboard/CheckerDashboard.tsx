@@ -1,123 +1,233 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { 
-  TrendingUp, Clock, CheckCircle2, AlertCircle, CalendarDays, 
-  MapPin, Factory, Eye, ArrowRight, BarChart3, Package
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import {
+  TrendingUp,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  CalendarDays,
+  Factory,
+  Package,
+  ArrowRight,
+  BarChart3,
+  Calendar,
+  RefreshCw,
+  Inbox,
 } from 'lucide-react-native';
 import StatCard from './StatCard';
-import qcCheckerService, { QCCheckerData } from '../../services/qcCheckerService';
+import qcCheckerService from '../../services/qcCheckerService';
 import { router } from 'expo-router';
 
-export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
-  const [profile, setProfile] = useState<QCCheckerData | null>(null);
-  const [inspections, setInspections] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+type StatusKey =
+  | 'APPROVED'
+  | 'QC_APPROVED'
+  | 'REJECTED'
+  | 'REINSPECTION'
+  | 'PENDING'
+  | 'UNDER_REVIEW';
 
-  // Load backend data mapping
-  useEffect(() => {
-    let mounted = true;
-    async function fetchDashboard() {
-      try {
-        const [profRes, inspRes] = await Promise.all([
-          qcCheckerService.getCheckerProfile(),
-          qcCheckerService.getInspections()
-        ]);
-        if (mounted) {
-          if (profRes.success) setProfile(profRes.data);
-          if (inspRes.success) setInspections(inspRes.inspections || []);
-        }
-      } catch (err) {
-        console.error("Dashboard backend fetch failed:", err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
+const getStatusBadgeStyle = (status: string) => {
+  const map: Record<StatusKey, { bg: string; text: string; border: string }> = {
+    APPROVED: {
+      bg: 'bg-emerald-100',
+      text: 'text-emerald-800',
+      border: 'border-emerald-200',
+    },
+    QC_APPROVED: {
+      bg: 'bg-emerald-100',
+      text: 'text-emerald-800',
+      border: 'border-emerald-200',
+    },
+    REJECTED: {
+      bg: 'bg-red-100',
+      text: 'text-red-800',
+      border: 'border-red-200',
+    },
+    REINSPECTION: {
+      bg: 'bg-orange-100',
+      text: 'text-orange-800',
+      border: 'border-orange-200',
+    },
+    PENDING: {
+      bg: 'bg-amber-100',
+      text: 'text-amber-800',
+      border: 'border-amber-200',
+    },
+    UNDER_REVIEW: {
+      bg: 'bg-blue-100',
+      text: 'text-blue-800',
+      border: 'border-blue-200',
+    },
+  };
+  return map[(status as StatusKey)] || map.PENDING;
+};
+
+const formattedDate = () =>
+  new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
+  const [assignedProducts, setAssignedProducts] = useState<any[]>([]);
+  const [assignedVendors, setAssignedVendors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setError(null);
+      const [productsRes, vendorsRes] = await Promise.all([
+        qcCheckerService.getAssignedProducts(),
+        qcCheckerService.getAssignedVendors(),
+      ]);
+      if (productsRes.success) setAssignedProducts(productsRes.data || []);
+      if (vendorsRes.success) setAssignedVendors(vendorsRes.data || []);
+    } catch (err: any) {
+      console.error('Dashboard fetch failed:', err);
+      setError(err?.message || 'Could not fetch dashboard data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    fetchDashboard();
-    return () => { mounted = false; };
   }, []);
 
-  const totalCompleted = profile?.completedInspections || 0;
-  
-  // Calculate dynamic stats from backend inspections data and profile
-  const scheduledFilter = inspections.filter(i => i.status === 'SCHEDULED' || i.status === 'IN_PROGRESS' || i.status === 'PENDING').slice(0, 5);
-  const recentFilter = inspections.filter(i => i.status !== 'SCHEDULED' && i.status !== 'PENDING' && i.status !== 'IN_PROGRESS').slice(0, 5);
-  
-  // Create stats fallback to match web display closely but connected
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  const pendingCount =
+    assignedProducts.filter(
+      (p) =>
+        p.approvalStatus === 'PENDING' ||
+        p.approvalStatus === 'REINSPECTION' ||
+        p.approvalStatus === 'UNDER_REVIEW',
+    ).length +
+    assignedVendors.filter(
+      (v) => v.status === 'UNDER_REVIEW' || v.status === 'PENDING',
+    ).length;
+
+  const passedCount = assignedProducts.filter(
+    (p) =>
+      p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED',
+  ).length;
+
+  const failedCount = assignedProducts.filter(
+    (p) => p.approvalStatus === 'REJECTED',
+  ).length;
+
+  const totalAssignments = assignedProducts.length + assignedVendors.length;
+
   const stats = [
     {
-      label: "Total Inspections",
-      value: totalCompleted > 0 ? totalCompleted : "127",
+      label: 'Total Assignments',
+      value: totalAssignments.toString(),
       icon: TrendingUp,
-      trend: "+12% this month",
-      color: "blue" as const,
+      trend: 'Products and Vendors',
+      color: 'blue' as const,
     },
     {
-      label: "Pending Reports",
-      value: scheduledFilter.length > 0 ? scheduledFilter.length : "8",
+      label: 'Pending Action',
+      value: pendingCount.toString(),
       icon: Clock,
-      trend: "Awaiting action",
-      color: "amber" as const,
+      trend: 'Awaiting inspection',
+      color: 'amber' as const,
     },
     {
-      label: "Passed",
-      value: recentFilter.filter(i => i.status === 'APPROVED').length > 0 ? recentFilter.filter(i => i.status === 'APPROVED').length : "118",
+      label: 'QC Approved',
+      value: passedCount.toString(),
       icon: CheckCircle2,
-      trend: "92.9% pass rate",
-      color: "emerald" as const,
+      trend: 'Passed inspection',
+      color: 'emerald' as const,
     },
     {
-      label: "Failed",
-      value: recentFilter.filter(i => i.status === 'REJECTED').length > 0 ? recentFilter.filter(i => i.status === 'REJECTED').length : "9",
+      label: 'Rejected',
+      value: failedCount.toString(),
       icon: AlertCircle,
-      trend: "7.1% failure rate",
-      color: "red" as const,
+      trend: 'Failed quality check',
+      color: 'red' as const,
     },
   ];
-
-  // Dummy Fallbacks mapping identical to web CheckerDashboard structure 
-  // until actual inspection backend returns full array payloads.
-  const displayScheduled = scheduledFilter.length > 0 ? scheduledFilter : [
-    { id: 1, vendor: { name: "Global Textiles Ltd", location: "Mumbai, MH" }, po: "PO-2024-001", priority: "high", scheduledDate: "Today", scheduledTime: "09:00 AM", itemsCount: 5000, estimatedDuration: "4 hours" },
-    { id: 2, vendor: { name: "Premium Garments C..", location: "Delhi, DL" }, po: "PO-2024-089", priority: "medium", scheduledDate: "Tomorrow", scheduledTime: "10:30 AM", itemsCount: 3000, estimatedDuration: "3 hours" }
-  ];
-
-  const displayRecent = recentFilter.length > 0 ? recentFilter : [
-    { id: 1, vendor: "Tech Components Inc", po: "PO-2023-112", status: "passed", date: "Oct 24, 2023" },
-    { id: 2, vendor: "Quality Fabrics Ltd", po: "PO-2023-098", status: "failed", date: "Oct 22, 2023" },
-    { id: 3, vendor: "Global Electronics", po: "PO-2023-076", status: "passed", date: "Oct 20, 2023" }
-  ];
-
-  const getPriorityStyle = (priority: string) => {
-    const lg = priority?.toLowerCase();
-    if (lg === 'high') return { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200' };
-    if (lg === 'low') return { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' };
-    return { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' };
-  };
-
-  const getStatusStyle = (status: string) => {
-    const lg = status?.toLowerCase();
-    if (lg === 'passed' || lg === 'approved') return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
-    if (lg === 'failed' || lg === 'rejected') return { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' };
-    return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
-  };
 
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center bg-gray-50">
         <ActivityIndicator size="large" color="#2563eb" />
-        <Text className="mt-4 text-gray-500">Syncing Dashboard...</Text>
+        <Text className="mt-4 text-slate-600">Loading your summary...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 px-8">
+        <View className="w-20 h-20 rounded-full bg-red-50 items-center justify-center mb-5">
+          <AlertCircle size={36} color="#dc2626" strokeWidth={1.75} />
+        </View>
+        <Text className="text-xl font-bold text-slate-900 mb-2 text-center">
+          Something went wrong
+        </Text>
+        <Text className="text-base text-slate-600 text-center mb-6">
+          {error}
+        </Text>
+        <TouchableOpacity
+          onPress={fetchDashboardData}
+          accessibilityLabel="Retry loading dashboard"
+          accessibilityRole="button"
+          activeOpacity={0.85}
+          className="flex-row items-center bg-blue-600 rounded-xl px-6 py-3"
+        >
+          <RefreshCw size={18} color="#ffffff" strokeWidth={2.25} />
+          <Text className="text-white font-bold text-base ml-2">Try Again</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+    <ScrollView
+      className="flex-1 bg-gray-50"
+      contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#2563eb"
+          colors={['#2563eb']}
+        />
+      }
+    >
       {/* Header */}
       <View className="mb-6">
-        <Text className="text-3xl font-extrabold text-gray-900 mb-1">Dashboard</Text>
-        <Text className="text-gray-600 text-sm">
-          Welcome back, <Text className="font-bold text-blue-600">{profile?.name || checkerId}</Text>
+        <Text className="text-3xl font-extrabold text-slate-900 mb-1">
+          Dashboard
         </Text>
+        <Text className="text-slate-600 text-sm mb-3">
+          Welcome back,{' '}
+          <Text className="font-bold text-blue-600">{checkerId}</Text>
+        </Text>
+        <View className="flex-row items-center">
+          <Calendar size={14} color="#64748b" />
+          <Text className="text-xs font-medium text-slate-500 ml-1.5">
+            {formattedDate()}
+          </Text>
+        </View>
       </View>
 
       {/* Stats Grid */}
@@ -127,113 +237,185 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
         ))}
       </View>
 
-      {/* Scheduled Inspections Section */}
-      <View className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
-        <View className="px-5 py-4 border-b border-gray-100 bg-blue-50/50 flex-row justify-between items-center">
-          <View className="flex-row items-center">
+      {/* Recent Assignments */}
+      <View className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+        <View className="px-5 py-4 border-b border-slate-200 bg-blue-50/50 flex-row justify-between items-center">
+          <View className="flex-row items-center flex-1 pr-2">
             <View className="p-2 bg-blue-100 rounded-lg mr-3">
               <CalendarDays size={18} color="#2563eb" />
             </View>
-            <View>
-              <Text className="text-lg font-bold text-gray-900">Scheduled</Text>
-              <Text className="text-xs text-gray-500">Upcoming checks</Text>
+            <View className="flex-1">
+              <Text className="text-lg font-bold text-slate-900">
+                Recent Assignments
+              </Text>
+              <Text className="text-xs text-slate-600">
+                Products and Vendors awaiting action
+              </Text>
             </View>
           </View>
-          <View className="bg-blue-100 px-2 py-1 rounded-full">
-            <Text className="text-xs font-bold text-blue-800">{displayScheduled.length} Tasks</Text>
+          <View className="bg-blue-100 px-2.5 py-1 rounded-full">
+            <Text className="text-xs font-bold text-blue-800">
+              {totalAssignments} total
+            </Text>
           </View>
         </View>
-        
-        <View className="p-4 gap-y-4">
-          {displayScheduled.map((insp: any, idx) => {
-            const priorityStyle = getPriorityStyle(insp.priority);
-            return (
-              <View key={idx} className="border border-gray-200 rounded-xl p-4">
-                <View className="flex-row justify-between items-start mb-2">
-                  <View className="flex-1 flex-row items-start mr-2">
-                    <View className="bg-blue-50 p-1.5 rounded-lg mr-2 mt-0.5">
-                       <Factory size={14} color="#2563eb" />
+
+        <View className="p-4">
+          {totalAssignments === 0 ? (
+            <View className="items-center py-10">
+              <View className="w-16 h-16 rounded-full bg-slate-100 items-center justify-center mb-3">
+                <Inbox size={28} color="#64748b" strokeWidth={1.75} />
+              </View>
+              <Text className="text-base font-bold text-slate-900 mb-1">
+                No active assignments
+              </Text>
+              <Text className="text-xs text-slate-500 text-center">
+                New assignments will appear here when available.
+              </Text>
+            </View>
+          ) : (
+            <View style={{ rowGap: 12 }}>
+              {assignedProducts.map((product) => {
+                const badge = getStatusBadgeStyle(product.approvalStatus);
+                return (
+                  <View
+                    key={`p-${product.id}`}
+                    className="border border-slate-200 rounded-xl p-4 bg-white"
+                  >
+                    <View className="flex-row items-start justify-between mb-3">
+                      <View className="flex-row items-start flex-1 pr-2">
+                        <View className="p-2 bg-blue-50 rounded-lg mr-3">
+                          <Package size={16} color="#2563eb" />
+                        </View>
+                        <View className="flex-1">
+                          <Text
+                            className="font-semibold text-slate-900 text-sm mb-0.5"
+                            numberOfLines={1}
+                          >
+                            {product.name}
+                          </Text>
+                          <Text
+                            className="text-xs text-slate-600 mb-2"
+                            numberOfLines={1}
+                          >
+                            SKU: {product.baseSku}
+                          </Text>
+                          <View
+                            className={`self-start px-2.5 py-0.5 rounded-full border ${badge.bg} ${badge.border}`}
+                          >
+                            <Text
+                              className={`text-[10px] font-bold ${badge.text}`}
+                            >
+                              {product.approvalStatus}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                      {product.vendor?.companyName ? (
+                        <Text
+                          className="text-[11px] font-medium text-slate-500 max-w-[110px] text-right"
+                          numberOfLines={2}
+                        >
+                          {product.vendor.companyName}
+                        </Text>
+                      ) : null}
                     </View>
-                    <View className="flex-1">
-                      <Text className="font-bold text-gray-900 text-sm" numberOfLines={1}>
-                        {typeof insp.vendor === 'object' ? (insp.vendor?.companyName || insp.vendor?.name) : (insp.vendor || insp.vendorName || "Unknown Vendor")}
+                    <TouchableOpacity
+                      onPress={() => router.push('/products' as any)}
+                      accessibilityLabel={`Go to products for ${product.name}`}
+                      accessibilityRole="button"
+                      activeOpacity={0.85}
+                      className="flex-row items-center justify-center bg-blue-600 rounded-lg py-2.5"
+                    >
+                      <Text className="text-white font-semibold text-sm mr-1.5">
+                        Go to Products
                       </Text>
-                      <View className="bg-gray-100 self-start px-2 py-0.5 rounded border border-gray-200 mt-1">
-                        <Text className="text-[10px] font-mono text-gray-600">{insp.po || insp.poNumber}</Text>
+                      <ArrowRight size={14} color="#ffffff" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+
+              {assignedVendors.map((vendor) => {
+                const badge = getStatusBadgeStyle(vendor.status);
+                return (
+                  <View
+                    key={`v-${vendor.id}`}
+                    className="border border-slate-200 rounded-xl p-4 bg-white"
+                  >
+                    <View className="flex-row items-start justify-between mb-3">
+                      <View className="flex-row items-start flex-1">
+                        <View className="p-2 bg-emerald-50 rounded-lg mr-3">
+                          <Factory size={16} color="#059669" />
+                        </View>
+                        <View className="flex-1">
+                          <Text
+                            className="font-semibold text-slate-900 text-sm mb-0.5"
+                            numberOfLines={1}
+                          >
+                            {vendor.companyName}
+                          </Text>
+                          <Text className="text-xs text-slate-600 mb-2">
+                            Factory Onboarding
+                          </Text>
+                          <View
+                            className={`self-start px-2.5 py-0.5 rounded-full border ${badge.bg} ${badge.border}`}
+                          >
+                            <Text
+                              className={`text-[10px] font-bold ${badge.text}`}
+                            >
+                              {vendor.status}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </View>
+                    <TouchableOpacity
+                      onPress={() => router.push('/vendors' as any)}
+                      accessibilityLabel={`Go to vendors for ${vendor.companyName}`}
+                      accessibilityRole="button"
+                      activeOpacity={0.85}
+                      className="flex-row items-center justify-center bg-emerald-600 rounded-lg py-2.5"
+                    >
+                      <Text className="text-white font-semibold text-sm mr-1.5">
+                        Go to Vendors
+                      </Text>
+                      <ArrowRight size={14} color="#ffffff" />
+                    </TouchableOpacity>
                   </View>
-                  <View className="items-end">
-                     <Text className="text-sm font-bold text-gray-900">{insp.scheduledDate || "N/A"}</Text>
-                     <Text className="text-xs text-gray-500">{insp.scheduledTime || "--:--"}</Text>
-                  </View>
-                </View>
-
-                {/* Badges/Tags */}
-                <View className="flex-row items-center justify-between mt-3 mb-4">
-                  <View className={`px-2 py-0.5 rounded-md border ${priorityStyle.bg} ${priorityStyle.border}`}>
-                     <Text className={`text-[10px] font-bold uppercase ${priorityStyle.text}`}>{insp.priority || 'NORMAL'}</Text>
-                  </View>
-                  <View className="flex-row items-center">
-                    <MapPin size={12} color="#64748b" />
-                    <Text className="text-xs text-gray-500 ml-1" numberOfLines={1}>{typeof insp.vendor === 'object' ? (insp.vendor?.location || insp.vendor?.businessCity) : 'Remote'}</Text>
-                  </View>
-                </View>
-
-                {/* Actions */}
-                <View className="flex-row gap-2 mt-2">
-                  <TouchableOpacity 
-                    className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl border border-gray-200 bg-gray-50"
-                    onPress={() => router.push('/vendors')}
-                  >
-                    <Eye size={14} color="#374151" />
-                    <Text className="ml-2 font-bold text-gray-700 text-xs">View Data</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    className="flex-1 flex-row items-center justify-center py-2.5 bg-blue-600 rounded-xl shadow-sm"
-                    onPress={() => router.push('/vendors')}
-                  >
-                    <Text className="mr-2 font-bold text-white text-xs">Start Form</Text>
-                    <ArrowRight size={14} color="#ffffff" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )
-          })}
+                );
+              })}
+            </View>
+          )}
         </View>
       </View>
 
-      {/* Recent Inspections Table-like List */}
-      <View className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-4">
-        <View className="px-5 py-4 border-b border-gray-100 bg-slate-50 flex-row justify-between items-center">
-           <View className="flex-row items-center">
-             <View className="p-2 bg-emerald-100 rounded-lg mr-3">
-               <BarChart3 size={18} color="#10b981" />
-             </View>
-             <View>
-               <Text className="text-lg font-bold text-gray-900">Recent Checks</Text>
-             </View>
-           </View>
+      {/* Summary Statistics */}
+      <View className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <View className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex-row items-center">
+          <View className="p-2 bg-emerald-100 rounded-lg mr-3">
+            <BarChart3 size={18} color="#059669" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-lg font-bold text-slate-900">
+              Summary Statistics
+            </Text>
+            <Text className="text-xs text-slate-600">
+              Current inspection overview
+            </Text>
+          </View>
         </View>
-        
-        <View className="px-5 py-2">
-          {displayRecent.map((insp: any, idx) => {
-             const statusStyle = getStatusStyle(insp.status);
-             return (
-              <View key={idx} className={`flex-row justify-between items-center py-4 ${idx !== displayRecent.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                 <View className="flex-1 mr-2">
-                   <Text className="text-sm font-bold text-gray-900 mb-1" numberOfLines={1}>{typeof insp.vendor === 'object' ? (insp.vendor?.companyName || insp.vendor?.name) : (insp.vendor || insp.vendorName || "Unknown")}</Text>
-                   <View className="flex-row items-center">
-                     <Text className="bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold mr-2">{insp.po || insp.poNumber || "PO-NA"}</Text>
-                     <Text className="text-[10px] text-gray-500">{insp.date || "Just now"}</Text>
-                   </View>
-                 </View>
-                 <View className={`px-2 py-1 rounded-md border ${statusStyle.bg} ${statusStyle.border}`}>
-                   <Text className={`text-[10px] font-bold uppercase ${statusStyle.text}`}>{insp.status}</Text>
-                 </View>
-              </View>
-             )
-          })}
+        <View className="py-10 px-6 items-center">
+          <View className="w-20 h-20 rounded-full bg-blue-100 items-center justify-center mb-4">
+            <BarChart3 size={36} color="#2563eb" strokeWidth={1.75} />
+          </View>
+          <Text className="text-base font-bold text-slate-900 mb-1">
+            Live Updates
+          </Text>
+          <Text className="text-sm text-slate-600 text-center max-w-xs">
+            Your dashboard reflects real-time assignments from the
+            administrators.
+          </Text>
         </View>
       </View>
     </ScrollView>
