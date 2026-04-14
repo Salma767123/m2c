@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, Linking, Image } from 'react-native';
-import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, ChevronRight } from 'lucide-react-native';
+import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, ChevronRight, MessageCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 export default function Footer() {

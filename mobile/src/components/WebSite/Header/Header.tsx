@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, TextInput } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, Pressable, TextInput, AppState } from 'react-native';
 import { Search, User, ShoppingCart } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { cartService } from '@/services/cartService';
@@ -61,14 +61,11 @@ export function Header() {
     }
   };
 
-  const handleSubmitEditing = () => {
-    router.push(`/(any)/search?q=${encodeURIComponent(searchQuery.trim())}` as any);
-  };
-
   // ── Badge label (99+ cap — same as web) ──────────────────────────────────
   const badgeLabel = cartCount > 99 ? '99+' : String(cartCount);
 
   return (
+    <>
     <View className="bg-gray-900">
       {/* First Section - Brand, Profile, Cart */}
       <View className="px-4 py-3 flex-row items-center justify-between">
@@ -133,36 +130,13 @@ export function Header() {
             <Search size={24} color="#000000" />
           </Pressable>
         </View>
-
-        {/* Row 2 — Search bar */}
-        <View className="px-4 pb-3">
-          <View className="flex-row items-center bg-gray-100 rounded-xl overflow-hidden border border-gray-300">
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search products..."
-              placeholderTextColor="#6b7280"
-              className="flex-1 px-4 py-3 text-gray-900 font-medium"
-              onSubmitEditing={handleSubmitEditing}
-              onFocus={handleSearch}
-              returnKeyType="search"
-            />
-            <TouchableOpacity
-              onPress={handleSearch}
-              className="bg-black px-4 py-3"
-              activeOpacity={0.8}
-            >
-              <Search size={22} color="#ffffff" />
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
+    </View>
 
-      {/* Sidebar — Modal layer, fully isolated from ScrollView */}
-      <Sidebar
-        visible={sidebarVisible}
-        onClose={() => setSidebarVisible(false)}
-      />
+    <Sidebar
+      visible={sidebarVisible}
+      onClose={() => setSidebarVisible(false)}
+    />
     </>
   );
 }
