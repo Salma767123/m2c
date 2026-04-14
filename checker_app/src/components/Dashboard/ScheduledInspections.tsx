@@ -66,7 +66,7 @@ export function ScheduledInspections() {
       await AsyncStorage.setItem('selectedInspection', JSON.stringify(inspection));
       
       // Navigate to vendor detail view with inspection ID
-      router.push(`/(tabs)/vendors/view?id=${inspectionId}`);
+      router.push(`/(tabs)/vendors/view?id=${inspectionId}` as any);
     } catch (error) {
       console.error('Error viewing inspection detail:', error);
     }
@@ -87,7 +87,7 @@ export function ScheduledInspections() {
       }));
 
       // Navigate to quality inspection form
-      router.push(`/(tabs)/vendors/add?vendorId=${inspectionId}&vendorName=${encodeURIComponent(inspection.vendor)}`);
+      router.push(`/(tabs)/vendors/add?vendorId=${inspectionId}&vendorName=${encodeURIComponent(inspection.vendor)}` as any);
     } catch (error) {
       console.error('Error starting inspection:', error);
     }

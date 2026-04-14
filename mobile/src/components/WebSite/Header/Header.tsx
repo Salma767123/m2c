@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, TextInput } from 'react-native';
 import { Search, User, ShoppingCart } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { cartService } from '@/services/cartService';
+import { userAuthService } from '@/services/userAuthService';
+import Sidebar from '../Sidebar/Sidebar';
 
 const pressableOpacity = ({ pressed }: { pressed: boolean }) => ({
   opacity: pressed ? 0.7 : 1,
@@ -9,14 +12,61 @@ const pressableOpacity = ({ pressed }: { pressed: boolean }) => ({
 
 export function Header() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const router = useRouter();
 
+  // ── Load cart item count (same logic as web — authenticated only) ──────────
+  const loadCartCount = useCallback(async () => {
+    try {
+      const authenticated = await userAuthService.isAuthenticated();
+      if (!authenticated) {
+        setCartCount(0);
+        return;
+      }
+      const response = await cartService.getCart();
+      if (response.success && response.data) {
+        // Use itemCount from backend (same as web Header)
+        const count = response.data.itemCount ?? response.data.items.length;
+        setCartCount(count);
+      }
+    } catch {
+      // Silently fail — badge just won't show
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load immediately on mount
+    loadCartCount();
+
+    // Poll every 5 seconds — same interval as web
+    const interval = setInterval(loadCartCount, 5000);
+
+    // Also refresh when app comes back to foreground
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') loadCartCount();
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [loadCartCount]);
+
+  // ── Search handlers ────────────────────────────────────────────────────────
   const handleSearch = () => {
     const q = searchQuery.trim();
     if (q.length > 0) {
       router.push(`/(any)/products?search=${encodeURIComponent(q)}` as any);
     }
   };
+
+  const handleSubmitEditing = () => {
+    router.push(`/(any)/search?q=${encodeURIComponent(searchQuery.trim())}` as any);
+  };
+
+  // ── Badge label (99+ cap — same as web) ──────────────────────────────────
+  const badgeLabel = cartCount > 99 ? '99+' : String(cartCount);
 
   return (
     <View className="bg-gray-900">
@@ -83,8 +133,37 @@ export function Header() {
             <Search size={24} color="#000000" />
           </Pressable>
         </View>
+
+        {/* Row 2 — Search bar */}
+        <View className="px-4 pb-3">
+          <View className="flex-row items-center bg-gray-100 rounded-xl overflow-hidden border border-gray-300">
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search products..."
+              placeholderTextColor="#6b7280"
+              className="flex-1 px-4 py-3 text-gray-900 font-medium"
+              onSubmitEditing={handleSubmitEditing}
+              onFocus={handleSearch}
+              returnKeyType="search"
+            />
+            <TouchableOpacity
+              onPress={handleSearch}
+              className="bg-black px-4 py-3"
+              activeOpacity={0.8}
+            >
+              <Search size={22} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
-    </View>
+
+      {/* Sidebar — Modal layer, fully isolated from ScrollView */}
+      <Sidebar
+        visible={sidebarVisible}
+        onClose={() => setSidebarVisible(false)}
+      />
+    </>
   );
 }
 

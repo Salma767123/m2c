@@ -1,7 +1,0 @@
-src/app/admin/dashboard/cms/page.tsx(2,22): error TS2307: Cannot find module '@/components/AdminDashboard/CMS/CMSStats' or its corresponding type declarations.
-src/app/admin/dashboard/cms/page.tsx(3,26): error TS2307: Cannot find module '@/components/AdminDashboard/CMS/ContentTable' or its corresponding type declarations.
-src/app/admin/dashboard/cms/page.tsx(4,24): error TS2307: Cannot find module '@/components/AdminDashboard/CMS/CMSActions' or its corresponding type declarations.
-src/app/admin/dashboard/cms/page.tsx(5,26): error TS2307: Cannot find module '@/components/AdminDashboard/CMS/QuickActions' or its corresponding type declarations.
-src/components/WebSite/CheckOut/CheckoutProcess/ReviewOrder.tsx(30,12): error TS2367: This comparison appears to be unintentional because the types '"razorpay" | "payu"' and '"card"' have no overlap.
-src/components/WebSite/CheckOut/CheckoutProcess/ReviewOrder.tsx(37,12): error TS2367: This comparison appears to be unintentional because the types '"razorpay" | "payu"' and '"upi"' have no overlap.
-src/components/WebSite/CheckOut/CheckoutProcess/ReviewOrder.tsx(43,12): error TS2367: This comparison appears to be unintentional because the types '"razorpay" | "payu"' and '"COD"' have no overlap.

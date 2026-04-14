@@ -28,6 +28,85 @@ const pressableOpacity = ({ pressed }: { pressed: boolean }) => ({
   opacity: pressed ? 0.7 : 1,
 });
 
+// ─── Header Component ─────────────────────────────────────────────────────────
+function Header() {
+  return (
+    <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-4 px-5`}>
+      <View className="flex-row items-center justify-between">
+        <View>
+          <Text className="text-white text-2xl font-extrabold tracking-tight">Categories</Text>
+          <Text className="text-gray-400 text-xs mt-0.5">Browse our collections</Text>
+        </View>
+        <View className="flex-row items-center gap-3">
+          <TouchableOpacity
+            onPress={() => router.push('/(any)/search' as any)}
+            className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center"
+            activeOpacity={0.7}
+          >
+            <Search size={18} color="#ffffff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/cart' as any)}
+            className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center"
+            activeOpacity={0.7}
+          >
+            <ShoppingCart size={18} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─── Category Card ────────────────────────────────────────────────────────────
+function CategoryCard({ category, onPress }: { category: Category; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="w-[48%] mb-4 bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100"
+      activeOpacity={0.75}
+    >
+      {/* Image area */}
+      <View className="w-full aspect-square bg-gray-100 relative">
+        {category.image ? (
+          <Image
+            source={{ uri: category.image }}
+            className="w-full h-full"
+            resizeMode="cover"
+          />
+        ) : (
+          <View className="w-full h-full items-center justify-center">
+            <Package size={40} color="#d1d5db" />
+          </View>
+        )}
+        {/* Dark overlay gradient at bottom */}
+        <View
+          className="absolute bottom-0 left-0 right-0 h-14"
+          style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
+        />
+      </View>
+
+      {/* Info area */}
+      <View className="px-3 py-3">
+        <Text className="text-sm font-bold text-gray-900 mb-0.5" numberOfLines={1}>
+          {category.name}
+        </Text>
+        <View className="flex-row items-center justify-between">
+          {category.subcategoryCount !== undefined && category.subcategoryCount > 0 ? (
+            <Text className="text-[11px] text-gray-500">
+              {category.subcategoryCount} subcategories
+            </Text>
+          ) : (
+            <Text className="text-[11px] text-gray-400">Explore</Text>
+          )}
+          <ChevronRight size={13} color="#9ca3af" />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);

@@ -21,6 +21,7 @@ import {
 import { useRouter } from 'expo-router';
 import { categoryService, Category } from '@/services/categoryService';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Subcategory {
   id: string;
   name: string;
@@ -106,6 +107,8 @@ export function SubCategories({ categorySlug }: SubCategoriesProps) {
     router.push({
       pathname: '/(any)/products',
       params: {
+        categoryName: category?.name,
+        subcategoryName: subcategory.name,
         category: category?.slug,
         subcategory: subcategory.slug,
       },
@@ -268,6 +271,7 @@ export function SubCategories({ categorySlug }: SubCategoriesProps) {
     );
   }
 
+  // ── Error ────────────────────────────────────────────────────────────────────
   if (error || !category) {
     return (
       <View className="flex-1 bg-slate-50">
@@ -308,6 +312,7 @@ export function SubCategories({ categorySlug }: SubCategoriesProps) {
     );
   }
 
+  // ── Main ──────────────────────────────────────────────────────────────────────
   return (
     <View className="flex-1 bg-slate-50">
       <HeaderBar title={category.name} />

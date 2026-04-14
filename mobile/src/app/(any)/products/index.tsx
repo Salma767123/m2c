@@ -25,6 +25,7 @@ import {
   ArrowUpDown,
 } from 'lucide-react-native';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
+import { categoryService, Category } from '@/services/categoryService';
 import ProductCard from '@/components/WebSite/ProductCard/ProductCard';
 
 const PAGE_SIZE = 12;
@@ -45,6 +46,7 @@ const pressableOpacity = ({ pressed }: { pressed: boolean }) => ({
 const titleCase = (value: string) =>
   value.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ProductsScreen() {
   const router = useRouter();
   const { category, subcategory, search: searchParam } = useLocalSearchParams<{
@@ -231,6 +233,45 @@ export default function ProductsScreen() {
 
   const keyExtractor = useCallback((item: PublicProduct) => item.id, []);
 
+  // ─── List header ─────────────────────────────────────────────────────────────
+  const ListHeader = (
+    <View className="px-3 pt-3 pb-2 flex-row items-center justify-between">
+      <View>
+        <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          {SORT_OPTIONS[sortIdx].label}
+        </Text>
+        {!loading && totalItems > 0 && (
+          <Text className="text-xs text-gray-500 font-medium mt-0.5">
+            Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems}
+          </Text>
+        )}
+      </View>
+      <View className="flex-row items-center gap-1.5 bg-gray-100 px-3 py-1.5 rounded-lg">
+        <LayoutGrid size={12} color="#6b7280" />
+        <Text className="text-[11px] font-semibold text-gray-500">Grid</Text>
+      </View>
+    </View>
+  );
+
+  // ─── Empty + Error ────────────────────────────────────────────────────────────
+  const EmptyView = (
+    <View className="flex-1 items-center justify-center py-24 px-8">
+      <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-5" style={{ borderWidth: 1, borderColor: '#e5e5e5' }}>
+        <Package size={34} color="#d1d5db" />
+      </View>
+      <Text className="text-lg font-black text-gray-900 text-center mb-2">No Products Found</Text>
+      <Text className="text-sm text-gray-400 text-center leading-5 mb-6">
+        {subcategoryName || selectedSub
+          ? `No products in "${selectedSub?.name || subcategoryName}" yet.`
+          : 'No products match your filters. Try adjusting them.'}
+      </Text>
+      <TouchableOpacity onPress={clearAllFilters} activeOpacity={0.85} className="bg-gray-900 rounded-xl px-7 py-3">
+        <Text className="text-white font-bold text-sm">Clear Filters</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <View className="flex-1 bg-gray-50">
       {/* Header */}
@@ -304,6 +345,41 @@ export default function ProductsScreen() {
             </Pressable>
           ) : null}
         </View>
+
+        {/* Active chips strip */}
+        {(categoryName || selectedCategory || selectedSub || subcategoryName || minPrice || maxPrice || sortIdx !== 0) && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3" contentContainerStyle={{ gap: 6 }}>
+            {(selectedCategory || categoryName) && (
+              <View className="flex-row items-center bg-white/15 rounded-full px-3 py-1">
+                <Text className="text-[11px] text-white font-semibold">{selectedCategory?.name || categoryName}</Text>
+              </View>
+            )}
+            {(selectedSub || subcategoryName) && (
+              <View className="flex-row items-center bg-white/15 rounded-full px-3 py-1">
+                <Text className="text-[11px] text-white font-semibold">{selectedSub?.name || subcategoryName}</Text>
+              </View>
+            )}
+            {sortIdx !== 0 && (
+              <View className="flex-row items-center bg-white/15 rounded-full px-3 py-1">
+                <Text className="text-[11px] text-white font-semibold">{SORT_OPTIONS[sortIdx].label}</Text>
+              </View>
+            )}
+            {(minPrice || maxPrice) && (
+              <View className="flex-row items-center bg-white/15 rounded-full px-3 py-1">
+                <Text className="text-[11px] text-white font-semibold">
+                  ₹{minPrice || '0'} – ₹{maxPrice || '∞'}
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={clearAllFilters}
+              className="flex-row items-center bg-white/20 rounded-full px-3 py-1 gap-1"
+            >
+              <X size={10} color="#fff" />
+              <Text className="text-[11px] text-white font-semibold">Clear</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
       </View>
 
       {/* Sort + Filter Bar */}

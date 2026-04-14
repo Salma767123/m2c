@@ -127,6 +127,39 @@ class PublicProductService {
     }
   }
 
+  async getProductsByTagPaged(tag: string, page: number = 1, limit: number = 10): Promise<ProductsResponse> {
+    try {
+      const response = await axios.get('/products/public', {
+        params: {
+          search: tag,
+          page,
+          limit,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching paged products by tag:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch products'
+      };
+    }
+  }
+
+  async getFeaturedProductsPaged(page: number = 1, limit: number = 10): Promise<ProductsResponse> {
+    return this.getProductsByTagPaged('Featured', page, limit);
+  }
+
+  async getTopSellingProductsPaged(page: number = 1, limit: number = 10): Promise<ProductsResponse> {
+    return this.getProductsByTagPaged('Top Selling', page, limit);
+  }
+
+  async getBestSellerProductsPaged(page: number = 1, limit: number = 10): Promise<ProductsResponse> {
+    return this.getProductsByTagPaged('Best Seller', page, limit);
+  }
+
   async getProduct(id: string): Promise<{ success: boolean; data?: PublicProduct; message?: string }> {
     try {
       const response = await axios.get(`/products/public/${id}`);

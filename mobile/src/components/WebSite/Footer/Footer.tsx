@@ -14,18 +14,15 @@ export default function Footer() {
     }
   };
 
-  const handleEmailPress = () => {
-    Linking.openURL('mailto:info@m2cmarkdowns.com');
-  };
-
-  const handlePhonePress = () => {
-    Linking.openURL('tel:+1234567890');
-  };
+  const handleEmailPress = () => Linking.openURL('mailto:info@m2cmarkdowns.com');
+  const handlePhonePress = () => Linking.openURL('tel:+1234567890');
+  const handleWhatsApp   = () => Linking.openURL('https://wa.me/1234567890');
 
   const quickLinks = [
-    { label: 'Home', href: '/(tabs)' },
-    { label: 'About Us', href: '/(any)/about' },
-    { label: 'Contact us',href:'/(any)/contact'},
+    { label: 'Home',       href: '/(tabs)' },
+    { label: 'About Us',   href: '/(any)/about' },
+    { label: 'Contact Us', href: '/(any)/contact' },
+    { label: 'My Wishlist', href: '/(any)/wishlist' },
   ];
 
   const legalLinks = [
@@ -35,27 +32,40 @@ export default function Footer() {
   ];
 
   const socialLinks = [
-    { icon: Facebook, url: 'https://facebook.com', color: '#1877F2' },
-    { icon: Twitter, url: 'https://twitter.com', color: '#1DA1F2' },
-    { icon: Instagram, url: 'https://instagram.com', color: '#E4405F' },
-    { icon: Linkedin, url: 'https://linkedin.com', color: '#0A66C2' },
+    { label: 'Facebook',  icon: Facebook,       url: 'https://facebook.com'  },
+    { label: 'Twitter',   icon: Twitter,        url: 'https://twitter.com'   },
+    { label: 'Instagram', icon: Instagram,      url: 'https://instagram.com' },
+    { label: 'LinkedIn',  icon: Linkedin,       url: 'https://linkedin.com'  },
+    { label: 'WhatsApp',  icon: MessageCircle,  url: '',                     onPress: handleWhatsApp },
   ];
 
   return (
     <View className="bg-[#1a1a1a]">
-      {/* Main Footer Content */}
-      <View className="px-6 py-4">
-        {/* Company Info */}
-        <View className="mb-8 pb-8 border-b border-gray-800 items-center">
-          <View className="bg-white rounded-lg p-2 mb-4 shadow-lg">
-            <Image 
+
+      {/* ── Main Content ──────────────────────────────────────────────────────── */}
+      <View className="px-5 pt-6 pb-4">
+
+        {/* ── 1. Company Info: image LEFT | text RIGHT ──────────────────────── */}
+        <View className="flex-row items-center mb-6 pb-6 border-b border-gray-800">
+          {/* Logo */}
+          <View className="bg-white rounded-2xl p-3 shadow-md" style={{ shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, elevation: 4 }}>
+            <Image
               source={require('../../../../assets/images/logo4.png')}
-              className="w-32 h-28"
-              resizeMode="contain"
+              className="w-32 h-20"
+              resizeMode="cover"
             />
           </View>
-          <Text className="text-2xl font-bold text-white mb-2">M2C MarkDowns</Text>
-          <Text className="text-base text-gray-400">Private Limited</Text>
+
+          {/* Company text — right-aligned */}
+          <View className="flex-1 items-end pl-4">
+            <Text className="text-xl font-bold text-white text-right tracking-tight leading-tight">
+              M2C MarkDowns
+            </Text>
+            <View className="w-10 h-px bg-gray-600 mt-2 mb-2" />
+            <Text className="text-xs font-semibold text-gray-400 text-right uppercase tracking-widest">
+              Private Limited
+            </Text>
+          </View>
         </View>
 
         {/* Links Grid */}
@@ -147,13 +157,21 @@ export default function Footer() {
                 123 Textile Street, Fashion District{'\n'}New York, NY 10001
               </Text>
             </View>
+            <Text className="text-gray-300 text-sm flex-1 leading-5">
+              123 Textile Street, Fashion District{'\n'}New York, NY 10001
+            </Text>
           </View>
         </View>
 
-        {/* Social Media */}
-        <View className="mb-2">
-          <Text className="text-lg font-bold text-white mb-4 text-center">Follow Us</Text>
-          <View className="flex-row justify-center space-x-3">
+        {/* ── 3. Social Media — label LEFT | icons RIGHT ────────────────────── */}
+        <View className="flex-row items-center justify-between mb-2">
+          {/* Left label */}
+          <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            Follow Us
+          </Text>
+
+          {/* Right icons */}
+          <View className="flex-row items-center gap-2">
             {socialLinks.map((social, index) => (
               <Pressable
                 key={index}
@@ -171,14 +189,16 @@ export default function Footer() {
             ))}
           </View>
         </View>
+
       </View>
 
-      {/* Bottom Bar */}
-      <View className="border-t border-gray-800 px-6 py-5 bg-black">
-        <Text className="text-center text-gray-400 text-xs leading-5">
+      {/* ── Bottom Bar ──────────────────────────────────────────────────────── */}
+      <View className="border-t border-gray-800 px-6 py-4 bg-black">
+        <Text className="text-center text-gray-500 text-xs leading-5">
           © {currentYear} M2C MarkDowns Private Limited.{'\n'}All rights reserved.
         </Text>
       </View>
+
     </View>
   );
 }

@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import {
   User,
@@ -241,7 +243,7 @@ export default function Profile() {
   if (isLoading) {
     return (
       <View className="flex-1 bg-gray-50 items-center justify-center">
-        <ActivityIndicator size="large" color="#1f2937" />
+        <ActivityIndicator size="large" color="#000000" />
         <Text className="mt-4 text-gray-500 text-sm">Loading profile...</Text>
       </View>
     );
@@ -251,18 +253,10 @@ export default function Profile() {
   if (!isAuthenticated) {
     return (
       <View className="flex-1 bg-gray-50">
-        <View
-          className="bg-white px-5 pt-4 pb-5"
-          style={{
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            elevation: 2,
-          }}
-        >
-          <Text className="text-2xl font-bold text-gray-900">Profile</Text>
-          <Text className="text-sm text-gray-500 mt-1">Manage your account</Text>
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-5 px-5`}>
+          <Text className="text-white text-2xl font-extrabold tracking-tight">Profile</Text>
+          <Text className="text-gray-400 text-xs mt-0.5">Manage your account</Text>
         </View>
 
         <View className="flex-1 items-center justify-center px-8">
@@ -271,13 +265,13 @@ export default function Profile() {
               width: 100,
               height: 100,
               borderRadius: 50,
-              backgroundColor: '#f1f5f9',
+              backgroundColor: '#f3f4f6',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 24,
             }}
           >
-            <User size={40} color="#94a3b8" />
+            <User size={40} color="#9ca3af" />
           </View>
           <Text className="text-2xl font-bold text-gray-900 mb-2">Login Required</Text>
           <Text className="text-gray-500 text-center text-base mb-8 leading-6">
@@ -286,7 +280,7 @@ export default function Profile() {
           <TouchableOpacity
             onPress={() => router.push('/(auth)/Login' as any)}
             activeOpacity={0.85}
-            className="bg-gray-900 rounded-2xl px-10 py-4"
+            className="bg-black rounded-2xl px-10 py-4"
             style={{
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 4 },
@@ -304,21 +298,14 @@ export default function Profile() {
 
   return (
     <View className="flex-1 bg-gray-50">
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      
       {/* ── Premium Header ── */}
-      <View
-        className="bg-white px-5 pt-4 pb-5"
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.04,
-          shadowRadius: 8,
-          elevation: 2,
-        }}
-      >
+      <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-4 px-5`}>
         <View className="flex-row items-center justify-between">
           <View>
-            <Text className="text-2xl font-bold text-gray-900">My Account</Text>
-            <Text className="text-sm text-gray-500 mt-0.5">Manage your profile settings</Text>
+            <Text className="text-white text-2xl font-extrabold tracking-tight">My Account</Text>
+            <Text className="text-gray-400 text-xs mt-0.5">Manage your profile settings</Text>
           </View>
 
           {/* Edit / Save-Cancel Buttons */}
@@ -327,15 +314,15 @@ export default function Profile() {
               onPress={() => setIsEditing(true)}
               activeOpacity={0.7}
               style={{
-                width: 42,
-                height: 42,
-                borderRadius: 14,
-                backgroundColor: '#f1f5f9',
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                backgroundColor: 'rgba(255,255,255,0.1)',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Edit3 size={18} color="#64748b" />
+              <Edit3 size={18} color="#ffffff" />
             </TouchableOpacity>
           ) : (
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -344,19 +331,19 @@ export default function Profile() {
                 disabled={isSaving}
                 activeOpacity={0.7}
                 style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 14,
-                  backgroundColor: '#ecfdf5',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  backgroundColor: '#ffffff',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  opacity: isSaving ? 0.5 : 1,
+                  opacity: isSaving ? 0.7 : 1,
                 }}
               >
                 {isSaving ? (
-                  <ActivityIndicator size="small" color="#10b981" />
+                  <ActivityIndicator size="small" color="#000000" />
                 ) : (
-                  <Save size={18} color="#10b981" />
+                  <Save size={18} color="#000000" />
                 )}
               </TouchableOpacity>
               <TouchableOpacity
@@ -364,16 +351,16 @@ export default function Profile() {
                 disabled={isSaving}
                 activeOpacity={0.7}
                 style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 14,
-                  backgroundColor: '#f1f5f9',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  backgroundColor: 'rgba(255,255,255,0.1)',
                   alignItems: 'center',
                   justifyContent: 'center',
                   opacity: isSaving ? 0.5 : 1,
                 }}
               >
-                <X size={18} color="#64748b" />
+                <X size={18} color="#ffffff" />
               </TouchableOpacity>
             </View>
           )}
@@ -399,6 +386,8 @@ export default function Profile() {
               backgroundColor: '#ffffff',
               borderRadius: 20,
               padding: 20,
+              borderWidth: 1,
+              borderColor: '#f3f4f6',
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.05,
@@ -413,7 +402,7 @@ export default function Profile() {
                   width: 64,
                   height: 64,
                   borderRadius: 20,
-                  backgroundColor: '#111827',
+                  backgroundColor: '#000000',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginRight: 16,
@@ -437,18 +426,18 @@ export default function Profile() {
                   style={{
                     fontSize: 18,
                     fontWeight: '700',
-                    color: '#1e293b',
+                    color: '#111827',
                     marginBottom: 4,
                   }}
                 >
                   {userProfile.firstName} {userProfile.lastName}
                 </Text>
-                <Text style={{ fontSize: 13, color: '#64748b', marginBottom: 2 }}>
+                <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>
                   {userProfile.email}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                  <Calendar size={12} color="#94a3b8" />
-                  <Text style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>
+                  <Calendar size={12} color="#9ca3af" />
+                  <Text style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>
                     Member since {formatJoinDate()}
                   </Text>
                 </View>
@@ -459,45 +448,46 @@ export default function Profile() {
             <View
               style={{
                 flexDirection: 'row',
-                marginTop: 16,
-                backgroundColor: '#f8fafc',
+                marginTop: 18,
+                backgroundColor: '#f9fafb',
                 borderRadius: 14,
                 padding: 12,
-                gap: 1,
+                borderWidth: 1,
+                borderColor: '#f3f4f6',
               }}
             >
               <View style={{ flex: 1, alignItems: 'center' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Mail size={12} color="#64748b" />
-                  <Text style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <Mail size={12} color="#6b7280" />
+                  <Text style={{ fontSize: 10, color: '#6b7280', marginLeft: 4, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     Email
                   </Text>
                 </View>
-                <Text style={{ fontSize: 12, color: '#1e293b', fontWeight: '600' }} numberOfLines={1}>
+                <Text style={{ fontSize: 12, color: '#111827', fontWeight: 'bold' }} numberOfLines={1}>
                   {userProfile.email ? 'Verified' : 'Not Set'}
                 </Text>
               </View>
-              <View style={{ width: 1, backgroundColor: '#e2e8f0' }} />
+              <View style={{ width: 1, backgroundColor: '#e5e7eb' }} />
               <View style={{ flex: 1, alignItems: 'center' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Phone size={12} color="#64748b" />
-                  <Text style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <Phone size={12} color="#6b7280" />
+                  <Text style={{ fontSize: 10, color: '#6b7280', marginLeft: 4, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     Phone
                   </Text>
                 </View>
-                <Text style={{ fontSize: 12, color: '#1e293b', fontWeight: '600' }} numberOfLines={1}>
+                <Text style={{ fontSize: 12, color: '#111827', fontWeight: 'bold' }} numberOfLines={1}>
                   {userProfile.phone ? 'Added' : 'Not Set'}
                 </Text>
               </View>
-              <View style={{ width: 1, backgroundColor: '#e2e8f0' }} />
+              <View style={{ width: 1, backgroundColor: '#e5e7eb' }} />
               <View style={{ flex: 1, alignItems: 'center' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <MapPin size={12} color="#64748b" />
-                  <Text style={{ fontSize: 10, color: '#94a3b8', marginLeft: 4, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    Address
+                  <MapPin size={12} color="#6b7280" />
+                  <Text style={{ fontSize: 10, color: '#6b7280', marginLeft: 4, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Location
                   </Text>
                 </View>
-                <Text style={{ fontSize: 12, color: '#1e293b', fontWeight: '600' }} numberOfLines={1}>
+                <Text style={{ fontSize: 12, color: '#111827', fontWeight: 'bold' }} numberOfLines={1}>
                   {userProfile.address.city || 'Not Set'}
                 </Text>
               </View>
@@ -526,11 +516,11 @@ export default function Profile() {
             justifyContent: 'center',
             paddingVertical: 16,
             borderWidth: 1,
-            borderColor: '#fee2e2',
+            borderColor: '#e5e7eb',
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.03,
-            shadowRadius: 8,
+            shadowOpacity: 0.05,
+            shadowRadius: 10,
             elevation: 2,
           }}
         >
@@ -539,15 +529,15 @@ export default function Profile() {
               width: 34,
               height: 34,
               borderRadius: 10,
-              backgroundColor: '#fef2f2',
+              backgroundColor: '#f3f4f6',
               alignItems: 'center',
               justifyContent: 'center',
               marginRight: 10,
             }}
           >
-            <LogOut size={16} color="#ef4444" />
+            <LogOut size={16} color="#111827" />
           </View>
-          <Text style={{ fontSize: 15, fontWeight: '600', color: '#ef4444' }}>
+          <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#111827' }}>
             Sign Out
           </Text>
         </TouchableOpacity>

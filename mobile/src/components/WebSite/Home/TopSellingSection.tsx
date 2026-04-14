@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { ArrowRight } from 'lucide-react-native';
 import { router } from 'expo-router';
-import  ProductCard  from '../ProductCard/ProductCard';
+import ProductCard from '../ProductCard/ProductCard';
 import { publicProductService, PublicProduct } from '@/services/publicProductService';
 
 interface TopSellingSectionProps {
@@ -34,18 +34,18 @@ export default function TopSellingSection({ onAddToCart, onToggleWishlist }: Top
 
   if (isLoading) {
     return (
-      <View className="bg-gray-50 px-4 py-6">
+      <View className="bg-white px-4 py-8">
         <View className="items-center justify-center py-12">
-          <ActivityIndicator size="large" color="#374151" />
-          <Text className="mt-4 text-gray-600">Loading top selling products...</Text>
+          <ActivityIndicator size="large" color="#111827" />
+          <Text className="mt-3 text-xs text-gray-400 tracking-widest uppercase">
+            Loading…
+          </Text>
         </View>
       </View>
     );
   }
 
-  if (products.length === 0) {
-    return null;
-  }
+  if (products.length === 0) return null;
 
   return (
     <View className="bg-gray-50 px-4 py-6">
@@ -71,10 +71,10 @@ export default function TopSellingSection({ onAddToCart, onToggleWishlist }: Top
         </Pressable>
       </View>
 
-      {/* Products Grid */}
+      {/* ── Products Grid ──────────────────────────────────────────────────── */}
       <View className="flex-row flex-wrap justify-between">
         {products.map((product) => (
-          <View key={product.id} className="w-[48%] mb-4">
+          <View key={product.id} className="w-[48.5%] mb-3">
             <ProductCard product={product} />
           </View>
         ))}

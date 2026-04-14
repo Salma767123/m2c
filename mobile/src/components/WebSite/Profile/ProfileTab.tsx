@@ -52,10 +52,12 @@ function SectionCard({
         marginTop: 16,
         backgroundColor: '#ffffff',
         borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#f3f4f6',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 12,
+        shadowRadius: 10,
         elevation: 3,
         overflow: 'hidden',
       }}
@@ -68,7 +70,7 @@ function SectionCard({
           paddingHorizontal: 16,
           paddingVertical: 14,
           borderBottomWidth: 1,
-          borderBottomColor: '#f1f5f9',
+          borderBottomColor: '#f9fafb',
         }}
       >
         <View
@@ -76,7 +78,7 @@ function SectionCard({
             width: 32,
             height: 32,
             borderRadius: 10,
-            backgroundColor: `${iconColor}15`,
+            backgroundColor: '#f3f4f6',
             alignItems: 'center',
             justifyContent: 'center',
             marginRight: 10,
@@ -84,7 +86,7 @@ function SectionCard({
         >
           <Icon size={16} color={iconColor} />
         </View>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: '#1e293b' }}>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>
           {title}
         </Text>
       </View>
@@ -116,12 +118,12 @@ function FormField({
   isLast?: boolean;
 }) {
   return (
-    <View style={{ marginBottom: isLast ? 0 : 14 }}>
+    <View style={{ marginBottom: isLast ? 0 : 16 }}>
       <Text
         style={{
           fontSize: 12,
-          fontWeight: '600',
-          color: '#94a3b8',
+          fontWeight: '700',
+          color: '#6b7280',
           marginBottom: 6,
           textTransform: 'uppercase',
           letterSpacing: 0.5,
@@ -134,7 +136,7 @@ function FormField({
         onChangeText={onChangeText}
         editable={isEditing}
         placeholder={placeholder}
-        placeholderTextColor="#cbd5e1"
+        placeholderTextColor="#9ca3af"
         keyboardType={keyboardType || 'default'}
         autoCapitalize={autoCapitalize || 'sentences'}
         style={{
@@ -143,11 +145,11 @@ function FormField({
           paddingVertical: 12,
           borderRadius: 12,
           fontSize: 14,
-          fontWeight: '500',
-          color: isEditing ? '#1e293b' : '#475569',
-          backgroundColor: isEditing ? '#ffffff' : '#f8fafc',
+          fontWeight: '600',
+          color: isEditing ? '#111827' : '#4b5563',
+          backgroundColor: isEditing ? '#ffffff' : '#f9fafb',
           borderWidth: 1,
-          borderColor: isEditing ? '#e2e8f0' : '#f1f5f9',
+          borderColor: isEditing ? '#d1d5db' : '#f3f4f6',
         }}
       />
     </View>
@@ -180,7 +182,7 @@ export default function ProfileTab({
   return (
     <View>
       {/* ── Personal Information ── */}
-      <SectionCard title="Personal Information" icon={User} iconColor="#3b82f6" delay={100}>
+      <SectionCard title="Personal Information" icon={User} iconColor="#111827" delay={100}>
         <FormField
           label="First Name"
           value={editedProfile.firstName}
@@ -216,7 +218,7 @@ export default function ProfileTab({
       </SectionCard>
 
       {/* ── Address Information ── */}
-      <SectionCard title="Address" icon={MapPin} iconColor="#8b5cf6" delay={200}>
+      <SectionCard title="Address" icon={MapPin} iconColor="#111827" delay={200}>
         <FormField
           label="Street Address"
           value={editedProfile.address.addressLine1}
@@ -233,13 +235,13 @@ export default function ProfileTab({
         />
 
         {/* State & Zip side by side */}
-        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
+        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
           <View style={{ flex: 1 }}>
             <Text
               style={{
                 fontSize: 12,
-                fontWeight: '600',
-                color: '#94a3b8',
+                fontWeight: '700',
+                color: '#6b7280',
                 marginBottom: 6,
                 textTransform: 'uppercase',
                 letterSpacing: 0.5,
@@ -252,18 +254,18 @@ export default function ProfileTab({
               onChangeText={(v) => handleInputChange('address.state', v)}
               editable={isEditing}
               placeholder="State"
-              placeholderTextColor="#cbd5e1"
+              placeholderTextColor="#9ca3af"
               style={{
                 width: '100%',
                 paddingHorizontal: 14,
                 paddingVertical: 12,
                 borderRadius: 12,
                 fontSize: 14,
-                fontWeight: '500',
-                color: isEditing ? '#1e293b' : '#475569',
-                backgroundColor: isEditing ? '#ffffff' : '#f8fafc',
+                fontWeight: '600',
+                color: isEditing ? '#111827' : '#4b5563',
+                backgroundColor: isEditing ? '#ffffff' : '#f9fafb',
                 borderWidth: 1,
-                borderColor: isEditing ? '#e2e8f0' : '#f1f5f9',
+                borderColor: isEditing ? '#d1d5db' : '#f3f4f6',
               }}
             />
           </View>
@@ -271,8 +273,8 @@ export default function ProfileTab({
             <Text
               style={{
                 fontSize: 12,
-                fontWeight: '600',
-                color: '#94a3b8',
+                fontWeight: '700',
+                color: '#6b7280',
                 marginBottom: 6,
                 textTransform: 'uppercase',
                 letterSpacing: 0.5,
@@ -285,7 +287,7 @@ export default function ProfileTab({
               onChangeText={(v) => handleInputChange('address.zipCode', v)}
               editable={isEditing}
               placeholder="Zip"
-              placeholderTextColor="#cbd5e1"
+              placeholderTextColor="#9ca3af"
               keyboardType="numeric"
               style={{
                 width: '100%',
@@ -293,11 +295,11 @@ export default function ProfileTab({
                 paddingVertical: 12,
                 borderRadius: 12,
                 fontSize: 14,
-                fontWeight: '500',
-                color: isEditing ? '#1e293b' : '#475569',
-                backgroundColor: isEditing ? '#ffffff' : '#f8fafc',
+                fontWeight: '600',
+                color: isEditing ? '#111827' : '#4b5563',
+                backgroundColor: isEditing ? '#ffffff' : '#f9fafb',
                 borderWidth: 1,
-                borderColor: isEditing ? '#e2e8f0' : '#f1f5f9',
+                borderColor: isEditing ? '#d1d5db' : '#f3f4f6',
               }}
             />
           </View>

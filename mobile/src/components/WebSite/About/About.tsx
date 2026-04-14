@@ -43,6 +43,8 @@ const aboutContent: AboutSection[] = [
   },
 ];
 
+  const router = useRouter();
+
 const missionStatement = {
   title: 'Our Mission',
   content:
