@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { CheckCircle } from 'lucide-react-native';
 import { Video, ResizeMode } from 'expo-av';
+import { useRouter } from 'expo-router';
 
 interface AboutSection {
   title: string;
