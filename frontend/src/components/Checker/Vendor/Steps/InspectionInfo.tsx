@@ -31,11 +31,14 @@ export default function InspectionInfo({ formData, setFormData }: StepProps) {
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Inspector Name:</label>
                     <input
                         type="text"
-                        value={formData.inspectorName}
-                        onChange={(e) => setFormData({ ...formData, inspectorName: e.target.value })}
-                        placeholder="Enter inspector name"
-                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.inspectorName || ""}
+                        readOnly
+                        aria-readonly="true"
+                        title="Auto-filled from your logged-in QC Checker profile"
+                        placeholder="Loading inspector..."
+                        className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-100 text-slate-700 cursor-not-allowed focus:outline-none"
                     />
+                    <p className="mt-2 text-xs text-slate-500">Auto-filled from your logged-in checker profile.</p>
                 </div>
                 <div>
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Inspection Status:</label>
