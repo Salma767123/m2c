@@ -37,6 +37,7 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
     // 1. Factory Details
     vendorName: vendorName,
     vendorId: vendorId || "",
+    vendorCode: "",
     factoryName: "",
     factoryAddress: "",
     contactPersonName: "",
@@ -130,6 +131,7 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
               ...prev,
               factoryName: inspection.factoryName || prev.factoryName,
               categoryToInspect: assignedCategories || prev.categoryToInspect,
+              vendorCode: inspection.vendor?.vendorCode || prev.vendorCode,
             }))
           }
         }

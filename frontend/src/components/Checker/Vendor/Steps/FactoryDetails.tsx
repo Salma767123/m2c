@@ -27,13 +27,14 @@ export default function FactoryDetails({ formData, setFormData }: StepProps) {
                     />
                 </div>
                 <div>
-                    <label className="block text-slate-700 font-semibold mb-3 text-sm">Vendor ID:</label>
+                    <label className="block text-slate-700 font-semibold mb-3 text-sm">Vendor Code:</label>
                     <input
                         type="text"
-                        value={formData.vendorId}
-                        onChange={(e) => setFormData({ ...formData, vendorId: e.target.value })}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        value={formData.vendorCode || ""}
                         readOnly
+                        aria-readonly="true"
+                        placeholder="Loading..."
+                        className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-100 text-slate-700 font-mono cursor-not-allowed focus:outline-none"
                     />
                 </div>
                 <div>
