@@ -244,6 +244,8 @@ class ProductService {
     sortOrder?: 'asc' | 'desc';
     inStock?: boolean;
     tag?: string;
+    colors?: string;
+    minRating?: number;
   }): Promise<{
     success: boolean;
     data: {

@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Linking, Image } from 'react-native';
-import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, ChevronRight } from 'lucide-react-native';
+import { View, Text, Pressable, Linking, Image } from 'react-native';
+import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, ChevronRight, MessageCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 export default function Footer() {
@@ -14,49 +14,58 @@ export default function Footer() {
     }
   };
 
-  const handleEmailPress = () => {
-    Linking.openURL('mailto:info@m2cmarkdowns.com');
-  };
-
-  const handlePhonePress = () => {
-    Linking.openURL('tel:+1234567890');
-  };
+  const handleEmailPress = () => Linking.openURL('mailto:info@m2cmarkdowns.com');
+  const handlePhonePress = () => Linking.openURL('tel:+1234567890');
+  const handleWhatsApp   = () => Linking.openURL('https://wa.me/1234567890');
 
   const quickLinks = [
-    { label: 'Home', href: '/(tabs)' },
-    { label: 'About Us', href: '/(any)/about' },
-    { label: 'Contact us',href:'/(any)/contact'},
+    { label: 'Home',       href: '/(tabs)' },
+    { label: 'About Us',   href: '/(any)/about' },
+    { label: 'Contact Us', href: '/(any)/contact' },
+    { label: 'My Wishlist', href: '/(any)/wishlist' },
   ];
 
   const legalLinks = [
-    { label: 'Privacy Policy', href: '/privacy' },
-    { label: 'Terms of Service', href: '/terms' },
-    { label: 'Return Policy', href: '/returns' },
-  
+    { label: 'Privacy Policy', href: '/(any)/privacy' },
+    { label: 'Terms of Service', href: '/(any)/terms' },
+    { label: 'Return Policy', href: '/(any)/returns' },
   ];
 
   const socialLinks = [
-    { icon: Facebook, url: 'https://facebook.com', color: '#1877F2' },
-    { icon: Twitter, url: 'https://twitter.com', color: '#1DA1F2' },
-    { icon: Instagram, url: 'https://instagram.com', color: '#E4405F' },
-    { icon: Linkedin, url: 'https://linkedin.com', color: '#0A66C2' },
+    { label: 'Facebook',  icon: Facebook,       url: 'https://facebook.com'  },
+    { label: 'Twitter',   icon: Twitter,        url: 'https://twitter.com'   },
+    { label: 'Instagram', icon: Instagram,      url: 'https://instagram.com' },
+    { label: 'LinkedIn',  icon: Linkedin,       url: 'https://linkedin.com'  },
+    { label: 'WhatsApp',  icon: MessageCircle,  url: '',                     onPress: handleWhatsApp },
   ];
 
   return (
     <View className="bg-[#1a1a1a]">
-      {/* Main Footer Content */}
-      <View className="px-6 py-4">
-        {/* Company Info */}
-        <View className="mb-8 pb-8 border-b border-gray-800 items-center">
-          <View className="bg-white rounded-lg p-2 mb-4 shadow-lg">
-            <Image 
+
+      {/* ── Main Content ──────────────────────────────────────────────────────── */}
+      <View className="px-5 pt-6 pb-4">
+
+        {/* ── 1. Company Info: image LEFT | text RIGHT ──────────────────────── */}
+        <View className="flex-row items-center mb-6 pb-6 border-b border-gray-800">
+          {/* Logo */}
+          <View className="bg-white rounded-2xl p-3 shadow-md" style={{ shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, elevation: 4 }}>
+            <Image
               source={require('../../../../assets/images/logo4.png')}
-              className="w-32 h-28"
-              resizeMode="contain"
+              className="w-32 h-20"
+              resizeMode="cover"
             />
           </View>
-          <Text className="text-2xl font-bold text-white mb-2">M2C MarkDowns</Text>
-          <Text className="text-base text-gray-400">Private Limited</Text>
+
+          {/* Company text — right-aligned */}
+          <View className="flex-1 items-end pl-4">
+            <Text className="text-xl font-bold text-white text-right tracking-tight leading-tight">
+              M2C MarkDowns
+            </Text>
+            <View className="w-10 h-px bg-gray-600 mt-2 mb-2" />
+            <Text className="text-xs font-semibold text-gray-400 text-right uppercase tracking-widest">
+              Private Limited
+            </Text>
+          </View>
         </View>
 
         {/* Links Grid */}
@@ -67,14 +76,17 @@ export default function Footer() {
               <Text className="text-lg font-bold text-white mb-4">Quick Links</Text>
               <View className="space-y-2">
                 {quickLinks.map((link) => (
-                  <TouchableOpacity
+                  <Pressable
                     key={link.label}
                     onPress={() => handleLinkPress(link.href)}
+                    accessibilityLabel={`Go to ${link.label}`}
+                    accessibilityRole="button"
+                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                     className="flex-row items-center py-2"
                   >
                     <ChevronRight size={14} color="#9ca3af" />
                     <Text className="text-gray-300 text-sm ml-2">{link.label}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 ))}
               </View>
             </View>
@@ -84,16 +96,19 @@ export default function Footer() {
               <Text className="text-lg font-bold text-white mb-4">Legal</Text>
               <View className="space-y-2">
                 {legalLinks.map((link) => (
-                  <TouchableOpacity
+                  <Pressable
                     key={link.label}
                     onPress={() => handleLinkPress(link.href)}
+                    accessibilityLabel={`Go to ${link.label}`}
+                    accessibilityRole="button"
+                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                     className="flex-row items-center py-2"
                   >
                     <ChevronRight size={14} color="#9ca3af" />
                     <Text className="text-gray-300 text-sm ml-2" numberOfLines={2}>
                       {link.label}
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 ))}
               </View>
             </View>
@@ -104,8 +119,11 @@ export default function Footer() {
         <View className="mb-8 bg-gray-800 rounded-2xl p-5">
           <Text className="text-lg font-bold text-white mb-4">Get In Touch</Text>
           <View className="space-y-4 gap-2">
-            <TouchableOpacity
+            <Pressable
               onPress={handleEmailPress}
+              accessibilityLabel="Send email"
+              accessibilityRole="button"
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
               className="flex-row items-center bg-gray-700 rounded-xl p-3"
             >
               <View className="bg-blue-500 rounded-full p-2">
@@ -114,10 +132,13 @@ export default function Footer() {
               <Text className="text-gray-200 text-sm ml-3 flex-1">
                 info@m2cmarkdowns.com
               </Text>
-            </TouchableOpacity>
+            </Pressable>
 
-            <TouchableOpacity
+            <Pressable
               onPress={handlePhonePress}
+              accessibilityLabel="Call us"
+              accessibilityRole="button"
+              style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
               className="flex-row items-center bg-gray-700 rounded-xl p-3"
             >
               <View className="bg-green-500 rounded-full p-2">
@@ -126,7 +147,7 @@ export default function Footer() {
               <Text className="text-gray-200 text-sm ml-3 flex-1">
                 +1 (234) 567-8900
               </Text>
-            </TouchableOpacity>
+            </Pressable>
 
             <View className="flex-row items-start bg-gray-700 rounded-xl p-3">
               <View className="bg-red-500 rounded-full p-2">
@@ -136,33 +157,48 @@ export default function Footer() {
                 123 Textile Street, Fashion District{'\n'}New York, NY 10001
               </Text>
             </View>
+            <Text className="text-gray-300 text-sm flex-1 leading-5">
+              123 Textile Street, Fashion District{'\n'}New York, NY 10001
+            </Text>
           </View>
         </View>
 
-        {/* Social Media */}
-        <View className="mb-2">
-          <Text className="text-lg font-bold text-white mb-4 text-center">Follow Us</Text>
-          <View className="flex-row justify-center space-x-3">
+        {/* ── 3. Social Media — label LEFT | icons RIGHT ────────────────────── */}
+        <View className="flex-row items-center justify-between mb-2">
+          {/* Left label */}
+          <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            Follow Us
+          </Text>
+
+          {/* Right icons */}
+          <View className="flex-row items-center gap-2">
             {socialLinks.map((social, index) => (
-              <TouchableOpacity
+              <Pressable
                 key={index}
                 onPress={() => handleLinkPress(social.url)}
-                className="bg-gray-800 p-4 rounded-full shadow-lg"
-                style={{ backgroundColor: social.color + '20' }}
+                accessibilityLabel="Open social media"
+                accessibilityRole="button"
+                className="p-4 rounded-full shadow-lg"
+                style={({ pressed }) => ({
+                  backgroundColor: social.color + '20',
+                  opacity: pressed ? 0.7 : 1,
+                })}
               >
                 <social.icon size={22} color={social.color} />
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
         </View>
+
       </View>
 
-      {/* Bottom Bar */}
-      <View className="border-t border-gray-800 px-6 py-5 bg-black">
-        <Text className="text-center text-gray-400 text-xs leading-5">
+      {/* ── Bottom Bar ──────────────────────────────────────────────────────── */}
+      <View className="border-t border-gray-800 px-6 py-4 bg-black">
+        <Text className="text-center text-gray-500 text-xs leading-5">
           © {currentYear} M2C MarkDowns Private Limited.{'\n'}All rights reserved.
         </Text>
       </View>
+
     </View>
   );
 }

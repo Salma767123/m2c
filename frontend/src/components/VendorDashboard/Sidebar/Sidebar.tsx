@@ -76,7 +76,12 @@ const navigation: NavigationItem[] = [
   },
 ];
 
-export default function VendorSidebar() {
+interface VendorSidebarProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }: VendorSidebarProps) {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { showSuccessToast } from '@/lib/toast-utils'
 import LoginForm from './LoginForm'
@@ -9,6 +10,22 @@ import LeftSideContent from './LeftSideContent'
 
 export default function LoginRegister() {
   const [isLogin, setIsLogin] = useState(true)
+  const router = useRouter()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken')
+    const userToken = localStorage.getItem('userToken') || sessionStorage.getItem('userToken')
+
+    if (adminToken) {
+      router.replace('/admin/dashboard')
+      return
+    }
+    if (userToken) {
+      router.replace('/')
+      return
+    }
+  }, [router])
 
   const handleGoogleAuth = async () => {
     try {

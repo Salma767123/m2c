@@ -1010,6 +1010,23 @@ model SEOSettings {
 }
 
 // ============================================
+// BANNER CAROUSEL
+// ============================================
+
+model BannerImage {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  imageUrl     String
+  altText      String?
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  updatedBy    String?  @db.ObjectId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("banner_images")
+}
+
+// ============================================
 // HUB MANAGEMENT
 // ============================================
 

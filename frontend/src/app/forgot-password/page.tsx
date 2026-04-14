@@ -1,7 +1,12 @@
+import { Suspense } from 'react'
 import Forgot from '@/components/WebSite/Forgot/Forgot'
 
 export default function ForgotPasswordPage() {
-  return <Forgot />
+  return (
+    <Suspense>
+      <Forgot />
+    </Suspense>
+  )
 }
 
 export const metadata = {

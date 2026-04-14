@@ -11,132 +11,79 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { FileText, CheckCircle, XCircle, Clock, Eye, Search } from 'lucide-react-native';
 
-type ReportStatus = 'passed' | 'failed' | 'pending';
+import { qcCheckerService } from '../../../services/qcCheckerService';
 
-type InspectionReport = {
-  id: string;
-  vendor: string;
-  po: string;
-  status: ReportStatus;
-  createdAt: string;
-  cartons?: number;
-  inspector?: string;
-  client?: string;
-  factory?: string;
-  serviceLocation?: string;
-};
-
-const REPORTS: InspectionReport[] = [
-  {
-    id: 'RPT-001',
-    vendor: 'Alpha Textiles Ltd',
-    po: 'PO-2024-091',
-    status: 'passed',
-    createdAt: '2024-02-25',
-    cartons: 50,
-    inspector: 'John Smith',
-    client: 'Fashion Forward Inc.',
-    factory: 'Alpha Textiles Main Unit',
-    serviceLocation: 'Bangalore, IN',
-  },
-  {
-    id: 'RPT-002',
-    vendor: 'Bright Garments',
-    po: 'PO-2024-089',
-    status: 'failed',
-    createdAt: '2024-02-24',
-    cartons: 75,
-    inspector: 'John Smith',
-    client: 'Style Co.',
-    factory: 'Bright Garments Factory',
-    serviceLocation: 'Tiruppur, IN',
-  },
-  {
-    id: 'RPT-003',
-    vendor: 'Quality Fashions',
-    po: 'PO-2024-087',
-    status: 'passed',
-    createdAt: '2024-02-24',
-    cartons: 100,
-    inspector: 'John Smith',
-    client: 'Premium Brands Ltd.',
-    factory: 'Quality Fashions Manufacturing',
-    serviceLocation: 'Mumbai, IN',
-  },
-  {
-    id: 'RPT-004',
-    vendor: 'Modern Apparel Co',
-    po: 'PO-2024-085',
-    status: 'pending',
-    createdAt: '2024-02-23',
-    cartons: 60,
-    inspector: 'John Smith',
-    client: 'Urban Wear Inc.',
-    factory: 'Modern Apparel Factory',
-    serviceLocation: 'Chennai, IN',
-  },
-  {
-    id: 'RPT-005',
-    vendor: 'Thread Masters',
-    po: 'PO-2024-084',
-    status: 'passed',
-    createdAt: '2024-02-22',
-    cartons: 45,
-    inspector: 'John Smith',
-    client: 'Textile World',
-    factory: 'Thread Masters Unit',
-    serviceLocation: 'Coimbatore, IN',
-  },
-];
+type ReportStatus = 'PASSED' | 'FAILED' | 'PENDING' | 'COMPLETED' | 'CONDITIONALLY_PASSED' | string;
 
 export default function ReportsScreen() {
   const [checkerIdLoaded, setCheckerIdLoaded] = useState(false);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<ReportStatus | 'all'>('all');
+  const [inspections, setInspections] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const stored = await AsyncStorage.getItem('checkerID');
-      if (!stored) {
-        router.replace('/(auth)/Login');
-        return;
+    const loadData = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('checkerID');
+        if (!stored) {
+          router.replace('/(auth)/Login');
+          return;
+        }
+        setCheckerIdLoaded(true);
+
+        const response = await qcCheckerService.getInspections();
+        if (response && response.success) {
+          setInspections(response.inspections || []);
+        }
+      } catch (error) {
+        console.error("Failed to load generic reports:", error);
+      } finally {
+        setLoading(false);
       }
-      setCheckerIdLoaded(true);
     };
 
-    checkAuth();
+    loadData();
   }, []);
 
   const filteredReports = useMemo(() => {
-    let filtered = REPORTS;
+    let filtered = inspections;
     
     // Filter by search query
     const query = search.trim().toLowerCase();
     if (query) {
       filtered = filtered.filter((r) => {
         return (
-          r.id.toLowerCase().includes(query) ||
-          r.vendor.toLowerCase().includes(query) ||
-          r.po.toLowerCase().includes(query) ||
-          r.client?.toLowerCase().includes(query)
+          r.id?.toLowerCase().includes(query) ||
+          r.vendor?.name?.toLowerCase().includes(query) ||
+          r.vendorName?.toLowerCase().includes(query) ||
+          r.poNumber?.toLowerCase().includes(query) ||
+          r.clientName?.toLowerCase().includes(query)
         );
       });
     }
     
     // Filter by status
     if (filterStatus !== 'all') {
-      filtered = filtered.filter(r => r.status === filterStatus);
+      if (filterStatus === 'PASSED') {
+         filtered = filtered.filter(r => r.status === 'COMPLETED' || r.status === 'PASSED' || r.result === 'PASSED' || r.result === 'QC_APPROVED');
+      } else if (filterStatus === 'FAILED') {
+         filtered = filtered.filter(r => r.status === 'REJECTED' || r.result === 'FAILED');
+      } else {
+         filtered = filtered.filter(r => r.status === filterStatus);
+      }
     }
     
     return filtered;
-  }, [search, filterStatus]);
+  }, [search, filterStatus, inspections]);
 
   const handleViewReport = (reportId: string) => {
     router.push(`/(tabs)/report/view?id=${reportId}`);
   };
 
-  const renderStatusBadge = (status: ReportStatus) => {
-    if (status === 'passed') {
+  const renderStatusBadge = (status: string, result?: string) => {
+    const checkValue = result || status;
+    if (checkValue === 'PASSED' || checkValue === 'COMPLETED' || checkValue === 'QC_APPROVED' || checkValue === 'passed') {
       return (
         <View className="flex-row items-center gap-1 bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-200">
           <CheckCircle size={10} color="#059669" />
@@ -144,7 +91,7 @@ export default function ReportsScreen() {
         </View>
       );
     }
-    if (status === 'failed') {
+    if (checkValue === 'FAILED' || checkValue === 'REJECTED' || checkValue === 'failed') {
       return (
         <View className="flex-row items-center gap-1 bg-red-100 px-2.5 py-1 rounded-full border border-red-200">
           <XCircle size={10} color="#dc2626" />
@@ -155,19 +102,26 @@ export default function ReportsScreen() {
     return (
       <View className="flex-row items-center gap-1 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200">
         <Clock size={10} color="#d97706" />
-        <Text className="text-[10px] font-bold text-amber-700">PENDING</Text>
+        <Text className="text-[10px] font-bold text-amber-700">{(checkValue || 'PENDING').toUpperCase()}</Text>
       </View>
     );
   };
 
-  const getStatusCount = (status: ReportStatus) => {
-    return REPORTS.filter(r => r.status === status).length;
+  const getStatusCount = (targetStatus: ReportStatus) => {
+    if (targetStatus === 'PASSED') {
+       return inspections.filter(r => r.status === 'COMPLETED' || r.status === 'PASSED' || r.result === 'PASSED').length;
+    }
+    if (targetStatus === 'FAILED') {
+       return inspections.filter(r => r.status === 'REJECTED' || r.result === 'FAILED').length;
+    }
+    return inspections.filter(r => r.status === targetStatus).length;
   };
 
-  if (!checkerIdLoaded) {
+  if (!checkerIdLoaded || loading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">
         <ActivityIndicator size="large" color="#3b82f6" />
+        <Text className="mt-4 text-gray-500 font-medium tracking-wide">Fetching Reports...</Text>
       </View>
     );
   }
@@ -199,10 +153,11 @@ export default function ReportsScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
           <View className="flex-row gap-2">
             {[
-              { key: 'all', label: 'All Reports', count: REPORTS.length },
-              { key: 'passed', label: 'Passed', count: getStatusCount('passed') },
-              { key: 'failed', label: 'Failed', count: getStatusCount('failed') },
-              { key: 'pending', label: 'Pending', count: getStatusCount('pending') }
+              { key: 'all', label: 'All Reports', count: inspections.length },
+              { key: 'PASSED', label: 'Passed', count: getStatusCount('PASSED') },
+              { key: 'FAILED', label: 'Failed', count: getStatusCount('FAILED') },
+              { key: 'SCHEDULED', label: 'Scheduled', count: getStatusCount('SCHEDULED') },
+              { key: 'IN_PROGRESS', label: 'In Progress', count: getStatusCount('IN_PROGRESS') }
             ].map((filter) => (
               <TouchableOpacity
                 key={filter.key}
@@ -243,34 +198,34 @@ export default function ReportsScreen() {
           >
             <View className="flex-row justify-between items-start mb-3">
               <View className="flex-1 mr-3">
-                <Text className="text-base font-bold text-gray-900 mb-1">
-                  {report.vendor}
+                <Text className="text-base font-bold text-gray-900 mb-1" numberOfLines={1}>
+                  {report.vendor?.name || report.vendor?.companyName || report.vendorName || "Unknown Vendor"}
                 </Text>
                 <View className="flex-row items-center gap-2">
                   <View className="bg-gray-100 border border-gray-200 px-2 py-1 rounded">
-                    <Text className="text-xs font-bold text-9ray-600">{report.po}</Text>
+                    <Text className="text-[10px] font-bold text-gray-700 font-mono">{report.poNumber || "PO-NA"}</Text>
                   </View>
-                  <Text className="text-xs text-gray-500">ID: {report.id}</Text>
+                  <Text className="text-[10px] text-gray-500 font-mono">ID: {report.id?.substring(0,8)}</Text>
                 </View>
               </View>
-              {renderStatusBadge(report.status)}
+              {renderStatusBadge(report.status, report.result)}
             </View>
 
             <View className="flex-row items-center justify-between mb-3 pb-3 border-b border-gray-100">
               <View className="flex-row items-center gap-4">
                 <View>
                   <Text className="text-[10px] text-gray-500">Date</Text>
-                  <Text className="text-xs font-semibold text-gray-900">{report.createdAt}</Text>
+                  <Text className="text-xs font-semibold text-gray-900">{new Date(report.createdAt).toLocaleDateString()}</Text>
                 </View>
                 <View>
-                  <Text className="text-[10px] text-gray-500">Cartons</Text>
-                  <Text className="text-xs font-semibold text-gray-900">{report.cartons}</Text>
+                  <Text className="text-[10px] text-gray-500">Scheduled</Text>
+                  <Text className="text-xs font-semibold text-gray-900">{report.scheduledDate || "N/A"}</Text>
                 </View>
-                {report.client && (
+                {report.clientName && (
                   <View>
                     <Text className="text-[10px] text-gray-500">Client</Text>
                     <Text className="text-xs font-semibold text-gray-900" numberOfLines={1}>
-                      {report.client}
+                      {report.clientName}
                     </Text>
                   </View>
                 )}
@@ -283,7 +238,7 @@ export default function ReportsScreen() {
               className="flex-row items-center justify-center gap-2 bg-gray-900 rounded-xl py-2.5 border border-gray-200"
             >
               <Eye size={14} color="#ffffff" />
-              <Text className="text-xs font-bold text-white">View Report</Text>
+              <Text className="text-xs font-bold text-white">View Report Data</Text>
             </TouchableOpacity>
           </View>
         ))}

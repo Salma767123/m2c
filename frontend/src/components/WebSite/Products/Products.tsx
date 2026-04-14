@@ -99,7 +99,7 @@ const Products = () => {
       try {
         setLoading(true);
         
-        const params = {
+        const params: Record<string, any> = {
           page: currentPage,
           limit: 12,
           search: searchTerm || undefined,
@@ -109,7 +109,9 @@ const Products = () => {
           maxPrice: priceRange.max < 1000 ? priceRange.max : undefined,
           sortBy: sortBy === 'price-low' || sortBy === 'price-high' ? 'basePrice' : sortBy,
           sortOrder: sortBy === 'price-low' ? 'asc' : 'desc',
-          inStock: inStockOnly || undefined
+          inStock: inStockOnly || undefined,
+          colors: selectedColors.length > 0 ? selectedColors.join(',') : undefined,
+          minRating: selectedRating > 0 ? selectedRating : undefined
         };
         
         console.log('Fetching products with params:', params);
@@ -137,7 +139,7 @@ const Products = () => {
     return () => {
       ignore = true;
     };
-  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, searchStringParam]);
+  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedColors, selectedRating, searchStringParam]);
 
   // Handle URL change reflecting updated searches
   useEffect(() => {
@@ -180,16 +182,8 @@ const Products = () => {
     setCurrentPage(1);
   };
 
-  // Filter products locally (for color and rating which aren't in API)
-  const filteredProducts = products.filter(product => {
-    const matchesColor = selectedColors.length === 0 || selectedColors.some(color =>
-      product.tags?.some(tag => tag.toLowerCase().includes(color.toLowerCase()))
-    );
-
-    const matchesRating = selectedRating === 0 || (product.rating && product.rating >= selectedRating);
-
-    return matchesColor && matchesRating;
-  });
+  // All filtering is now done server-side
+  const filteredProducts = products;
 
   const activeFiltersCount = selectedColors.length +
     (selectedRating > 0 ? 1 : 0) +
@@ -423,6 +417,7 @@ const Products = () => {
                                 } else {
                                   setSelectedColors(selectedColors.filter(c => c !== color));
                                 }
+                                setCurrentPage(1);
                               }}
                               className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
                             />
@@ -443,7 +438,7 @@ const Products = () => {
                               name="rating"
                               value={rating}
                               checked={selectedRating === rating}
-                              onChange={(e) => setSelectedRating(Number(e.target.value))}
+                              onChange={(e) => { setSelectedRating(Number(e.target.value)); setCurrentPage(1); }}
                               className="border-gray-300 text-amber-600 focus:ring-amber-500"
                             />
                             <div className="ml-2 flex items-center">
@@ -466,7 +461,7 @@ const Products = () => {
                             name="rating"
                             value={0}
                             checked={selectedRating === 0}
-                            onChange={(e) => setSelectedRating(Number(e.target.value))}
+                            onChange={(e) => { setSelectedRating(Number(e.target.value)); setCurrentPage(1); }}
                             className="border-gray-300 text-amber-600 focus:ring-amber-500"
                           />
                           <span className="ml-2 text-sm text-gray-700">All Ratings</span>

@@ -5,6 +5,7 @@ import { User, Mail, Phone, MapPin, Building2, Shield, Save, FileText, CreditCar
 import GSTSettingsTab from "./GSTSettingsTab";
 import HubSettingsTab from "./HubSettingsTab";
 import SEOSettingsTab from "./SEOSettingsTab";
+import BannerSettingsTab from "./BannerSettingsTab";
 import InvoiceSettings from "../Billing/Settings/InvoiceSettings";
 import { Card, CardContent } from "../../UI/Card";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
@@ -43,7 +44,7 @@ export default function Settings() {
     zipCode: "10001",
   });
 
-  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo" | "banner">("profile");
 
   // Profile form state
   const [profileData, setProfileData] = useState({
@@ -493,6 +494,16 @@ export default function Settings() {
               >
                 <Globe className="h-4 w-4 inline mr-2" />
                 SEO Settings
+              </button>
+              <button
+                onClick={() => setActiveTab("banner")}
+                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "banner"
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                <ImageIcon className="h-4 w-4 inline mr-2" />
+                Banner
               </button>
             </>
           )}
@@ -1447,6 +1458,11 @@ export default function Settings() {
       {/* SEO Settings Tab */}
       {activeTab === "seo" && canAccessAdminSettings && (
         <SEOSettingsTab />
+      )}
+
+      {/* Banner Settings Tab */}
+      {activeTab === "banner" && canAccessAdminSettings && (
+        <BannerSettingsTab />
       )}
     </div>
   );

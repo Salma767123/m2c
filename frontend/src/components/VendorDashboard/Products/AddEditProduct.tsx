@@ -499,6 +499,29 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     }
   }, [isEdit, productId, inventoryId, availableInventoryItems])
 
+  // Auto-calculate discount percentage when prices change
+  useEffect(() => {
+    if (formData.originalPrice && formData.basePrice && formData.originalPrice > formData.basePrice) {
+      const calculatedDiscount = Math.round(
+        ((formData.originalPrice - formData.basePrice) / formData.originalPrice) * 100
+      );
+      
+      // Only update if the calculated discount is different from current
+      if (formData.discount !== calculatedDiscount) {
+        setFormData(prev => ({
+          ...prev,
+          discount: calculatedDiscount
+        }));
+      }
+    } else if (formData.discount && (!formData.originalPrice || formData.originalPrice <= formData.basePrice)) {
+      // Clear discount if original price is not set or is less than base price
+      setFormData(prev => ({
+        ...prev,
+        discount: undefined
+      }));
+    }
+  }, [formData.originalPrice, formData.basePrice]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
 

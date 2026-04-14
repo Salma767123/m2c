@@ -8,9 +8,11 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import {
-  ShoppingCart,
+  ShoppingBag,
   Plus,
   Minus,
   Trash2,
@@ -21,6 +23,10 @@ import {
   Package,
   CheckCircle,
   ArrowRight,
+  Tag,
+  RotateCcw,
+  AlertCircle,
+  ChevronLeft,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,6 +36,7 @@ import { publicProductService } from '@/services/publicProductService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface OrderItem {
   id: string;
   productId: string;
@@ -43,9 +50,16 @@ interface OrderItem {
   inStock: boolean;
   quantity: number;
   description?: string;
+  availableStock?: number;
   material?: string;
   discount?: number;
   gstPercentage?: number;
+  variantDetails?: {
+    size: string;
+    color: string;
+    colorHex?: string;
+    sku?: string;
+  };
 }
 
 interface OrderSummary {
@@ -56,6 +70,10 @@ interface OrderSummary {
   total: number;
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmt = (n: number) => `₹${n.toFixed(2)}`;
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function Cart() {
   const [cartItems, setCartItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,21 +81,23 @@ export default function Cart() {
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
 
   useEffect(() => {
     fetchCart();
     loadSavedCoupon();
   }, []);
 
+  // ── Data ────────────────────────────────────────────────────────────────────
   const loadSavedCoupon = async () => {
     try {
-      const savedCoupon = await AsyncStorage.getItem('appliedCoupon');
-      if (savedCoupon) {
-        const { code, discountAmount } = JSON.parse(savedCoupon);
+      const saved = await AsyncStorage.getItem('appliedCoupon');
+      if (saved) {
+        const { code, discountAmount: da } = JSON.parse(saved);
         setAppliedPromo(code);
-        setDiscountAmount(discountAmount);
+        setDiscountAmount(da);
       }
-    } catch (e) {
+    } catch {
       await AsyncStorage.removeItem('appliedCoupon');
     }
   };
@@ -89,121 +109,135 @@ export default function Cart() {
       setIsAuthenticated(authenticated);
 
       if (!authenticated) {
-        // Fetch from local storage for guest users
         const localCart = await cartService.getLocalCart();
-        const itemsPromises = localCart.map(async (item: any) => {
+        const promises = localCart.map(async (item: any) => {
           try {
-            const productRes = await publicProductService.getProduct(item.productId);
-            if (productRes.success && productRes.data) {
-              const product = productRes.data;
+            const res = await publicProductService.getProduct(item.productId);
+            if (res.success && res.data) {
+              const p = res.data;
+              // Resolve variant if present
+              let variantDetails: OrderItem['variantDetails'] = undefined;
+              let finalPrice = p.adminFixedPrice || p.basePrice;
+              let finalImages = p.images.map((img: any) => img.url);
+              let finalStock = p.totalStock;
+              if (item.variantId && p.variants) {
+                const v = p.variants.find((vv: any) => vv.id === item.variantId);
+                if (v) {
+                  variantDetails = { size: v.size, color: v.color, colorHex: v.colorHex, sku: v.sku };
+                  finalPrice = v.price;
+                  finalStock = v.stock;
+                  if (v.images?.length > 0) finalImages = v.images;
+                }
+              }
               return {
                 id: item.id,
                 productId: item.productId,
-                name: product.name,
-                price: product.adminFixedPrice || product.basePrice,
-                originalPrice: product.originalPrice,
-                images: product.images.map((img: any) => img.url),
-                category: product.category,
-                rating: product.rating,
-                reviews: product.reviews,
-                inStock: product.inStock,
+                name: p.name,
+                price: finalPrice,
+                originalPrice: p.originalPrice,
+                images: finalImages,
+                category: p.category,
+                rating: p.rating,
+                reviews: p.reviews,
+                inStock: p.inStock,
+                availableStock: finalStock,
                 quantity: item.quantity,
-                description: product.description,
-                material: product.material,
-                discount: product.discount,
-                gstPercentage: product.gstPercentage,
+                description: p.description,
+                material: p.material,
+                discount: p.discount,
+                gstPercentage: p.gstPercentage,
+                variantDetails,
               };
             }
-          } catch (err) {
-            console.error(`Failed to fetch product ${item.productId}`, err);
-          }
+          } catch { /* skip broken product */ }
           return null;
         });
-
-        const resolvedItems = await Promise.all(itemsPromises);
-        const items = resolvedItems.filter((item: any) => item !== null) as OrderItem[];
-        setCartItems(items);
+        const resolved = await Promise.all(promises);
+        setCartItems(resolved.filter(Boolean) as OrderItem[]);
       } else {
-        // Fetch from backend for authenticated users
         const response = await cartService.getCart();
         if (response.success && response.data) {
-          const items = response.data.items.map((item: any) => ({
-            id: item.id,
-            productId: item.productId,
-            name: item.product?.name || 'Unknown Product',
-            price: item.price,
-            originalPrice: item.product?.originalPrice,
-            images: item.product?.images?.map((img: any) => img.url) || [],
-            category: item.product?.category || '',
-            rating: item.product?.rating,
-            reviews: item.product?.reviews,
-            inStock: item.product?.inStock ?? true,
-            quantity: item.quantity,
-            description: item.product?.description,
-            material: item.product?.material,
-            discount: item.product?.discount,
-            gstPercentage: item.product?.gstPercentage,
-          }));
-          setCartItems(items);
+          setCartItems(
+            response.data.items.map((item: any) => {
+              const hasVariantImg = item.variant?.images && item.variant.images.length > 0;
+              const hasProductImg = item.product?.images && item.product.images.length > 0;
+              const imgArray = hasVariantImg
+                ? item.variant.images
+                : hasProductImg
+                ? item.product.images.map((img: any) => img.url)
+                : [];
+              return {
+                id: item.id,
+                productId: item.productId,
+                name: item.product?.name || 'Unknown Product',
+                price: item.price,
+                originalPrice: item.product?.originalPrice,
+                images: imgArray,
+                category: item.product?.category || '',
+                rating: item.product?.rating,
+                reviews: item.product?.reviews,
+                inStock: item.product?.inStock ?? true,
+                availableStock: item.variant?.stock ?? item.product?.availableStock,
+                quantity: item.quantity,
+                description: item.product?.description,
+                material: item.product?.material,
+                discount: item.product?.discount,
+                gstPercentage: item.product?.gstPercentage,
+                variantDetails: item.variant
+                  ? {
+                      size: item.variant.size,
+                      color: item.variant.color,
+                      colorHex: item.variant.colorHex,
+                      sku: item.variant.sku,
+                    }
+                  : undefined,
+              };
+            })
+          );
         }
       }
-    } catch (error) {
-      console.error('Failed to fetch cart:', error);
+    } catch {
       showErrorToast('Error', 'Failed to load cart items');
     } finally {
       setLoading(false);
     }
   };
 
-  const updateQuantity = async (id: string, productId: string, newQuantity: number) => {
-    if (newQuantity < 1) {
-      removeItem(id, productId);
-      return;
-    }
-
+  // ── Cart actions ─────────────────────────────────────────────────────────────
+  const updateQuantity = async (id: string, productId: string, newQty: number) => {
+    if (newQty < 1) { removeItem(id); return; }
     try {
       if (!isAuthenticated) {
-        cartService.updateLocalCartItem(productId, newQuantity);
-        setCartItems((items) =>
-          items.map((item) =>
-            item.productId === productId ? { ...item, quantity: newQuantity } : item
-          )
-        );
+        await cartService.updateLocalCartItem(id, newQty);
+        setCartItems(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty } : i));
         showSuccessToast('Updated', 'Cart item quantity updated');
-        return;
+      } else {
+        await cartService.updateCartItem(id, newQty);
+        setCartItems(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty } : i));
+        showSuccessToast('Updated', 'Cart item quantity updated');
       }
-
-      await cartService.updateCartItem(id, newQuantity);
-      setCartItems((items) =>
-        items.map((item) => (item.id === id ? { ...item, quantity: newQuantity } : item))
-      );
-      showSuccessToast('Updated', 'Cart item quantity updated');
-    } catch (error) {
-      console.error('Failed to update quantity:', error);
+    } catch {
       showErrorToast('Error', 'Failed to update quantity');
     }
   };
 
-  const removeItem = async (id: string, productId: string) => {
-    Alert.alert('Remove Item', 'Are you sure you want to remove this item?', [
-      { text: 'Cancel', style: 'cancel' },
+  const removeItem = (id: string) => {
+    Alert.alert('Remove Item', 'Remove this item from your cart?', [
+      { text: 'Keep', style: 'cancel' },
       {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
           try {
             if (!isAuthenticated) {
-              cartService.removeFromLocalCart(productId);
-              setCartItems((items) => items.filter((item) => item.productId !== productId));
-              showSuccessToast('Removed', 'Item removed from cart');
-              return;
+              await cartService.removeFromLocalCart(id);
+              setCartItems(prev => prev.filter(i => i.id !== id));
+            } else {
+              await cartService.removeFromCart(id);
+              setCartItems(prev => prev.filter(i => i.id !== id));
             }
-
-            await cartService.removeFromCart(id);
-            setCartItems((items) => items.filter((item) => item.id !== id));
             showSuccessToast('Removed', 'Item removed from cart');
-          } catch (error) {
-            console.error('Failed to remove item:', error);
+          } catch {
             showErrorToast('Error', 'Failed to remove item');
           }
         },
@@ -212,65 +246,51 @@ export default function Cart() {
   };
 
   const applyPromoCode = async () => {
-    if (!promoCode.trim()) {
-      showErrorToast('Error', 'Please enter a promo code');
-      return;
-    }
-
+    if (!promoCode.trim()) { showErrorToast('Error', 'Please enter a promo code'); return; }
     try {
-      const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      setApplyingCoupon(true);
+      const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
       const response = await couponService.applyCoupon(promoCode, subtotal);
-
       if (response.success && response.data) {
         setAppliedPromo(response.data.code);
         setDiscountAmount(response.data.discountAmount);
         setPromoCode('');
-        showSuccessToast(
-          'Success',
-          `Coupon "${response.data.code}" applied! You saved $${response.data.discountAmount.toFixed(2)}`
-        );
-
-        await AsyncStorage.setItem(
-          'appliedCoupon',
-          JSON.stringify({
-            code: response.data.code,
-            discountAmount: response.data.discountAmount,
-          })
-        );
+        await AsyncStorage.setItem('appliedCoupon', JSON.stringify({
+          code: response.data.code,
+          discountAmount: response.data.discountAmount,
+        }));
+        showSuccessToast('Applied!', `Coupon "${response.data.code}" saved you ${fmt(response.data.discountAmount)}`);
       } else {
         throw new Error(response.message || 'Invalid coupon');
       }
-    } catch (error: any) {
-      console.error('Coupon error:', error);
-      setAppliedPromo('');
-      setDiscountAmount(0);
+    } catch (e: any) {
+      setAppliedPromo(''); setDiscountAmount(0);
       await AsyncStorage.removeItem('appliedCoupon');
-      showErrorToast('Error', error.message || 'Failed to apply coupon');
+      showErrorToast('Invalid Coupon', e.message || 'Failed to apply coupon');
+    } finally {
+      setApplyingCoupon(false);
     }
   };
 
   const removeCoupon = async () => {
-    setAppliedPromo('');
-    setDiscountAmount(0);
+    setAppliedPromo(''); setDiscountAmount(0);
     await AsyncStorage.removeItem('appliedCoupon');
     showSuccessToast('Removed', 'Coupon removed');
   };
 
+  // ── Summary ──────────────────────────────────────────────────────────────────
   const calculateSummary = (): OrderSummary => {
-    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const shipping = 0;
-    const discount = discountAmount;
-
-    const tax = cartItems.reduce((sum, item) => {
-      const itemSubtotal = item.price * item.quantity;
-      const gstRate = item.gstPercentage ? item.gstPercentage / 100 : 0;
-      return sum + itemSubtotal * gstRate;
+    const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+    const tax = cartItems.reduce((s, i) => {
+      return s + i.price * i.quantity * (i.gstPercentage ? i.gstPercentage / 100 : 0);
     }, 0);
-
-    const total = subtotal + shipping + tax - discount;
-
-    return { subtotal, shipping, tax, discount, total: total > 0 ? total : 0 };
+    const total = Math.max(0, subtotal + tax - discountAmount);
+    return { subtotal, shipping: 0, tax, discount: discountAmount, total };
   };
+
+  const hasStockIssue = cartItems.some(
+    i => i.inStock === false || (i.availableStock !== undefined && i.quantity > i.availableStock)
+  );
 
   const handleCheckout = () => {
     if (!isAuthenticated) {
@@ -280,294 +300,436 @@ export default function Cart() {
       ]);
       return;
     }
-
-    if (cartItems.length === 0) {
-      showErrorToast('Empty Cart', 'Please add items to your cart');
+    if (hasStockIssue) {
+      showErrorToast('Stock Issue', 'Remove out-of-stock items before checkout');
       return;
     }
-
-    // Navigate to checkout
     router.push('/(any)/checkout');
   };
 
+  // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <View className="flex-1 bg-gray-50 items-center justify-center">
+        <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
         <ActivityIndicator size="large" color="#000000" />
-        <Text className="text-gray-600 mt-4">Loading cart...</Text>
+        <Text className="text-gray-500 mt-3 text-sm">Loading your cart…</Text>
       </View>
     );
   }
 
   const summary = calculateSummary();
 
-  return (
-    <View className="flex-1 bg-gray-50">
-      {/* Header */}
-      <View className="bg-white px-4 py-6 border-b border-gray-200">
-        <Text className="text-2xl font-bold text-gray-900">Shopping Cart</Text>
-        <Text className="text-gray-600 mt-1">Review your items and proceed to checkout</Text>
-      </View>
+  // ── Empty state ──────────────────────────────────────────────────────────────
+  if (cartItems.length === 0) {
+    return (
+      <View className="flex-1 bg-gray-50">
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
 
-      {cartItems.length === 0 ? (
-        <View className="flex-1 items-center justify-center p-6">
-          <ShoppingCart size={64} color="#d1d5db" />
-          <Text className="text-2xl font-bold text-gray-900 mt-4 mb-2">Your cart is empty</Text>
-          <Text className="text-gray-600 text-center mb-6">
-            Add some items to get started
+        {/* Header */}
+        <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-5 px-5`}>
+          <Text className="text-white text-2xl font-extrabold tracking-tight">My Cart</Text>
+          <Text className="text-gray-400 text-xs mt-0.5">0 items</Text>
+        </View>
+
+        <View className="flex-1 items-center justify-center p-8">
+          {/* Empty bag illustration */}
+          <View className="w-24 h-24 rounded-full bg-gray-100 items-center justify-center mb-6">
+            <ShoppingBag size={48} color="#d1d5db" />
+          </View>
+          <Text className="text-2xl font-extrabold text-gray-900 mb-2 text-center">
+            Your cart is empty
+          </Text>
+          <Text className="text-sm text-gray-500 text-center leading-5 mb-8">
+            Looks like you haven't added anything yet.{'\n'}Start shopping to fill it up!
           </Text>
           <TouchableOpacity
             onPress={() => router.push('/(tabs)')}
-            className="bg-black rounded-xl px-8 py-4"
+            activeOpacity={0.85}
+            className="bg-black px-8 py-4 rounded-2xl flex-row items-center gap-2"
           >
-            <Text className="text-white font-bold text-lg">Continue Shopping</Text>
+            <Text className="text-white text-base font-bold">Start Shopping</Text>
+            <ArrowRight size={18} color="#ffffff" />
           </TouchableOpacity>
         </View>
-      ) : (
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 20 }}>
-          {/* Cart Items */}
-          <View className="p-4">
-            <View className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-4">
-              <View className="px-4 py-3 bg-[#222222] flex-row items-center justify-between">
-                <Text className="text-lg font-bold text-white">Cart Items</Text>
-                <View className="bg-white px-3 py-1 rounded-full">
-                  <Text className="text-[#313131] text-sm font-medium">
-                    {cartItems.length} items
-                  </Text>
-                </View>
-              </View>
+      </View>
+    );
+  }
 
-              {cartItems.map((item, index) => (
-                <View
-                  key={item.id}
-                  className={`p-4 ${index < cartItems.length - 1 ? 'border-b border-gray-200' : ''}`}
-                >
-                  <View className="flex-row">
-                    {/* Product Image */}
-                    <View className="shrink-0">
-                      {item.images && item.images.length > 0 ? (
-                        <Image
-                          source={{ uri: item.images[0] }}
-                          className="w-24 h-24 rounded-xl border border-gray-200"
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View className="w-24 h-24 items-center justify-center bg-gray-100 rounded-xl border border-gray-200">
-                          <Package size={32} color="#9ca3af" />
+  // ── Main cart ─────────────────────────────────────────────────────────────────
+  return (
+    <View className="flex-1 bg-gray-50">
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+
+      {/* ── Page Header ─────────────────────────────────────────────────────── */}
+      <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-5 px-5`}>
+        <View className="flex-row items-center justify-between">
+          <View>
+            <Text className="text-white text-2xl font-extrabold tracking-tight">My Cart</Text>
+            <Text className="text-gray-400 text-xs mt-0.5">
+              {cartItems.length} item{cartItems.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+          {/* Item count chip */}
+          <View className="bg-gray-200 rounded-full px-3.5 py-1.5">
+            <Text className="text-black font-extrabold text-xs">{cartItems.length}</Text>
+          </View>
+        </View>
+
+        {/* Subtotal preview strip */}
+        <View className="bg-white/10 rounded-xl px-4 py-2.5 mt-3.5 flex-row justify-between items-center">
+          <Text className="text-gray-300 text-xs">Subtotal</Text>
+          <Text className="text-white text-lg font-extrabold">{fmt(summary.subtotal)}</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Cart Items ────────────────────────────────────────────────────── */}
+        <View className="px-4 pt-4">
+
+          {cartItems.map((item, index) => {
+            const isLast = index === cartItems.length - 1;
+            const isOutOfStock = !item.inStock;
+            const isOverStock = item.availableStock !== undefined && item.quantity > item.availableStock;
+            const hasIssue = isOutOfStock || isOverStock;
+
+            return (
+              <View
+                key={item.id}
+                className={`bg-white rounded-[20px] overflow-hidden shadow-sm ${isLast ? '' : 'mb-3'} border-[1.5px] ${hasIssue ? 'border-gray-400' : 'border-transparent'}`}
+              >
+                {/* Stock issue banner */}
+                {hasIssue && (
+                  <View className="flex-row items-center gap-1.5 px-3.5 py-1.5 bg-gray-100">
+                    <AlertCircle size={13} color="#374151" />
+                    <Text className="text-xs font-semibold text-gray-700">
+                      {isOutOfStock ? 'Out of Stock' : `Only ${item.availableStock} available — reduce quantity`}
+                    </Text>
+                  </View>
+                )}
+
+                {/* ── SECTION 1: 25% image | 75% info ───────────────────── */}
+                <View className="p-4 flex-row gap-3">
+
+                  {/* Left 25% — Product image */}
+                  <View className="w-[25%] relative">
+                    {item.images?.length > 0 ? (
+                      <Image
+                        source={{ uri: item.images[0] }}
+                        className="w-full aspect-square rounded-2xl bg-gray-100"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View className="w-full aspect-square rounded-2xl bg-gray-100 items-center justify-center">
+                        <Package size={28} color="#d1d5db" />
+                      </View>
+                    )}
+                    {/* Discount badge */}
+                    {item.discount && item.discount > 0 && (
+                      <View className="absolute top-1 left-1 bg-gray-800 rounded-md px-1 py-0.5">
+                        <Text className="text-white text-[9px] font-extrabold">-{item.discount}%</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Right 75% — Name row + delete + Tags */}
+                  <View className="flex-1">
+                    {/* Name row + delete button */}
+                    <View className="flex-row items-start justify-between mb-1.5">
+                      <Text
+                        className="flex-1 text-[15px] font-bold text-gray-900 leading-5 mr-2"
+                        numberOfLines={2}
+                      >
+                        {item.name}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => removeItem(item.id)}
+                        className="p-1 -mt-0.5"
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Trash2 size={17} color="#374151" />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Tags row: category · material · rating */}
+                    <View className="flex-row flex-wrap gap-1.5">
+                      {item.category ? (
+                        <View className="bg-gray-100 px-2 py-0.5 rounded-md">
+                          <Text className="text-[11px] text-gray-700 font-semibold">{item.category}</Text>
+                        </View>
+                      ) : null}
+                      {item.material ? (
+                        <View className="bg-gray-100 px-2 py-0.5 rounded-md">
+                          <Text className="text-[11px] text-gray-700 font-semibold">{item.material}</Text>
+                        </View>
+                      ) : null}
+                      {item.rating !== undefined && (
+                        <View className="flex-row items-center gap-0.5 bg-gray-100 px-1.5 py-0.5 rounded-md">
+                          <Star size={10} color="#6b7280" fill="#6b7280" />
+                          <Text className="text-[11px] text-gray-700 font-semibold">
+                            {item.rating} ({item.reviews ?? 0})
+                          </Text>
                         </View>
                       )}
                     </View>
+                  </View>
+                </View>
 
-                    {/* Product Details */}
-                    <View className="flex-1 ml-4">
-                      <View className="flex-row justify-between items-start mb-2">
-                        <View className="flex-1 mr-2">
-                          <Text className="text-base font-bold text-gray-900 mb-1">
-                            {item.name}
-                          </Text>
-                          {item.description && (
-                            <Text className="text-xs text-gray-600 mb-2" numberOfLines={2}>
-                              {item.description}
-                            </Text>
-                          )}
-                          <View className="flex-row flex-wrap gap-2 mb-2">
-                            <View className="bg-blue-100 px-2 py-1 rounded-full">
-                              <Text className="text-xs text-blue-700">{item.category}</Text>
-                            </View>
-                            {item.rating !== undefined && (
-                              <View className="flex-row items-center gap-1">
-                                <Star size={12} color="#fbbf24" fill="#fbbf24" />
-                                <Text className="text-xs text-gray-600">{item.rating}</Text>
-                                <Text className="text-xs text-gray-500">
-                                  ({item.reviews || 0})
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                          <View className="flex-row flex-wrap gap-2">
-                            {item.material && (
-                              <View className="bg-green-100 px-2 py-1 rounded-full">
-                                <Text className="text-xs text-green-700">{item.material}</Text>
-                              </View>
-                            )}
-                            {item.discount && (
-                              <View className="bg-gray-100 px-2 py-1 rounded-full">
-                                <Text className="text-xs text-gray-700 font-semibold">
-                                  Save {item.discount}%
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        </View>
-                        <TouchableOpacity
-                          onPress={() => removeItem(item.id, item.productId)}
-                          className="p-2"
-                        >
-                          <Trash2 size={18} color="#9ca3af" />
-                        </TouchableOpacity>
+                {/* ── SECTION 2: Full-width Variant details ──────────────── */}
+                {item.variantDetails && (
+                  <View className="flex-row items-center gap-4 px-4 py-2.5 bg-gray-50 border-t border-gray-100">
+                    {/* Color */}
+                    <View className="flex-row items-center gap-1.5">
+                      <Text className="text-[11px] text-gray-500 font-medium">Color:</Text>
+                      <View className="flex-row items-center gap-1">
+                        {item.variantDetails.colorHex && (
+                          <View
+                            className="w-3.5 h-3.5 rounded-full border border-gray-300"
+                            style={{ backgroundColor: item.variantDetails.colorHex }}
+                          />
+                        )}
+                        <Text className="text-[12px] font-semibold text-gray-800">
+                          {item.variantDetails.color}
+                        </Text>
                       </View>
+                    </View>
 
-                      {/* Price and Quantity */}
-                      <View className="flex-row items-center justify-between mt-3">
-                        <View className="flex-row items-center gap-2">
-                          <Text className="text-lg font-bold text-gray-900">
-                            ${item.price.toFixed(2)}
-                          </Text>
-                          {item.originalPrice && (
-                            <Text className="text-sm text-gray-500 line-through">
-                              ${item.originalPrice.toFixed(2)}
-                            </Text>
-                          )}
-                        </View>
+                    {/* Divider */}
+                    <View className="w-px h-3.5 bg-gray-300" />
 
-                        <View className="flex-row items-center border border-gray-300 rounded-lg">
-                          <TouchableOpacity
-                            onPress={() =>
-                              updateQuantity(item.id, item.productId, item.quantity - 1)
-                            }
-                            disabled={!item.inStock}
-                            className="p-2"
-                          >
-                            <Minus size={16} color={item.inStock ? '#374151' : '#d1d5db'} />
-                          </TouchableOpacity>
-                          <Text className="px-3 py-2 font-medium text-gray-900">
-                            {item.quantity}
-                          </Text>
-                          <TouchableOpacity
-                            onPress={() =>
-                              updateQuantity(item.id, item.productId, item.quantity + 1)
-                            }
-                            disabled={!item.inStock}
-                            className="p-2"
-                          >
-                            <Plus size={16} color={item.inStock ? '#374151' : '#d1d5db'} />
-                          </TouchableOpacity>
-                        </View>
+                    {/* Size */}
+                    <View className="flex-row items-center gap-1.5">
+                      <Text className="text-[11px] text-gray-500 font-medium">Size:</Text>
+                      <View className="bg-white border border-gray-200 rounded-lg px-2 py-0.5">
+                        <Text className="text-[12px] font-bold text-gray-800">
+                          {item.variantDetails.size}
+                        </Text>
                       </View>
+                    </View>
 
-                      {!item.inStock && (
-                        <Text className="text-xs text-red-600 font-medium mt-2">
-                          Out of Stock
+                    {/* SKU if available */}
+                    {item.variantDetails.sku && (
+                      <>
+                        <View className="w-px h-3.5 bg-gray-300" />
+                        <Text className="text-[10px] text-gray-400 font-medium">
+                          SKU: {item.variantDetails.sku}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                )}
+
+                {/* ── Price + Qty stepper + Line total ───────────────────── */}
+                <View className="px-4 pt-3 pb-4">
+                  <View className="flex-row items-center justify-between">
+                    {/* Price stack */}
+                    <View>
+                      <Text className="text-[17px] font-extrabold text-gray-900">
+                        {fmt(item.price)}
+                      </Text>
+                      {item.originalPrice && item.originalPrice > item.price && (
+                        <Text className="text-xs text-gray-400 line-through">
+                          {fmt(item.originalPrice)}
                         </Text>
                       )}
                     </View>
+
+                    {/* Qty stepper */}
+                    <View className="flex-row items-center bg-gray-100 rounded-xl overflow-hidden">
+                      <TouchableOpacity
+                        onPress={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
+                        disabled={!item.inStock}
+                        className="px-3 py-2"
+                        activeOpacity={0.7}
+                      >
+                        <Minus size={15} color={item.inStock ? '#374151' : '#d1d5db'} />
+                      </TouchableOpacity>
+                      <View className="px-2.5">
+                        <Text className="text-[15px] font-bold text-gray-900 min-w-[18px] text-center">
+                          {item.quantity}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
+                        disabled={!item.inStock}
+                        className="px-3 py-2"
+                        activeOpacity={0.7}
+                      >
+                        <Plus size={15} color={item.inStock ? '#374151' : '#d1d5db'} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
+
+                  {/* Line total */}
+                  <Text className="text-xs text-gray-500 mt-1.5 text-right">
+                    Item total:{' '}
+                    <Text className="font-bold text-gray-700">{fmt(item.price * item.quantity)}</Text>
+                  </Text>
                 </View>
-              ))}
+
+              </View>
+            );
+          })}
+
+          {/* ── Promo Code ────────────────────────────────────────────────── */}
+          <View className="bg-white rounded-[20px] mt-4 p-4.5 shadow-sm p-4">
+            {/* Section title */}
+            <View className="flex-row items-center gap-2 mb-3.5">
+              <View className="w-8 h-8 bg-gray-100 rounded-xl items-center justify-center">
+                <Tag size={15} color="#374151" />
+              </View>
+              <Text className="text-[15px] font-bold text-gray-900">Promo Code</Text>
             </View>
 
-            {/* Promo Code */}
-            <View className="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
-              <Text className="text-base font-bold text-gray-900 mb-3">Promo Code</Text>
-              <View className="flex-row gap-2">
-                <TextInput
-                  placeholder="Enter promo code"
-                  value={promoCode}
-                  onChangeText={setPromoCode}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl bg-white"
-                />
+            {appliedPromo ? (
+              <View className="bg-gray-100 rounded-2xl p-3.5 border-[1.5px] border-gray-300 flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2.5 flex-1">
+                  <CheckCircle size={20} color="#374151" />
+                  <View>
+                    <Text className="text-sm font-bold text-gray-800">"{appliedPromo}" applied!</Text>
+                    <Text className="text-xs text-gray-600 mt-0.5">
+                      You saved {fmt(discountAmount)} 🎉
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={removeCoupon} activeOpacity={0.7} className="p-1">
+                  <Trash2 size={16} color="#374151" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View className="flex-row gap-2.5">
+                <View className="flex-1 flex-row items-center bg-gray-50 border-[1.5px] border-gray-200 rounded-2xl px-3.5">
+                  <TextInput
+                    placeholder="Enter promo code"
+                    value={promoCode}
+                    onChangeText={setPromoCode}
+                    autoCapitalize="characters"
+                    className="flex-1 py-3 text-sm text-gray-900 tracking-wider"
+                    placeholderTextColor="#9ca3af"
+                    returnKeyType="done"
+                    onSubmitEditing={applyPromoCode}
+                  />
+                </View>
                 <TouchableOpacity
                   onPress={applyPromoCode}
-                  className="px-6 py-3 bg-[#222222] rounded-xl items-center justify-center"
+                  disabled={applyingCoupon}
+                  activeOpacity={0.85}
+                  className={`rounded-2xl px-5 items-center justify-center min-w-[72px] ${applyingCoupon ? 'bg-gray-400' : 'bg-black'}`}
                 >
-                  <Text className="text-white font-medium">Apply</Text>
+                  {applyingCoupon
+                    ? <ActivityIndicator size="small" color="#ffffff" />
+                    : <Text className="text-white text-sm font-bold">Apply</Text>
+                  }
                 </TouchableOpacity>
               </View>
-              {appliedPromo && (
-                <View className="mt-3 flex-row items-center justify-between bg-green-50 p-3 rounded-lg border border-green-100">
-                  <View className="flex-row items-center gap-2 flex-1">
-                    <CheckCircle size={18} color="#16a34a" />
-                    <View className="flex-1">
-                      <Text className="text-sm font-medium text-green-600">
-                        Code "{appliedPromo}" applied!
-                      </Text>
-                      <Text className="text-xs text-green-700">
-                        You saved ${discountAmount.toFixed(2)}
-                      </Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity onPress={removeCoupon} className="p-1">
-                    <Trash2 size={16} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              )}
+            )}
+          </View>
+
+          {/* ── Order Summary ─────────────────────────────────────────────── */}
+          <View className="bg-white rounded-[20px] mt-3.5 overflow-hidden shadow-sm">
+            {/* Summary header */}
+            <View className="bg-black px-4.5 py-3.5 p-4">
+              <Text className="text-white text-base font-extrabold">Order Summary</Text>
             </View>
 
-            {/* Order Summary */}
-            <View className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-4">
-              <View className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                <Text className="text-lg font-bold text-gray-900">Order Summary</Text>
+            <View className="p-4">
+              {/* Line items */}
+              {[
+                { label: 'Subtotal',  value: fmt(summary.subtotal),  special: false },
+                { label: 'Shipping',  value: summary.shipping === 0 ? 'FREE' : fmt(summary.shipping), special: summary.shipping === 0 },
+                { label: 'Tax (GST)', value: fmt(summary.tax),        special: false },
+              ].map(({ label, value, special }) => (
+                <View key={label} className="flex-row justify-between mb-3">
+                  <Text className="text-sm text-gray-500">{label}</Text>
+                  <Text className={`text-sm font-semibold ${special ? 'text-gray-900 font-extrabold' : 'text-gray-700'}`}>{value}</Text>
+                </View>
+              ))}
+
+              {/* GST breakdown per product */}
+              {cartItems.some(i => i.gstPercentage) && (
+                <View className="bg-gray-50 rounded-xl p-2.5 mb-3">
+                  {cartItems.map(i => {
+                    if (!i.gstPercentage) return null;
+                    const tax = i.price * i.quantity * (i.gstPercentage / 100);
+                    return (
+                      <View key={i.id} className="flex-row justify-between mb-1">
+                        <Text className="text-[11px] text-gray-400 flex-1 mr-2" numberOfLines={1}>
+                          {i.name} ({i.gstPercentage}%)
+                        </Text>
+                        <Text className="text-[11px] text-gray-400">{fmt(tax)}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Discount */}
+              {summary.discount > 0 && (
+                <View className="flex-row justify-between mb-3 bg-gray-100 p-2.5 rounded-xl border border-gray-200">
+                  <View className="flex-row items-center gap-1.5">
+                    <Tag size={13} color="#374151" />
+                    <Text className="text-sm text-gray-700 font-semibold">Coupon Discount</Text>
+                  </View>
+                  <Text className="text-sm text-gray-900 font-bold">-{fmt(summary.discount)}</Text>
+                </View>
+              )}
+
+              {/* Divider */}
+              <View className="h-px bg-gray-100 mb-3.5" />
+
+              {/* Grand total */}
+              <View className="flex-row justify-between items-center mb-5">
+                <Text className="text-base font-extrabold text-gray-900">Total</Text>
+                <Text className="text-[22px] font-black text-black">{fmt(summary.total)}</Text>
               </View>
 
-              <View className="p-4">
-                <View className="space-y-3 mb-4">
-                  <View className="flex-row justify-between mb-2">
-                    <Text className="text-gray-600">Subtotal</Text>
-                    <Text className="font-medium text-gray-900">
-                      ${summary.subtotal.toFixed(2)}
-                    </Text>
-                  </View>
-                  <View className="flex-row justify-between mb-2">
-                    <Text className="text-gray-600">Shipping</Text>
-                    <Text className="font-medium text-gray-900">
-                      {summary.shipping === 0 ? 'Free' : `$${summary.shipping.toFixed(2)}`}
-                    </Text>
-                  </View>
-                  <View className="flex-row justify-between mb-2">
-                    <Text className="text-gray-600">Tax (GST)</Text>
-                    <Text className="font-medium text-gray-900">${summary.tax.toFixed(2)}</Text>
-                  </View>
-                  {summary.discount > 0 && (
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-green-600">Discount</Text>
-                      <Text className="font-medium text-green-600">
-                        -${summary.discount.toFixed(2)}
-                      </Text>
-                    </View>
-                  )}
-                  <View className="flex-row justify-between border-t border-gray-200 pt-3">
-                    <Text className="text-lg font-bold text-gray-900">Total</Text>
-                    <Text className="text-lg font-bold text-gray-900">
-                      ${summary.total.toFixed(2)}
-                    </Text>
-                  </View>
+              {/* ── Checkout button ── */}
+              {hasStockIssue ? (
+                <View className="bg-gray-100 rounded-2xl py-4 flex-row items-center justify-center gap-2 mb-4">
+                  <AlertCircle size={18} color="#9ca3af" />
+                  <Text className="text-gray-400 font-bold text-sm">
+                    Remove out-of-stock items to proceed
+                  </Text>
                 </View>
-
+              ) : (
                 <TouchableOpacity
                   onPress={handleCheckout}
-                  className="bg-[#313131] rounded-xl py-4 flex-row items-center justify-center mb-4"
+                  activeOpacity={0.88}
+                  className="bg-black rounded-2xl py-4 flex-row items-center justify-center gap-2.5 mb-4"
+                  style={{ shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 }}
                 >
                   <CreditCard size={20} color="#ffffff" />
-                  <Text className="text-white font-bold text-base ml-2">
+                  <Text className="text-white text-base font-extrabold tracking-wide">
                     Proceed to Checkout
                   </Text>
-                  <ArrowRight size={16} color="#ffffff" className="ml-1" />
+                  <ArrowRight size={18} color="#ffffff" />
                 </TouchableOpacity>
+              )}
 
-                {/* Trust Badges */}
-                <View className="space-y-3 pt-4 border-t border-gray-200">
-                  <View className="flex-row items-center gap-3">
-                    <Shield size={18} color="#16a34a" />
-                    <Text className="text-sm text-gray-600 flex-1">
-                      Secure checkout with SSL encryption
-                    </Text>
+              {/* Trust badges */}
+              <View className="gap-2.5">
+                {[
+                  { icon: Shield,    color: '#374151', label: 'SSL encrypted & secure checkout' },
+                  { icon: Truck,     color: '#374151', label: 'Free shipping on orders over ₹999' },
+                  { icon: RotateCcw, color: '#374151', label: '30-day hassle-free return policy' },
+                ].map(({ icon: Icon, color, label }) => (
+                  <View key={label} className="flex-row items-center gap-2.5">
+                    <View className="w-7 h-7 rounded-lg items-center justify-center bg-gray-100">
+                      <Icon size={14} color={color} />
+                    </View>
+                    <Text className="text-xs text-gray-500 flex-1">{label}</Text>
                   </View>
-                  <View className="flex-row items-center gap-3">
-                    <Truck size={18} color="#2563eb" />
-                    <Text className="text-sm text-gray-600 flex-1">
-                      Free shipping on orders over $100
-                    </Text>
-                  </View>
-                  <View className="flex-row items-center gap-3">
-                    <Package size={18} color="#9333ea" />
-                    <Text className="text-sm text-gray-600 flex-1">30-day return policy</Text>
-                  </View>
-                </View>
+                ))}
               </View>
             </View>
           </View>
-        </ScrollView>
-      )}
+        </View>
+      </ScrollView>
     </View>
   );
 }
