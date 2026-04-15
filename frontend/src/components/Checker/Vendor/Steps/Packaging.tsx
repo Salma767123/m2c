@@ -102,7 +102,10 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
       ].map((item) => (
         <div key={item.key} className="bg-slate-50/50 rounded-xl p-6 space-y-4">
           <div>
-            <label className="block text-slate-900 font-semibold mb-2">{item.label}</label>
+            <label className="block text-slate-900 font-semibold mb-2">
+              {item.label}
+              <span className="text-red-500 ml-0.5" aria-label="required">*</span>
+            </label>
             <p className="text-slate-600 text-sm mb-4">{item.detail}</p>
           </div>
 

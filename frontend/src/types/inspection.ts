@@ -66,3 +66,65 @@ export interface RecentInspection {
   status: 'passed' | 'failed' | 'pending'
   date: string
 }
+
+// ============================
+// QC Checker — Product Detail
+// Shared between qcCheckerService.getProductDetails response and the
+// ProductDetail component so the contract is a single source of truth.
+// ============================
+
+export interface ProductImage {
+  url: string
+  alt?: string
+  isPrimary?: boolean
+  sortOrder?: number
+}
+
+export interface ProductVariant {
+  id: string
+  sku: string
+  size: string
+  color: string
+  colorHex?: string | null
+  price: number
+  stock: number
+  images?: string[]
+}
+
+export interface ProductDetailVendor {
+  id?: string
+  companyName?: string
+  ownerName?: string
+  email?: string
+  businessEmail?: string
+  businessPhone?: string
+  factoryCity?: string | null
+  factoryState?: string | null
+}
+
+export interface AssignedQcSummary {
+  name?: string
+  email?: string
+}
+
+export interface ProductDetailData {
+  id: string
+  name: string
+  baseSku: string
+  category: string
+  subCategory?: string | null
+  basePrice: number
+  totalStock: number
+  description?: string | null
+  approvalStatus: string
+  approvedAt?: string | null
+  approvedBy?: string | null
+  rejectionReason?: string | null
+  qcInspectionData?: Record<string, unknown> | null
+  createdAt: string
+  updatedAt?: string | null
+  images?: ProductImage[]
+  variants?: ProductVariant[]
+  vendor?: ProductDetailVendor
+  assignedQc?: AssignedQcSummary | null
+}

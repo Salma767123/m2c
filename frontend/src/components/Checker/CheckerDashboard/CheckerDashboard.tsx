@@ -27,12 +27,12 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
       setLoading(true)
       try {
         const [productsRes, vendorsRes] = await Promise.all([
-          qcCheckerService.getAssignedProducts(),
+          qcCheckerService.getAssignedProducts({ limit: 50 }),
           qcCheckerService.getAssignedVendors({ limit: 50 })
         ])
 
         if (productsRes.success) {
-          setAssignedProducts(productsRes.data ?? [])
+          setAssignedProducts((productsRes.data?.products ?? []) as unknown as typeof assignedProducts)
         }
         if (vendorsRes.success) {
           setAssignedVendors(vendorsRes.data?.vendors ?? [])

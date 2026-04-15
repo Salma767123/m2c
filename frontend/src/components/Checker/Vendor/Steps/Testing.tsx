@@ -136,14 +136,19 @@ export default function Testing({ formData, setFormData }: TestingProps) {
     { id: "smellCheck", label: "Smell Check", detail: "Unusual odor detection" },
   ]
 
-  const tests = formData.tests || defaultTests.map(test => ({
-    ...test,
-    pass: false,
-    fail: false,
-    photos: [],
-    rightPhotos: [],
-    wrongPhotos: []
-  }))
+  // Empty array is truthy, so `formData.tests || defaults` fails to fall
+  // through when the parent initialises with `tests: []`. Explicitly check
+  // length so a fresh form still renders the default test list.
+  const tests = (formData.tests && formData.tests.length > 0)
+    ? formData.tests
+    : defaultTests.map(test => ({
+        ...test,
+        pass: false,
+        fail: false,
+        photos: [],
+        rightPhotos: [],
+        wrongPhotos: []
+      }))
 
   const updateTest = (testId: string, field: string, value: any) => {
     const updatedTests = tests.map(t =>
@@ -227,6 +232,10 @@ export default function Testing({ formData, setFormData }: TestingProps) {
       <div className="border-b border-slate-200 pb-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-2">6. On-site Tests</h2>
         <p className="text-slate-600">Functional tests for durability and color integrity (Section C - Item 6)</p>
+        <p className="text-xs text-slate-500 mt-2">
+          <span className="text-red-500 mr-0.5" aria-label="required">*</span>
+          Mark Pass or Fail on at least one test before moving on.
+        </p>
       </div>
 
       {tests.map((test) => (

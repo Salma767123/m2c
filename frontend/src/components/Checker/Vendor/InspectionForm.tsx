@@ -28,6 +28,11 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
   const [submitting, setSubmitting] = useState(false)
   const [inspectionId, setInspectionId] = useState<string | null>(null)
   const [errors, setErrors] = useState<AllErrors>({})
+  // Snapshot of which vendor-sourced fields had a value at autofill time.
+  // Locked once, then used for readonly decisions across all steps — so typing
+  // into a field that the vendor left empty can never silently re-lock it,
+  // and the decision survives step unmount/remount during navigation.
+  const [autofillSnapshot, setAutofillSnapshot] = useState<Record<string, boolean>>({})
   const [formData, setFormData] = useState({
     // 1. Factory Details
     vendorName: vendorName,
@@ -136,6 +141,22 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
             factoryLicenseNumber: prev.factoryLicenseNumber || v.tradeLicenseNumber || "",
           }))
 
+          // Lock-state snapshot: true only where the vendor (or admin, for
+          // categoryToInspect) supplied a value. Fields left empty here stay
+          // editable for the entire session, regardless of what the checker
+          // types later.
+          const isNonEmpty = (s?: string | null) => typeof s === "string" && s.trim() !== ""
+          setAutofillSnapshot({
+            factoryName: isNonEmpty(v.companyName),
+            contactPersonName: isNonEmpty(v.ownerName),
+            contactPhoneNumber: isNonEmpty(v.businessPhone),
+            factoryAddress: isNonEmpty(factoryAddressFull),
+            gstTaxId: isNonEmpty(v.gstNumber),
+            businessRegistrationNumber: isNonEmpty(v.businessRegistrationNumber),
+            factoryLicenseNumber: isNonEmpty(v.tradeLicenseNumber),
+            categoryToInspect: isNonEmpty(assignedCategories),
+          })
+
           // Mark prefill complete so subsequent effect re-runs short-circuit.
           // Set before auto-start so the SCHEDULED → IN_PROGRESS request is also one-shot.
           prefilledForVendorIdRef.current = vendorId
@@ -218,11 +239,11 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
   const renderStepContent = () => {
     switch (currentStep) {
       case "factoryDetails":
-        return <FactoryDetails formData={formData} setFormData={setFormData} errors={currentStepErrors} />
+        return <FactoryDetails formData={formData} setFormData={setFormData} errors={currentStepErrors} autofillSnapshot={autofillSnapshot} />
       case "legalRegistration":
-        return <LegalRegistration formData={formData} setFormData={setFormData} errors={currentStepErrors} />
+        return <LegalRegistration formData={formData} setFormData={setFormData} errors={currentStepErrors} autofillSnapshot={autofillSnapshot} />
       case "productionInfo":
-        return <ProductionInfo formData={formData} setFormData={setFormData} errors={currentStepErrors} />
+        return <ProductionInfo formData={formData} setFormData={setFormData} errors={currentStepErrors} autofillSnapshot={autofillSnapshot} />
       case "basicInfrastructure":
         return <BasicInfrastructure formData={formData} setFormData={setFormData} />
       case "qualitySafety":
@@ -280,6 +301,11 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
 
       const res = await qcCheckerService.completeInspection(inspectionId, payload);
       if (res.success) {
+        // Defensive reset: even though the parent will unmount this form in
+        // 1.5s, clearing the id + autofill ref now means the form cannot
+        // resubmit the same inspection if anything delays the unmount.
+        setInspectionId(null);
+        prefilledForVendorIdRef.current = null;
         showSuccessToast("Inspection Submitted! ✅", "Factory inspection report has been submitted successfully.");
         setTimeout(() => {
           onComplete();

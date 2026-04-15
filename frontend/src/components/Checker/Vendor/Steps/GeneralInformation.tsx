@@ -3,6 +3,10 @@
 import { CheckCircle, ChevronDown } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 
+// Visual marker for required fields — keeps the Product Inspection labels
+// consistent with the Vendor Inspection's RequiredMark helper.
+const Req = () => <span className="text-red-500 ml-0.5" aria-label="required">*</span>
+
 interface GeneralInformationProps {
   formData: {
     client: string
@@ -13,9 +17,22 @@ interface GeneralInformationProps {
     serviceType: string
   }
   setFormData: (data: any) => void
+  // Captured by parent at autofill time so lock state is stable across
+  // typing and step remounts. Missing snapshot → every field editable.
+  autofillSnapshot?: Record<string, boolean>
 }
 
-export default function GeneralInformation({ formData, setFormData }: GeneralInformationProps) {
+const READONLY_CLS =
+  "w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-100 text-slate-700 cursor-not-allowed"
+const EDITABLE_CLS =
+  "w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+
+export default function GeneralInformation({ formData, setFormData, autofillSnapshot = {} }: GeneralInformationProps) {
+  const clientLocked = !!autofillSnapshot.client
+  const vendorLocked = !!autofillSnapshot.vendor
+  const factoryLocked = !!autofillSnapshot.factory
+  const serviceLocationLocked = !!autofillSnapshot.serviceLocation
+
   const [showServiceTypeDropdown, setShowServiceTypeDropdown] = useState(false)
   const serviceTypeDropdownRef = useRef<HTMLDivElement>(null)
 
@@ -55,46 +72,54 @@ export default function GeneralInformation({ formData, setFormData }: GeneralInf
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Client:</label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Client:<Req /></label>
           <input
             type="text"
             value={formData.client}
-            onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+            readOnly={clientLocked}
+            aria-readonly={clientLocked || undefined}
+            onChange={(e) => !clientLocked && setFormData({ ...formData, client: e.target.value })}
             placeholder="Enter client name"
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+            className={clientLocked ? READONLY_CLS : EDITABLE_CLS}
           />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Vendor:</label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Vendor:<Req /></label>
           <input
             type="text"
             value={formData.vendor}
-            onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+            readOnly={vendorLocked}
+            aria-readonly={vendorLocked || undefined}
+            onChange={(e) => !vendorLocked && setFormData({ ...formData, vendor: e.target.value })}
+            className={vendorLocked ? READONLY_CLS : EDITABLE_CLS}
           />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Factory:</label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Factory:<Req /></label>
           <input
             type="text"
             value={formData.factory}
-            onChange={(e) => setFormData({ ...formData, factory: e.target.value })}
+            readOnly={factoryLocked}
+            aria-readonly={factoryLocked || undefined}
+            onChange={(e) => !factoryLocked && setFormData({ ...formData, factory: e.target.value })}
             placeholder="Enter factory name"
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+            className={factoryLocked ? READONLY_CLS : EDITABLE_CLS}
           />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Location:</label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Location:<Req /></label>
           <input
             type="text"
             value={formData.serviceLocation}
-            onChange={(e) => setFormData({ ...formData, serviceLocation: e.target.value })}
+            readOnly={serviceLocationLocked}
+            aria-readonly={serviceLocationLocked || undefined}
+            onChange={(e) => !serviceLocationLocked && setFormData({ ...formData, serviceLocation: e.target.value })}
             placeholder="Enter service location"
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+            className={serviceLocationLocked ? READONLY_CLS : EDITABLE_CLS}
           />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Start Date:</label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Start Date:<Req /></label>
           <input
             type="date"
             value={formData.serviceStartDate}
@@ -103,7 +128,7 @@ export default function GeneralInformation({ formData, setFormData }: GeneralInf
           />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Type:</label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Type:<Req /></label>
           <div ref={serviceTypeDropdownRef} className="relative">
             <button
               onClick={() => setShowServiceTypeDropdown(!showServiceTypeDropdown)}

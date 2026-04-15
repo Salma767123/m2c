@@ -22,8 +22,3 @@ export function RequiredMark() {
 
 // Styling for vendor-autofilled, checker-immutable fields.
 export const READONLY_CLS = `${BASE_INPUT} ${OK_BORDER} bg-slate-100 cursor-not-allowed`
-
-// True when a vendor-supplied value is present and should be locked from edits.
-export function hasAutofillValue(v: unknown): boolean {
-    return typeof v === "string" && v.trim() !== ""
-}

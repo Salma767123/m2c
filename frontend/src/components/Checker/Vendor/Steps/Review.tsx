@@ -18,7 +18,6 @@ interface ReviewProps {
       itemDescription: string
       totalQuantity: number
       inspectionQuantity: number
-      status: string
     }>
     // Packaging Remarks (single selection 1-10)
     shipperCartonRemark: string
@@ -38,15 +37,6 @@ interface ReviewProps {
 }
 
 export default function Review({ formData }: ReviewProps) {
-  const getStatusColor = (status: string) => {
-    const colors = {
-      "Pending": "bg-amber-100 text-amber-800 border-amber-200",
-      "Ready": "bg-emerald-100 text-emerald-800 border-emerald-200",
-      "In Progress": "bg-blue-100 text-blue-800 border-blue-200",
-      "Completed": "bg-slate-100 text-slate-800 border-slate-200",
-    }
-    return colors[status as keyof typeof colors] || colors["Pending"]
-  }
 
   // Collect all remark codes and calculate average
   const getRemarkAnalysis = () => {
@@ -184,7 +174,6 @@ export default function Review({ formData }: ReviewProps) {
                   <th className="text-left py-3 px-3 font-semibold text-slate-700">Description</th>
                   <th className="text-left py-3 px-3 font-semibold text-slate-700">Total Qty</th>
                   <th className="text-left py-3 px-3 font-semibold text-slate-700">Inspection Qty</th>
-                  <th className="text-left py-3 px-3 font-semibold text-slate-700">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -194,11 +183,6 @@ export default function Review({ formData }: ReviewProps) {
                     <td className="py-3 px-3 text-slate-600">{item.itemDescription}</td>
                     <td className="py-3 px-3 text-slate-900">{item.totalQuantity}</td>
                     <td className="py-3 px-3 text-slate-900">{item.inspectionQuantity}</td>
-                    <td className="py-3 px-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(item.status)}`}>
-                        {item.status}
-                      </span>
-                    </td>
                   </tr>
                 ))}
               </tbody>

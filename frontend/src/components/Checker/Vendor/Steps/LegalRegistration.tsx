@@ -5,7 +5,6 @@ import {
     READONLY_CLS,
     ErrorText,
     RequiredMark,
-    hasAutofillValue,
     inputCls,
 } from "./fieldHelpers"
 
@@ -13,15 +12,16 @@ interface StepProps {
     formData: any
     setFormData: (data: any) => void
     errors?: StepErrors
+    // Per-field snapshot: true iff the vendor supplied a value at autofill
+    // time. Captured once by the parent so typing into an empty field can't
+    // silently re-lock it, and lock state survives step remounts.
+    autofillSnapshot?: Record<string, boolean>
 }
 
-// Field lock rule: vendor-supplied values are authoritative and immutable for
-// the checker. When the vendor left a field blank, the checker fills it in
-// from on-site verification, so the field stays editable in that case.
-export default function LegalRegistration({ formData, setFormData, errors = {} }: StepProps) {
-    const bizRegLocked = hasAutofillValue(formData.businessRegistrationNumber)
-    const gstLocked = hasAutofillValue(formData.gstTaxId)
-    const licenseLocked = hasAutofillValue(formData.factoryLicenseNumber)
+export default function LegalRegistration({ formData, setFormData, errors = {}, autofillSnapshot = {} }: StepProps) {
+    const bizRegLocked = !!autofillSnapshot.businessRegistrationNumber
+    const gstLocked = !!autofillSnapshot.gstTaxId
+    const licenseLocked = !!autofillSnapshot.factoryLicenseNumber
 
     return (
         <div className="space-y-8">

@@ -190,7 +190,7 @@ export default function Documentation({ formData, setFormData }: DocumentationPr
       </div>
 
       <div>
-        <label className="block text-slate-700 font-semibold mb-3">Inspector Signature/Initials:</label>
+        <label className="block text-slate-700 font-semibold mb-3">Inspector Signature/Initials:<span className="text-red-500 ml-0.5" aria-label="required">*</span></label>
         <input
           type="text"
           value={formData.inspectorSignature}

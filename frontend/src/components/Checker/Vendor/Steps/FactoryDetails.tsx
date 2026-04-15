@@ -5,7 +5,6 @@ import {
     READONLY_CLS,
     ErrorText,
     RequiredMark,
-    hasAutofillValue,
     inputCls,
 } from "./fieldHelpers"
 
@@ -13,17 +12,20 @@ interface StepProps {
     formData: any
     setFormData: (data: any) => void
     errors?: StepErrors
+    // Captured by parent at autofill time so lock state is stable across
+    // typing and step remounts.
+    autofillSnapshot?: Record<string, boolean>
 }
 
 // Vendor Name / Vendor Code are always server-supplied and never editable.
 // The remaining fields lock only when the vendor provided a value, so the
 // checker can still fill in anything the vendor left blank from on-site
 // verification.
-export default function FactoryDetails({ formData, setFormData, errors = {} }: StepProps) {
-    const factoryNameLocked = hasAutofillValue(formData.factoryName)
-    const contactNameLocked = hasAutofillValue(formData.contactPersonName)
-    const contactPhoneLocked = hasAutofillValue(formData.contactPhoneNumber)
-    const addressLocked = hasAutofillValue(formData.factoryAddress)
+export default function FactoryDetails({ formData, setFormData, errors = {}, autofillSnapshot = {} }: StepProps) {
+    const factoryNameLocked = !!autofillSnapshot.factoryName
+    const contactNameLocked = !!autofillSnapshot.contactPersonName
+    const contactPhoneLocked = !!autofillSnapshot.contactPhoneNumber
+    const addressLocked = !!autofillSnapshot.factoryAddress
 
     return (
         <div className="space-y-8">

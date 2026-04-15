@@ -1,13 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
-import { AlertCircle, Eye, FileText } from 'lucide-react'
+import Dropdown from '@/components/UI/Dropdown'
+import {
+    AlertCircle,
+    Eye,
+    FileText,
+    Search,
+    RotateCw,
+    X,
+    ChevronLeft,
+    ChevronRight,
+} from 'lucide-react'
 import { showErrorToast } from '@/lib/toast-utils'
 import { qcCheckerService } from '@/services/qcCheckerService'
+import { useDebounce } from '@/hooks/useDebounce'
 import ProductInspectionForm from './ProductInspectionForm'
 import ProductDetail from './ProductDetail'
 
@@ -29,50 +41,132 @@ interface AssignedProduct {
     }
 }
 
+const PAGE_SIZE = 12
+const DEFAULT_SORT = 'createdAt:desc'
+
+// Mirrors the ProductApprovalStatus enum in backend/prisma/schema.prisma.
+const STATUS_OPTIONS = [
+    { value: '', label: 'All statuses' },
+    { value: 'PENDING', label: 'Pending' },
+    { value: 'REINSPECTION', label: 'Reinspection' },
+    { value: 'QC_APPROVED', label: 'QC Approved' },
+    { value: 'APPROVED', label: 'Approved' },
+    { value: 'REJECTED', label: 'Rejected' },
+]
+
+const SORT_OPTIONS = [
+    { value: 'createdAt:desc', label: 'Newest first' },
+    { value: 'createdAt:asc', label: 'Oldest first' },
+    { value: 'name:asc', label: 'Name A–Z' },
+    { value: 'name:desc', label: 'Name Z–A' },
+    { value: 'basePrice:asc', label: 'Price low–high' },
+    { value: 'basePrice:desc', label: 'Price high–low' },
+]
+
+const APPROVAL_BADGE: Record<string, string> = {
+    PENDING: 'bg-yellow-100 text-yellow-800',
+    REINSPECTION: 'bg-orange-100 text-orange-800',
+    QC_APPROVED: 'bg-emerald-100 text-emerald-800',
+    APPROVED: 'bg-green-100 text-green-800',
+    REJECTED: 'bg-red-100 text-red-800',
+}
+
 export default function Products() {
+    const router = useRouter()
+    const searchParams = useSearchParams()
+
+    const initialSearch = searchParams.get('search') ?? ''
+    const initialStatus = searchParams.get('status') ?? ''
+    const initialSort = searchParams.get('sort') ?? DEFAULT_SORT
+    const initialPage = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1)
+
+    const [searchInput, setSearchInput] = useState(initialSearch)
+    const [status, setStatus] = useState(initialStatus)
+    const [sort, setSort] = useState(initialSort)
+    const [page, setPage] = useState(initialPage)
+
+    const debouncedSearch = useDebounce(searchInput, 300)
+
     const [products, setProducts] = useState<AssignedProduct[]>([])
+    const [pagination, setPagination] = useState({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 })
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+
     const [selectedProduct, setSelectedProduct] = useState<AssignedProduct | null>(null)
     const [viewingProductId, setViewingProductId] = useState<string | null>(null)
 
+    // Reset to page 1 on search change (after first render so deep-linked ?page=N is honoured).
+    const didMountRef = useRef(false)
     useEffect(() => {
-        loadProducts()
-    }, [])
+        if (!didMountRef.current) {
+            didMountRef.current = true
+            return
+        }
+        setPage(1)
+    }, [debouncedSearch])
 
-    const loadProducts = async () => {
+    // Sync URL for shareability + back-button behaviour.
+    useEffect(() => {
+        const params = new URLSearchParams()
+        if (debouncedSearch) params.set('search', debouncedSearch)
+        if (status) params.set('status', status)
+        if (sort !== DEFAULT_SORT) params.set('sort', sort)
+        if (page !== 1) params.set('page', String(page))
+        const qs = params.toString()
+        router.replace(qs ? `?${qs}` : '?', { scroll: false })
+    }, [debouncedSearch, status, sort, page, router])
+
+    const [sortBy, sortOrder] = useMemo(() => {
+        const [by, ord] = sort.split(':')
+        return [by || 'createdAt', (ord as 'asc' | 'desc') || 'desc']
+    }, [sort])
+
+    // Ignore stale responses when the user rapidly changes filters.
+    const requestIdRef = useRef(0)
+
+    const loadProducts = useCallback(async () => {
+        const requestId = ++requestIdRef.current
         setLoading(true)
+        setError(null)
         try {
-            const response = await qcCheckerService.getAssignedProducts()
+            const response = await qcCheckerService.getAssignedProducts({
+                page,
+                limit: PAGE_SIZE,
+                search: debouncedSearch || undefined,
+                status: status || undefined,
+                sortBy,
+                sortOrder,
+            })
+            if (requestId !== requestIdRef.current) return
             if (response.success) {
-                setProducts(response.data)
+                setProducts(response.data.products as unknown as AssignedProduct[])
+                setPagination(response.data.pagination)
             }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unable to fetch assigned products'
-            console.error('Error loading products:', error)
+        } catch (err) {
+            if (requestId !== requestIdRef.current) return
+            const message = err instanceof Error ? err.message : 'Unable to fetch assigned products'
+            console.error('Error loading products:', err)
+            setError(message)
             showErrorToast('Load Failed', message)
         } finally {
-            setLoading(false)
+            if (requestId === requestIdRef.current) setLoading(false)
         }
+    }, [page, debouncedSearch, status, sortBy, sortOrder])
+
+    useEffect(() => {
+        loadProducts()
+    }, [loadProducts])
+
+    const handleClearFilters = () => {
+        setSearchInput('')
+        setStatus('')
+        setSort(DEFAULT_SORT)
+        setPage(1)
     }
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'PENDING': return 'bg-yellow-100 text-yellow-800'
-            case 'REINSPECTION': return 'bg-orange-100 text-orange-800'
-            case 'APPROVED': return 'bg-green-100 text-green-800'
-            case 'REJECTED': return 'bg-red-100 text-red-800'
-            default: return 'bg-gray-100 text-gray-800'
-        }
-    }
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                <span className="ml-3 text-gray-600 font-medium">Loading Assigned Products...</span>
-            </div>
-        )
-    }
+    const hasActiveFilters = Boolean(debouncedSearch || status || sort !== DEFAULT_SORT || page !== 1)
+    const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
+    const rangeEnd = Math.min(pagination.page * pagination.limit, pagination.total)
 
     if (selectedProduct) {
         return (
@@ -117,22 +211,126 @@ export default function Products() {
 
     return (
         <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Assigned Products</h1>
                     <p className="text-gray-600 mt-1">Review and approve or reject vendor products</p>
                 </div>
+                <button
+                    onClick={loadProducts}
+                    disabled={loading}
+                    title="Refresh"
+                    aria-label="Refresh products"
+                    className="p-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50"
+                >
+                    <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
             </div>
+
+            {/* Filter bar */}
+            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-start">
+                <div className="relative">
+                    <label htmlFor="product-search" className="sr-only">Search products</label>
+                    <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 pointer-events-none" />
+                    <input
+                        id="product-search"
+                        type="text"
+                        placeholder="Search by product, SKU, category, or vendor..."
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        className="w-full pl-12 pr-10 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white shadow-sm"
+                    />
+                    {searchInput && (
+                        <button
+                            onClick={() => setSearchInput('')}
+                            aria-label="Clear search"
+                            className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+                <div className="min-w-45">
+                    <Dropdown
+                        id="product-status-filter"
+                        value={status}
+                        options={STATUS_OPTIONS}
+                        onChange={(v) => {
+                            setStatus(v as string)
+                            setPage(1)
+                        }}
+                        placeholder="All statuses"
+                    />
+                </div>
+                <div className="min-w-45">
+                    <Dropdown
+                        id="product-sort-filter"
+                        value={sort}
+                        options={SORT_OPTIONS}
+                        onChange={(v) => {
+                            setSort(v as string)
+                            setPage(1)
+                        }}
+                    />
+                </div>
+            </div>
+
+            {/* Results summary */}
+            <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+                <span>
+                    {loading
+                        ? 'Loading products...'
+                        : pagination.total === 0
+                            ? '0 products'
+                            : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total} product${pagination.total === 1 ? '' : 's'}`}
+                </span>
+                {hasActiveFilters && (
+                    <button
+                        onClick={handleClearFilters}
+                        className="text-blue-600 hover:text-blue-700 font-medium underline underline-offset-2"
+                    >
+                        Clear filters
+                    </button>
+                )}
+            </div>
+
+            {/* Error state */}
+            {error && !loading && (
+                <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-6 flex items-center justify-between gap-4 flex-wrap">
+                    <span>{error}</span>
+                    <button
+                        onClick={loadProducts}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                        <RotateCw className="w-4 h-4" /> Retry
+                    </button>
+                </div>
+            )}
 
             <Card>
                 <CardHeader>
                     <CardTitle>Products Awaiting Inspection</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                    {products.length === 0 ? (
+                    {loading && products.length === 0 ? (
+                        <div className="flex items-center justify-center py-16">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                            <span className="ml-3 text-gray-600 font-medium">Loading products...</span>
+                        </div>
+                    ) : !loading && products.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
                             <AlertCircle className="h-12 w-12 text-gray-300 mb-4" />
-                            <p className="text-gray-500 font-medium">No assigned products at this time</p>
+                            <p className="text-gray-500 font-medium">
+                                {hasActiveFilters ? 'No products match your filters' : 'No assigned products at this time'}
+                            </p>
+                            {hasActiveFilters && (
+                                <button
+                                    onClick={handleClearFilters}
+                                    className="mt-4 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    Clear filters
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <Table>
@@ -171,7 +369,7 @@ export default function Products() {
                                             <p className="text-sm text-gray-800">{product.category}</p>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge className={getStatusColor(product.approvalStatus)}>
+                                            <Badge className={APPROVAL_BADGE[product.approvalStatus] || 'bg-gray-100 text-gray-800'}>
                                                 {product.approvalStatus}
                                             </Badge>
                                         </TableCell>
@@ -187,7 +385,7 @@ export default function Products() {
                                                     <Eye className="h-4 w-4 mr-2" />
                                                     View
                                                 </Button>
-                                                {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'UNDER_REVIEW' || product.approvalStatus === 'REINSPECTION') && (
+                                                {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'REINSPECTION') && (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
@@ -207,6 +405,83 @@ export default function Products() {
                     )}
                 </CardContent>
             </Card>
+
+            {pagination.totalPages > 1 && (
+                <Pagination
+                    page={pagination.page}
+                    totalPages={pagination.totalPages}
+                    onChange={setPage}
+                    disabled={loading}
+                />
+            )}
         </div>
     )
+}
+
+function Pagination({
+    page,
+    totalPages,
+    onChange,
+    disabled,
+}: {
+    page: number
+    totalPages: number
+    onChange: (p: number) => void
+    disabled?: boolean
+}) {
+    const pages = getPageRange(page, totalPages)
+    return (
+        <nav aria-label="Pagination" className="mt-2 flex items-center justify-center gap-1 flex-wrap">
+            <button
+                type="button"
+                onClick={() => onChange(page - 1)}
+                disabled={disabled || page <= 1}
+                aria-label="Previous page"
+                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+                <ChevronLeft className="w-4 h-4" /> Prev
+            </button>
+            {pages.map((p, i) =>
+                p === '…' ? (
+                    <span key={`ellipsis-${i}`} className="px-2 text-slate-400" aria-hidden="true">…</span>
+                ) : (
+                    <button
+                        key={p}
+                        type="button"
+                        onClick={() => onChange(p)}
+                        disabled={disabled}
+                        aria-current={p === page ? 'page' : undefined}
+                        aria-label={`Go to page ${p}`}
+                        className={`min-w-9 px-3 py-2 rounded-lg border font-medium ${p === page
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            } disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                        {p}
+                    </button>
+                )
+            )}
+            <button
+                type="button"
+                onClick={() => onChange(page + 1)}
+                disabled={disabled || page >= totalPages}
+                aria-label="Next page"
+                className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+                Next <ChevronRight className="w-4 h-4" />
+            </button>
+        </nav>
+    )
+}
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+    const pages: Array<number | '…'> = [1]
+    if (current > 4) pages.push('…')
+    const start = Math.max(2, current - 1)
+    const end = Math.min(total - 1, current + 1)
+    for (let p = start; p <= end; p++) pages.push(p)
+    if (current < total - 3) pages.push('…')
+    pages.push(total)
+    return pages
 }

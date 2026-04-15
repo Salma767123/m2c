@@ -5,7 +5,6 @@ import {
     READONLY_CLS,
     ErrorText,
     RequiredMark,
-    hasAutofillValue,
     inputCls,
 } from "./fieldHelpers"
 
@@ -13,13 +12,16 @@ interface StepProps {
     formData: any
     setFormData: (data: any) => void
     errors?: StepErrors
+    // Captured by parent at autofill time so lock state is stable across
+    // typing and step remounts.
+    autofillSnapshot?: Record<string, boolean>
 }
 
 // Category to Inspect is admin-assigned via inspection.itemsToInspect — locked
 // when present so the checker cannot mutate the assigned scope. Falls back to
 // editable only if admin somehow left it empty (defensive).
-export default function ProductionInfo({ formData, setFormData, errors = {} }: StepProps) {
-    const categoryLocked = hasAutofillValue(formData.categoryToInspect)
+export default function ProductionInfo({ formData, setFormData, errors = {}, autofillSnapshot = {} }: StepProps) {
+    const categoryLocked = !!autofillSnapshot.categoryToInspect
 
     return (
         <div className="space-y-8">

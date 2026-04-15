@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Check, ArrowLeft, ArrowRight } from "lucide-react"
 
 // Import steps from the actual paths
@@ -15,6 +15,25 @@ import Review from "@/components/Checker/Vendor/Steps/Review"
 
 import { qcCheckerService } from "@/services/qcCheckerService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
+import {
+    validateStep,
+    validateAll,
+    hasErrors,
+    firstErrorMessage,
+    type Step as ValidationStep,
+    type AllErrors,
+} from "@/components/Checker/Products/validation"
+
+// Default test battery rendered when the parent seeds `tests: []`. Kept in
+// sync with the defaults in Testing.tsx so a fresh inspection always starts
+// with the full 5-test list visible.
+const DEFAULT_TESTS = [
+    { id: "dropTestResult", label: "Carton Drop Test", detail: "Action and result views" },
+    { id: "colorFastnessDry", label: "Color Fastness (Dry)", detail: "Dry cloth rubbing test" },
+    { id: "colorFastnessWet", label: "Color Fastness (Wet)", detail: "Wet cloth rubbing test" },
+    { id: "seamStrengthResult", label: "Seam Strength Test", detail: "Pull gauge testing" },
+    { id: "smellCheck", label: "Smell Check", detail: "Unusual odor detection" },
+].map((t) => ({ ...t, pass: false, fail: false, photos: [], rightPhotos: [], wrongPhotos: [] }))
 
 interface ProductInspectionFormProps {
     productId: string
@@ -24,15 +43,7 @@ interface ProductInspectionFormProps {
     onCancel: () => void
 }
 
-type Step =
-    | "generalInformation"
-    | "preparation"
-    | "measurements"
-    | "packaging"
-    | "defects"
-    | "testing"
-    | "documentation"
-    | "review"
+type Step = ValidationStep
 
 export default function ProductInspectionForm({
     productId,
@@ -43,6 +54,15 @@ export default function ProductInspectionForm({
 }: ProductInspectionFormProps) {
     const [currentStep, setCurrentStep] = useState<Step>("generalInformation")
     const [submitting, setSubmitting] = useState(false)
+    const [errors, setErrors] = useState<AllErrors>({})
+
+    // Snapshot of which fields the server supplied at autofill time. Used by
+    // the child steps (General Information today) to decide which inputs stay
+    // editable vs. lock to readonly. Stable across typing + step remounts.
+    const [autofillSnapshot, setAutofillSnapshot] = useState<Record<string, boolean>>({})
+    // Guards the autofill effect against StrictMode double-invoke and
+    // clobbering checker edits on parent re-renders.
+    const prefilledForProductIdRef = useRef<string | null>(null)
 
     const [formData, setFormData] = useState({
         // GeneralInformation
@@ -59,8 +79,7 @@ export default function ProductInspectionForm({
             itemName: productName,
             itemDescription: "Standard Product Assessment",
             totalQuantity: 0,
-            inspectionQuantity: 0,
-            status: "Pending"
+            inspectionQuantity: 0
         }],
         warehousePhotoEvidences: [] as any[],
 
@@ -94,8 +113,10 @@ export default function ProductInspectionForm({
         minorDefectDetails: "",
         defectPhotos: [] as any[],
 
-        // Testing
-        tests: [] as any[],
+        // Testing — seeded with the 5-test battery so the step renders
+        // correctly on first open. Replaces the old empty-array init that
+        // tripped the truthy-check in Testing.tsx.
+        tests: DEFAULT_TESTS as any[],
         testingPhotos: [] as any[],
 
         // Documentation
@@ -108,6 +129,65 @@ export default function ProductInspectionForm({
         finalDecision: "Approved", // Approved, Rejected
         reviewerRemarks: ""
     })
+
+    // Autofill factory + service location from the vendor record, inspector
+    // signature from the cached checker profile. Runs once per productId
+    // (ref guard survives StrictMode / Fast Refresh / parent re-renders).
+    // Checker edits are always preserved: `prev.X || …` falls through only
+    // when the checker has not typed anything yet.
+    useEffect(() => {
+        let cancelled = false
+        if (!productId) return
+        if (prefilledForProductIdRef.current === productId) return
+
+        const cached = qcCheckerService.getCheckerData?.()
+        if (cached?.name && !cancelled) {
+            setFormData((prev) => ({
+                ...prev,
+                inspectorSignature: prev.inspectorSignature || cached.name,
+            }))
+        }
+
+        const isNonEmpty = (s?: string | null) =>
+            typeof s === "string" && s.trim() !== ""
+
+        qcCheckerService
+            .getProductDetails(productId)
+            .then((res) => {
+                if (cancelled || !res?.success) return
+                const product = res.data.product
+                const v = product?.vendor || {}
+                const factoryName = v.companyName || ""
+                const serviceLocation = [v.factoryCity, v.factoryState]
+                    .filter(Boolean)
+                    .join(", ")
+
+                setFormData((prev) => ({
+                    ...prev,
+                    factory: prev.factory || factoryName,
+                    serviceLocation: prev.serviceLocation || serviceLocation,
+                }))
+
+                setAutofillSnapshot({
+                    // Client + vendor come from parent state / props and are
+                    // always non-empty when this branch runs, so lock them.
+                    client: true,
+                    vendor: isNonEmpty(vendorName),
+                    factory: isNonEmpty(factoryName),
+                    serviceLocation: isNonEmpty(serviceLocation),
+                })
+
+                prefilledForProductIdRef.current = productId
+            })
+            .catch((err) => {
+                if (cancelled) return
+                console.error("Failed to autofill product inspection form", err)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [productId, vendorName])
 
     const steps: { id: Step; label: string }[] = [
         { id: "generalInformation", label: "General Information" },
@@ -124,6 +204,19 @@ export default function ProductInspectionForm({
     const isLastStep = currentStepIndex === steps.length - 1
 
     const nextStep = () => {
+        // Validate the current step before advancing so half-filled inspection
+        // reports can't be walked through by hitting Next repeatedly. Matches
+        // the Vendor Inspection flow.
+        const stepErrors = validateStep(currentStep, formData)
+        setErrors((prev) => ({ ...prev, [currentStep]: stepErrors }))
+        if (hasErrors(stepErrors)) {
+            showErrorToast(
+                "Please complete this step",
+                firstErrorMessage(stepErrors) || "Some required fields are missing."
+            )
+            window.scrollTo({ top: 0, behavior: "smooth" })
+            return
+        }
         if (!isLastStep) {
             setCurrentStep(steps[currentStepIndex + 1].id)
         }
@@ -133,6 +226,14 @@ export default function ProductInspectionForm({
         if (currentStepIndex > 0) {
             setCurrentStep(steps[currentStepIndex - 1].id)
         }
+    }
+
+    // Allow clicking any step circle to jump there, but revalidate the step
+    // we're leaving so errors stay surfaced.
+    const goToStep = (target: Step) => {
+        const stepErrors = validateStep(currentStep, formData)
+        setErrors((prev) => ({ ...prev, [currentStep]: stepErrors }))
+        setCurrentStep(target)
     }
 
     // Helper to clean photo data before submission
@@ -145,8 +246,19 @@ export default function ProductInspectionForm({
     }
 
     const handleSubmit = async () => {
-        if (formData.finalDecision === "Rejected" && !formData.reviewerRemarks) {
-            showErrorToast("Error", "Rejection remarks are required.")
+        // Full form validation before submit. Populates `errors` so every
+        // invalid step lights up red in the sidebar, and jumps the checker to
+        // the first invalid step so they can start fixing from the top.
+        const all = validateAll(formData)
+        if (Object.keys(all).length > 0) {
+            setErrors(all)
+            const firstInvalid = steps.find((s) => all[s.id])?.id
+            if (firstInvalid) setCurrentStep(firstInvalid)
+            showErrorToast(
+                "Cannot submit yet",
+                "Some required fields are missing. Review the highlighted steps."
+            )
+            window.scrollTo({ top: 0, behavior: "smooth" })
             return
         }
 
@@ -197,27 +309,34 @@ export default function ProductInspectionForm({
                         {steps.map((step, index) => {
                             const isActive = currentStep === step.id
                             const isPast = steps.findIndex((s) => s.id === currentStep) > index
+                            const stepHasErrors = hasErrors(errors[step.id])
 
                             return (
                                 <button
                                     key={step.id}
-                                    onClick={() => setCurrentStep(step.id)}
-                                    className={`flex items-center w-full p-3 rounded-xl transition-all duration-200 text-left ${isActive
-                                        ? "bg-blue-50 text-blue-700"
-                                        : isPast
-                                            ? "text-slate-600 hover:bg-slate-50"
-                                            : "text-slate-400 hover:bg-slate-50"
+                                    onClick={() => goToStep(step.id)}
+                                    aria-current={isActive ? "step" : undefined}
+                                    aria-label={`${step.label}${stepHasErrors ? " (has errors)" : ""}`}
+                                    className={`flex items-center w-full p-3 rounded-xl transition-all duration-200 text-left ${stepHasErrors
+                                        ? "bg-red-50 text-red-700"
+                                        : isActive
+                                            ? "bg-blue-50 text-blue-700"
+                                            : isPast
+                                                ? "text-slate-600 hover:bg-slate-50"
+                                                : "text-slate-400 hover:bg-slate-50"
                                         }`}
                                 >
                                     <div
-                                        className={`flex items-center justify-center w-8 h-8 rounded-full mr-3 text-sm font-semibold transition-colors duration-200 ${isActive
-                                            ? "bg-blue-100 text-blue-700 font-bold"
-                                            : isPast
-                                                ? "bg-green-100 text-green-600"
-                                                : "bg-slate-100 text-slate-500"
+                                        className={`flex items-center justify-center w-8 h-8 rounded-full mr-3 text-sm font-semibold transition-colors duration-200 ${stepHasErrors
+                                            ? "bg-red-100 text-red-600 ring-2 ring-red-200"
+                                            : isActive
+                                                ? "bg-blue-100 text-blue-700 font-bold"
+                                                : isPast
+                                                    ? "bg-green-100 text-green-600"
+                                                    : "bg-slate-100 text-slate-500"
                                             }`}
                                     >
-                                        {isPast ? <Check className="w-4 h-4" /> : index + 1}
+                                        {stepHasErrors ? "!" : isPast ? <Check className="w-4 h-4" /> : index + 1}
                                     </div>
                                     <span className={`font-medium ${isActive ? "font-bold" : ""}`}>
                                         {step.label}
@@ -232,7 +351,7 @@ export default function ProductInspectionForm({
                 <div className="flex-1 flex flex-col min-h-[600px]">
                     <div className="p-8 flex-1">
                         {currentStep === "generalInformation" && (
-                            <GeneralInformation formData={formData} setFormData={setFormData} />
+                            <GeneralInformation formData={formData} setFormData={setFormData} autofillSnapshot={autofillSnapshot} />
                         )}
                         {currentStep === "preparation" && (
                             <Preparation formData={formData} setFormData={setFormData} />

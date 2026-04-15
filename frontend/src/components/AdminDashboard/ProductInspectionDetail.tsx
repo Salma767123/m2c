@@ -194,7 +194,6 @@ export default function ProductInspectionDetail({ productId }: Props) {
                                     <th className="p-3 border-b text-xs uppercase tracking-wider">Description</th>
                                     <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Total Qty</th>
                                     <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Insp. Qty</th>
-                                    <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -204,9 +203,6 @@ export default function ProductInspectionDetail({ productId }: Props) {
                                         <td className="p-3 text-slate-500">{item.itemDescription}</td>
                                         <td className="p-3 font-bold text-center">{item.totalQuantity}</td>
                                         <td className="p-3 font-bold text-blue-600 text-center">{item.inspectionQuantity}</td>
-                                        <td className="p-3 text-center">
-                                            <StatusChip value={item.status} />
-                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

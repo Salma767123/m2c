@@ -118,7 +118,7 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
       </div>
 
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-slate-900">Measurement Samples</h3>
+        <h3 className="text-lg font-semibold text-slate-900">Measurement Samples<span className="text-red-500 ml-0.5" aria-label="required">*</span></h3>
         <button
           onClick={addSample}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

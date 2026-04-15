@@ -1,5 +1,6 @@
 import axios from '@/lib/axios';
 import axiosLib from 'axios';
+import type { ProductDetailData } from '@/types/inspection';
 
 export interface QCCheckerData {
     id: string;
@@ -280,22 +281,38 @@ class QCCheckerService {
     // QC Checker: Products Operations
     // ============================
 
-    // Get assigned products
-    async getAssignedProducts(): Promise<{ success: boolean; data: any[] }> {
+    // Get assigned products — paginated + filterable.
+    // Response: { success, data: { products, pagination: { total, page, limit, totalPages } } }
+    async getAssignedProducts(params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        status?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+    }): Promise<{
+        success: boolean;
+        data: {
+            products: Record<string, unknown>[];
+            pagination: { total: number; page: number; limit: number; totalPages: number };
+        };
+    }> {
         try {
             const response = await axios.get('/qc-checkers/products', {
                 headers: {
                     'Authorization': `Bearer ${this.getCheckerToken()}`
-                }
+                },
+                params,
             });
             return response.data;
-        } catch (error: any) {
-            throw new Error(error.message || 'Failed to fetch assigned products');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to fetch assigned products';
+            throw new Error(message);
         }
     }
 
     // Get product details (product + variants + images + vendor contact + QC activity)
-    async getProductDetails(productId: string): Promise<{ success: boolean; data: { product: any } }> {
+    async getProductDetails(productId: string): Promise<{ success: boolean; data: { product: ProductDetailData } }> {
         try {
             const response = await axios.get(`/qc-checkers/products/${productId}/details`, {
                 headers: {
@@ -303,8 +320,9 @@ class QCCheckerService {
                 }
             });
             return response.data;
-        } catch (error: any) {
-            throw new Error(error.message || 'Failed to fetch product details');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to fetch product details';
+            throw new Error(message);
         }
     }
 

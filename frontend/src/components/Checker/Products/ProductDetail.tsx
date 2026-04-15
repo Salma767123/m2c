@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import type { ProductDetailData, ProductImage, ProductVariant } from "@/types/inspection"
 import {
     ArrowLeft,
     Package,
@@ -17,6 +18,8 @@ import {
     XCircle,
     Clock,
     UserCheck,
+    X,
+    ImageIcon,
 } from "lucide-react"
 import { qcCheckerService } from "@/services/qcCheckerService"
 
@@ -34,9 +37,10 @@ const TAB_LABELS: Record<Tab, string> = {
     activity: "QC Activity",
 }
 
+// Mirrors the ProductApprovalStatus enum in backend/prisma/schema.prisma —
+// products have no UNDER_REVIEW status (that is vendor-only).
 const APPROVAL_COLOR: Record<string, string> = {
     PENDING: "bg-amber-100 text-amber-800 border-amber-200",
-    UNDER_REVIEW: "bg-blue-100 text-blue-800 border-blue-200",
     REINSPECTION: "bg-orange-100 text-orange-800 border-orange-200",
     QC_APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
     APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
@@ -59,9 +63,27 @@ const formatCurrency = (value?: number | null) => {
 
 export default function ProductDetail({ productId, onBack, onStartInspection }: ProductDetailProps) {
     const [activeTab, setActiveTab] = useState<Tab>("overview")
-    const [product, setProduct] = useState<any>(null)
+    const [product, setProduct] = useState<ProductDetailData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [lightbox, setLightbox] = useState<{ src: string; caption?: string } | null>(null)
+
+    // Close lightbox on Escape + lock body scroll while it is open so the
+    // background page can't move behind the overlay. Both are standard modal
+    // a11y expectations and restore cleanly on close/unmount.
+    useEffect(() => {
+        if (!lightbox) return
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setLightbox(null)
+        }
+        const previousOverflow = document.body.style.overflow
+        document.body.style.overflow = "hidden"
+        window.addEventListener("keydown", onKey)
+        return () => {
+            window.removeEventListener("keydown", onKey)
+            document.body.style.overflow = previousOverflow
+        }
+    }, [lightbox])
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -110,9 +132,9 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
         )
     }
 
-    const canStartInspection = ["PENDING", "UNDER_REVIEW", "REINSPECTION"].includes(product.approvalStatus)
+    const canStartInspection = ["PENDING", "REINSPECTION"].includes(product.approvalStatus)
     const primaryImage =
-        product.images?.find((i: any) => i.isPrimary)?.url ||
+        product.images?.find((i) => i.isPrimary)?.url ||
         product.images?.[0]?.url ||
         null
 
@@ -191,7 +213,7 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                             <OverviewTab product={product} primaryImage={primaryImage} />
                         )}
                         {activeTab === "images" && (
-                            <ImagesTab product={product} />
+                            <ImagesTab product={product} onOpenLightbox={setLightbox} />
                         )}
                         {activeTab === "activity" && (
                             <QcActivityTab product={product} />
@@ -199,6 +221,14 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                     </div>
                 </div>
             </div>
+
+            {lightbox && (
+                <Lightbox
+                    src={lightbox.src}
+                    caption={lightbox.caption}
+                    onClose={() => setLightbox(null)}
+                />
+            )}
         </div>
     )
 }
@@ -236,7 +266,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     )
 }
 
-function OverviewTab({ product, primaryImage }: { product: any; primaryImage: string | null }) {
+function OverviewTab({ product, primaryImage }: { product: ProductDetailData; primaryImage: string | null }) {
     const v = product.vendor || {}
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -288,9 +318,25 @@ function OverviewTab({ product, primaryImage }: { product: any; primaryImage: st
     )
 }
 
-function ImagesTab({ product }: { product: any }) {
-    const images: Array<{ url: string; isPrimary?: boolean; alt?: string }> = product.images || []
-    const variants: any[] = product.variants || []
+type LightboxPayload = { src: string; caption?: string }
+type OpenLightbox = (payload: LightboxPayload) => void
+
+function ImagesTab({
+    product,
+    onOpenLightbox,
+}: {
+    product: ProductDetailData
+    onOpenLightbox: OpenLightbox
+}) {
+    const images: ProductImage[] = product.images || []
+    const variants: ProductVariant[] = product.variants || []
+    const primaryProductImage = images.find((i) => i.isPrimary)?.url || images[0]?.url || null
+
+    // Fallback cascade for the variant thumbnail: variant's own first image →
+    // product primary → placeholder. Variants without dedicated images (e.g.,
+    // size-only variants) still render with something useful.
+    const variantThumb = (v: ProductVariant): string | null =>
+        v.images?.[0] || primaryProductImage
 
     return (
         <div className="space-y-8">
@@ -300,18 +346,29 @@ function ImagesTab({ product }: { product: any }) {
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                         {images.map((img, idx) => (
-                            <div key={idx} className="relative group">
+                            <button
+                                key={idx}
+                                type="button"
+                                onClick={() =>
+                                    onOpenLightbox({
+                                        src: img.url,
+                                        caption: img.alt || `${product.name} — image ${idx + 1}`,
+                                    })
+                                }
+                                className="relative group text-left rounded-xl overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                aria-label={`View ${img.alt || `image ${idx + 1}`} in fullscreen`}
+                            >
                                 <img
                                     src={img.url}
                                     alt={img.alt || `${product.name} ${idx + 1}`}
-                                    className="w-full h-32 object-cover rounded-xl border border-slate-200"
+                                    className="w-full h-32 object-cover border border-slate-200 group-hover:opacity-90 transition-opacity"
                                 />
                                 {img.isPrimary && (
                                     <span className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
                                         Primary
                                     </span>
                                 )}
-                            </div>
+                            </button>
                         ))}
                     </div>
                 )}
@@ -325,7 +382,8 @@ function ImagesTab({ product }: { product: any }) {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-slate-50 text-left text-xs text-slate-600 uppercase tracking-wide">
-                                    <th className="px-3 py-2 rounded-l-lg">SKU</th>
+                                    <th className="px-3 py-2 rounded-l-lg w-16">Image</th>
+                                    <th className="px-3 py-2">SKU</th>
                                     <th className="px-3 py-2">Size</th>
                                     <th className="px-3 py-2">Color</th>
                                     <th className="px-3 py-2">Price</th>
@@ -333,30 +391,102 @@ function ImagesTab({ product }: { product: any }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {variants.map((v) => (
-                                    <tr key={v.id} className="border-b border-slate-100 last:border-0">
-                                        <td className="px-3 py-2 font-mono text-xs">{v.sku}</td>
-                                        <td className="px-3 py-2">{v.size}</td>
-                                        <td className="px-3 py-2">
-                                            <span className="inline-flex items-center gap-1.5">
-                                                {v.colorHex && (
-                                                    <span
-                                                        className="w-3 h-3 rounded-full border border-slate-200"
-                                                        style={{ backgroundColor: v.colorHex }}
-                                                    />
+                                {variants.map((v) => {
+                                    const thumb = variantThumb(v)
+                                    const caption = `${v.sku} — ${v.size} / ${v.color}`
+                                    return (
+                                        <tr key={v.id} className="border-b border-slate-100 last:border-0 align-middle">
+                                            <td className="px-3 py-2">
+                                                {thumb ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onOpenLightbox({ src: thumb, caption })}
+                                                        className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 block"
+                                                        aria-label={`View image for ${caption}`}
+                                                    >
+                                                        <img
+                                                            src={thumb}
+                                                            alt={caption}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </button>
+                                                ) : (
+                                                    <div
+                                                        className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center"
+                                                        aria-label="No image"
+                                                    >
+                                                        <ImageIcon className="w-4 h-4 text-slate-300" />
+                                                    </div>
                                                 )}
-                                                {v.color}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2">{formatCurrency(v.price)}</td>
-                                        <td className="px-3 py-2">{v.stock}</td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                            <td className="px-3 py-2 font-mono text-xs">{v.sku}</td>
+                                            <td className="px-3 py-2">{v.size}</td>
+                                            <td className="px-3 py-2">
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    {v.colorHex && (
+                                                        <span
+                                                            className="w-3 h-3 rounded-full border border-slate-200"
+                                                            style={{ backgroundColor: v.colorHex }}
+                                                        />
+                                                    )}
+                                                    {v.color}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2">{formatCurrency(v.price)}</td>
+                                            <td className="px-3 py-2">{v.stock}</td>
+                                        </tr>
+                                    )
+                                })}
                             </tbody>
                         </table>
                     </div>
                 )}
             </Section>
+        </div>
+    )
+}
+
+function Lightbox({ src, caption, onClose }: { src: string; caption?: string; onClose: () => void }) {
+    const closeButtonRef = useRef<HTMLButtonElement>(null)
+
+    // Auto-focus the close button on open so keyboard users land on an
+    // actionable control immediately, matching native dialog behaviour.
+    useEffect(() => {
+        closeButtonRef.current?.focus()
+    }, [])
+
+    return (
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={caption || "Image preview"}
+            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+            onClick={onClose}
+        >
+            <button
+                ref={closeButtonRef}
+                type="button"
+                onClick={onClose}
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white"
+                aria-label="Close image preview"
+            >
+                <X className="w-5 h-5" />
+            </button>
+            <div
+                className="max-w-5xl max-h-[90vh] flex flex-col items-center gap-3"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <img
+                    src={src}
+                    alt={caption || "Preview"}
+                    className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl"
+                />
+                {caption && (
+                    <p className="text-sm text-white/90 font-medium bg-black/40 px-3 py-1.5 rounded-full">
+                        {caption}
+                    </p>
+                )}
+            </div>
         </div>
     )
 }
@@ -382,7 +512,7 @@ function humanizeKey(key: string): string {
         .trim()
 }
 
-function QcActivityTab({ product }: { product: any }) {
+function QcActivityTab({ product }: { product: ProductDetailData }) {
     const status: string = product.approvalStatus
     const hasAction = Boolean(product.approvedAt || product.rejectionReason || product.qcInspectionData)
     const isRejected = status === "REJECTED"

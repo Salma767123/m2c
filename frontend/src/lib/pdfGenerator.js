@@ -203,15 +203,14 @@ export const generateInspectionPDF = async (reportData, reportId) => {
       item.itemName,
       item.itemDescription.length > 35 ? item.itemDescription.substring(0, 35) + '...' : item.itemDescription,
       item.poQuantity.toLocaleString(),
-      item.inspectedQuantity.toString(),
-      item.status
+      item.inspectedQuantity.toString()
     ])
-    
+
     yPosition = drawTable(
-      ['Item Name', 'Description', 'PO Qty', 'Inspected', 'Status'],
+      ['Item Name', 'Description', 'PO Qty', 'Inspected'],
       itemsData,
       yPosition,
-      [40, 70, 25, 25, 25]
+      [45, 80, 30, 30]
     )
     
     yPosition += 10
@@ -549,7 +548,6 @@ export const generateHTMLReport = (reportData, reportId) => {
                     <th>Description</th>
                     <th>PO Quantity</th>
                     <th>Inspected</th>
-                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -559,7 +557,6 @@ export const generateHTMLReport = (reportData, reportId) => {
                       <td>${item.itemDescription}</td>
                       <td>${item.poQuantity.toLocaleString()}</td>
                       <td>${item.inspectedQuantity}</td>
-                      <td><strong>${item.status}</strong></td>
                     </tr>
                   `).join('')}
                 </tbody>
