@@ -122,12 +122,149 @@ export default function ProductInspectionForm({
   const currentStepIndex = STEPS.findIndex((s) => s.id === currentStep);
   const isLastStep = currentStepIndex === STEPS.length - 1;
 
+  // Tracks which steps the user has already tried to advance from.
+  // Inline errors only render on steps the user has "attempted" — avoids
+  // red borders the first time a step is viewed.
+  const [attempted, setAttempted] = useState<Set<Step>>(new Set());
+  const markAttempted = (step: Step) =>
+    setAttempted((prev) => {
+      if (prev.has(step)) return prev;
+      const next = new Set(prev);
+      next.add(step);
+      return next;
+    });
+
+  // Returns fieldName -> error message. Keys are the same names used inside
+  // each step component so inline rendering lights up the right field.
+  const validateStep = (step: Step): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    const reqStr = (k: string, v: any, msg: string) => {
+      if (!(typeof v === 'string' && v.trim().length > 0)) errs[k] = msg;
+    };
+    const reqNum = (k: string, v: any, msg: string) => {
+      if (!(typeof v === 'number' && v > 0)) errs[k] = msg;
+    };
+    const reqArr = (k: string, v: any, msg: string) => {
+      if (!(Array.isArray(v) && v.length > 0)) errs[k] = msg;
+    };
+
+    switch (step) {
+      case 'generalInformation':
+        reqStr('client', formData.client, 'Client is required');
+        reqStr('vendor', formData.vendor, 'Vendor is required');
+        reqStr('factory', formData.factory, 'Factory is required');
+        reqStr('serviceLocation', formData.serviceLocation, 'Service location is required');
+        reqStr('serviceStartDate', formData.serviceStartDate, 'Service start date is required');
+        reqStr('serviceType', formData.serviceType, 'Select a service type');
+        break;
+
+      case 'preparation':
+        if (!Array.isArray(formData.items) || formData.items.length === 0) {
+          errs.items = 'Add at least one item';
+        } else {
+          formData.items.forEach((it: any, i: number) => {
+            reqStr(`items.${i}.itemName`, it.itemName, 'Item name is required');
+            reqStr(`items.${i}.itemDescription`, it.itemDescription, 'Description is required');
+            reqNum(`items.${i}.totalQuantity`, Number(it.totalQuantity), 'Must be greater than 0');
+            reqNum(`items.${i}.inspectionQuantity`, Number(it.inspectionQuantity), 'Must be greater than 0');
+            reqStr(`items.${i}.status`, it.status, 'Status is required');
+          });
+        }
+        reqArr('warehousePhotoEvidences', formData.warehousePhotoEvidences, 'Add at least one photo');
+        break;
+
+      case 'measurements':
+        reqArr('measurements', formData.measurements, 'Add at least one measurement');
+        (formData.measurements || []).forEach((m: any, i: number) => {
+          const hasAny = Object.values(m || {}).some(
+            (v) => v !== undefined && v !== null && String(v).trim() !== '',
+          );
+          if (!hasAny) errs[`measurements.${i}`] = 'Fill in the details';
+        });
+        reqArr('measurementPhotos', formData.measurementPhotos, 'Add at least one photo');
+        break;
+
+      case 'packaging':
+        reqStr('shipperCartonRemark', formData.shipperCartonRemark, 'Required');
+        reqStr('innerCartonRemark', formData.innerCartonRemark, 'Required');
+        reqStr('retailPackagingRemark', formData.retailPackagingRemark, 'Required');
+        reqStr('productTypeRemark', formData.productTypeRemark, 'Required');
+        reqStr('aqlWorkmanshipRemark', formData.aqlWorkmanshipRemark, 'Required');
+        reqStr('onSiteTestsRemark', formData.onSiteTestsRemark, 'Required');
+        reqArr('packagingPhotos', formData.packagingPhotos, 'Add at least one photo');
+        break;
+
+      case 'defects':
+        reqStr('inspectionLevel', formData.inspectionLevel, 'Select an inspection level');
+        reqNum('sampleSize', Number(formData.sampleSize), 'Sample size must be greater than 0');
+        if (Number(formData.criticalDefects) > 0)
+          reqStr('criticalDefectDetails', formData.criticalDefectDetails, 'Describe the critical defects');
+        if (Number(formData.majorDefects) > 0)
+          reqStr('majorDefectDetails', formData.majorDefectDetails, 'Describe the major defects');
+        if (Number(formData.minorDefects) > 0)
+          reqStr('minorDefectDetails', formData.minorDefectDetails, 'Describe the minor defects');
+        reqArr('defectPhotos', formData.defectPhotos, 'Add at least one photo');
+        break;
+
+      case 'testing':
+        reqArr('tests', formData.tests, 'Add at least one test');
+        (formData.tests || []).forEach((t: any, i: number) => {
+          // Each seeded test needs Pass or Fail marked (exclusive, set via toggles)
+          if (!t.pass && !t.fail) {
+            errs[`tests.${i}.result`] = 'Mark Pass or Fail';
+          }
+        });
+        reqArr('testingPhotos', formData.testingPhotos, 'Add at least one photo');
+        break;
+
+      case 'documentation':
+        reqStr('inspectorSignature', formData.inspectorSignature, 'Signature is required');
+        reqArr('documentationPhotos', formData.documentationPhotos, 'Add at least one photo');
+        reqArr('photocopyDocuments', formData.photocopyDocuments, 'Add at least one document');
+        reqArr('companyIdCards', formData.companyIdCards, 'Add at least one ID card');
+        break;
+
+      case 'review':
+        reqStr('finalDecision', formData.finalDecision, 'Pick a final decision');
+        if (formData.finalDecision === 'Rejected')
+          reqStr('reviewerRemarks', formData.reviewerRemarks, 'Rejection remarks are required');
+        break;
+    }
+    return errs;
+  };
+
+  const currentErrors = validateStep(currentStep);
+  const showErrors = attempted.has(currentStep);
+  const errorCount = Object.keys(currentErrors).length;
+
   const nextStep = () => {
-    if (!isLastStep) setCurrentStep(STEPS[currentStepIndex + 1].id);
+    if (isLastStep) return;
+    if (errorCount > 0) {
+      markAttempted(currentStep);
+      return;
+    }
+    setCurrentStep(STEPS[currentStepIndex + 1].id);
   };
 
   const prevStep = () => {
     if (currentStepIndex > 0) setCurrentStep(STEPS[currentStepIndex - 1].id);
+  };
+
+  const jumpToStep = (targetStep: Step) => {
+    const targetIdx = STEPS.findIndex((s) => s.id === targetStep);
+    if (targetIdx <= currentStepIndex) {
+      setCurrentStep(targetStep);
+      return;
+    }
+    for (let i = currentStepIndex; i < targetIdx; i++) {
+      const errs = validateStep(STEPS[i].id);
+      if (Object.keys(errs).length > 0) {
+        setCurrentStep(STEPS[i].id);
+        markAttempted(STEPS[i].id);
+        return;
+      }
+    }
+    setCurrentStep(targetStep);
   };
 
   const cleanPhotos = (photos: any[]) => {
@@ -139,8 +276,18 @@ export default function ProductInspectionForm({
   };
 
   const handleSubmit = async () => {
-    if (formData.finalDecision === 'Rejected' && !formData.reviewerRemarks) {
-      showErrorToast('Error', 'Rejection remarks are required.');
+    // Full sweep before submission — reveal inline errors on every step that
+    // has any, and jump to the first one so the user can fix it.
+    const invalidSteps = STEPS.filter(
+      (s) => Object.keys(validateStep(s.id)).length > 0,
+    );
+    if (invalidSteps.length > 0) {
+      setAttempted((prev) => {
+        const next = new Set(prev);
+        invalidSteps.forEach((s) => next.add(s.id));
+        return next;
+      });
+      setCurrentStep(invalidSteps[0].id);
       return;
     }
 
@@ -190,22 +337,25 @@ export default function ProductInspectionForm({
     );
   };
 
+  const stepErrors = showErrors ? currentErrors : {};
+
   const renderStepContent = () => {
+    const p = { formData, setFormData, errors: stepErrors } as any;
     switch (currentStep) {
       case 'generalInformation':
-        return <GeneralInformation formData={formData} setFormData={setFormData} />;
+        return <GeneralInformation {...p} />;
       case 'preparation':
-        return <Preparation formData={formData} setFormData={setFormData} />;
+        return <Preparation {...p} />;
       case 'measurements':
-        return <Measurements formData={formData} setFormData={setFormData} />;
+        return <Measurements {...p} />;
       case 'packaging':
-        return <Packaging formData={formData} setFormData={setFormData} />;
+        return <Packaging {...p} />;
       case 'defects':
-        return <Defects formData={formData} setFormData={setFormData} />;
+        return <Defects {...p} />;
       case 'testing':
-        return <Testing formData={formData} setFormData={setFormData} />;
+        return <Testing {...p} />;
       case 'documentation':
-        return <Documentation formData={formData} setFormData={setFormData} />;
+        return <Documentation {...p} />;
       case 'review':
         return <Review formData={formData as any} />;
       default:
@@ -232,7 +382,7 @@ export default function ProductInspectionForm({
                       ? 'bg-green-50'
                       : 'bg-gray-100'
                   }`}
-                  onPress={() => setCurrentStep(step.id)}
+                  onPress={() => jumpToStep(step.id)}
                 >
                   <View
                     className={`w-5 h-5 rounded-full items-center justify-center mr-1.5 ${
@@ -309,17 +459,47 @@ export default function ProductInspectionForm({
                 Rejection Remarks <Text className="text-red-500">*</Text>
               </Text>
               <TextInput
-                className="border border-gray-300 rounded-xl px-4 py-3 bg-white text-sm text-gray-900 min-h-[70px]"
+                className={`rounded-xl px-4 py-3 bg-white text-sm text-gray-900 min-h-[70px] border ${
+                  stepErrors.reviewerRemarks ? 'border-red-400' : 'border-gray-300'
+                }`}
                 value={formData.reviewerRemarks}
                 onChangeText={(val) => setFormData({ ...formData, reviewerRemarks: val })}
                 placeholder="Enter reason for rejection..."
                 multiline
                 textAlignVertical="top"
               />
+              {stepErrors.reviewerRemarks ? (
+                <Text className="text-xs text-red-600 mt-1">
+                  {stepErrors.reviewerRemarks}
+                </Text>
+              ) : null}
             </View>
           )}
         </View>
       )}
+
+      {/* Required-fields hint */}
+      <View className="px-4 pt-1 pb-2">
+        <Text className="text-[11px] text-slate-500">
+          <Text className="text-red-500 font-bold">*</Text> All fields on this
+          step are required to continue.
+        </Text>
+      </View>
+
+      {/* Inline banner — only after the user hit Next on an invalid step */}
+      {showErrors && errorCount > 0 ? (
+        <View className="mx-4 mt-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 flex-row items-start">
+          <View className="w-5 h-5 rounded-full bg-red-500 items-center justify-center mr-2 mt-0.5">
+            <Text className="text-white text-[10px] font-bold">!</Text>
+          </View>
+          <Text className="text-xs text-red-700 flex-1 leading-4">
+            <Text className="font-bold">
+              {errorCount} {errorCount === 1 ? 'field needs' : 'fields need'} your attention.
+            </Text>{' '}
+            Review the highlighted fields to continue.
+          </Text>
+        </View>
+      ) : null}
 
       {/* Form Content */}
       <View className="flex-1 px-4 pt-2">{renderStepContent()}</View>

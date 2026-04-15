@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Plus, Trash2, Upload, X } from 'lucide-react-native';
 import { showImagePickerOptions, ImagePickerResult } from '@/utils/imagePicker';
+import { FieldError } from '../FormFields';
 
 interface MeasurementsProps {
   formData: {
@@ -19,9 +20,11 @@ interface MeasurementsProps {
     measurementPhotos: any[];
   };
   setFormData: (data: any) => void;
+  errors?: Record<string, string>;
 }
 
-export default function Measurements({ formData, setFormData }: MeasurementsProps) {
+export default function Measurements({ formData, setFormData, errors = {} }: MeasurementsProps) {
+  const errorCount = Object.keys(errors).length;
   const updateMeasurement = (id: number, field: string, value: any) => {
     const updated = formData.measurements.map((m) =>
       m.id === id ? { ...m, [field]: value } : m
@@ -52,7 +55,7 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
     const newPhotos = images.map((img) => ({
       name: img.name,
       uri: img.uri,
-      data: img.uri,
+      data: img.data || img.uri,
     }));
     setFormData({ ...formData, measurementPhotos: [...formData.measurementPhotos, ...newPhotos] });
   };
@@ -76,6 +79,9 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
           <Text className="text-white text-sm font-semibold ml-1">Add</Text>
         </TouchableOpacity>
       </View>
+
+      
+      {errors.measurements ? <FieldError msg={errors.measurements} /> : null}
 
       {formData.measurements.length === 0 && (
         <View className="bg-gray-50 rounded-xl p-8 items-center mb-4">
@@ -171,7 +177,10 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
 
       {/* Photos */}
       <View className="mt-2 mb-6">
-        <Text className="text-sm font-bold text-gray-900 mb-3">Measurement Photos</Text>
+        <Text className="text-sm font-bold text-gray-900 mb-3">
+          Measurement Photos <Text className="text-red-500">*</Text>
+        </Text>
+        <FieldError msg={errors.measurementPhotos} />
         <TouchableOpacity
           className="border-2 border-dashed border-gray-300 rounded-xl py-6 items-center bg-gray-50"
           onPress={() => showImagePickerOptions(handlePhotos)}
