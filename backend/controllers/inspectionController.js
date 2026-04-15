@@ -322,7 +322,7 @@ const completeInspection = async (req, res) => {
         res.json({ success: true, message: 'Inspection completed successfully', inspection: updatedInspection });
     } catch (error) {
         console.error('Error completing inspection:', error);
-        res.status(500).json({ error: 'Internal server error', details: error.message });
+        res.status(500).json({ error: 'Internal server error' });
     }
 };
 

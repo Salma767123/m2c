@@ -126,9 +126,8 @@ const createQCChecker = async (req, res) => {
                 password: plainPassword,
                 loginLink,
             });
-            console.log(`✅ QC Checker credentials email sent to: ${email}`);
         } catch (emailError) {
-            console.error('⚠️ Failed to send credentials email:', emailError.message);
+            console.error('Failed to send credentials email:', emailError.message);
             // Still return success but with a warning
         }
 
@@ -468,15 +467,12 @@ const qcCheckerLogin = async (req, res) => {
             });
         }
 
-        console.log(`🔍 QC Checker login attempt: ${checkerId}`);
-
         // Find checker by checkerId
         const checker = await prisma.qCChecker.findUnique({
             where: { checkerId: checkerId.toUpperCase() },
         });
 
         if (!checker) {
-            console.log('❌ QC Checker not found');
             return res.status(401).json({
                 success: false,
                 error: 'Invalid credentials. Please check your Checker ID and password.',
@@ -485,7 +481,6 @@ const qcCheckerLogin = async (req, res) => {
 
         // Check if checker is active
         if (!checker.isActive || checker.status === 'SUSPENDED') {
-            console.log('❌ QC Checker account is not active');
             return res.status(401).json({
                 success: false,
                 error: 'Your account is not active. Please contact admin.',
@@ -495,7 +490,6 @@ const qcCheckerLogin = async (req, res) => {
         // Verify password
         const isPasswordValid = await bcrypt.compare(password, checker.password);
         if (!isPasswordValid) {
-            console.log('❌ Invalid password');
             return res.status(401).json({
                 success: false,
                 error: 'Invalid credentials. Please check your Checker ID and password.',
@@ -510,8 +504,6 @@ const qcCheckerLogin = async (req, res) => {
 
         // Generate token
         const token = generateCheckerToken(checker.id);
-
-        console.log(`✅ QC Checker login successful: ${checker.name} (${checker.checkerId})`);
 
         res.json({
             success: true,
