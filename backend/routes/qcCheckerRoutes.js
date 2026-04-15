@@ -14,6 +14,7 @@ const {
     approveVendorByQc,
     rejectVendorByQc,
     getAssignedProducts,
+    getProductDetails,
     approveProductByQc,
     rejectProductByQc
 } = require('../controllers/qcCheckerController');
@@ -39,6 +40,7 @@ router.post('/vendors/:vendorId/reject', authenticateToken, rejectVendorByQc);
 
 // QC Products
 router.get('/products', authenticateToken, getAssignedProducts);
+router.get('/products/:productId/details', authenticateToken, getProductDetails);
 router.post('/products/:productId/approve', authenticateToken, approveProductByQc);
 router.post('/products/:productId/reject', authenticateToken, rejectProductByQc);
 

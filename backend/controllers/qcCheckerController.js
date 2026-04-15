@@ -1021,6 +1021,63 @@ const getAssignedProducts = async (req, res) => {
 };
 
 // ============================
+// QC Checker: Get product details (scoped to assigned checker)
+// ============================
+const getProductDetails = async (req, res) => {
+    try {
+        if (req.user.role !== 'QC_CHECKER') {
+            return res.status(403).json({ success: false, message: 'Access denied: QC Checker role required' });
+        }
+
+        const { productId } = req.params;
+        const qcCheckerId = req.user.id;
+
+        const product = await prisma.product.findFirst({
+            where: { id: productId, assignedQcId: qcCheckerId },
+            include: {
+                vendor: {
+                    select: {
+                        id: true,
+                        companyName: true,
+                        ownerName: true,
+                        email: true,
+                        businessPhone: true,
+                        businessEmail: true,
+                        factoryCity: true,
+                        factoryState: true,
+                    },
+                },
+                images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
+                variants: { orderBy: { createdAt: 'asc' } },
+                assignedQc: { select: { name: true, email: true } },
+            },
+        });
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: 'Product not found or not assigned to you',
+            });
+        }
+
+        // QC activity for this product lives on the Product record itself
+        // (approvedAt, approvedBy, rejectionReason, qcInspectionData). The
+        // Inspection model has no productId relation, so there is no separate
+        // history to fetch — the product document is the canonical source.
+        res.status(200).json({
+            success: true,
+            data: { product },
+        });
+    } catch (error) {
+        console.error('Error fetching product details:', error);
+        res.status(500).json({
+            success: false,
+            message: 'An error occurred while fetching product details',
+        });
+    }
+};
+
+// ============================
 // QC Checker: Approve Product
 // ============================
 const approveProductByQc = async (req, res) => {
@@ -1189,6 +1246,7 @@ module.exports = {
     approveVendorByQc,
     rejectVendorByQc,
     getAssignedProducts,
+    getProductDetails,
     approveProductByQc,
     rejectProductByQc,
 };

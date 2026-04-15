@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
-import { Check, X, AlertCircle, FileText } from 'lucide-react'
-import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+import { AlertCircle, Eye, FileText } from 'lucide-react'
+import { showErrorToast } from '@/lib/toast-utils'
 import { qcCheckerService } from '@/services/qcCheckerService'
 import ProductInspectionForm from './ProductInspectionForm'
+import ProductDetail from './ProductDetail'
 
 interface AssignedProduct {
     id: string
@@ -31,10 +32,8 @@ interface AssignedProduct {
 export default function Products() {
     const [products, setProducts] = useState<AssignedProduct[]>([])
     const [loading, setLoading] = useState(true)
-    const [showRejectionModal, setShowRejectionModal] = useState(false)
-    const [rejectingProductId, setRejectingProductId] = useState<string | null>(null)
-    const [rejectionReason, setRejectionReason] = useState('')
     const [selectedProduct, setSelectedProduct] = useState<AssignedProduct | null>(null)
+    const [viewingProductId, setViewingProductId] = useState<string | null>(null)
 
     useEffect(() => {
         loadProducts()
@@ -47,50 +46,12 @@ export default function Products() {
             if (response.success) {
                 setProducts(response.data)
             }
-        } catch (error: any) {
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to fetch assigned products'
             console.error('Error loading products:', error)
-            showErrorToast('Load Failed', error.message || 'Unable to fetch assigned products')
+            showErrorToast('Load Failed', message)
         } finally {
             setLoading(false)
-        }
-    }
-
-    const handleApprove = async (productId: string) => {
-        if (!window.confirm('Are you sure you want to approve this product?')) return
-
-        try {
-            const response = await qcCheckerService.approveProduct(productId)
-            if (response.success) {
-                showSuccessToast('Product Approved', 'You have successfully approved this product.')
-                loadProducts()
-            }
-        } catch (error: any) {
-            showErrorToast('Approval Failed', error.message || 'Unable to approve product.')
-        }
-    }
-
-    const handleRejectClick = (productId: string) => {
-        setRejectingProductId(productId)
-        setRejectionReason('')
-        setShowRejectionModal(true)
-    }
-
-    const handleRejectSubmit = async () => {
-        if (!rejectingProductId || !rejectionReason.trim()) {
-            showErrorToast('Validation Error', 'Please provide a valid reason for rejection.')
-            return
-        }
-
-        try {
-            const response = await qcCheckerService.rejectProduct(rejectingProductId, rejectionReason.trim())
-            if (response.success) {
-                showSuccessToast('Product Rejected', 'You have rejected this product.')
-                setShowRejectionModal(false)
-                setRejectingProductId(null)
-                loadProducts()
-            }
-        } catch (error: any) {
-            showErrorToast('Rejection Failed', error.message || 'Unable to reject product.')
         }
     }
 
@@ -133,6 +94,24 @@ export default function Products() {
                     onCancel={() => setSelectedProduct(null)}
                 />
             </div>
+        )
+    }
+
+    if (viewingProductId) {
+        const viewed = products.find((p) => p.id === viewingProductId) || null
+        return (
+            <ProductDetail
+                productId={viewingProductId}
+                onBack={() => setViewingProductId(null)}
+                onStartInspection={
+                    viewed
+                        ? () => {
+                            setViewingProductId(null)
+                            setSelectedProduct(viewed)
+                        }
+                        : undefined
+                }
+            />
         )
     }
 
@@ -197,8 +176,18 @@ export default function Products() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'UNDER_REVIEW' || product.approvalStatus === 'REINSPECTION') && (
-                                                <div className="flex items-center justify-end space-x-2">
+                                            <div className="flex items-center justify-end space-x-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setViewingProductId(product.id)}
+                                                    className="text-slate-700 border-slate-200 hover:bg-slate-50 font-medium"
+                                                    aria-label={`View details for ${product.name}`}
+                                                >
+                                                    <Eye className="h-4 w-4 mr-2" />
+                                                    View
+                                                </Button>
+                                                {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'UNDER_REVIEW' || product.approvalStatus === 'REINSPECTION') && (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
@@ -208,8 +197,8 @@ export default function Products() {
                                                         <FileText className="h-4 w-4 mr-2" />
                                                         Start Inspection
                                                     </Button>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -218,29 +207,6 @@ export default function Products() {
                     )}
                 </CardContent>
             </Card>
-
-            {showRejectionModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">Reject Product</h3>
-                        <p className="text-sm text-gray-600 mb-4">Please provide a reason for rejecting this product inspection.</p>
-
-                        <textarea
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition-all resize-none h-28 mix-blend-multiply"
-                            placeholder="Enter rejection reason..."
-                            value={rejectionReason}
-                            onChange={(e) => setRejectionReason(e.target.value)}
-                        />
-
-                        <div className="flex justify-end gap-3 mt-6">
-                            <Button variant="outline" onClick={() => setShowRejectionModal(false)}>Cancel</Button>
-                            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={handleRejectSubmit}>
-                                Confirm Rejection
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

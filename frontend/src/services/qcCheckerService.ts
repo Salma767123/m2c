@@ -294,6 +294,20 @@ class QCCheckerService {
         }
     }
 
+    // Get product details (product + variants + images + vendor contact + QC activity)
+    async getProductDetails(productId: string): Promise<{ success: boolean; data: { product: any } }> {
+        try {
+            const response = await axios.get(`/qc-checkers/products/${productId}/details`, {
+                headers: {
+                    'Authorization': `Bearer ${this.getCheckerToken()}`
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to fetch product details');
+        }
+    }
+
     // Approve Product
     async approveProduct(productId: string, formData?: any): Promise<{ success: boolean; message: string; data: any }> {
         try {
