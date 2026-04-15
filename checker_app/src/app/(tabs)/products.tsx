@@ -1,44 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
-import { AlertCircle, FileText, CheckCircle2 } from 'lucide-react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from 'react-native';
+import { AlertCircle, FileText } from 'lucide-react-native';
 import qcCheckerService from '../../services/qcCheckerService';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { showErrorToast } from '@/lib/toast-utils';
+
+interface AssignedProduct {
+  id: string;
+  name: string;
+  baseSku: string;
+  category: string;
+  basePrice: number;
+  totalStock: number;
+  status: string;
+  approvalStatus: string;
+  createdAt: string;
+  images?: Array<{ url: string; isPrimary: boolean }>;
+  vendor: {
+    companyName: string;
+    ownerName: string;
+    email: string;
+  };
+}
 
 export default function ProductsTab() {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<AssignedProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter();
+
+  const loadProducts = useCallback(async () => {
+    try {
+      const response = await qcCheckerService.getAssignedProducts();
+      if (response?.success && response.data) {
+        setProducts(response.data);
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch assigned products:', error);
+      showErrorToast('Load Failed', error.message || 'Unable to fetch assigned products');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        // Assuming getAssignedProducts is implemented in qcCheckerService
-        const response = await qcCheckerService.getAssignedProducts();
-        if (mounted && response?.success && response.data) {
-          setProducts(response.data);
-        } else if (mounted) {
-          // Fallback static data
-          setProducts([
-            { id: '1', name: "Men's Cotton T-Shirt", baseSku: "TSH-M-C-01", category: "Apparel", approvalStatus: "PENDING", vendor: { companyName: "Global Textiles Ltd", ownerName: "John Doe" } },
-            { id: '2', name: "Denim Jeans Classic", baseSku: "JNS-D-C-02", category: "Apparel", approvalStatus: "UNDER_REVIEW", vendor: { companyName: "Premium Garments C..", ownerName: "Jane Smith" } },
-          ]);
-        }
-      } catch (error) {
-        console.error("Failed to fetch assigned products:", error);
-        if (mounted) {
-          setProducts([
-            { id: '1', name: "Men's Cotton T-Shirt", baseSku: "TSH-M-C-01", category: "Apparel", approvalStatus: "PENDING", vendor: { companyName: "Global Textiles Ltd", ownerName: "John Doe" } }
-          ]);
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
+    loadProducts();
+  }, [loadProducts]);
 
-    fetchProducts();
-    return () => { mounted = false; };
-  }, []);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadProducts();
+  }, [loadProducts]);
 
   const getStatusStyle = (status: string) => {
     const s = status?.toUpperCase();
@@ -46,7 +59,19 @@ export default function ProductsTab() {
     if (s === 'APPROVED') return { bg: 'bg-emerald-100', text: 'text-emerald-800' };
     if (s === 'REJECTED') return { bg: 'bg-red-100', text: 'text-red-800' };
     if (s === 'UNDER_REVIEW') return { bg: 'bg-blue-100', text: 'text-blue-800' };
+    if (s === 'REINSPECTION') return { bg: 'bg-orange-100', text: 'text-orange-800' };
     return { bg: 'bg-gray-100', text: 'text-gray-800' };
+  };
+
+  const handleStartInspection = (product: AssignedProduct) => {
+    router.push({
+      pathname: '/(tabs)/product-inspection',
+      params: {
+        productId: product.id,
+        productName: product.name,
+        vendorName: product.vendor?.companyName || '',
+      },
+    } as any);
   };
 
   if (loading) {
@@ -59,7 +84,11 @@ export default function ProductsTab() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+    <ScrollView
+      className="flex-1 bg-gray-50"
+      contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       <View className="mb-6">
         <Text className="text-3xl font-extrabold text-gray-900 mb-1">Assigned Products</Text>
         <Text className="text-gray-600 text-sm">Review and approve or reject vendor products</Text>
@@ -79,7 +108,10 @@ export default function ProductsTab() {
           <View className="p-4 gap-y-4">
             {products.map((product) => {
               const statusStyle = getStatusStyle(product.approvalStatus);
-              const needsInspection = product.approvalStatus === 'PENDING' || product.approvalStatus === 'UNDER_REVIEW';
+              const needsInspection =
+                product.approvalStatus === 'PENDING' ||
+                product.approvalStatus === 'UNDER_REVIEW' ||
+                product.approvalStatus === 'REINSPECTION';
 
               return (
                 <View key={product.id} className="border border-gray-200 rounded-xl p-4">
@@ -105,27 +137,22 @@ export default function ProductsTab() {
                       <Text className="text-xs text-gray-500" numberOfLines={1}>{product.vendor?.ownerName}</Text>
                     </View>
                     <View className="flex-1 pl-2">
-                       <Text className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Status</Text>
-                       <View className={`self-start px-2 py-0.5 rounded-full ${statusStyle.bg}`}>
-                         <Text className={`text-[10px] font-bold ${statusStyle.text}`}>{product.approvalStatus}</Text>
-                       </View>
-                       <Text className="text-xs text-gray-700 mt-1">{product.category}</Text>
+                      <Text className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Status</Text>
+                      <View className={`self-start px-2 py-0.5 rounded-full ${statusStyle.bg}`}>
+                        <Text className={`text-[10px] font-bold ${statusStyle.text}`}>{product.approvalStatus}</Text>
+                      </View>
+                      <Text className="text-xs text-gray-700 mt-1">{product.category}</Text>
                     </View>
                   </View>
 
-                  {needsInspection ? (
-                    <TouchableOpacity 
+                  {needsInspection && (
+                    <TouchableOpacity
                       className="flex-row items-center justify-center py-2.5 rounded-xl border border-blue-200 bg-blue-50"
-                      onPress={() => { /* Handled Product Inspection logic */ }}
+                      onPress={() => handleStartInspection(product)}
                     >
                       <FileText size={16} color="#2563eb" />
                       <Text className="ml-2 font-bold text-blue-700 text-sm">Start Inspection</Text>
                     </TouchableOpacity>
-                  ) : (
-                    <View className="flex-row items-center justify-center py-2.5 rounded-xl bg-gray-50 border border-gray-100">
-                      <CheckCircle2 size={16} color="#10b981" />
-                      <Text className="ml-2 font-bold text-gray-600 text-sm">Inspection Completed</Text>
-                    </View>
                   )}
                 </View>
               );

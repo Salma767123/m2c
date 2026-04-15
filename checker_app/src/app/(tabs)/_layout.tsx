@@ -21,9 +21,8 @@ export default function TabLayout() {
     { name: "index", label: "Home", icon: LayoutDashboard },
     { name: "vendors", label: "Vendors", icon: Users },
     { name: "products", label: "Products", icon: Box },
-    { name: "report", label: "Reports", icon: FileText },
-    { name: "settings", label: "Settings", icon: SettingsIcon },
-  ];
+    { name: "report", label: "Reports", icon: FileText }
+];
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
