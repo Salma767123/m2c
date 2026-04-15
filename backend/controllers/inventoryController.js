@@ -785,12 +785,58 @@ const getVendorCategories = async (req, res) => {
         subcategories = allSubcategories;
       }
 
-      // Append any legacy string names that weren't resolved as objectIds
+      // Look up string names in the database to resolve them to real categories with subcategories
       if (stringNames.length > 0) {
+        const nameMatchedCategories = await prisma.category.findMany({
+          where: {
+            name: { in: stringNames, mode: 'insensitive' },
+            parentId: null,
+            status: 'ACTIVE'
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            subcategories: {
+              where: { status: 'ACTIVE' },
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                parentId: true
+              }
+            }
+          }
+        });
+
+        const resolvedNames = new Set(nameMatchedCategories.map(c => c.name.toLowerCase()));
+
         categories = [
           ...categories,
-          ...stringNames.map(name => ({ id: name, name: name, slug: name }))
+          ...nameMatchedCategories.map(cat => ({
+            id: cat.id,
+            name: cat.name,
+            slug: cat.slug
+          }))
         ];
+
+        // Collect subcategories from name-matched categories
+        const nameMatchedSubcategories = nameMatchedCategories.reduce((acc, cat) => {
+          if (cat.subcategories && cat.subcategories.length > 0) {
+            acc.push(...cat.subcategories);
+          }
+          return acc;
+        }, []);
+        subcategories = [...subcategories, ...nameMatchedSubcategories];
+
+        // Append any truly unresolvable names as fallback
+        const unresolvedNames = stringNames.filter(name => !resolvedNames.has(name.toLowerCase()));
+        if (unresolvedNames.length > 0) {
+          categories = [
+            ...categories,
+            ...unresolvedNames.map(name => ({ id: name, name: name, slug: name }))
+          ];
+        }
       }
     }
 
@@ -1099,12 +1145,58 @@ const getVendorCategoriesByVendorId = async (req, res) => {
         subcategories = allSubcategories;
       }
 
-      // Append any legacy string names that weren't resolved as objectIds
+      // Look up string names in the database to resolve them to real categories with subcategories
       if (stringNames.length > 0) {
+        const nameMatchedCategories = await prisma.category.findMany({
+          where: {
+            name: { in: stringNames, mode: 'insensitive' },
+            parentId: null,
+            status: 'ACTIVE'
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            subcategories: {
+              where: { status: 'ACTIVE' },
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                parentId: true
+              }
+            }
+          }
+        });
+
+        const resolvedNames = new Set(nameMatchedCategories.map(c => c.name.toLowerCase()));
+
         categories = [
           ...categories,
-          ...stringNames.map(name => ({ id: name, name: name, slug: name }))
+          ...nameMatchedCategories.map(cat => ({
+            id: cat.id,
+            name: cat.name,
+            slug: cat.slug
+          }))
         ];
+
+        // Collect subcategories from name-matched categories
+        const nameMatchedSubcategories = nameMatchedCategories.reduce((acc, cat) => {
+          if (cat.subcategories && cat.subcategories.length > 0) {
+            acc.push(...cat.subcategories);
+          }
+          return acc;
+        }, []);
+        subcategories = [...subcategories, ...nameMatchedSubcategories];
+
+        // Append any truly unresolvable names as fallback
+        const unresolvedNames = stringNames.filter(name => !resolvedNames.has(name.toLowerCase()));
+        if (unresolvedNames.length > 0) {
+          categories = [
+            ...categories,
+            ...unresolvedNames.map(name => ({ id: name, name: name, slug: name }))
+          ];
+        }
       }
     }
 

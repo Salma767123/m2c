@@ -54,14 +54,10 @@ const createProduct = async (req, res) => {
       fabricSpecifications,
 
       // Variants Management
-      variants,
       hasVariants,
 
       // Base Product Info
       baseSku,
-
-      // Images
-      images,
 
       // Stock Management
       totalStock,
@@ -79,6 +75,8 @@ const createProduct = async (req, res) => {
       status
     } = req.body;
 
+    // Resolve base64 images to URLs
+    let { images, variants } = req.body;
     ({ images, variants } = await ensureImageUrls({ images, variants }));
 
     // Validate required fields
@@ -1290,14 +1288,10 @@ const createProductByAdmin = async (req, res) => {
       fabricSpecifications,
 
       // Variants Management
-      variants,
       hasVariants,
 
       // Base Product Info
       baseSku,
-
-      // Images
-      images,
 
       // Stock Management
       totalStock,
@@ -1316,6 +1310,8 @@ const createProductByAdmin = async (req, res) => {
       approvalStatus // Admin can set approval status directly
     } = req.body;
 
+    // Resolve base64 images to URLs
+    let { images, variants } = req.body;
     ({ images, variants } = await ensureImageUrls({ images, variants }));
 
     // Validate required fields

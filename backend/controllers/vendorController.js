@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const { prisma } = require('../config/database');
 const { normalizeCategoryValues } = require('../utils/categoryResolver');
+const { generateVendorCode, reconcileAndGenerate } = require('../utils/vendorCodeGenerator');
 const {
   sendVendorApprovalEmail,
   sendVendorRejectionEmail,
@@ -230,9 +231,10 @@ const registerVendor = async (req, res) => {
       Object.values(parsedSelectedCategories || {}).flat()
     );
 
-    // Create vendor record
-    const vendor = await prisma.vendor.create({
-      data: {
+    // Build the vendor data payload once — reused if we need to retry after a
+    // unique-index collision on vendorCode (e.g. counter drift).
+    const buildVendorData = (vendorCode) => ({
+        vendorCode,
         email,
         password: hashedPassword,
         status: 'PENDING',
@@ -316,8 +318,31 @@ const registerVendor = async (req, res) => {
         applicationStep: 8, // Completed all steps
         completedSteps: [1, 2, 3, 4, 5, 6, 7, 8],
         submittedAt: new Date()
-      }
     });
+
+    // Create vendor + generate code atomically. If the unique index on
+    // vendorCode rejects our code (counter drifted vs existing rows), self-heal
+    // by reconciling the counter to max(existing sequence) + 1 and retry once.
+    async function createVendorWithCode() {
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const code = await generateVendorCode(tx);
+          return tx.vendor.create({ data: buildVendorData(code) });
+        });
+      } catch (err) {
+        const isDuplicateCode =
+          err?.code === 'P2002' &&
+          (err.meta?.target === 'vendorCode' ||
+            (Array.isArray(err.meta?.target) && err.meta.target.includes('vendorCode')));
+        if (!isDuplicateCode) throw err;
+
+        console.warn('vendorCode collision detected — reconciling counter and retrying');
+        const code = await reconcileAndGenerate();
+        return prisma.vendor.create({ data: buildVendorData(code) });
+      }
+    }
+
+    const vendor = await createVendorWithCode();
 
     // Create certifications
     if (parsedSelectedCertifications && parsedSelectedCertifications.length > 0) {
@@ -507,7 +532,8 @@ const getAllVendors = async (req, res) => {
       where.OR = [
         { companyName: { contains: search, mode: 'insensitive' } },
         { ownerName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } }
+        { email: { contains: search, mode: 'insensitive' } },
+        { vendorCode: { contains: search, mode: 'insensitive' } }
       ];
     }
 

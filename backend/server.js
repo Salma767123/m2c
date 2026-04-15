@@ -16,10 +16,7 @@ const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(helmet());
-
-// CORS Configuration
+// CORS Configuration - must be before helmet
 const allowedOrigins = [
   "http://localhost:3000",
   "https://m2-c-p6ikdsx.vercel.app",
@@ -45,29 +42,12 @@ app.use(
   }),
 );
 
-// Additional CORS headers for Vercel serverless
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-    );
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization",
-    );
-  }
-
-  // Handle preflight
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  next();
-});
+// Middleware
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
 // app.use(morgan('combined')); // Commented out to reduce console logs
 app.use(
   express.json({

@@ -120,6 +120,7 @@ export interface VendorProfile {
   website?: string;
   establishedYear?: number;
   vendorType: string;
+  vendorCode?: string;
   productCategories: string[];
   productTypes: string[];
   specializations: string[];

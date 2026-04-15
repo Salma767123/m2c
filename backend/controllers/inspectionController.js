@@ -75,6 +75,7 @@ const getInspectionsByChecker = async (req, res) => {
                 vendor: {
                     select: {
                         id: true,
+                        vendorCode: true,
                         companyName: true,
                         businessCity: true,
                         businessState: true,
@@ -284,6 +285,7 @@ const getInspectionById = async (req, res) => {
                 vendor: {
                     select: {
                         id: true,
+                        vendorCode: true,
                         companyName: true,
                         email: true,
                         ownerName: true,

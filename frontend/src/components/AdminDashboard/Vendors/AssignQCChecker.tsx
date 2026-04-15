@@ -10,6 +10,7 @@ import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 
 interface Vendor {
   id: string;
+  vendorCode: string | null;
   companyName: string;
   ownerName: string;
   email: string;
@@ -45,6 +46,7 @@ export default function AssignQCChecker() {
 
         const AllVendors = vendorListResponse.vendors.map((v: any) => ({
           id: v.id,
+          vendorCode: v.vendorCode || null,
           companyName: v.companyName,
           ownerName: v.ownerName,
           email: v.email,
@@ -73,10 +75,12 @@ export default function AssignQCChecker() {
   const [filterVendorStatus, setFilterVendorStatus] = useState<string>("all");
 
   const filteredVendors = vendors.filter((vendor) => {
+    const q = searchTerm.toLowerCase();
     const matchesSearch =
-      vendor.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vendor.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vendor.email.toLowerCase().includes(searchTerm.toLowerCase());
+      vendor.companyName.toLowerCase().includes(q) ||
+      vendor.ownerName.toLowerCase().includes(q) ||
+      vendor.email.toLowerCase().includes(q) ||
+      (vendor.vendorCode?.toLowerCase().includes(q) ?? false);
 
     const matchesAssignmentFilter =
       filterStatus === "all" ||
@@ -158,7 +162,7 @@ export default function AssignQCChecker() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
               <input
                 type="text"
-                placeholder="Search by company name, owner, or email..."
+                placeholder="Search by company name, owner, email, or vendor code..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
@@ -219,6 +223,9 @@ export default function AssignQCChecker() {
                       <div>
                         <div className="font-medium text-gray-900">{vendor.companyName}</div>
                         <div className="text-sm text-gray-500">{vendor.ownerName}</div>
+                        {vendor.vendorCode && (
+                          <div className="text-xs font-mono text-gray-400 mt-0.5">{vendor.vendorCode}</div>
+                        )}
                       </div>
                     </div>
                   </TableCell>
