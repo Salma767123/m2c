@@ -251,7 +251,9 @@ export default function VendorView({ vendorId }: VendorViewProps) {
               </Button>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{vendor.companyName}</h1>
-                <p className="text-gray-600">Vendor ID: {vendor.id}</p>
+                <p className="text-gray-600">
+                  Vendor Code: <span className="font-mono">{vendor.vendorCode || vendor.id}</span>
+                </p>
               </div>
             </div>
 

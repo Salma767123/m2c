@@ -220,6 +220,7 @@ model WishlistItem {
 
 model Vendor {
   id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  vendorCode            String?   @unique // Human-readable code, format VND-YYYY-NNNN
   email                 String    @unique
   password              String?
   
@@ -1324,4 +1325,14 @@ enum InspectionStatus {
 enum InspectionResult {
   PASSED
   FAILED
+}
+
+// Generic atomic counter for sequential code generation (vendor, future entities).
+// Single-document upserts on MongoDB are atomic, so concurrent registrations
+// cannot collide on the same sequence value.
+model Counter {
+  id    String @id @map("_id") // e.g. "vendor-2026"
+  value Int    @default(0)
+
+  @@map("counters")
 }
