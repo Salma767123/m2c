@@ -48,9 +48,10 @@ export default function SplashScreen() {
     const checkAuth = async () => {
       try {
         const userId = await AsyncStorage.getItem('userID');
-        
+        const userToken = await AsyncStorage.getItem('userToken');
+
         setTimeout(() => {
-          if (userId) {
+          if (userId || userToken) {
             router.replace('/(tabs)');
           } else {
             router.replace('/(auth)/Login');
@@ -89,19 +90,19 @@ export default function SplashScreen() {
           </View>
 
           {/* App Title */}
-          <Text className="text-4xl font-bold text-white mb-3 text-center">
+          <Text className="text-4xl font-bold text-black mb-3 text-center">
             M2C Store
           </Text>
           
-          <Text className="text-base text-gray-400 text-center mb-8">
+          <Text className="text-base text-dark-600 text-center mb-8">
             Your Shopping Destination
           </Text>
 
           {/* Loading Indicator */}
           <View className="flex-row items-center space-x-2">
-            <View className="w-2 h-2 bg-white rounded-full opacity-40" />
-            <View className="w-2 h-2 bg-white rounded-full opacity-60" />
-            <View className="w-2 h-2 bg-white rounded-full opacity-80" />
+            <View className="w-2 h-2 bg-black rounded-full opacity-40" />
+            <View className="w-2 h-2 bg-black rounded-full opacity-60" />
+            <View className="w-2 h-2 bg-black rounded-full opacity-80" />
           </View>
         </Animated.View>
 
