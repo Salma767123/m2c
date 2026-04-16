@@ -158,6 +158,17 @@ class CartService {
       console.error('Failed to clear cart from localStorage:', error);
     }
   }
+
+  // Check free shipping eligibility
+  async checkFreeShipping(userId: string, cartTotal: number): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+      const response = await axios.post('/coupons/check-free-shipping', { userId, cartTotal });
+      return response.data;
+    } catch (error: any) {
+      console.warn('Free shipping check failed:', error);
+      return { success: false, message: error.response?.data?.message || 'Failed to check free shipping' };
+    }
+  }
 }
 
 export const cartService = new CartService();

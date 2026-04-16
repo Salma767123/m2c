@@ -16,13 +16,13 @@ import {
   Settings,
 } from "lucide-react";
 import { IconUserFilled } from '@tabler/icons-react';
-import { categories } from "@/components/mockData/products";
 import Category from "./CategoryBar/CategoryBar";
-import { getStoredAuth, isAuthenticated } from "@/lib/auth";
+import { isAuthenticated } from "@/lib/auth";
 import { cartService } from "@/services/cartService";
 import { wishlistService } from "@/services/wishlistService";
 import { userAuthService } from "@/services/userAuthService";
-import { categoryService, Category as APICategory } from "@/services/categoryService";
+import { categoryService } from "@/services/categoryService";
+import { couponService } from "@/services/couponService";
 
 const Header = () => {
   const pathname = usePathname();
@@ -41,6 +41,7 @@ const Header = () => {
   const [userName, setUserName] = useState("");
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [promotionalOffers, setPromotionalOffers] = useState<string[]>([]);
   const [popularSearches, setPopularSearches] = useState<string[]>([
     "Towels",
     "Bath Linen",
@@ -236,6 +237,47 @@ const Header = () => {
     fetchPopularSearches();
   }, [])
 
+  // Load Promotional Offers
+  useEffect(() => {
+    const loadPromotionalOffers = async () => {
+      try {
+        // Try to get active promotional coupons
+        const response = await couponService.getPromotionalCoupons();
+        
+        if (response.success && response.data.length > 0) {
+          // Filter out empty or invalid promotional messages
+          const validOffers = response.data.filter(offer => 
+            offer && typeof offer === 'string' && offer.trim().length > 0
+          );
+          
+          if (validOffers.length > 0) {
+            setPromotionalOffers(validOffers);
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn('Error loading promotional offers:', error);
+      }
+      
+      // Always set fallback offers if API fails or returns no valid data
+      setPromotionalOffers([
+        'Free shipping on orders above ₹999',
+        'New arrivals - Kitchen Aprons starting at ₹299',
+        'Premium Cotton Towels - Buy 2 Get 1 Free',
+        'Special discount on Table Linen - Up to 40% off',
+        'Cotton Bags starting from ₹199 only',
+        'Jute products with eco-friendly packaging',
+        'Bath Towel Collection on 50% off'
+      ]);
+    };
+
+    loadPromotionalOffers();
+
+    // Refresh promotional offers every 30 seconds
+    const interval = setInterval(loadPromotionalOffers, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const isActiveLink = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
@@ -303,12 +345,45 @@ const Header = () => {
 
   return (
     <div className="sticky top-0 z-50 font-sans">
-      {/* Top Section */}
-      <div className="h-8 sm:h-10 md:h-12 bg-[#222222] flex items-center justify-center px-2 sm:px-4">
-        <p className="text-white text-xs sm:text-sm md:text-base font-medium text-center px-2">
-          Bath Towel Collection on 50% off
-        </p>
+      {/* Top Section - Infinite Scrolling Promotional Banner */}
+      <div className="h-8 sm:h-10 md:h-12 bg-[#222222] flex items-center overflow-hidden relative">
+        {promotionalOffers.length > 0 && (
+          <div className="flex animate-scroll whitespace-nowrap">
+            {/* Duplicate the offers multiple times for seamless infinite scroll */}
+            {[...promotionalOffers, ...promotionalOffers, ...promotionalOffers, ...promotionalOffers].map((offer, index) => (
+              <div 
+                key={index}
+                className="flex items-center px-6 sm:px-8 md:px-12"
+              >
+                <p className="text-white text-xs sm:text-sm md:text-base font-medium whitespace-nowrap">
+                  {offer}
+                </p>
+                <span className="text-white/30 mx-6 sm:mx-8 md:mx-10">|</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      <style jsx>{`
+        @keyframes scroll {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-25%);
+          }
+        }
+        
+        .animate-scroll {
+          animation: scroll 20s linear infinite;
+          will-change: transform;
+        }
+        
+        .animate-scroll:hover {
+          animation-play-state: running;
+        }
+      `}</style>
 
       {/* Main Header */}
       <header className="bg-white shadow-lg border-b border-gray-100 transition-all duration-300">

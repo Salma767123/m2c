@@ -61,6 +61,7 @@ export interface CreateOrderParams {
     shippingCost?: number;
     tax?: number;
     discount?: number;
+    freeShipping?: boolean;
 }
 
 class OrderService {
