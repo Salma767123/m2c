@@ -31,8 +31,8 @@ const PAGE_SIZE = 12
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
-  { value: "UNDER_REVIEW", label: "Under Review" },
-  { value: "APPROVED", label: "Approved" },
+  { value: "UNDER_REVIEW", label: "Under Review by Admin" },
+  { value: "APPROVED", label: "Approved by Admin" },
   { value: "REJECTED", label: "Rejected" },
   { value: "SUSPENDED", label: "Suspended" },
 ]
@@ -40,8 +40,6 @@ const STATUS_OPTIONS = [
 const SORT_OPTIONS = [
   { value: "submittedAt:desc", label: "Newest first" },
   { value: "submittedAt:asc", label: "Oldest first" },
-  { value: "companyName:asc", label: "Name A–Z" },
-  { value: "companyName:desc", label: "Name Z–A" },
 ]
 
 const STATUS_COLORS: Record<string, string> = {
@@ -53,7 +51,12 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const getStatusColor = (status: string) => STATUS_COLORS[status] || STATUS_COLORS.PENDING
-const formatStatus = (status: string) => status.replace(/_/g, " ").toLowerCase()
+const FRIENDLY_LABELS: Record<string, string> = {
+  UNDER_REVIEW: "Under Review by Admin",
+  QC_APPROVED: "Approved by QC",
+  APPROVED: "Approved by Admin",
+}
+const formatStatus = (status: string) => FRIENDLY_LABELS[status] || status.replace(/_/g, " ").toLowerCase()
 
 function formatVendorLocation(city?: string | null, state?: string | null): string {
   const parts = [city, state].map((p) => (p ?? "").trim()).filter(Boolean)
@@ -385,12 +388,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
                 className="block w-full text-left p-6 pb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset flex-1"
               >
                 <div className="flex items-start justify-between mb-4 gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-100 rounded-xl">
-                      <Factory className="w-6 h-6 text-blue-600" aria-hidden="true" />
-                    </div>
-                    <h3 className="font-bold text-slate-900 text-lg leading-tight">{vendor.name}</h3>
-                  </div>
+                  <h3 className="font-bold text-slate-900 text-lg leading-tight">{vendor.name}</h3>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium border capitalize whitespace-nowrap ${getStatusColor(vendor.status)}`}>
                     {formatStatus(vendor.status)}
                   </span>

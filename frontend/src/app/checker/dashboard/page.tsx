@@ -33,10 +33,38 @@ export default function DashboardPage() {
 
   if (!checkerID) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading dashboard...</p>
+      <div className="p-8 font-sans animate-pulse">
+        <div className="mb-8 flex items-center justify-between">
+          <div className="space-y-3">
+            <div className="h-9 bg-slate-200 rounded w-56" />
+            <div className="h-5 bg-slate-100 rounded w-40" />
+          </div>
+          <div className="h-4 bg-slate-100 rounded w-48" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-slate-200 p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="space-y-3 flex-1">
+                  <div className="h-4 bg-slate-200 rounded w-28" />
+                  <div className="h-8 bg-slate-200 rounded w-16" />
+                </div>
+                <div className="w-12 h-12 bg-slate-200 rounded-xl" />
+              </div>
+              <div className="h-4 bg-slate-100 rounded w-36" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+          <div className="h-6 bg-slate-200 rounded w-44 mb-6" />
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="border border-slate-100 rounded-xl p-4 space-y-3">
+                <div className="h-4 bg-slate-200 rounded w-48" />
+                <div className="h-9 bg-slate-100 rounded-lg w-full" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )

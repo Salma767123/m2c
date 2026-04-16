@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
-  Eye, Package, CheckCircle, XCircle,
+  Eye, Package, CheckCircle, XCircle, Download,
   Search, X, ChevronLeft, ChevronRight, RotateCw,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -20,8 +20,6 @@ const DEFAULT_SORT = "updatedAt:desc"
 const SORT_OPTIONS = [
   { value: "updatedAt:desc", label: "Latest first" },
   { value: "updatedAt:asc", label: "Oldest first" },
-  { value: "name:asc", label: "Name A–Z" },
-  { value: "name:desc", label: "Name Z–A" },
 ]
 
 function getPageRange(current: number, total: number): Array<number | "…"> {
@@ -136,7 +134,7 @@ export default function ProductReportsTab() {
     switch (status) {
       case "QC_APPROVED":
       case "APPROVED":
-        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" />{status === "QC_APPROVED" ? "QC Approved" : "Approved"}</Badge>
+        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" />{status === "QC_APPROVED" ? "Approved by QC" : "Approved by Admin"}</Badge>
       case "REJECTED":
         return <Badge className="bg-red-100 text-red-800 border-red-200 flex items-center gap-1"><XCircle className="w-3 h-3" />Rejected</Badge>
       default:
@@ -310,14 +308,23 @@ export default function ProductReportsTab() {
                   </TableCell>
                   <TableCell>{getStatusBadge(product.approvalStatus || "")}</TableCell>
                   <TableCell>
-                    <button
-                      onClick={() => router.push(`/checker/dashboard/report/product/${product.id}`)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
-                      title="View Report"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      View Report
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push(`/checker/dashboard/report/product/${product.id}`)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                        title="View Report"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        View Report
+                      </button>
+                      <button
+                        onClick={() => router.push(`/checker/dashboard/report/product/${product.id}?download=true`)}
+                        className="flex items-center justify-center w-8 h-8 text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                        title="Download PDF"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

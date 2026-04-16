@@ -91,7 +91,7 @@ const getInspectionsByChecker = async (req, res) => {
         const limit = Math.min(Math.max(parseInt(req.query.limit) || 12, 1), 50);
         const search = (req.query.search || '').trim().slice(0, 100);
         const result = req.query.result || '';
-        const ALLOWED_SORT_FIELDS = ['scheduledDate', 'completedAt', 'createdAt', 'vendorName'];
+        const ALLOWED_SORT_FIELDS = ['scheduledDate', 'completedAt', 'createdAt'];
         const sortBy = ALLOWED_SORT_FIELDS.includes(req.query.sortBy) ? req.query.sortBy : 'completedAt';
         const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
         const ALLOWED_STATUSES = ['COMPLETED', 'SCHEDULED', 'IN_PROGRESS', 'CANCELLED'];
@@ -121,24 +121,26 @@ const getInspectionsByChecker = async (req, res) => {
         const [inspections, total] = await Promise.all([
             prisma.inspection.findMany({
                 where,
-                include: {
+                select: {
+                    id: true,
+                    clientName: true,
+                    scheduledDate: true,
+                    priority: true,
+                    status: true,
+                    completedAt: true,
+                    result: true,
+                    score: true,
+                    notes: true,
+                    createdAt: true,
+                    updatedAt: true,
                     vendor: {
                         select: {
                             id: true,
-                            vendorCode: true,
                             companyName: true,
-                            businessCity: true,
-                            businessState: true,
-                            status: true,
-                            email: true,
-                            ownerName: true,
-                            businessPhone: true
                         }
                     }
                 },
-                orderBy: sortBy === 'vendorName'
-                    ? { vendor: { companyName: sortOrder } }
-                    : { [sortBy]: sortOrder },
+                orderBy: { [sortBy]: sortOrder },
                 skip: (page - 1) * limit,
                 take: limit,
             }),

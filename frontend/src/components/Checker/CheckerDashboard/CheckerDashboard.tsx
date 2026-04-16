@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { TrendingUp, Clock, CheckCircle2, AlertCircle, BarChart3, Calendar, CalendarDays, MapPin, Factory, Eye, ArrowRight, Package } from "lucide-react"
+import { TrendingUp, Clock, CheckCircle2, AlertCircle, Calendar, CalendarDays, Factory, Package } from "lucide-react"
 import StatCard from "@/components/Checker/CheckerDashboard/StatCard"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/UI/Table"
-import ScheduledInspectionDetail from "@/components/Checker/CheckerDashboard/ScheduledInspectionDetail"
 import InspectionForm from "@/components/Checker/Vendor/InspectionForm"
 import { qcCheckerService } from "@/services/qcCheckerService"
 import { showErrorToast } from "@/lib/toast-utils"
@@ -16,19 +14,20 @@ interface DashboardHomeProps {
 
 export default function DashboardHome({ checkerID }: DashboardHomeProps) {
   const [selectedInspection, setSelectedInspection] = useState<any | null>(null)
-  const [showInspectionDetail, setShowInspectionDetail] = useState(false)
   const [showInspectionForm, setShowInspectionForm] = useState(false)
   const [assignedProducts, setAssignedProducts] = useState<any[]>([])
   const [assignedVendors, setAssignedVendors] = useState<any[]>([])
+  const [completedInspections, setCompletedInspections] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true)
       try {
-        const [productsRes, vendorsRes] = await Promise.all([
+        const [productsRes, vendorsRes, inspectionsRes] = await Promise.all([
           qcCheckerService.getAssignedProducts({ limit: 50 }),
-          qcCheckerService.getAssignedVendors({ limit: 50 })
+          qcCheckerService.getAssignedVendors({ limit: 50 }),
+          qcCheckerService.getInspections({ limit: 50, status: 'COMPLETED' }),
         ])
 
         if (productsRes.success) {
@@ -36,6 +35,9 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
         }
         if (vendorsRes.success) {
           setAssignedVendors(vendorsRes.data?.vendors ?? [])
+        }
+        if (inspectionsRes.success) {
+          setCompletedInspections(inspectionsRes.inspections ?? [])
         }
       } catch (error: any) {
         console.error("Error fetching dashboard data:", error)
@@ -48,43 +50,62 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
     fetchDashboardData()
   }, [])
 
-  const pendingCount = assignedProducts.filter(p =>
+  // Product counts
+  const pendingProducts = assignedProducts.filter(p =>
     p.approvalStatus === 'PENDING' || p.approvalStatus === 'REINSPECTION' || p.approvalStatus === 'UNDER_REVIEW'
-  ).length + assignedVendors.filter(v => v.status === 'UNDER_REVIEW' || v.status === 'PENDING').length
+  ).length
+  const passedProducts = assignedProducts.filter(p => p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED').length
+  const failedProducts = assignedProducts.filter(p => p.approvalStatus === 'REJECTED').length
 
-  const passedCount = assignedProducts.filter(p => p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED').length
-  const failedCount = assignedProducts.filter(p => p.approvalStatus === 'REJECTED').length
+  // Vendor inspection counts
+  const pendingVendors = assignedVendors.filter(v => v.status === 'UNDER_REVIEW' || v.status === 'PENDING').length
+  const passedVendors = completedInspections.filter(i => i.result === 'PASSED').length
+  const failedVendors = completedInspections.filter(i => i.result === 'FAILED').length
+
+  const pl = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
   const stats = [
     {
       label: "Total Assignments",
       value: (assignedProducts.length + assignedVendors.length).toString(),
       icon: TrendingUp,
-      trend: "Products and Vendors",
+      trend: `${pl(assignedProducts.length, "Product")} · ${pl(assignedVendors.length, "Vendor")}`,
       color: "blue" as const,
     },
     {
       label: "Pending Action",
-      value: pendingCount.toString(),
+      value: (pendingProducts + pendingVendors).toString(),
       icon: Clock,
-      trend: "Awaiting inspection",
+      trend: `${pl(pendingProducts, "Product")} · ${pl(pendingVendors, "Vendor")}`,
       color: "amber" as const,
     },
     {
-      label: "QC Approved",
-      value: passedCount.toString(),
+      label: "Passed",
+      value: (passedProducts + passedVendors).toString(),
       icon: CheckCircle2,
-      trend: "Passed inspection",
+      trend: `${pl(passedProducts, "Product")} · ${pl(passedVendors, "Vendor")}`,
       color: "emerald" as const,
     },
     {
       label: "Rejected",
-      value: failedCount.toString(),
+      value: (failedProducts + failedVendors).toString(),
       icon: AlertCircle,
-      trend: "Failed quality check",
+      trend: `${pl(failedProducts, "Product")} · ${pl(failedVendors, "Vendor")}`,
       color: "red" as const,
     },
   ]
+
+  const STATUS_LABELS: Record<string, string> = {
+    APPROVED: "Approved by Admin",
+    QC_APPROVED: "Approved by QC",
+    REJECTED: "Rejected",
+    REINSPECTION: "Reinspection",
+    PENDING: "Pending",
+    UNDER_REVIEW: "Under Review by Admin",
+    SUSPENDED: "Suspended",
+  }
+
+  const formatStatus = (status: string) => STATUS_LABELS[status] || status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
 
   const getStatusBadge = (status: string) => {
     const badgeClasses = {
@@ -98,24 +119,68 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
     return badgeClasses[status as keyof typeof badgeClasses] || badgeClasses.PENDING
   }
 
-  const handleBackToDashboard = () => {
-    setShowInspectionDetail(false)
-    setShowInspectionForm(false)
-    setSelectedInspection(null)
-  }
-
   const handleCompleteInspection = () => {
     setShowInspectionForm(false)
-    setShowInspectionDetail(false)
     setSelectedInspection(null)
   }
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading your summary...</p>
+      <div className="p-8 font-sans animate-pulse">
+        {/* Header skeleton */}
+        <div className="mb-8 flex items-center justify-between">
+          <div className="space-y-3">
+            <div className="h-9 bg-slate-200 rounded w-56" />
+            <div className="h-5 bg-slate-100 rounded w-40" />
+          </div>
+          <div className="h-4 bg-slate-100 rounded w-48" />
+        </div>
+
+        {/* Stat cards skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-slate-200 p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="space-y-3 flex-1">
+                  <div className="h-4 bg-slate-200 rounded w-28" />
+                  <div className="h-8 bg-slate-200 rounded w-16" />
+                </div>
+                <div className="w-12 h-12 bg-slate-200 rounded-xl" />
+              </div>
+              <div className="h-4 bg-slate-100 rounded w-36" />
+            </div>
+          ))}
+        </div>
+
+        {/* Recent Assignments skeleton */}
+        <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-slate-200 rounded-lg" />
+              <div className="space-y-2">
+                <div className="h-5 bg-slate-200 rounded w-44" />
+                <div className="h-3 bg-slate-100 rounded w-56" />
+              </div>
+            </div>
+            <div className="h-6 bg-slate-200 rounded-full w-16" />
+          </div>
+          <div className="p-6 space-y-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="border border-slate-100 rounded-xl p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-10 h-10 bg-slate-200 rounded-lg" />
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 bg-slate-200 rounded w-48" />
+                      <div className="h-3 bg-slate-100 rounded w-24" />
+                    </div>
+                  </div>
+                  <div className="h-6 bg-slate-200 rounded-full w-20" />
+                </div>
+                <div className="h-9 bg-slate-100 rounded-lg w-full" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -159,8 +224,8 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
         ))}
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+      {/* Main Content */}
+      <div className="grid grid-cols-1 gap-8 mb-8">
         {/* Scheduled Inspections */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
           <div className="px-6 py-5 border-b border-slate-200/60 bg-linear-to-r from-blue-50 to-white">
@@ -181,106 +246,91 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
           </div>
 
           <div className="p-6">
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {assignedProducts.length === 0 && assignedVendors.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">No active assignments found.</div>
-              ) : (
-                <>
-                  {assignedProducts.map((product) => (
-                    <div key={product.id} className="border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="p-2 bg-blue-50 rounded-lg">
-                              <Package className="w-4 h-4 text-blue-600" />
+            {assignedProducts.length === 0 && assignedVendors.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">No active assignments found.</div>
+            ) : (
+              <div className="space-y-6">
+                {/* Products Section */}
+                {assignedProducts.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Package className="w-4 h-4 text-blue-600" />
+                      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Products</h3>
+                      <span className="text-xs text-slate-400 font-medium">({assignedProducts.length})</span>
+                    </div>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {[...assignedProducts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((product) => (
+                        <div key={product.id} className="border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="p-2 bg-blue-50 rounded-lg shrink-0">
+                                <Package className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-semibold text-slate-900 text-sm truncate">{product.name}</h4>
+                                <p className="text-xs text-slate-500">SKU: {product.baseSku}</p>
+                              </div>
                             </div>
-                            <div>
-                              <h3 className="font-semibold text-slate-900 text-sm">{product.name}</h3>
-                              <p className="text-xs text-slate-600">SKU: {product.baseSku}</p>
+                            <div className="flex items-center gap-3 shrink-0 ml-3">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadge(product.approvalStatus)}`}>
+                                {formatStatus(product.approvalStatus)}
+                              </span>
+                              <p className="text-xs text-slate-500 hidden sm:block">{product.vendor?.companyName}</p>
                             </div>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadge(product.approvalStatus)}`}>
-                            {product.approvalStatus}
-                          </span>
+                          <button
+                            onClick={() => window.location.href = '/checker/dashboard/products'}
+                            className="w-full bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md text-sm"
+                          >
+                            Go to Products
+                          </button>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xs font-medium text-slate-500">{product.vendor?.companyName}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => window.location.href = '/checker/dashboard/products'}
-                          className="flex-1 bg-linear-to-r from-blue-600 to-blue-700 text-white font-semibold py-2 px-3 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-2 group text-sm"
-                        >
-                          Go to Products
-                        </button>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                  {assignedVendors.map((vendor) => (
-                    <div key={vendor.id} className="border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="p-2 bg-emerald-50 rounded-lg">
-                              <Factory className="w-4 h-4 text-emerald-600" />
+                  </div>
+                )}
+
+                {/* Vendors Section */}
+                {assignedVendors.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Factory className="w-4 h-4 text-emerald-600" />
+                      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Vendors</h3>
+                      <span className="text-xs text-slate-400 font-medium">({assignedVendors.length})</span>
+                    </div>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {[...assignedVendors].sort((a, b) => new Date(b.createdAt || b.submittedAt || 0).getTime() - new Date(a.createdAt || a.submittedAt || 0).getTime()).map((vendor) => (
+                        <div key={vendor.id} className="border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className="p-2 bg-emerald-50 rounded-lg shrink-0">
+                                <Factory className="w-4 h-4 text-emerald-600" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-semibold text-slate-900 text-sm truncate">{vendor.companyName}</h4>
+                                <p className="text-xs text-slate-500">Factory Onboarding</p>
+                              </div>
                             </div>
-                            <div>
-                              <h3 className="font-semibold text-slate-900 text-sm">{vendor.companyName}</h3>
-                              <p className="text-xs text-slate-600">Factory Onboarding</p>
-                            </div>
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 ml-3 ${getStatusBadge(vendor.status)}`}>
+                              {formatStatus(vendor.status)}
+                            </span>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadge(vendor.status)}`}>
-                            {vendor.status}
-                          </span>
+                          <button
+                            onClick={() => window.location.href = '/checker/dashboard/vendors'}
+                            className="w-full bg-emerald-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md text-sm"
+                          >
+                            Go to Vendors
+                          </button>
                         </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => window.location.href = '/checker/dashboard/vendors'}
-                          className="flex-1 bg-linear-to-r from-emerald-600 to-emerald-700 text-white font-semibold py-2 px-3 rounded-lg hover:from-emerald-700 hover:to-emerald-800 transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-2 group text-sm"
-                        >
-                          Go to Vendors
-                        </button>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Assignment Overview */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-200/60 bg-linear-to-r from-slate-50 to-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <BarChart3 className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900">Summary Statistics</h2>
-                  <p className="text-sm text-slate-600">Current inspection overview</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-8">
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-blue-100 text-blue-600 mb-4">
-                  <BarChart3 className="w-10 h-10" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-1">Live Updates</h3>
-                <p className="text-slate-600 max-w-xs">Your dashboard reflects real-time assignments from the administrators.</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   )

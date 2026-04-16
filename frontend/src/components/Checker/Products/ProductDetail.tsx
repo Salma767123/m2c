@@ -12,7 +12,6 @@ import {
     IndianRupee,
     Layers,
     FileText,
-    Loader2,
     RotateCw,
     CheckCircle,
     XCircle,
@@ -45,6 +44,14 @@ const APPROVAL_COLOR: Record<string, string> = {
     QC_APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
     APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
     REJECTED: "bg-red-100 text-red-800 border-red-200",
+}
+
+const APPROVAL_LABELS: Record<string, string> = {
+    PENDING: "Pending",
+    REINSPECTION: "Reinspection",
+    QC_APPROVED: "Approved by QC",
+    APPROVED: "Approved by Admin",
+    REJECTED: "Rejected",
 }
 
 const formatDate = (iso?: string | null) => {
@@ -109,9 +116,55 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
-                <span className="ml-3 text-slate-600 font-medium">Loading product details…</span>
+            <div className="p-8 max-w-6xl mx-auto font-sans animate-pulse">
+                <div className="flex items-start justify-between mb-6 gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-slate-200 rounded-lg" />
+                        <div className="space-y-2">
+                            <div className="h-8 bg-slate-200 rounded w-56" />
+                            <div className="flex items-center gap-3">
+                                <div className="h-4 bg-slate-100 rounded w-24" />
+                                <div className="h-6 bg-slate-200 rounded-full w-20" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <div className="h-10 bg-slate-200 rounded-lg w-24" />
+                        <div className="h-10 bg-slate-200 rounded-lg w-36" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+                            <div className="h-48 bg-slate-200 rounded-xl" />
+                            <div className="h-5 bg-slate-200 rounded w-40" />
+                            <div className="h-4 bg-slate-100 rounded w-full" />
+                            <div className="h-4 bg-slate-100 rounded w-3/4" />
+                        </div>
+                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+                            <div className="h-5 bg-slate-200 rounded w-32" />
+                            <div className="grid grid-cols-2 gap-4">
+                                {Array.from({ length: 4 }).map((_, i) => (
+                                    <div key={i} className="space-y-2">
+                                        <div className="h-3 bg-slate-100 rounded w-20" />
+                                        <div className="h-4 bg-slate-200 rounded w-28" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+                            <div className="h-5 bg-slate-200 rounded w-28" />
+                            <div className="h-4 bg-slate-100 rounded w-full" />
+                            <div className="h-4 bg-slate-100 rounded w-2/3" />
+                        </div>
+                        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+                            <div className="h-5 bg-slate-200 rounded w-24" />
+                            <div className="h-4 bg-slate-100 rounded w-full" />
+                        </div>
+                    </div>
+                </div>
             </div>
         )
     }
@@ -156,7 +209,7 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                             <div className="flex items-center gap-3 mt-1 text-sm text-slate-600">
                                 <span>SKU: <span className="font-mono">{product.baseSku}</span></span>
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${APPROVAL_COLOR[product.approvalStatus] || "bg-slate-100 text-slate-700 border-slate-200"}`}>
-                                    {product.approvalStatus}
+                                    {APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus}
                                 </span>
                             </div>
                         </div>

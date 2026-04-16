@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 import {
   ArrowLeft, FileText, CheckCircle, XCircle,
@@ -95,11 +96,14 @@ interface InspectionRecord {
 }
 
 export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
+  const searchParams = useSearchParams()
+  const autoDownload = searchParams.get("download") === "true"
   const [inspection, setInspection] = useState<InspectionRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const reportRef = useRef<HTMLDivElement>(null)
+  const autoDownloadTriggered = useRef(false)
 
   useEffect(() => {
     const load = async () => {
@@ -116,9 +120,62 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
     load()
   }, [reportId])
 
+  // Auto-trigger PDF download when navigated with ?download=true
+  // Auto-trigger PDF download when navigated with ?download=true
+  useEffect(() => {
+    if (!autoDownload || autoDownloadTriggered.current || loading || !inspection || downloading) return
+    let cancelled = false
+    const tryDownload = () => {
+      if (cancelled) return
+      if (!reportRef.current) {
+        setTimeout(tryDownload, 300)
+        return
+      }
+      autoDownloadTriggered.current = true
+      const fd = inspection.itemsToInspect && !Array.isArray(inspection.itemsToInspect) ? inspection.itemsToInspect : {}
+      const vendorName = inspection.vendor?.companyName || (fd as Record<string, string>).vendorName || "Report"
+      downloadReportPdf({
+        element: reportRef.current,
+        title: "Factory Inspection Report",
+        submittedDate: inspection.completedAt
+          ? new Date(inspection.completedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
+          : "—",
+        filename: `Factory_Report_${vendorName.replace(/\s+/g, "_")}_${reportId.slice(-8).toUpperCase()}.pdf`,
+      }).catch(() => { /* silent */ })
+    }
+    const timer = setTimeout(tryDownload, 500)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [autoDownload, loading, inspection, downloading, reportId])
+
   if (loading) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#222222]" />
+    <div className="p-8 max-w-5xl mx-auto font-sans space-y-6 animate-pulse">
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 bg-slate-200 rounded-xl" />
+        <div className="flex-1 space-y-2">
+          <div className="h-8 bg-slate-200 rounded w-64" />
+          <div className="h-4 bg-slate-100 rounded w-48" />
+        </div>
+        <div className="h-10 bg-slate-200 rounded-lg w-36" />
+      </div>
+      <div className="h-24 bg-slate-200 rounded-2xl" />
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <div className="w-5 h-5 bg-slate-200 rounded" />
+            <div className="h-4 bg-slate-200 rounded w-48" />
+          </div>
+          <div className="p-6 space-y-3">
+            <div className="grid grid-cols-3 gap-4">
+              {Array.from({ length: 3 }).map((_, j) => (
+                <div key={j} className="space-y-2">
+                  <div className="h-3 bg-slate-100 rounded w-20" />
+                  <div className="h-4 bg-slate-200 rounded w-32" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 

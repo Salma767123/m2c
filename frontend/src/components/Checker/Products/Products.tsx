@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
@@ -49,16 +48,14 @@ const STATUS_OPTIONS = [
     { value: '', label: 'All statuses' },
     { value: 'PENDING', label: 'Pending' },
     { value: 'REINSPECTION', label: 'Reinspection' },
-    { value: 'QC_APPROVED', label: 'QC Approved' },
-    { value: 'APPROVED', label: 'Approved' },
+    { value: 'QC_APPROVED', label: 'Approved by QC' },
+    { value: 'APPROVED', label: 'Approved by Admin' },
     { value: 'REJECTED', label: 'Rejected' },
 ]
 
 const SORT_OPTIONS = [
     { value: 'createdAt:desc', label: 'Newest first' },
     { value: 'createdAt:asc', label: 'Oldest first' },
-    { value: 'name:asc', label: 'Name A–Z' },
-    { value: 'name:desc', label: 'Name Z–A' },
     { value: 'basePrice:asc', label: 'Price low–high' },
     { value: 'basePrice:desc', label: 'Price high–low' },
 ]
@@ -69,6 +66,14 @@ const APPROVAL_BADGE: Record<string, string> = {
     QC_APPROVED: 'bg-emerald-100 text-emerald-800',
     APPROVED: 'bg-green-100 text-green-800',
     REJECTED: 'bg-red-100 text-red-800',
+}
+
+const APPROVAL_LABELS: Record<string, string> = {
+    PENDING: 'Pending',
+    REINSPECTION: 'Reinspection',
+    QC_APPROVED: 'Approved by QC',
+    APPROVED: 'Approved by Admin',
+    REJECTED: 'Rejected',
 }
 
 export default function Products() {
@@ -173,8 +178,8 @@ export default function Products() {
             <div className="p-6 space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Product Inspection</h1>
-                        <p className="text-gray-600 mt-1">Complete the inspection form for {selectedProduct.name}</p>
+                        <h1 className="text-2xl font-bold text-slate-900">Product Inspection</h1>
+                        <p className="text-slate-600 mt-1">Complete the inspection form for {selectedProduct.name}</p>
                     </div>
                 </div>
                 <ProductInspectionForm
@@ -210,11 +215,11 @@ export default function Products() {
     }
 
     return (
-        <div className="p-6 space-y-6">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="p-8 font-sans space-y-6">
+            <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Assigned Products</h1>
-                    <p className="text-gray-600 mt-1">Review and approve or reject vendor products</p>
+                    <h1 className="text-4xl font-bold text-slate-900 mb-2">Assigned Products</h1>
+                    <p className="text-slate-600 text-lg">Review and approve or reject vendor products</p>
                 </div>
                 <button
                     onClick={loadProducts}
@@ -307,20 +312,37 @@ export default function Products() {
                 </div>
             )}
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Products Awaiting Inspection</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
                     {loading && products.length === 0 ? (
-                        <div className="flex items-center justify-center py-16">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                            <span className="ml-3 text-gray-600 font-medium">Loading products...</span>
+                        <div className="animate-pulse">
+                            <div className="grid grid-cols-5 gap-4 px-6 py-4 border-b border-slate-100">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <div key={i} className="h-4 bg-slate-200 rounded w-20" />
+                                ))}
+                            </div>
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <div key={i} className="grid grid-cols-5 gap-4 px-6 py-5 border-b border-slate-50 items-center">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-slate-200 rounded-lg shrink-0" />
+                                        <div className="space-y-2 flex-1">
+                                            <div className="h-4 bg-slate-200 rounded w-32" />
+                                            <div className="h-3 bg-slate-100 rounded w-20" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <div className="h-4 bg-slate-100 rounded w-28" />
+                                        <div className="h-3 bg-slate-50 rounded w-20" />
+                                    </div>
+                                    <div className="h-4 bg-slate-100 rounded w-16" />
+                                    <div className="h-6 bg-slate-200 rounded-full w-20" />
+                                    <div className="h-8 bg-slate-100 rounded-lg w-20" />
+                                </div>
+                            ))}
                         </div>
                     ) : !loading && products.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <AlertCircle className="h-12 w-12 text-gray-300 mb-4" />
-                            <p className="text-gray-500 font-medium">
+                            <AlertCircle className="h-12 w-12 text-slate-300 mb-4" />
+                            <p className="text-slate-500 font-medium">
                                 {hasActiveFilters ? 'No products match your filters' : 'No assigned products at this time'}
                             </p>
                             {hasActiveFilters && (
@@ -348,29 +370,29 @@ export default function Products() {
                                     <TableRow key={product.id}>
                                         <TableCell>
                                             <div className="flex items-center space-x-3">
-                                                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
                                                     {product.images?.[0]?.url ? (
                                                         <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <span className="text-xs text-gray-400">No Image</span>
+                                                        <span className="text-xs text-slate-400">No Image</span>
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <p className="font-semibold text-gray-900">{product.name}</p>
-                                                    <p className="text-xs text-gray-500">SKU: {product.baseSku}</p>
+                                                    <p className="font-semibold text-slate-900">{product.name}</p>
+                                                    <p className="text-xs text-slate-500">SKU: {product.baseSku}</p>
                                                 </div>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <p className="font-medium text-gray-900">{product.vendor.companyName}</p>
-                                            <p className="text-sm text-gray-500">{product.vendor.ownerName}</p>
+                                            <p className="font-medium text-slate-900">{product.vendor.companyName}</p>
+                                            <p className="text-sm text-slate-500">{product.vendor.ownerName}</p>
                                         </TableCell>
                                         <TableCell>
-                                            <p className="text-sm text-gray-800">{product.category}</p>
+                                            <p className="text-sm text-slate-800">{product.category}</p>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge className={APPROVAL_BADGE[product.approvalStatus] || 'bg-gray-100 text-gray-800'}>
-                                                {product.approvalStatus}
+                                            <Badge className={APPROVAL_BADGE[product.approvalStatus] || 'bg-slate-100 text-slate-800'}>
+                                                {APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -403,8 +425,7 @@ export default function Products() {
                             </TableBody>
                         </Table>
                     )}
-                </CardContent>
-            </Card>
+            </div>
 
             {pagination.totalPages > 1 && (
                 <Pagination

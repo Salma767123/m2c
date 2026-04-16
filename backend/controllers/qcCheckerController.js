@@ -590,7 +590,7 @@ const getCheckerProfile = async (req, res) => {
 // QC Checker: Get assigned vendors
 // ============================
 const ALLOWED_VENDOR_STATUSES = ['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'SUSPENDED'];
-const ALLOWED_VENDOR_SORT_FIELDS = ['submittedAt', 'companyName', 'status'];
+const ALLOWED_VENDOR_SORT_FIELDS = ['submittedAt', 'status'];
 
 const getAssignedVendors = async (req, res) => {
     try {
@@ -985,7 +985,7 @@ const ALLOWED_PRODUCT_APPROVAL_STATUSES = [
     'REINSPECTION',
     'REJECTED',
 ];
-const ALLOWED_PRODUCT_SORT_FIELDS = ['createdAt', 'name', 'approvalStatus', 'basePrice'];
+const ALLOWED_PRODUCT_SORT_FIELDS = ['createdAt', 'approvalStatus', 'basePrice'];
 
 const getAssignedProducts = async (req, res) => {
     try {
@@ -1027,13 +1027,23 @@ const getAssignedProducts = async (req, res) => {
             prisma.product.count({ where }),
             prisma.product.findMany({
                 where,
-                include: {
+                select: {
+                    id: true,
+                    name: true,
+                    baseSku: true,
+                    category: true,
+                    basePrice: true,
+                    totalStock: true,
+                    status: true,
+                    approvalStatus: true,
+                    createdAt: true,
                     vendor: {
                         select: { companyName: true, ownerName: true, email: true },
                     },
                     images: {
                         where: { isPrimary: true },
                         take: 1,
+                        select: { url: true, isPrimary: true },
                     },
                 },
                 orderBy: { [sortBy]: sortOrder },

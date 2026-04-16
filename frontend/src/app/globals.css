@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+button, [role="button"], a, select, summary, [type="checkbox"], [type="radio"] {
+  cursor: pointer;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
