@@ -17,6 +17,7 @@ import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import inventoryService, { InventoryItem as APIInventoryItem, InventoryStats } from '@/services/inventoryService'
 import StockHistoryModal from '@/components/Shared/StockHistoryModal'
+import { showWarningToast } from '@/lib/toast-utils'
 
 const getStatusBadge = (status: string, currentStock: number, lowStockAlert: number) => {
   if (currentStock === 0) {
@@ -376,9 +377,13 @@ export default function Inventory() {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled
-                            className="opacity-50 cursor-not-allowed"
-                            title={!item.hasProductCreated ? 'Create a product first' : `Product status: ${item.productApprovalStatus}`}
+                            onClick={() => {
+                              if (!item.hasProductCreated) {
+                                showWarningToast('Stock Update Not Available', 'Create a product first before updating stock.')
+                              } else {
+                                showWarningToast('Stock Update Not Available', `Product approval status: ${item.productApprovalStatus}. Stock can only be updated after admin approval.`)
+                              }
+                            }}
                           >
                             Update Stock
                           </Button>
@@ -402,11 +407,22 @@ export default function Inventory() {
                             Create Product
                           </Button>
                         )}
-                        <Link href={`/vendor/dashboard/inventory/edit/${item.id}`}>
-                          <Button variant="outline" size="sm" className="hover:bg-gray-50 hover:border-gray-200">
+                        {item.hasProductCreated && item.productApprovalStatus === 'APPROVED' ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="hover:bg-gray-50 hover:border-gray-200"
+                            onClick={() => showWarningToast('Edit Restricted', 'This product has been approved. Only admin can edit the inventory.')}
+                          >
                             <Edit className="w-4 h-4" />
                           </Button>
-                        </Link>
+                        ) : (
+                          <Link href={`/vendor/dashboard/inventory/edit/${item.id}`}>
+                            <Button variant="outline" size="sm" className="hover:bg-gray-50 hover:border-gray-200">
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"

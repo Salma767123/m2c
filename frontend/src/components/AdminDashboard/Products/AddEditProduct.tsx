@@ -450,7 +450,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 imageType: img.imageType as 'cover' | 'gallery'
               })) || [],
 
-              totalStock: product.totalStock,
+              // For variant products, use base stock from inventory (not aggregate totalStock)
+              totalStock: product.hasVariants && product.inventory?.baseStock !== undefined
+                ? product.inventory.baseStock
+                : product.totalStock,
               lowStockThreshold: product.lowStockThreshold,
               trackInventory: product.trackInventory,
 
@@ -763,18 +766,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
           ...prev,
           [name]: type === 'number' ? parseFloat(value) || 0 :
             type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-        }
-
-        // Auto-calculate discount percentage when originalPrice or basePrice changes
-        if ((name === 'originalPrice' || name === 'basePrice') && updated.originalPrice && updated.basePrice) {
-          const original = parseFloat(String(updated.originalPrice)) || 0
-          const base = parseFloat(String(updated.basePrice)) || 0
-
-          if (original > base && base > 0) {
-            updated.discount = Math.round(((original - base) / original) * 100)
-          } else {
-            updated.discount = undefined
-          }
         }
 
         return updated
@@ -2156,71 +2147,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         </div>
                         <p className="text-xs text-gray-600 mt-1">Price for single unit</p>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Original Price (Optional)
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-gray-500">₹</span>
-                          <input
-                            type="number"
-                            name="originalPrice"
-                            value={formData.originalPrice || ''}
-                            onChange={handleInputChange}
-                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="0"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1">For showing discount</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Discount %
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            name="discount"
-                            value={formData.discount || ''}
-                            onChange={handleInputChange}
-                            max="100"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="0"
-                          />
-                          <span className="absolute right-3 top-2 text-gray-500">%</span>
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1">Auto-calculated if original price set</p>
-                      </div>
                     </div>
-
-                    {/* Price Summary */}
-                    {formData.basePrice > 0 && (
-                      <div className="p-4 bg-white border border-gray-300 rounded-lg">
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div>
-                            <p className="text-xs text-gray-600 mb-1">Selling Price</p>
-                            <p className="text-2xl font-bold text-gray-900">₹{formData.basePrice.toFixed(2)}</p>
-                          </div>
-                          {formData.originalPrice && formData.originalPrice > formData.basePrice && (
-                            <>
-                              <div>
-                                <p className="text-xs text-gray-600 mb-1">Original Price</p>
-                                <p className="text-2xl font-bold text-gray-400 line-through">₹{formData.originalPrice.toFixed(2)}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-gray-600 mb-1">You Save</p>
-                                <p className="text-2xl font-bold text-green-600">
-                                  ₹{(formData.originalPrice - formData.basePrice).toFixed(2)}
-                                  {formData.discount && (
-                                    <span className="text-sm ml-1">({formData.discount}%)</span>
-                                  )}
-                                </p>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Variant Pricing Section */}
@@ -2258,64 +2185,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                   />
                                 </div>
                               </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Original Price (₹)
-                                </label>
-                                <div className="relative">
-                                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">₹</span>
-                                  <input
-                                    type="number"
-                                    value={variant.originalPrice || ''}
-                                    onChange={(e) => {
-                                      const origPrice = parseFloat(e.target.value) || 0;
-                                      // Update both originalPrice and auto-calculated discount in one state update
-                                      setFormData(prev => ({
-                                        ...prev,
-                                        variants: prev.variants.map(v => {
-                                          if (v.id === variant.id) {
-                                            const disc = origPrice > 0 && v.price > 0 && origPrice > v.price
-                                              ? Math.round(((origPrice - v.price) / origPrice) * 100)
-                                              : undefined;
-                                            return { ...v, originalPrice: origPrice || undefined, discount: disc };
-                                          }
-                                          return v;
-                                        })
-                                      }));
-                                    }}
-                                    className="w-full pl-6 pr-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="For showing discount"
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Discount %
-                                </label>
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    value={variant.discount || ''}
-                                    readOnly
-                                    className="w-full px-2 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-600"
-                                    placeholder="Auto"
-                                  />
-                                  <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">%</span>
-                                </div>
-                              </div>
                             </div>
-                            {/* Variant Price Summary */}
-                            {variant.originalPrice && variant.originalPrice > variant.price && (
-                              <div className="mt-2 p-2 bg-gray-50 rounded-md flex items-center gap-4 text-sm">
-                                <span className="text-gray-900 font-semibold">₹{variant.price.toFixed(2)}</span>
-                                <span className="text-gray-400 line-through">₹{variant.originalPrice.toFixed(2)}</span>
-                                <span className="text-green-600 font-medium">
-                                  Save ₹{(variant.originalPrice - variant.price).toFixed(2)} ({variant.discount}%)
-                                </span>
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>

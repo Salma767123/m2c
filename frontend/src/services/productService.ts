@@ -114,9 +114,9 @@ export interface Product extends ProductFormData {
     name: string;
     sku: string;
     currentStock: number;
+    baseStock: number;
     category?: string;
   };
-  baseStock?: number; // Pre-calculated base stock from backend
 }
 
 export interface ProductStats {

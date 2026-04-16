@@ -63,7 +63,9 @@ export default function VendorProductRequests() {
   const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [approvingRequest, setApprovingRequest] = useState<VendorProductRequest | null>(null)
   const [adminPrice, setAdminPrice] = useState<string>('')
+  const [originalPrice, setOriginalPrice] = useState<string>('')
   const [variantPrices, setVariantPrices] = useState<Record<string, string>>({})
+  const [variantOriginalPrices, setVariantOriginalPrices] = useState<Record<string, string>>({})
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -123,16 +125,21 @@ export default function VendorProductRequests() {
 
     setApprovingRequest(request)
     setAdminPrice(request.basePrice.toString())
+    setOriginalPrice(request.originalPrice?.toString() || '')
 
     // Initialize variant prices if product has variants
     if (request.variants && request.variants.length > 0) {
       const initialPrices: Record<string, string> = {}
+      const initialOriginalPrices: Record<string, string> = {}
       request.variants.forEach(v => {
         initialPrices[v.id] = v.price.toString()
+        initialOriginalPrices[v.id] = v.originalPrice?.toString() || ''
       })
       setVariantPrices(initialPrices)
+      setVariantOriginalPrices(initialOriginalPrices)
     } else {
       setVariantPrices({})
+      setVariantOriginalPrices({})
     }
 
     setShowApprovalModal(true)
@@ -143,6 +150,23 @@ export default function VendorProductRequests() {
 
     const hasVariants = approvingRequest.variants && approvingRequest.variants.length > 0
 
+    // Validate base admin price
+    if (!adminPrice || parseFloat(adminPrice) <= 0) {
+      showErrorToast('Invalid Price', 'Please enter a valid admin selling price')
+      return
+    }
+
+    // Validate original price (required)
+    if (!originalPrice || parseFloat(originalPrice) <= 0) {
+      showErrorToast('Invalid Price', 'Please enter a valid original price')
+      return
+    }
+
+    if (parseFloat(originalPrice) <= parseFloat(adminPrice)) {
+      showErrorToast('Invalid Price', 'Original price must be greater than selling price')
+      return
+    }
+
     if (hasVariants) {
       // Validate all variant prices
       const invalidVariants = approvingRequest.variants!.filter(v =>
@@ -152,12 +176,22 @@ export default function VendorProductRequests() {
         showErrorToast('Invalid Prices', 'Please enter valid admin prices for all variants')
         return
       }
-    }
 
-    // Validate base admin price
-    if (!adminPrice || parseFloat(adminPrice) <= 0) {
-      showErrorToast('Invalid Price', 'Please enter a valid admin base price')
-      return
+      const invalidOriginalPrices = approvingRequest.variants!.filter(v =>
+        !variantOriginalPrices[v.id] || parseFloat(variantOriginalPrices[v.id]) <= 0
+      )
+      if (invalidOriginalPrices.length > 0) {
+        showErrorToast('Invalid Prices', 'Please enter valid original prices for all variants')
+        return
+      }
+
+      const invalidDiscounts = approvingRequest.variants!.filter(v =>
+        parseFloat(variantOriginalPrices[v.id]) <= parseFloat(variantPrices[v.id])
+      )
+      if (invalidDiscounts.length > 0) {
+        showErrorToast('Invalid Prices', 'Original price must be greater than admin price for all variants')
+        return
+      }
     }
 
     try {
@@ -167,10 +201,20 @@ export default function VendorProductRequests() {
           )
         : undefined
 
+      const variantOriginalPricesNum = hasVariants
+        ? Object.fromEntries(
+            Object.entries(variantOriginalPrices)
+              .filter(([, price]) => price && parseFloat(price) > 0)
+              .map(([id, price]) => [id, parseFloat(price)])
+          )
+        : undefined
+
       const response = await adminProductService.approveProduct(
         approvingRequest.id,
-        hasVariants ? undefined : parseFloat(adminPrice),
-        variantPricesNum
+        parseFloat(adminPrice),
+        variantPricesNum,
+        originalPrice ? parseFloat(originalPrice) : undefined,
+        variantOriginalPricesNum && Object.keys(variantOriginalPricesNum).length > 0 ? variantOriginalPricesNum : undefined
       )
 
       if (response.success) {
@@ -514,30 +558,55 @@ export default function VendorProductRequests() {
               <p className="text-sm text-gray-500">Vendor Base Price: ₹{approvingRequest.basePrice}</p>
             </div>
 
-            {/* Base Admin Price */}
-            {!(approvingRequest.variants && approvingRequest.variants.length > 0) && (
-              <div className="mb-4">
+            {/* Base Pricing - always shown */}
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Admin Fixed Price (₹)
+                  Admin Selling Price (₹) *
                 </label>
+                <div className="mb-2 text-sm text-gray-600">
+                  Vendor Base Price: ₹{approvingRequest.basePrice}
+                </div>
                 <input
                   type="number"
                   value={adminPrice}
                   onChange={(e) => setAdminPrice(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                  placeholder="Enter admin price"
+                  placeholder="Enter selling price"
                   step="0.01"
                   min="0"
                 />
-                <p className="text-xs text-gray-500 mt-1">This will be the final price customers see.</p>
+                <p className="text-xs text-gray-500 mt-1">Final selling price customers see.</p>
               </div>
-            )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Original Price (₹) *
+                </label>
+                <div className="mb-2 text-sm text-gray-600">
+                  For showing strikethrough discount
+                </div>
+                <input
+                  type="number"
+                  value={originalPrice}
+                  onChange={(e) => setOriginalPrice(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  placeholder="Enter original price"
+                  step="0.01"
+                  min="0"
+                />
+                {originalPrice && parseFloat(originalPrice) > parseFloat(adminPrice) && (
+                  <p className="text-xs text-green-600 mt-1">
+                    {Math.round(((parseFloat(originalPrice) - parseFloat(adminPrice)) / parseFloat(adminPrice)) * 100)}% off
+                  </p>
+                )}
+              </div>
+            </div>
 
             {/* Variant Prices */}
             {approvingRequest.variants && approvingRequest.variants.length > 0 && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Set Admin Prices for Each Variant
+                  Set Prices for Each Variant
                 </label>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {approvingRequest.variants.map((variant) => (
@@ -554,28 +623,52 @@ export default function VendorProductRequests() {
                           </div>
                         </div>
                       </div>
-                      <div className="mt-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Admin Price (₹)
-                        </label>
-                        <input
-                          type="number"
-                          value={variantPrices[variant.id] || ''}
-                          onChange={(e) => setVariantPrices(prev => ({
-                            ...prev,
-                            [variant.id]: e.target.value
-                          }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
-                          placeholder="Enter admin price"
-                          step="0.01"
-                          min="0"
-                        />
+                      <div className="mt-2 grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Admin Price (₹) *
+                          </label>
+                          <input
+                            type="number"
+                            value={variantPrices[variant.id] || ''}
+                            onChange={(e) => setVariantPrices(prev => ({
+                              ...prev,
+                              [variant.id]: e.target.value
+                            }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                            placeholder="Selling price"
+                            step="0.01"
+                            min="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Original Price (₹) *
+                          </label>
+                          <input
+                            type="number"
+                            value={variantOriginalPrices[variant.id] || ''}
+                            onChange={(e) => setVariantOriginalPrices(prev => ({
+                              ...prev,
+                              [variant.id]: e.target.value
+                            }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                            placeholder="Original price"
+                            step="0.01"
+                            min="0"
+                          />
+                          {variantOriginalPrices[variant.id] && variantPrices[variant.id] && parseFloat(variantOriginalPrices[variant.id]) > parseFloat(variantPrices[variant.id]) && (
+                            <p className="text-xs text-green-600 mt-1">
+                              {Math.round(((parseFloat(variantOriginalPrices[variant.id]) - parseFloat(variantPrices[variant.id])) / parseFloat(variantPrices[variant.id])) * 100)}% off
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Set individual prices for each variant. These will be the final prices customers see.
+                  Set admin selling price and original price for each variant. Discount % is auto-calculated.
                 </p>
               </div>
             )}

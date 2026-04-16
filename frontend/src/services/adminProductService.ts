@@ -51,6 +51,7 @@ export interface AdminProduct {
     name: string;
     sku: string;
     currentStock: number;
+    baseStock: number;
     category: string;
   };
   images: Array<{
@@ -157,7 +158,9 @@ class AdminProductService {
   async approveProduct(
     id: string,
     adminPrice?: number,
-    variantPrices?: Record<string, number>
+    variantPrices?: Record<string, number>,
+    originalPrice?: number,
+    variantOriginalPrices?: Record<string, number>
   ): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
     try {
       const payload: any = {};
@@ -166,6 +169,12 @@ class AdminProductService {
       }
       if (variantPrices !== undefined) {
         payload.variantPrices = variantPrices;
+      }
+      if (originalPrice !== undefined) {
+        payload.originalPrice = originalPrice;
+      }
+      if (variantOriginalPrices !== undefined) {
+        payload.variantOriginalPrices = variantOriginalPrices;
       }
       const response = await axios.put(`/products/${id}/approve`, payload);
       return response.data;

@@ -437,7 +437,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
               images: product.images || [],
 
-              totalStock: product.totalStock,
+              // For variant products, totalStock = base stock only (not aggregate)
+              // inventory.baseStock has the correct base stock value
+              totalStock: product.hasVariants && product.inventory?.baseStock !== undefined
+                ? product.inventory.baseStock
+                : product.totalStock,
               lowStockThreshold: product.lowStockThreshold,
               trackInventory: product.trackInventory,
 
@@ -499,28 +503,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     }
   }, [isEdit, productId, inventoryId, availableInventoryItems])
 
-  // Auto-calculate discount percentage when prices change
-  useEffect(() => {
-    if (formData.originalPrice && formData.basePrice && formData.originalPrice > formData.basePrice) {
-      const calculatedDiscount = Math.round(
-        ((formData.originalPrice - formData.basePrice) / formData.originalPrice) * 100
-      );
-      
-      // Only update if the calculated discount is different from current
-      if (formData.discount !== calculatedDiscount) {
-        setFormData(prev => ({
-          ...prev,
-          discount: calculatedDiscount
-        }));
-      }
-    } else if (formData.discount && (!formData.originalPrice || formData.originalPrice <= formData.basePrice)) {
-      // Clear discount if original price is not set or is less than base price
-      setFormData(prev => ({
-        ...prev,
-        discount: undefined
-      }));
-    }
-  }, [formData.originalPrice, formData.basePrice]);
+  // Note: originalPrice and discount are set by admin during approval, not by vendor
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -912,6 +895,39 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700"></div>
               <span className="ml-3 text-gray-600">Loading product data...</span>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Guard: block vendor from editing approved products
+  if (isEdit && formData.approvalStatus === 'APPROVED') {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-4">
+          <Link href="/vendor/dashboard/products">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Products
+            </Button>
+          </Link>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+              <Package className="h-8 w-8 text-green-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900">Product Editing Restricted</h2>
+            <p className="text-sm text-gray-600">
+              This product has been approved by admin and cannot be edited. Only admin can modify approved products and their inventory.
+            </p>
+            <Link href="/vendor/dashboard/products">
+              <Button className="mt-4">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Products
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -1836,89 +1852,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         </div>
                         <p className="text-xs text-gray-600 mt-1">Price for single unit</p>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Original Price (Optional)
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-gray-500">₹</span>
-                          <input
-                            type="number"
-                            name="originalPrice"
-                            value={formData.originalPrice || ''}
-                            onChange={handleInputChange}
-                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="0"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1">For showing discount</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Discount %
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            name="discount"
-                            value={formData.discount || ''}
-                            onChange={handleInputChange}
-                            max="100"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                            placeholder="0"
-                          />
-                          <span className="absolute right-3 top-2 text-gray-500">%</span>
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1">Auto-calculated if original price set</p>
-                      </div>
                     </div>
-
-                    {/* Single Unit Summary */}
-                    {formData.basePrice > 0 && (
-                      <div className="p-4 bg-white border border-gray-300 rounded-lg mb-4">
-                        <h5 className="font-medium text-gray-900 mb-3">Single Unit Configuration</h5>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <span className="text-gray-600">Base Price:</span>
-                            <span className="font-medium ml-2">₹{formData.basePrice.toFixed(2)}</span>
-                          </div>
-                          {formData.originalPrice && formData.originalPrice > formData.basePrice && (
-                            <div>
-                              <span className="text-gray-600">Discount:</span>
-                              <span className="font-medium text-green-600 ml-2">
-                                {Math.round(((formData.originalPrice - formData.basePrice) / formData.originalPrice) * 100)}% off
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Price Summary */}
-                    {formData.basePrice > 0 && (
-                      <div className="p-4 bg-white border border-gray-300 rounded-lg">
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div>
-                            <p className="text-xs text-gray-600 mb-1">Selling Price</p>
-                            <p className="text-2xl font-bold text-gray-900">₹{formData.basePrice.toFixed(2)}</p>
-                          </div>
-                          {formData.originalPrice && formData.originalPrice > formData.basePrice && (
-                            <>
-                              <div>
-                                <p className="text-xs text-gray-600 mb-1">Original Price</p>
-                                <p className="text-2xl font-bold text-gray-400 line-through">₹{formData.originalPrice.toFixed(2)}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-gray-600 mb-1">You Save</p>
-                                <p className="text-2xl font-bold text-green-600">
-                                  ₹{(formData.originalPrice - formData.basePrice).toFixed(2)}
-                                </p>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </CardContent>
               </Card>
