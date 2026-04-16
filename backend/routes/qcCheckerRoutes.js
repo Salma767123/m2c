@@ -14,6 +14,7 @@ const {
     approveVendorByQc,
     rejectVendorByQc,
     getAssignedProducts,
+    getProductReports,
     getProductDetails,
     approveProductByQc,
     rejectProductByQc
@@ -40,6 +41,7 @@ router.post('/vendors/:vendorId/reject', authenticateToken, rejectVendorByQc);
 
 // QC Products
 router.get('/products', authenticateToken, getAssignedProducts);
+router.get('/products/reports', authenticateToken, getProductReports);
 router.get('/products/:productId/details', authenticateToken, getProductDetails);
 router.post('/products/:productId/approve', authenticateToken, approveProductByQc);
 router.post('/products/:productId/reject', authenticateToken, rejectProductByQc);

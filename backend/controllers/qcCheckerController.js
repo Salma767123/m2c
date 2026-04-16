@@ -1064,6 +1064,85 @@ const getAssignedProducts = async (req, res) => {
 };
 
 // ============================
+// QC Checker: Get completed product inspection reports (paginated)
+// ============================
+const getProductReports = async (req, res) => {
+    try {
+        if (req.user.role !== 'QC_CHECKER') {
+            return res.status(403).json({ success: false, message: 'Access denied: QC Checker role required' });
+        }
+
+        const qcCheckerId = req.user.id;
+
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 12, 1), 50);
+        const search = (req.query.search || '').toString().trim().slice(0, 100);
+        const sortBy = ALLOWED_PRODUCT_SORT_FIELDS.includes(req.query.sortBy)
+            ? req.query.sortBy
+            : 'updatedAt';
+        const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+
+        const where = {
+            assignedQcId: qcCheckerId,
+            approvalStatus: { in: ['QC_APPROVED', 'APPROVED', 'REJECTED'] },
+        };
+        if (search) {
+            where.OR = [
+                { name: { contains: search, mode: 'insensitive' } },
+                { baseSku: { contains: search, mode: 'insensitive' } },
+                { category: { contains: search, mode: 'insensitive' } },
+                { vendor: { companyName: { contains: search, mode: 'insensitive' } } },
+            ];
+        }
+
+        const [total, products] = await Promise.all([
+            prisma.product.count({ where }),
+            prisma.product.findMany({
+                where,
+                select: {
+                    id: true,
+                    name: true,
+                    baseSku: true,
+                    category: true,
+                    approvalStatus: true,
+                    rejectionReason: true,
+                    updatedAt: true,
+                    vendor: {
+                        select: { companyName: true, ownerName: true },
+                    },
+                    images: {
+                        where: { isPrimary: true },
+                        take: 1,
+                    },
+                },
+                orderBy: { [sortBy]: sortOrder },
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                products,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit),
+                },
+            },
+        });
+    } catch (error) {
+        console.error('Error fetching product reports:', error);
+        res.status(500).json({
+            success: false,
+            message: 'An error occurred while fetching product reports',
+        });
+    }
+};
+
+// ============================
 // QC Checker: Get product details (scoped to assigned checker)
 // ============================
 const getProductDetails = async (req, res) => {
@@ -1305,6 +1384,7 @@ module.exports = {
     approveVendorByQc,
     rejectVendorByQc,
     getAssignedProducts,
+    getProductReports,
     getProductDetails,
     approveProductByQc,
     rejectProductByQc,

@@ -87,30 +87,74 @@ const getInspectionsByChecker = async (req, res) => {
     try {
         const checkerId = req.user.id; // From authMiddleware
 
-        const inspections = await prisma.inspection.findMany({
-            where: { checkerId },
-            include: {
-                vendor: {
-                    select: {
-                        id: true,
-                        vendorCode: true,
-                        companyName: true,
-                        businessCity: true,
-                        businessState: true,
-                        status: true,
-                        email: true,
-                        ownerName: true,
-                        businessPhone: true
-                    }
-                }
-            },
-            orderBy: [
-                { scheduledDate: 'asc' },
-                { scheduledTime: 'asc' }
-            ]
-        });
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 12, 1), 50);
+        const search = (req.query.search || '').trim().slice(0, 100);
+        const result = req.query.result || '';
+        const ALLOWED_SORT_FIELDS = ['scheduledDate', 'completedAt', 'createdAt', 'vendorName'];
+        const sortBy = ALLOWED_SORT_FIELDS.includes(req.query.sortBy) ? req.query.sortBy : 'completedAt';
+        const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+        const ALLOWED_STATUSES = ['COMPLETED', 'SCHEDULED', 'IN_PROGRESS', 'CANCELLED'];
+        const status = ALLOWED_STATUSES.includes(req.query.status) ? req.query.status : '';
 
-        res.json({ success: true, inspections });
+        const where = { checkerId };
+
+        // If status filter is provided use it, otherwise default to COMPLETED for reports
+        if (status) {
+            where.status = status;
+        } else {
+            where.status = 'COMPLETED';
+        }
+
+        if (result === 'PASSED' || result === 'FAILED') {
+            where.result = result;
+        }
+
+        if (search) {
+            where.OR = [
+                { vendor: { companyName: { contains: search, mode: 'insensitive' } } },
+                { clientName: { contains: search, mode: 'insensitive' } },
+                { notes: { contains: search, mode: 'insensitive' } },
+            ];
+        }
+
+        const [inspections, total] = await Promise.all([
+            prisma.inspection.findMany({
+                where,
+                include: {
+                    vendor: {
+                        select: {
+                            id: true,
+                            vendorCode: true,
+                            companyName: true,
+                            businessCity: true,
+                            businessState: true,
+                            status: true,
+                            email: true,
+                            ownerName: true,
+                            businessPhone: true
+                        }
+                    }
+                },
+                orderBy: sortBy === 'vendorName'
+                    ? { vendor: { companyName: sortOrder } }
+                    : { [sortBy]: sortOrder },
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
+            prisma.inspection.count({ where }),
+        ]);
+
+        res.json({
+            success: true,
+            inspections,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        });
     } catch (error) {
         console.error('Error fetching QC checker inspections:', error);
         res.status(500).json({ error: 'Internal server error' });

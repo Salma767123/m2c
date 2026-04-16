@@ -311,6 +311,44 @@ class QCCheckerService {
         }
     }
 
+    // Get completed product inspection reports (paginated)
+    async getProductReports(params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+    }): Promise<{
+        success: boolean;
+        data: {
+            products: Array<{
+                id: string;
+                name: string;
+                baseSku?: string;
+                category?: string;
+                approvalStatus?: string;
+                rejectionReason?: string;
+                updatedAt?: string;
+                vendor?: { companyName?: string };
+                images?: { url: string }[];
+            }>;
+            pagination: { total: number; page: number; limit: number; totalPages: number };
+        };
+    }> {
+        try {
+            const response = await axios.get('/qc-checkers/products/reports', {
+                headers: {
+                    'Authorization': `Bearer ${this.getCheckerToken()}`
+                },
+                params,
+            });
+            return response.data;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to fetch product reports';
+            throw new Error(message);
+        }
+    }
+
     // Get product details (product + variants + images + vendor contact + QC activity)
     async getProductDetails(productId: string): Promise<{ success: boolean; data: { product: ProductDetailData } }> {
         try {
@@ -359,12 +397,21 @@ class QCCheckerService {
     // ============================
 
     // Get Assigned Inspections
-    async getInspections(): Promise<{ success: boolean; inspections: any[] }> {
+    async getInspections(params?: {
+        page?: number;
+        limit?: number;
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        result?: string;
+        status?: string;
+    }): Promise<{ success: boolean; inspections: any[]; pagination: { total: number; page: number; limit: number; totalPages: number } }> {
         try {
             const response = await axios.get('/inspections', {
                 headers: {
                     'Authorization': `Bearer ${this.getCheckerToken()}`
-                }
+                },
+                params,
             });
             return response.data;
         } catch (error: any) {
