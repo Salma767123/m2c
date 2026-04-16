@@ -173,7 +173,7 @@ interface ProductFormData {
   weight?: string
   inStock: boolean
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
-  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'REINSPECTION'
+  approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION'
   approvedAt?: string
   approvedBy?: string
   rejectionReason?: string

@@ -68,6 +68,7 @@ export interface AdminProduct {
     colorHex?: string;
     sku: string;
     price: number;
+    originalPrice?: number;
     adminFixedPrice?: number; // Admin's fixed price for this variant
     stock: number;
     images?: string[];

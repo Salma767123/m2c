@@ -19,6 +19,7 @@ interface VendorProductRequest {
   category: string
   subCategory?: string
   basePrice: number
+  originalPrice?: number
   totalStock: number
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
   approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION'
@@ -40,6 +41,7 @@ interface VendorProductRequest {
     size: string
     color: string
     price: number
+    originalPrice?: number
     stock: number
   }>
   fabricType?: string
