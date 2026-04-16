@@ -36,7 +36,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
   const [showRejectionModal, setShowRejectionModal] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [adminPrice, setAdminPrice] = useState('')
+  const [originalPrice, setOriginalPrice] = useState('')
   const [variantPrices, setVariantPrices] = useState<Record<string, string>>({})
+  const [variantOriginalPrices, setVariantOriginalPrices] = useState<Record<string, string>>({})
   const [actionLoading, setActionLoading] = useState(false)
 
   // Fetch product data from backend
@@ -49,14 +51,18 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           setProduct(response.data)
           // Set initial admin price to the product's admin fixed price or base price
           setAdminPrice((response.data.adminFixedPrice || response.data.basePrice).toString())
+          setOriginalPrice(response.data.originalPrice?.toString() || '')
 
           // Initialize variant prices if product has variants
           if (response.data.hasVariants && response.data.variants) {
             const initialVariantPrices: Record<string, string> = {}
+            const initialVariantOriginalPrices: Record<string, string> = {}
             response.data.variants.forEach(variant => {
               initialVariantPrices[variant.id] = (variant.adminFixedPrice || variant.price).toString()
+              initialVariantOriginalPrices[variant.id] = variant.originalPrice?.toString() || ''
             })
             setVariantPrices(initialVariantPrices)
+            setVariantOriginalPrices(initialVariantOriginalPrices)
           }
         } else {
           showErrorToast('Error', 'Product not found')
@@ -77,9 +83,25 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
   const handleApprove = async () => {
     if (!product) return
 
-    // Validate pricing based on whether product has variants
+    // Validate base admin price (required for all products)
+    if (!adminPrice || parseFloat(adminPrice) <= 0) {
+      showErrorToast('Invalid Price', 'Please enter a valid admin selling price')
+      return
+    }
+
+    // Validate original price (required)
+    if (!originalPrice || parseFloat(originalPrice) <= 0) {
+      showErrorToast('Invalid Price', 'Please enter a valid original price')
+      return
+    }
+
+    if (parseFloat(originalPrice) <= parseFloat(adminPrice)) {
+      showErrorToast('Invalid Price', 'Original price must be greater than selling price')
+      return
+    }
+
+    // Validate variant prices if product has variants
     if (product.hasVariants && product.variants && product.variants.length > 0) {
-      // Check if all variants have valid prices
       const invalidVariants = product.variants.filter(v =>
         !variantPrices[v.id] || parseFloat(variantPrices[v.id]) <= 0
       )
@@ -88,10 +110,22 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         showErrorToast('Invalid Prices', 'Please enter valid admin prices for all variants')
         return
       }
-    } else {
-      // Single product - check admin price
-      if (!adminPrice || parseFloat(adminPrice) <= 0) {
-        showErrorToast('Invalid Price', 'Please enter a valid admin price')
+
+      const invalidOriginalPrices = product.variants.filter(v =>
+        !variantOriginalPrices[v.id] || parseFloat(variantOriginalPrices[v.id]) <= 0
+      )
+
+      if (invalidOriginalPrices.length > 0) {
+        showErrorToast('Invalid Prices', 'Please enter valid original prices for all variants')
+        return
+      }
+
+      const invalidDiscounts = product.variants.filter(v =>
+        parseFloat(variantOriginalPrices[v.id]) <= parseFloat(variantPrices[v.id])
+      )
+
+      if (invalidDiscounts.length > 0) {
+        showErrorToast('Invalid Prices', 'Original price must be greater than admin price for all variants')
         return
       }
     }
@@ -106,10 +140,20 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         )
         : undefined
 
+      const variantOriginalPricesNum = product.hasVariants && product.variants
+        ? Object.fromEntries(
+          Object.entries(variantOriginalPrices)
+            .filter(([, price]) => price && parseFloat(price) > 0)
+            .map(([id, price]) => [id, parseFloat(price)])
+        )
+        : undefined
+
       const response = await adminProductService.approveProduct(
         product.id,
-        product.hasVariants ? undefined : parseFloat(adminPrice),
-        variantPricesNum
+        parseFloat(adminPrice),
+        variantPricesNum,
+        originalPrice ? parseFloat(originalPrice) : undefined,
+        variantOriginalPricesNum && Object.keys(variantOriginalPricesNum).length > 0 ? variantOriginalPricesNum : undefined
       )
 
       if (response.success) {
@@ -120,7 +164,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           ...prev,
           approvalStatus: 'APPROVED',
           approvedAt: new Date().toISOString(),
-          adminFixedPrice: product.hasVariants ? undefined : parseFloat(adminPrice)
+          adminFixedPrice: parseFloat(adminPrice)
         } : null)
         // Optionally redirect back to requests list
         setTimeout(() => {
@@ -337,6 +381,49 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
+                  {/* Base Variant Stock */}
+                  <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        {product.singleUnitColorHex && (
+                          <div
+                            className="w-10 h-10 rounded border-2 border-blue-300 shadow-sm"
+                            style={{ backgroundColor: product.singleUnitColorHex }}
+                            title={product.singleUnitColor || 'Base'}
+                          />
+                        )}
+                        <div>
+                          <h4 className="font-semibold text-gray-900">
+                            Base Unit {product.singleUnitSize && product.singleUnitColor ? `(${product.singleUnitSize} - ${product.singleUnitColor})` : ''}
+                          </h4>
+                          <p className="text-xs text-blue-600 font-medium">Base / Default Variant</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-900">₹{product.basePrice}</p>
+                        {product.adminFixedPrice && (
+                          <p className="text-xs text-green-600">Admin: ₹{product.adminFixedPrice}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 mt-4">
+                      <div className="bg-white p-3 rounded border">
+                        <p className="text-xs text-gray-500 mb-1">Vendor Price</p>
+                        <p className="text-sm font-semibold text-gray-900">₹{product.basePrice}</p>
+                      </div>
+                      {product.adminFixedPrice && (
+                        <div className="bg-white p-3 rounded border border-green-200">
+                          <p className="text-xs text-gray-500 mb-1">Admin Price</p>
+                          <p className="text-sm font-semibold text-green-600">₹{product.adminFixedPrice}</p>
+                        </div>
+                      )}
+                      <div className="bg-white p-3 rounded border">
+                        <p className="text-xs text-gray-500 mb-1">Stock</p>
+                        <p className="text-sm font-semibold text-blue-700">{product.inventory?.baseStock ?? 0} units</p>
+                      </div>
+                    </div>
+                  </div>
+
                   {product.variants.map((variant, index) => (
                     <div key={variant.id || index} className="p-4 border rounded-lg bg-gray-50">
                       {/* Variant Details */}
@@ -539,6 +626,11 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 <div>
                   <p className="text-sm font-medium text-gray-900">Stock & Variants</p>
                   <p className="text-sm text-gray-600">{product.totalStock} units</p>
+                  {product.hasVariants && product.variants && (
+                    <p className="text-xs text-gray-500">
+                      Base: {product.inventory?.baseStock ?? 0} units | Variants: {product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)} units
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500">
                     {product.hasVariants ? `${product.variants?.length || 0} variants` : 'No variants'}
                   </p>
@@ -641,11 +733,59 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               <p className="text-sm text-gray-600">Vendor: {product.vendor.companyName}</p>
             </div>
 
-            {/* Conditional rendering based on whether product has variants */}
-            {product.hasVariants && product.variants && product.variants.length > 0 ? (
+            {/* Base Pricing - always shown */}
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Admin Selling Price (₹) *
+                </label>
+                <div className="mb-2 text-sm text-gray-600">
+                  Vendor Base Price: ₹{product.basePrice}
+                </div>
+                <input
+                  type="number"
+                  value={adminPrice}
+                  onChange={(e) => setAdminPrice(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  placeholder="Enter selling price"
+                  step="0.01"
+                  min="0"
+                  disabled={actionLoading}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Final selling price customers see.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Original Price (₹) *
+                </label>
+                <div className="mb-2 text-sm text-gray-600">
+                  For showing strikethrough discount
+                </div>
+                <input
+                  type="number"
+                  value={originalPrice}
+                  onChange={(e) => setOriginalPrice(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  placeholder="Enter original price"
+                  step="0.01"
+                  min="0"
+                  disabled={actionLoading}
+                />
+                {originalPrice && parseFloat(originalPrice) > parseFloat(adminPrice) && (
+                  <p className="text-xs text-green-600 mt-1">
+                    {Math.round(((parseFloat(originalPrice) - parseFloat(adminPrice)) / parseFloat(adminPrice)) * 100)}% off
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Variant Prices - shown only when product has variants */}
+            {product.hasVariants && product.variants && product.variants.length > 0 && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Set Admin Prices for Each Variant
+                  Set Prices for Each Variant
                 </label>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {product.variants.map((variant) => (
@@ -666,51 +806,54 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                           </div>
                         </div>
                       </div>
-                      <div className="mt-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Admin Price (₹)
-                        </label>
-                        <input
-                          type="number"
-                          value={variantPrices[variant.id] || ''}
-                          onChange={(e) => setVariantPrices(prev => ({
-                            ...prev,
-                            [variant.id]: e.target.value
-                          }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
-                          placeholder="Enter admin price"
-                          step="0.01"
-                          min="0"
-                          disabled={actionLoading}
-                        />
+                      <div className="mt-2 grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Admin Price (₹) *
+                          </label>
+                          <input
+                            type="number"
+                            value={variantPrices[variant.id] || ''}
+                            onChange={(e) => setVariantPrices(prev => ({
+                              ...prev,
+                              [variant.id]: e.target.value
+                            }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                            placeholder="Selling price"
+                            step="0.01"
+                            min="0"
+                            disabled={actionLoading}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Original Price (₹) *
+                          </label>
+                          <input
+                            type="number"
+                            value={variantOriginalPrices[variant.id] || ''}
+                            onChange={(e) => setVariantOriginalPrices(prev => ({
+                              ...prev,
+                              [variant.id]: e.target.value
+                            }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent text-sm"
+                            placeholder="Original price"
+                            step="0.01"
+                            min="0"
+                            disabled={actionLoading}
+                          />
+                          {variantOriginalPrices[variant.id] && variantPrices[variant.id] && parseFloat(variantOriginalPrices[variant.id]) > parseFloat(variantPrices[variant.id]) && (
+                            <p className="text-xs text-green-600 mt-1">
+                              {Math.round(((parseFloat(variantOriginalPrices[variant.id]) - parseFloat(variantPrices[variant.id])) / parseFloat(variantPrices[variant.id])) * 100)}% off
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Set individual prices for each variant. These will be the final prices customers see.
-                </p>
-              </div>
-            ) : (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Admin Fixed Price (₹)
-                </label>
-                <div className="mb-2 text-sm text-gray-600">
-                  Vendor's Base Price: ₹{product.basePrice}
-                </div>
-                <input
-                  type="number"
-                  value={adminPrice}
-                  onChange={(e) => setAdminPrice(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                  placeholder="Enter final price"
-                  step="0.01"
-                  min="0"
-                  disabled={actionLoading}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  This will be the final price customers see.
+                  Set admin selling price and original price for each variant. Discount % is auto-calculated.
                 </p>
               </div>
             )}

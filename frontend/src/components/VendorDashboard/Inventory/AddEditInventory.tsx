@@ -60,6 +60,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   const [filteredSubcategories, setFilteredSubcategories] = useState<Array<{ id: string; name: string; slug: string; parentId?: string }>>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
 
+  const [linkedProductApproved, setLinkedProductApproved] = useState(false)
+
   // Track original stock for edit mode
   const [originalStock, setOriginalStock] = useState<number>(0)
 
@@ -195,6 +197,12 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
         try {
           const inventoryItem = await inventoryService.getItem(inventoryId)
           console.log('Loaded inventory item:', inventoryItem)
+
+          // Check if linked product is approved
+          if (inventoryItem.hasProductCreated && inventoryItem.productApprovalStatus === 'APPROVED') {
+            setLinkedProductApproved(true)
+          }
+
           const formattedData = inventoryService.formatForForm(inventoryItem)
           console.log('Formatted data:', formattedData)
           console.log('Category from inventory:', formattedData.category)
@@ -409,6 +417,39 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 {isLoadingData ? 'Loading inventory data...' : 'Loading categories...'}
               </span>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Guard: block vendor from editing inventory when linked product is approved
+  if (isEdit && linkedProductApproved) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-4">
+          <Link href="/vendor/dashboard/inventory">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Inventory
+            </Button>
+          </Link>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+              <Package className="h-8 w-8 text-green-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900">Inventory Editing Restricted</h2>
+            <p className="text-sm text-gray-600">
+              This inventory item is linked to an approved product and cannot be edited. Only admin can modify inventory for approved products.
+            </p>
+            <Link href="/vendor/dashboard/inventory">
+              <Button className="mt-4">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Inventory
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

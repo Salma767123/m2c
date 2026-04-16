@@ -272,6 +272,20 @@ const updateInventoryItem = async (req, res) => {
       }
     }
 
+    // Block vendor from editing inventory item when linked product is approved
+    if (!isAdmin && existingItem.hasProductCreated && existingItem.productId) {
+      const linkedProduct = await prisma.product.findUnique({
+        where: { id: existingItem.productId },
+        select: { approvalStatus: true }
+      });
+      if (linkedProduct && linkedProduct.approvalStatus === 'APPROVED') {
+        return res.status(403).json({
+          success: false,
+          message: 'This inventory item is linked to an approved product and cannot be edited by vendor. Only admin can modify it.'
+        });
+      }
+    }
+
     // Validate source type specific fields
     if (sourceType === 'SUPPLIER' && !supplier) {
       return res.status(400).json({

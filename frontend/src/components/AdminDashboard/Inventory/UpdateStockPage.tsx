@@ -109,10 +109,15 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
             // Initialize variant stocks
             if (productData.hasVariants && productData.variants) {
               const initialStocks: Record<string, number> = {}
+              let variantSum = 0
               productData.variants.forEach((variant: ProductVariant) => {
                 initialStocks[variant.id] = variant.stock
+                variantSum += variant.stock
               })
               setVariantStocks(initialStocks)
+
+              // baseStock is set correctly by backend during product creation
+              setNewStock(item.baseStock.toString())
             }
           }
         }
@@ -226,9 +231,11 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
     return Object.values(variantStocks).reduce((sum, stock) => sum + stock, 0)
   }
 
-  const stockDifference = product?.hasVariants
-    ? calculateTotalVariantStock() - (product?.totalStock || 0)
-    : parseInt(newStock || '0') - (inventoryItem?.baseStock || 0)
+  const getAggregateStock = () => {
+    return (parseInt(newStock) || 0) + calculateTotalVariantStock()
+  }
+
+  const stockDifference = getAggregateStock() - (inventoryItem?.currentStock || 0)
 
   const isIncrease = stockDifference > 0
   const isDecrease = stockDifference < 0
@@ -444,9 +451,12 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-gray-700">Total Stock</span>
                       <span className="text-xl font-bold text-gray-900">
-                        {calculateTotalVariantStock()} units
+                        {getAggregateStock()} units
                       </span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Base ({parseInt(newStock) || 0}) + Variants ({calculateTotalVariantStock()})
+                    </p>
                   </div>
                 </div>
               )}
@@ -495,8 +505,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                   <p className="mt-1 text-sm text-red-600">{errors.newStock}</p>
                 )}
 
-                {/* Stock Change Indicator for Base Stock */}
-                {stockDifference !== 0 && !isNaN(stockDifference) && !product?.hasVariants && (
+                {/* Stock Change Indicator */}
+                {stockDifference !== 0 && !isNaN(stockDifference) && (
                   <div
                     className={`flex items-center space-x-2 p-3 mt-2 rounded-lg ${isIncrease ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                       }`}
@@ -514,25 +524,6 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                   </div>
                 )}
               </div>
-
-              {/* Stock Change Indicator */}
-              {stockDifference !== 0 && !isNaN(stockDifference) && (
-                <div
-                  className={`flex items-center space-x-2 p-3 rounded-lg ${isIncrease ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                    }`}
-                >
-                  {isIncrease ? (
-                    <TrendingUp className="h-5 w-5" />
-                  ) : (
-                    <TrendingDown className="h-5 w-5" />
-                  )}
-                  <span className="font-medium">
-                    {isIncrease ? '+' : ''}
-                    {stockDifference} units
-                  </span>
-                  <span className="text-sm">({isIncrease ? 'Increase' : 'Decrease'})</span>
-                </div>
-              )}
 
               {/* Reason Input */}
               <div>

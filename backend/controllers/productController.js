@@ -156,16 +156,21 @@ const createProduct = async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       // Determine the stock to use
       let productStock = 0;
+      let baseStockValue = 0;
 
       if (hasVariants && variants && variants.length > 0) {
-        // If has variants, total stock is sum of variant stocks
-        productStock = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+        // If has variants, total stock = base stock + variant stocks
+        const variantStockSum = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+        baseStockValue = parseInt(totalStock) || 0;
+        productStock = baseStockValue + variantStockSum;
       } else if (isFromInventory && inventoryItem) {
         // If from inventory (and no variants), use user-entered stock or fallback to inventory stock
         productStock = parseInt(totalStock) || inventoryItem.currentStock;
+        baseStockValue = productStock;
       } else {
         // Otherwise use provided total stock
         productStock = parseInt(totalStock) || 0;
+        baseStockValue = productStock;
       }
 
       // Create product
@@ -259,11 +264,10 @@ const createProduct = async (req, res) => {
         // Set base stock and total stock properly
         if (hasVariants && variants && variants.length > 0) {
           // For products with variants:
-          // - baseStock remains the original inventory stock (or gets set to a specific base variant stock)
-          // - currentStock becomes total of base + variants
-          const variantStockSum = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
-          inventoryUpdateData.baseStock = inventoryItem.currentStock; // Preserve original as base stock
-          inventoryUpdateData.currentStock = inventoryItem.currentStock + variantStockSum; // Total stock
+          // - baseStock = user-entered base stock value
+          // - currentStock = base stock + variant stocks
+          inventoryUpdateData.baseStock = baseStockValue;
+          inventoryUpdateData.currentStock = productStock; // Already includes base + variants
         } else {
           // For products without variants, sync inventory stock with product stock
           inventoryUpdateData.baseStock = productStock;
@@ -373,7 +377,8 @@ const getVendorProducts = async (req, res) => {
           select: {
             name: true,
             sku: true,
-            currentStock: true
+            currentStock: true,
+            baseStock: true
           }
         }
       },
@@ -439,6 +444,7 @@ const getProduct = async (req, res) => {
             name: true,
             sku: true,
             currentStock: true,
+            baseStock: true,
             category: true
           }
         }
@@ -497,6 +503,14 @@ const updateProduct = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Product not found'
+      });
+    }
+
+    // Block vendor from editing approved products — only admin can modify
+    if (existingProduct.approvalStatus === 'APPROVED') {
+      return res.status(403).json({
+        success: false,
+        message: 'This product has been approved by admin and cannot be edited. Only admin can modify approved products.'
       });
     }
 
@@ -677,7 +691,8 @@ const updateProduct = async (req, res) => {
             id: true,
             name: true,
             sku: true,
-            currentStock: true
+            currentStock: true,
+            baseStock: true
           }
         }
       }
@@ -931,7 +946,7 @@ const getAvailableInventoryItems = async (req, res) => {
 const approveProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { adminPrice, variantPrices } = req.body; // Get admin price and variant prices
+    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices } = req.body;
     const adminId = req.user.id;
 
     // Find the product with variants
@@ -1000,19 +1015,38 @@ const approveProduct = async (req, res) => {
         });
       }
 
-      // Update each variant with admin price
+      // Update each variant with admin price, original price and discount
       await Promise.all(
-        product.variants.map(variant =>
-          prisma.productVariant.update({
+        product.variants.map(variant => {
+          const adminFixed = parseFloat(variantPrices[variant.id]);
+          const variantData = { adminFixedPrice: adminFixed };
+          if (variantOriginalPrices && variantOriginalPrices[variant.id]) {
+            const origPrice = parseFloat(variantOriginalPrices[variant.id]);
+            variantData.originalPrice = origPrice;
+            if (origPrice > adminFixed) {
+              variantData.discount = Math.round(((origPrice - adminFixed) / adminFixed) * 100);
+            }
+          }
+          return prisma.productVariant.update({
             where: { id: variant.id },
-            data: { adminFixedPrice: parseFloat(variantPrices[variant.id]) }
-          })
-        )
+            data: variantData
+          });
+        })
       );
 
-      // For products with variants, adminFixedPrice can be null or average
-      // Let's set it to null since variants have individual prices
-      updateData.adminFixedPrice = null;
+      // Set base admin price for the product
+      if (adminPrice !== undefined && adminPrice !== null && parseFloat(adminPrice) > 0) {
+        updateData.adminFixedPrice = parseFloat(adminPrice);
+      }
+
+      // Set original price and discount for the product
+      if (originalPrice !== undefined && originalPrice !== null && parseFloat(originalPrice) > 0) {
+        const origPrice = parseFloat(originalPrice);
+        updateData.originalPrice = origPrice;
+        if (updateData.adminFixedPrice && origPrice > updateData.adminFixedPrice) {
+          updateData.discount = Math.round(((origPrice - updateData.adminFixedPrice) / updateData.adminFixedPrice) * 100);
+        }
+      }
 
     } else {
       // Product without variants - require single admin price
@@ -1026,6 +1060,15 @@ const approveProduct = async (req, res) => {
       }
 
       updateData.adminFixedPrice = parseFloat(finalAdminPrice);
+
+      // Set original price and discount for the product
+      if (originalPrice !== undefined && originalPrice !== null && parseFloat(originalPrice) > 0) {
+        const origPrice = parseFloat(originalPrice);
+        updateData.originalPrice = origPrice;
+        if (origPrice > parseFloat(finalAdminPrice)) {
+          updateData.discount = Math.round(((origPrice - parseFloat(finalAdminPrice)) / parseFloat(finalAdminPrice)) * 100);
+        }
+      }
     }
 
     // Update product approval status
@@ -1224,6 +1267,7 @@ const getProductForAdmin = async (req, res) => {
             name: true,
             sku: true,
             currentStock: true,
+            baseStock: true,
             category: true
           }
         }
@@ -1410,16 +1454,21 @@ const createProductByAdmin = async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       // Determine the stock to use
       let productStock = 0;
+      let baseStockValue = 0;
 
       if (hasVariants && variants && variants.length > 0) {
-        // If has variants, total stock is sum of variant stocks
-        productStock = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+        // If has variants, total stock = base stock + variant stocks
+        const variantStockSum = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+        baseStockValue = parseInt(totalStock) || 0;
+        productStock = baseStockValue + variantStockSum;
       } else if (isFromInventory && inventoryItem) {
         // If from inventory (and no variants), use user-entered stock or fallback to inventory stock
         productStock = parseInt(totalStock) || inventoryItem.currentStock;
+        baseStockValue = productStock;
       } else {
         // Otherwise use provided total stock
         productStock = parseInt(totalStock) || 0;
+        baseStockValue = productStock;
       }
 
       // Create product
@@ -1516,11 +1565,10 @@ const createProductByAdmin = async (req, res) => {
         // Set base stock and total stock properly
         if (hasVariants && variants && variants.length > 0) {
           // For products with variants:
-          // - baseStock remains the original inventory stock (or gets set to a specific base variant stock)
-          // - currentStock becomes total of base + variants
-          const variantStockSum = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
-          inventoryUpdateData.baseStock = inventoryItem.currentStock; // Preserve original as base stock
-          inventoryUpdateData.currentStock = inventoryItem.currentStock + variantStockSum; // Total stock
+          // - baseStock = user-entered base stock value
+          // - currentStock = base stock + variant stocks
+          inventoryUpdateData.baseStock = baseStockValue;
+          inventoryUpdateData.currentStock = productStock; // Already includes base + variants
         } else {
           // For products without variants, sync inventory stock with product stock
           inventoryUpdateData.baseStock = productStock;
@@ -1823,7 +1871,8 @@ const updateProductByAdmin = async (req, res) => {
             id: true,
             name: true,
             sku: true,
-            currentStock: true
+            currentStock: true,
+            baseStock: true
           }
         }
       }
@@ -2249,7 +2298,8 @@ const getPublicProduct = async (req, res) => {
         updatedAt: true,
         inventory: {
           select: {
-            currentStock: true
+            currentStock: true,
+            baseStock: true
           }
         }
       }

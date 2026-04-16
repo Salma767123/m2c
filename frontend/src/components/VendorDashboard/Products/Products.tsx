@@ -7,7 +7,7 @@ import { Button } from '@/components/UI/Button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import { Plus, Edit, Eye, Trash2 } from 'lucide-react'
 import { productService, type Product } from '@/services/productService'
-import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 
 export default function Products() {
   const router = useRouter();
@@ -210,7 +210,13 @@ export default function Products() {
                           variant="ghost"
                           size="sm"
                           className="hover:bg-gray-50 hover:text-[#222222]"
-                          onClick={() => handleEditProduct(product)}
+                          onClick={() => {
+                            if (product.approvalStatus === 'APPROVED') {
+                              showWarningToast('Edit Restricted', 'This product has been approved. Only admin can edit the product.')
+                            } else {
+                              handleEditProduct(product)
+                            }
+                          }}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -218,7 +224,13 @@ export default function Products() {
                           variant="ghost"
                           size="sm"
                           className="text-gray-700 hover:bg-gray-50 hover:text-red-600"
-                          onClick={() => handleDeleteProduct(product.id)}
+                          onClick={() => {
+                            if (product.approvalStatus === 'APPROVED') {
+                              showWarningToast('Delete Restricted', 'This product has been approved. Only admin can delete the product.')
+                            } else {
+                              handleDeleteProduct(product.id)
+                            }
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

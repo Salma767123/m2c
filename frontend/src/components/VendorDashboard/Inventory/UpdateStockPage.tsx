@@ -112,10 +112,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
               })
               setVariantStocks(initialStocks)
 
-              // Use the backend baseStock
-              const bStockValue = item.baseStock
-
-              setNewStock(bStockValue.toString())
+              // Use baseStock directly from backend
+              setNewStock(item.baseStock.toString())
             } else {
               // Use baseStock from backend
               setNewStock(item.baseStock.toString())
@@ -274,7 +272,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
     )
   }
 
-  // Guard: stock updates only allowed after product is approved
+  // Guard: vendors cannot update stock — only admin can modify stock for approved products
   if (!inventoryItem.hasProductCreated || !product || productApprovalStatus !== 'APPROVED') {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -299,6 +297,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
       </div>
     )
   }
+
+
 
   const primaryImage = product?.images?.find(img => img.isPrimary)?.url || product?.images?.[0]?.url
 
@@ -456,10 +456,12 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-700">Total Stock</span>
                       <span className="text-xl font-bold text-[#222222]">
-                        {calculateTotalVariantStock()} units
+                        {getAggregateStock()} units
                       </span>
                     </div>
-
+                    <p className="text-xs text-slate-500 mt-1">
+                      Base ({parseInt(newStock) || 0}) + Variants ({calculateTotalVariantStock()})
+                    </p>
                   </div>
                 </div>
               )}
