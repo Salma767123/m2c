@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Text,
   TextInput,
@@ -6,6 +6,7 @@ import {
   View,
   Image,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,9 +14,14 @@ import { router } from 'expo-router';
 import { User, Lock, LogIn, ShoppingBag, Eye, EyeOff } from 'lucide-react-native';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import {
+  GoogleSignin,
+  isSuccessResponse,
+  isErrorWithCode,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 
-const MOCK_USERS = ['customer@demo.com', 'user@test.com', 'demo@m2c.com', 'test@example.com'];
-const DEMO_PASSWORD = 'demo123';
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -23,21 +29,64 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const currentYear = new Date().getFullYear();
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: GOOGLE_CLIENT_ID,
+    });
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+
+      if (isSuccessResponse(response)) {
+        const { user } = response.data;
+
+        const result = await userAuthService.googleLogin({
+          googleId: user.id,
+          email: user.email,
+          name: user.name || user.email.split('@')[0],
+          image: user.photo || undefined,
+        });
+
+        if (result.success && result.data) {
+          await userAuthService.storeAuthData(result.data.token, result.data.user, true);
+          showSuccessToast('Welcome!', `Signed in as ${result.data.user.name}`);
+          router.replace('/(tabs)');
+        }
+      }
+    } catch (error: any) {
+      if (isErrorWithCode(error)) {
+        if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
+        if (error.code === statusCodes.IN_PROGRESS) return;
+        if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          showErrorToast('Error', 'Google Play Services not available.');
+          return;
+        }
+      }
+      console.error('Google sign-in error:', error);
+      showErrorToast('Login Failed', error.message || 'Google sign-in failed.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const validateEmail = useCallback((value: string) => {
     if (!value) {
       setEmailError('Please enter your email address');
       return false;
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(value)) {
       setEmailError('Please enter a valid email address');
       return false;
     }
-
     setEmailError('');
     return true;
   }, []);
@@ -47,12 +96,10 @@ export default function LoginScreen() {
       setPasswordError('Please enter your password');
       return false;
     }
-
     if (value.length < 6) {
       setPasswordError('Password must be at least 6 characters');
       return false;
     }
-
     setPasswordError('');
     return true;
   }, []);
@@ -62,61 +109,24 @@ export default function LoginScreen() {
     const isEmailValid = validateEmail(normalizedEmail);
     const isPasswordValid = validatePassword(password.trim());
 
-    if (!isEmailValid || !isPasswordValid) {
-      return;
-    }
+    if (!isEmailValid || !isPasswordValid) return;
 
     try {
       setSubmitting(true);
 
-      // Try actual API login first
-      try {
-        const response = await userAuthService.login({
-          email: normalizedEmail,
-          password: password.trim(),
-        });
+      const response = await userAuthService.login({
+        email: normalizedEmail,
+        password: password.trim(),
+      });
 
-        if (response.success && response.data) {
-          // Store auth data using the service
-          await userAuthService.storeAuthData(
-            response.data.token,
-            response.data.user,
-            true // rememberMe
-          );
-
-          showSuccessToast('Welcome Back!', `Logged in as ${response.data.user.name}`);
-          router.replace('/(tabs)');
-          return;
-        }
-      } catch (apiError: any) {
-        console.log('API login failed, trying mock login:', apiError.message);
-        
-        // Fallback to mock login for demo
-        if (!MOCK_USERS.includes(normalizedEmail) || password.trim() !== DEMO_PASSWORD) {
-          showErrorToast('Invalid Credentials', 'Please check your email and password.');
-          return;
-        }
-
-        // Mock successful login
-        const mockUser = {
-          id: 'mock_user_123',
-          email: normalizedEmail,
-          name: normalizedEmail.split('@')[0],
-          role: 'user' as const,
-          isVerified: true,
-        };
-
-        const mockToken = 'mock_token_' + Date.now();
-
-        // Store mock auth data
-        await userAuthService.storeAuthData(mockToken, mockUser, true);
-        
-        showSuccessToast('Welcome!', `Logged in as ${mockUser.name}`);
+      if (response.success && response.data) {
+        await userAuthService.storeAuthData(response.data.token, response.data.user, true);
+        showSuccessToast('Welcome Back!', `Logged in as ${response.data.user.name}`);
         router.replace('/(tabs)');
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      showErrorToast('Login Failed', error.message || 'Unable to login. Please try again.');
+      showErrorToast('Login Failed', error.message || 'Invalid credentials. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -137,7 +147,7 @@ export default function LoginScreen() {
           {/* Logo Section */}
           <View className="items-center mb-8 mt-4">
             <View className="bg-white rounded-2xl p-4 mb-4 shadow-2xl">
-              <Image 
+              <Image
                 source={require('../../../assets/images/logo4.png')}
                 className="w-48 h-36"
                 resizeMode="contain"
@@ -163,9 +173,7 @@ export default function LoginScreen() {
 
             {/* Email Input */}
             <View className="mb-4">
-              <Text className="text-xs font-semibold text-gray-800 mb-2">
-                Email Address
-              </Text>
+              <Text className="text-xs font-semibold text-gray-800 mb-2">Email Address</Text>
               <View className={`flex-row items-center bg-gray-50 rounded-xl px-3 py-3 border ${
                 emailError ? 'border-red-500' : 'border-gray-300'
               }`}>
@@ -177,9 +185,7 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   onChangeText={(value) => {
                     setEmail(value.toLowerCase());
-                    if (emailError) {
-                      setEmailError('');
-                    }
+                    if (emailError) setEmailError('');
                   }}
                   onBlur={() => validateEmail(email)}
                   placeholder="Enter your email"
@@ -197,9 +203,7 @@ export default function LoginScreen() {
 
             {/* Password Input */}
             <View className="mb-5">
-              <Text className="text-xs font-semibold text-gray-800 mb-2">
-                Password
-              </Text>
+              <Text className="text-xs font-semibold text-gray-800 mb-2">Password</Text>
               <View className={`flex-row items-center bg-gray-50 rounded-xl px-3 py-3 border ${
                 passwordError ? 'border-red-500' : 'border-gray-300'
               }`}>
@@ -209,9 +213,7 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   onChangeText={(value) => {
                     setPassword(value);
-                    if (passwordError) {
-                      setPasswordError('');
-                    }
+                    if (passwordError) setPasswordError('');
                   }}
                   onBlur={() => validatePassword(password)}
                   placeholder="Enter your password"
@@ -251,36 +253,40 @@ export default function LoginScreen() {
                 {submitting ? 'Signing in...' : 'Sign In'}
               </Text>
             </TouchableOpacity>
-          </View>
 
-          {/* Demo Credentials */}
-          {/* <View className="mt-6 bg-gray-900 rounded-2xl p-4 border border-gray-800">
-            <View className="flex-row items-center mb-2.5">
-              <View className="bg-blue-500 rounded-full w-1.5 h-1.5 mr-2" />
-              <Text className="text-xs font-bold text-gray-300">
-                Demo Credentials
+            {/* Divider */}
+            <View className="flex-row items-center my-5">
+              <View className="flex-1 h-px bg-gray-300" />
+              <Text className="mx-4 text-xs text-gray-500 font-medium">OR</Text>
+              <View className="flex-1 h-px bg-gray-300" />
+            </View>
+
+            {/* Google Sign-In Button */}
+            <TouchableOpacity
+              disabled={googleLoading}
+              onPress={handleGoogleSignIn}
+              className={`rounded-xl py-3.5 items-center justify-center flex-row border border-gray-300 ${
+                googleLoading ? 'bg-gray-100' : 'bg-white'
+              }`}
+            >
+              {googleLoading ? (
+                <ActivityIndicator size="small" color="#4285F4" />
+              ) : (
+                <Image
+                  source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                  style={{ width: 20, height: 20 }}
+                />
+              )}
+              <Text className="font-bold text-sm ml-3 text-gray-700">
+                {googleLoading ? 'Signing in...' : 'Continue with Google'}
               </Text>
-            </View>
-            <View>
-              <View className="mb-2">
-                <Text className="text-xs text-gray-500 mb-1">Checker IDs:</Text>
-                <Text className="text-xs text-gray-400 leading-4">
-                  {MOCK_CHECKERS.join(', ')}
-                </Text>
-              </View>
-              <View className="flex-row items-center">
-                <Text className="text-xs text-gray-500 mr-2">Password:</Text>
-                <View className="bg-gray-800 px-2 py-1 rounded">
-                  <Text className="text-xs text-white font-bold">demo123</Text>
-                </View>
-              </View>
-            </View>
-          </View> */}
+            </TouchableOpacity>
+          </View>
 
           {/* Footer */}
           <View className="mt-5 items-center pb-2">
             <Text className="text-xs text-gray-600">
-              © {currentYear} M2C Store. All rights reserved.
+              {'\u00A9'} {currentYear} M2C Store. All rights reserved.
             </Text>
           </View>
         </View>
