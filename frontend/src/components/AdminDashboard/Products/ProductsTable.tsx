@@ -24,6 +24,7 @@ interface Product {
   name: string
   category: string
   basePrice: number
+  originalPrice?: number
   adminFixedPrice?: number // Admin's fixed price
   hasVariants?: boolean
   totalStock: number
@@ -46,6 +47,7 @@ interface Product {
     size: string
     color: string
     price: number
+    originalPrice?: number
     stock: number
   }>
 }
