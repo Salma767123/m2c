@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/UI/Toaster";
+import PageTracker from "@/components/Analytics/PageTracker";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -41,6 +42,7 @@ export default function RootLayout({
       <body
         className={`${outfit.variable} font-outfit antialiased h-full`}
       >
+        <PageTracker />
         {children}
         <Toaster />
       </body>

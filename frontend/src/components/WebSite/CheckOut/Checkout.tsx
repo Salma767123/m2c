@@ -94,6 +94,8 @@ export default function Checkout() {
 
   const [discountAmount, setDiscountAmount] = useState(0)
   const [couponCode, setCouponCode] = useState("")
+  const [freeShippingApplied, setFreeShippingApplied] = useState(false)
+  const [freeShippingMessage, setFreeShippingMessage] = useState("")
 
   const [orderSummary, setOrderSummary] = useState({
     subtotal: 0,
@@ -113,9 +115,11 @@ export default function Checkout() {
     const savedCoupon = localStorage.getItem('appliedCoupon')
     if (savedCoupon) {
       try {
-        const { code, discountAmount } = JSON.parse(savedCoupon)
-        setCouponCode(code)
-        setDiscountAmount(discountAmount)
+        const { code, discountAmount, freeShipping, freeShippingMessage } = JSON.parse(savedCoupon)
+        setCouponCode(code || "")
+        setDiscountAmount(discountAmount || 0)
+        setFreeShippingApplied(freeShipping || false)
+        setFreeShippingMessage(freeShippingMessage || "")
       } catch (e) {
         console.error("Failed to parse coupon", e)
       }
@@ -224,7 +228,7 @@ export default function Checkout() {
 
   const calculateTotals = () => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    const shipping = 0
+    const shipping = freeShippingApplied ? 0 : 0 // Free shipping if applied, otherwise standard free shipping
     const tax = cartItems.reduce((sum, item) => {
       const itemSubtotal = item.price * item.quantity
       const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0
@@ -386,7 +390,8 @@ export default function Checkout() {
         paymentId,
         shippingCost: orderSummary.shipping,
         tax: orderSummary.tax,
-        discount: orderSummary.discount
+        discount: orderSummary.discount,
+        freeShipping: freeShippingApplied
       })
 
       if (response.success && response.data) {
@@ -597,7 +602,14 @@ export default function Checkout() {
                   <div className="flex justify-between">
                     <span className="text-slate-600">Shipping</span>
                     <span className="font-medium">
-                      {orderSummary.shipping === 0 ? "Free" : `$${orderSummary.shipping.toFixed(2)}`}
+                      {orderSummary.shipping === 0 ? (
+                        <span className="text-green-600 flex items-center gap-1">
+                          <Truck className="w-4 h-4" />
+                          Free
+                        </span>
+                      ) : (
+                        `$${orderSummary.shipping.toFixed(2)}`
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between">

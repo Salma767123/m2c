@@ -60,7 +60,7 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
 );
-// app.use(morgan('combined')); // Commented out to reduce console logs
+app.use(morgan(':method :url :status :response-time ms'));
 app.use(
   express.json({
     limit: "50mb",
@@ -151,6 +151,7 @@ const adminDashboardRoutes = require("./routes/adminDashboardRoutes");
 const vendorDashboardRoutes = require("./routes/vendorDashboardRoutes");
 const seoSettingsRoutes = require("./routes/seoSettingsRoutes");
 const bannerRoutes = require("./routes/bannerRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -183,6 +184,7 @@ app.use("/api/vendor-reports", vendorReportsRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/admin-dashboard", adminDashboardRoutes);
 app.use("/api/vendor-dashboard", vendorDashboardRoutes);
+app.use("/api/analytics", analyticsRoutes);
 app.use("/api/seo-settings", seoSettingsRoutes);
 app.use("/api/banners", bannerRoutes);
 // 404 handler

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "dk",
-    "slug": "dk",
+    "slug": "m2c",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/1024.png",
@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.m2c.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/logo3.png",
@@ -28,11 +29,19 @@
     },
     "plugins": [
       "expo-router",
-      "expo-video"
+      "expo-video",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "eb361ce3-397f-4683-8cfb-94f3e32b9b68"
+      }
+    },
+    "owner": "manoj_kumar_t"
   }
 }

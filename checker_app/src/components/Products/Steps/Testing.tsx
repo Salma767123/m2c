@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Upload, X, Check } from 'lucide-react-native';
 import { showImagePickerOptions, ImagePickerResult } from '@/utils/imagePicker';
+import { FieldError } from '../FormFields';
 
 interface TestingProps {
   formData: {
@@ -18,6 +19,7 @@ interface TestingProps {
     testingPhotos: any[];
   };
   setFormData: (data: any) => void;
+  errors?: Record<string, string>;
 }
 
 const DEFAULT_TESTS = [
@@ -28,20 +30,26 @@ const DEFAULT_TESTS = [
   { id: 'smellCheck', label: 'Smell Check', detail: 'Unusual odor detection' },
 ];
 
-export default function Testing({ formData, setFormData }: TestingProps) {
-  // Initialize tests if empty
-  if (formData.tests.length === 0) {
-    const initialTests = DEFAULT_TESTS.map((t) => ({
-      ...t,
-      pass: false,
-      fail: false,
-      photos: [],
-      rightPhotos: [],
-      wrongPhotos: [],
-    }));
-    setFormData({ ...formData, tests: initialTests });
-    return null;
-  }
+export default function Testing({ formData, setFormData, errors = {} }: TestingProps) {
+  // Seed default tests on first mount. Must run in an effect, not during
+  // render, otherwise React warns about updating a parent while rendering.
+  useEffect(() => {
+    if (formData.tests.length === 0) {
+      const initialTests = DEFAULT_TESTS.map((t) => ({
+        ...t,
+        pass: false,
+        fail: false,
+        photos: [],
+        rightPhotos: [],
+        wrongPhotos: [],
+      }));
+      setFormData({ ...formData, tests: initialTests });
+    }
+    // Only seed once; subsequent renders shouldn't re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (formData.tests.length === 0) return null;
 
   const updateTest = (testId: string, field: string, value: any) => {
     const updated = formData.tests.map((t) => {
@@ -57,7 +65,7 @@ export default function Testing({ formData, setFormData }: TestingProps) {
     const newPhotos = images.map((img) => ({
       name: img.name,
       uri: img.uri,
-      data: img.uri,
+      data: img.data || img.uri,
       id: Date.now() + Math.random(),
     }));
     const updated = formData.tests.map((t) =>
@@ -70,7 +78,7 @@ export default function Testing({ formData, setFormData }: TestingProps) {
     const newPhotos = images.map((img) => ({
       name: img.name,
       uri: img.uri,
-      data: img.uri,
+      data: img.data || img.uri,
       id: Date.now() + Math.random(),
     }));
     const updated = formData.tests.map((t) =>
@@ -97,7 +105,7 @@ export default function Testing({ formData, setFormData }: TestingProps) {
     const newPhotos = images.map((img) => ({
       name: img.name,
       uri: img.uri,
-      data: img.uri,
+      data: img.data || img.uri,
       id: Date.now() + Math.random(),
     }));
     setFormData({ ...formData, testingPhotos: [...formData.testingPhotos, ...newPhotos] });
@@ -114,9 +122,22 @@ export default function Testing({ formData, setFormData }: TestingProps) {
         <Text className="text-sm text-gray-500">Perform and document product tests</Text>
       </View>
 
-      {formData.tests.map((test) => (
-        <View key={test.id} className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
-          <Text className="text-sm font-bold text-gray-900 mb-1">{test.label}</Text>
+      
+      {errors.tests ? <FieldError msg={errors.tests} /> : null}
+
+      {formData.tests.map((test, idx) => {
+        const testErr = errors[`tests.${idx}.result`];
+        return (
+        <View
+          key={test.id}
+          className={`rounded-xl p-4 mb-4 border ${
+            testErr ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200'
+          }`}
+        >
+          <View className="flex-row items-center mb-1">
+            <Text className="text-sm font-bold text-gray-900">{test.label}</Text>
+            <Text className="text-red-500 ml-1">*</Text>
+          </View>
           <Text className="text-xs text-gray-500 mb-3">{test.detail}</Text>
 
           {/* Pass / Fail toggles */}
@@ -198,11 +219,15 @@ export default function Testing({ formData, setFormData }: TestingProps) {
             </View>
           </View>
         </View>
-      ))}
+        );
+      })}
 
       {/* General Testing Photos */}
       <View className="mt-2 mb-6">
-        <Text className="text-sm font-bold text-gray-900 mb-3">General Testing Photos</Text>
+        <Text className="text-sm font-bold text-gray-900 mb-3">
+          General Testing Photos <Text className="text-red-500">*</Text>
+        </Text>
+        <FieldError msg={errors.testingPhotos} />
         <TouchableOpacity
           className="border-2 border-dashed border-gray-300 rounded-xl py-6 items-center bg-gray-50"
           onPress={() => showImagePickerOptions(handleGeneralPhotos)}

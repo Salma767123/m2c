@@ -1,6 +1,6 @@
 import { Stack, usePathname } from "expo-router";
-import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Text, TouchableOpacity, View, Keyboard, Platform } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
@@ -16,6 +16,15 @@ export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const allTabs = [
     { name: "index", label: "Home", icon: LayoutDashboard },
@@ -41,10 +50,11 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Custom Bottom Navigation */}
-      <View 
+      {/* Custom Bottom Navigation — hidden when keyboard is open */}
+      {!keyboardVisible && (
+      <View
         className="absolute left-0 right-0 bg-white border-t border-gray-200 shadow-2xl"
-        style={{ 
+        style={{
           bottom: 0,
           paddingBottom: insets.bottom,
         }}
@@ -90,6 +100,7 @@ export default function TabLayout() {
           })}
         </View>
       </View>
+      )}
     </SafeAreaView>
   );
 }

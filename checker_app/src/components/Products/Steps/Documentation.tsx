@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Upload, X } from 'lucide-react-native';
 import { showImagePickerOptions, ImagePickerResult } from '@/utils/imagePicker';
+import { FieldError, fieldBorder } from '../FormFields';
 
 interface DocumentationProps {
   formData: {
@@ -11,14 +12,16 @@ interface DocumentationProps {
     companyIdCards: any[];
   };
   setFormData: (data: any) => void;
+  errors?: Record<string, string>;
 }
 
-export default function Documentation({ formData, setFormData }: DocumentationProps) {
+export default function Documentation({ formData, setFormData, errors = {} }: DocumentationProps) {
+  const errorCount = Object.keys(errors).length;
   const makePhotoHandler = (field: string) => (images: ImagePickerResult[]) => {
     const newPhotos = images.map((img) => ({
       name: img.name,
       uri: img.uri,
-      data: img.uri,
+      data: img.data || img.uri,
       id: Date.now() + Math.random(),
     }));
     setFormData({ ...formData, [field]: [...(formData as any)[field], ...newPhotos] });
@@ -38,6 +41,7 @@ export default function Documentation({ formData, setFormData }: DocumentationPr
     required: boolean
   ) => {
     const photos = (formData as any)[field] || [];
+    const err = errors[field];
     return (
       <View className="mb-4">
         <View className="flex-row items-center mb-2">
@@ -47,12 +51,15 @@ export default function Documentation({ formData, setFormData }: DocumentationPr
         <Text className="text-xs text-gray-500 mb-2">{subtitle}</Text>
 
         <TouchableOpacity
-          className={`border-2 border-dashed ${borderColor} rounded-xl py-5 items-center ${bgColor}`}
+          className={`border-2 border-dashed rounded-xl py-5 items-center ${
+            err ? 'border-red-400 bg-red-50' : `${borderColor} ${bgColor}`
+          }`}
           onPress={() => showImagePickerOptions(makePhotoHandler(field))}
         >
-          <Upload size={20} color={iconColor} />
+          <Upload size={20} color={err ? '#ef4444' : iconColor} />
           <Text className="text-xs text-gray-500 mt-1">Tap to add photos</Text>
         </TouchableOpacity>
+        <FieldError msg={err} />
 
         {photos.length > 0 && (
           <View className="flex-row flex-wrap mt-2 gap-2">
@@ -80,15 +87,20 @@ export default function Documentation({ formData, setFormData }: DocumentationPr
         <Text className="text-sm text-gray-500">Upload documents and provide inspector details</Text>
       </View>
 
+      
+
       {/* Inspector Signature */}
       <View className="mb-5">
-        <Text className="text-sm font-semibold text-gray-700 mb-1">Inspector Signature / Initials</Text>
+        <Text className="text-sm font-semibold text-gray-700 mb-1">
+          Inspector Signature / Initials <Text className="text-red-500">*</Text>
+        </Text>
         <TextInput
-          className="border border-gray-300 rounded-xl px-4 py-3 text-gray-900 bg-white"
+          className={`${fieldBorder(errors.inspectorSignature)} text-gray-900`}
           value={formData.inspectorSignature}
           onChangeText={(val) => setFormData({ ...formData, inspectorSignature: val })}
           placeholder="Enter your signature or initials"
         />
+        <FieldError msg={errors.inspectorSignature} />
       </View>
 
       {renderPhotoSection(

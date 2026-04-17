@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import {
@@ -91,8 +90,18 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
         qcCheckerService.getAssignedProducts(),
         qcCheckerService.getAssignedVendors(),
       ]);
-      if (productsRes.success) setAssignedProducts(productsRes.data || []);
-      if (vendorsRes.success) setAssignedVendors(vendorsRes.data || []);
+      if (productsRes.success) {
+        const raw: any = productsRes.data;
+        const list = Array.isArray(raw) ? raw : (raw?.products || raw?.items || []);
+        setAssignedProducts(list);
+      }
+      if (vendorsRes.success) {
+        // Service now returns { data: { vendors, pagination } } for the list page,
+        // but some callers (dashboard) just want the array. Handle both shapes.
+        const raw: any = vendorsRes.data;
+        const list = Array.isArray(raw) ? raw : (raw?.vendors || []);
+        setAssignedVendors(list);
+      }
     } catch (err: any) {
       console.error('Dashboard fetch failed:', err);
       setError(err?.message || 'Could not fetch dashboard data');
@@ -165,12 +174,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
   ];
 
   if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50">
-        <ActivityIndicator size="large" color="#2563eb" />
-        <Text className="mt-4 text-slate-600">Loading your summary...</Text>
-      </View>
-    );
+    return <DashboardSkeleton checkerId={checkerId} />;
   }
 
   if (error) {
@@ -274,7 +278,12 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
               </Text>
             </View>
           ) : (
-            <View style={{ rowGap: 12 }}>
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ rowGap: 12, paddingBottom: 4 }}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+            >
               {assignedProducts.map((product) => {
                 const badge = getStatusBadgeStyle(product.approvalStatus);
                 return (
@@ -385,7 +394,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
                   </View>
                 );
               })}
-            </View>
+            </ScrollView>
           )}
         </View>
       </View>
@@ -416,6 +425,123 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
             Your dashboard reflects real-time assignments from the
             administrators.
           </Text>
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+
+function SkeletonBlock({
+  width,
+  height,
+  rounded = 'md',
+  className = '',
+}: {
+  width: number | string;
+  height: number;
+  rounded?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  className?: string;
+}) {
+  const radius = { sm: 4, md: 8, lg: 12, xl: 16, full: 9999 }[rounded];
+  return (
+    <View
+      className={`bg-slate-200 ${className}`}
+      style={{ width: width as any, height, borderRadius: radius }}
+    />
+  );
+}
+
+function SkeletonStatCard() {
+  return (
+    <View
+      className="bg-white border border-slate-200 rounded-2xl p-4"
+      style={{ width: '48%', marginBottom: 12 }}
+    >
+      <View className="flex-row items-center justify-between mb-3">
+        <SkeletonBlock width={36} height={36} rounded="xl" />
+        <SkeletonBlock width={36} height={14} rounded="md" />
+      </View>
+      <SkeletonBlock width="70%" height={24} rounded="md" className="mb-2" />
+      <SkeletonBlock width="50%" height={10} rounded="md" />
+    </View>
+  );
+}
+
+function SkeletonAssignmentCard() {
+  return (
+    <View className="border border-slate-200 rounded-xl p-4 mb-3">
+      <View className="flex-row items-start mb-3">
+        <SkeletonBlock width={36} height={36} rounded="lg" className="mr-3" />
+        <View className="flex-1">
+          <SkeletonBlock width="75%" height={14} rounded="md" className="mb-2" />
+          <SkeletonBlock width="40%" height={10} rounded="md" className="mb-2" />
+          <SkeletonBlock width={72} height={18} rounded="full" />
+        </View>
+      </View>
+      <SkeletonBlock width="100%" height={36} rounded="lg" />
+    </View>
+  );
+}
+
+function DashboardSkeleton({ checkerId }: { checkerId: string | null }) {
+  return (
+    <ScrollView
+      className="flex-1 bg-gray-50"
+      contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header: real greeting + placeholder date */}
+      <View className="mb-6">
+        <Text className="text-3xl font-extrabold text-slate-900 mb-1">Dashboard</Text>
+        <Text className="text-slate-600 text-sm mb-3">
+          Welcome back,{' '}
+          <Text className="font-bold text-blue-600">{checkerId || '...'}</Text>
+        </Text>
+        <SkeletonBlock width={220} height={14} rounded="md" />
+      </View>
+
+      {/* Stats grid */}
+      <View className="flex-row flex-wrap justify-between mb-6">
+        <SkeletonStatCard />
+        <SkeletonStatCard />
+        <SkeletonStatCard />
+        <SkeletonStatCard />
+      </View>
+
+      {/* Recent Assignments card */}
+      <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6">
+        <View className="px-5 py-4 border-b border-slate-200 flex-row items-center justify-between bg-blue-50/50">
+          <View className="flex-row items-center flex-1">
+            <SkeletonBlock width={36} height={36} rounded="lg" className="mr-3" />
+            <View className="flex-1">
+              <SkeletonBlock width={160} height={16} rounded="md" className="mb-2" />
+              <SkeletonBlock width={220} height={10} rounded="md" />
+            </View>
+          </View>
+          <SkeletonBlock width={64} height={22} rounded="full" />
+        </View>
+        <View className="p-4">
+          <SkeletonAssignmentCard />
+          <SkeletonAssignmentCard />
+          <SkeletonAssignmentCard />
+        </View>
+      </View>
+
+      {/* Summary statistics card */}
+      <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <View className="px-5 py-4 border-b border-slate-200 flex-row items-center bg-slate-50">
+          <SkeletonBlock width={36} height={36} rounded="lg" className="mr-3" />
+          <View className="flex-1">
+            <SkeletonBlock width={160} height={16} rounded="md" className="mb-2" />
+            <SkeletonBlock width={200} height={10} rounded="md" />
+          </View>
+        </View>
+        <View className="py-10 px-6 items-center">
+          <SkeletonBlock width={80} height={80} rounded="full" className="mb-4" />
+          <SkeletonBlock width={120} height={14} rounded="md" className="mb-2" />
+          <SkeletonBlock width={200} height={10} rounded="md" />
         </View>
       </View>
     </ScrollView>

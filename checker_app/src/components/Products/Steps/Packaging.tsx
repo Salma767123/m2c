@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Upload, X } from 'lucide-react-native';
 import { showImagePickerOptions, ImagePickerResult } from '@/utils/imagePicker';
+import { FieldError } from '../FormFields';
 
 interface PackagingProps {
   formData: {
@@ -14,6 +15,7 @@ interface PackagingProps {
     packagingPhotos: any[];
   };
   setFormData: (data: any) => void;
+  errors?: Record<string, string>;
 }
 
 const REMARK_SECTIONS = [
@@ -27,7 +29,8 @@ const REMARK_SECTIONS = [
 
 const REMARK_CODES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
 
-export default function Packaging({ formData, setFormData }: PackagingProps) {
+export default function Packaging({ formData, setFormData, errors = {} }: PackagingProps) {
+  const errorCount = Object.keys(errors).length;
   const handleRemarkSelect = (key: string, value: string) => {
     const current = (formData as any)[key];
     setFormData({ ...formData, [key]: current === value ? '' : value });
@@ -37,7 +40,7 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
     const newPhotos = images.map((img) => ({
       name: img.name,
       uri: img.uri,
-      data: img.uri,
+      data: img.data || img.uri,
     }));
     setFormData({ ...formData, packagingPhotos: [...formData.packagingPhotos, ...newPhotos] });
   };
@@ -53,11 +56,21 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
         <Text className="text-sm text-gray-500">Rate each packaging aspect using codes 1-10</Text>
       </View>
 
+      
+
       {REMARK_SECTIONS.map((section) => {
         const currentValue = (formData as any)[section.key];
+        const err = errors[section.key];
         return (
-          <View key={section.key} className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
-            <Text className="text-sm font-bold text-gray-900 mb-1">{section.label}</Text>
+          <View
+            key={section.key}
+            className={`rounded-xl p-4 mb-4 border ${
+              err ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50'
+            }`}
+          >
+            <Text className="text-sm font-bold text-gray-900 mb-1">
+              {section.label} <Text className="text-red-500">*</Text>
+            </Text>
             <Text className="text-xs text-gray-500 mb-3">{section.detail}</Text>
 
             <View className="flex-row flex-wrap gap-2">
@@ -89,20 +102,26 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
                 </TouchableOpacity>
               </View>
             )}
+            <FieldError msg={err} />
           </View>
         );
       })}
 
       {/* Photos */}
       <View className="mt-2 mb-6">
-        <Text className="text-sm font-bold text-gray-900 mb-3">Packaging Photos</Text>
+        <Text className="text-sm font-bold text-gray-900 mb-3">
+          Packaging Photos <Text className="text-red-500">*</Text>
+        </Text>
         <TouchableOpacity
-          className="border-2 border-dashed border-gray-300 rounded-xl py-6 items-center bg-gray-50"
+          className={`border-2 border-dashed rounded-xl py-6 items-center ${
+            errors.packagingPhotos ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-gray-50'
+          }`}
           onPress={() => showImagePickerOptions(handlePhotos)}
         >
           <Upload size={24} color="#9ca3af" />
           <Text className="text-sm text-gray-500 mt-2">Tap to add photos</Text>
         </TouchableOpacity>
+        <FieldError msg={errors.packagingPhotos} />
 
         {formData.packagingPhotos.length > 0 && (
           <View className="flex-row flex-wrap mt-3 gap-2">

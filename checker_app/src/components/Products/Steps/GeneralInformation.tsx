@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { ChevronDown, CheckCircle } from 'lucide-react-native';
+import { Label, FieldError, fieldBorder } from '../FormFields';
 
 interface GeneralInformationProps {
   formData: {
@@ -12,6 +13,7 @@ interface GeneralInformationProps {
     serviceType: string;
   };
   setFormData: (data: any) => void;
+  errors?: Record<string, string>;
 }
 
 const SERVICE_TYPES = [
@@ -23,8 +25,9 @@ const SERVICE_TYPES = [
   'Product Testing',
 ];
 
-export default function GeneralInformation({ formData, setFormData }: GeneralInformationProps) {
+export default function GeneralInformation({ formData, setFormData, errors = {} }: GeneralInformationProps) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const errorCount = Object.keys(errors).length;
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
@@ -33,66 +36,67 @@ export default function GeneralInformation({ formData, setFormData }: GeneralInf
         <Text className="text-sm text-gray-500">Provide basic details about the inspection service</Text>
       </View>
 
-      {/* Client */}
+      
+
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-1">Client</Text>
+        <Label required>Client</Label>
         <TextInput
-          className="border border-gray-300 rounded-xl px-4 py-3 text-gray-900 bg-white"
+          className={`${fieldBorder(errors.client)} text-gray-900`}
           value={formData.client}
           onChangeText={(val) => setFormData({ ...formData, client: val })}
           placeholder="Client name"
         />
+        <FieldError msg={errors.client} />
       </View>
 
-      {/* Vendor */}
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-1">Vendor</Text>
+        <Label required>Vendor</Label>
         <TextInput
-          className="border border-gray-300 rounded-xl px-4 py-3 text-gray-900 bg-white"
+          className={`${fieldBorder(errors.vendor)} text-gray-900`}
           value={formData.vendor}
           onChangeText={(val) => setFormData({ ...formData, vendor: val })}
           placeholder="Vendor name"
         />
+        <FieldError msg={errors.vendor} />
       </View>
 
-      {/* Factory */}
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-1">Factory</Text>
+        <Label required>Factory</Label>
         <TextInput
-          className="border border-gray-300 rounded-xl px-4 py-3 text-gray-900 bg-white"
+          className={`${fieldBorder(errors.factory)} text-gray-900`}
           value={formData.factory}
           onChangeText={(val) => setFormData({ ...formData, factory: val })}
           placeholder="Factory name"
         />
+        <FieldError msg={errors.factory} />
       </View>
 
-      {/* Service Location */}
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-1">Service Location</Text>
+        <Label required>Service Location</Label>
         <TextInput
-          className="border border-gray-300 rounded-xl px-4 py-3 text-gray-900 bg-white"
+          className={`${fieldBorder(errors.serviceLocation)} text-gray-900`}
           value={formData.serviceLocation}
           onChangeText={(val) => setFormData({ ...formData, serviceLocation: val })}
           placeholder="Service location"
         />
+        <FieldError msg={errors.serviceLocation} />
       </View>
 
-      {/* Service Start Date */}
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-1">Service Start Date</Text>
+        <Label required>Service Start Date</Label>
         <TextInput
-          className="border border-gray-300 rounded-xl px-4 py-3 text-gray-900 bg-white"
+          className={`${fieldBorder(errors.serviceStartDate)} text-gray-900`}
           value={formData.serviceStartDate}
           onChangeText={(val) => setFormData({ ...formData, serviceStartDate: val })}
           placeholder="YYYY-MM-DD"
         />
+        <FieldError msg={errors.serviceStartDate} />
       </View>
 
-      {/* Service Type Dropdown */}
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-gray-700 mb-1">Service Type</Text>
+        <Label required>Service Type</Label>
         <TouchableOpacity
-          className="border border-gray-300 rounded-xl px-4 py-3 bg-white flex-row items-center justify-between"
+          className={`${fieldBorder(errors.serviceType)} flex-row items-center justify-between`}
           onPress={() => setShowDropdown(!showDropdown)}
         >
           <Text className={formData.serviceType ? 'text-gray-900' : 'text-gray-400'}>
@@ -100,9 +104,10 @@ export default function GeneralInformation({ formData, setFormData }: GeneralInf
           </Text>
           <ChevronDown size={18} color="#9ca3af" />
         </TouchableOpacity>
+        <FieldError msg={errors.serviceType} />
 
         {showDropdown && (
-          <View className="border border-gray-200 rounded-xl mt-1 bg-white shadow-sm overflow-hidden">
+          <View className="border border-gray-200 rounded-xl mt-1 bg-white overflow-hidden">
             {SERVICE_TYPES.map((type) => (
               <TouchableOpacity
                 key={type}
@@ -121,11 +126,10 @@ export default function GeneralInformation({ formData, setFormData }: GeneralInf
         )}
       </View>
 
-      {/* Info Note */}
       <View className="bg-blue-50 rounded-xl p-4 flex-row items-start mt-2 mb-6">
         <CheckCircle size={18} color="#2563eb" />
         <Text className="text-sm text-blue-700 ml-2 flex-1">
-          All fields are required for a complete inspection record. Ensure accuracy before proceeding.
+          All fields are required for a complete inspection record.
         </Text>
       </View>
     </ScrollView>

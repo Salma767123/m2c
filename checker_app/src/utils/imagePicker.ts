@@ -5,7 +5,12 @@ export interface ImagePickerResult {
   uri: string;
   name: string;
   type: string;
+  /** base64 data URL (`data:image/jpeg;base64,...`) — ready to send to the API. */
+  data: string;
 }
+
+const toDataUrl = (base64?: string | null, mime: string = 'image/jpeg') =>
+  base64 ? `data:${mime};base64,${base64}` : '';
 
 export const requestCameraPermission = async (): Promise<boolean> => {
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -37,17 +42,21 @@ export const showImagePickerOptions = (
   onImageSelected: (images: ImagePickerResult[]) => void,
   allowMultiple: boolean = true
 ) => {
+  // Defer the native picker launch until AFTER the Alert's dismiss animation.
+  // Launching immediately inside onPress silently fails on both iOS + Android
+  // because two native modals can't open on the same frame.
+  const defer = (fn: () => void) => setTimeout(fn, 350);
   Alert.alert(
     'Select Photo',
     'Choose an option',
     [
       {
         text: 'Take Photo',
-        onPress: () => takePhoto(onImageSelected),
+        onPress: () => defer(() => takePhoto(onImageSelected)),
       },
       {
         text: 'Choose from Gallery',
-        onPress: () => pickFromGallery(onImageSelected, allowMultiple),
+        onPress: () => defer(() => pickFromGallery(onImageSelected, allowMultiple)),
       },
       {
         text: 'Cancel',
@@ -66,9 +75,10 @@ export const takePhoto = async (
 
   try {
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: false,
-      quality: 0.8,
+      quality: 0.6,
+      base64: true,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -76,12 +86,13 @@ export const takePhoto = async (
         uri: asset.uri,
         name: `photo_${Date.now()}_${index}.jpg`,
         type: 'image/jpeg',
+        data: toDataUrl(asset.base64, 'image/jpeg'),
       }));
       onImageSelected(images);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error taking photo:', error);
-    Alert.alert('Error', 'Failed to take photo. Please try again.');
+    Alert.alert('Camera Error', error?.message || 'Failed to open camera.');
   }
 };
 
@@ -94,24 +105,27 @@ export const pickFromGallery = async (
 
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsMultipleSelection: allowMultiple,
-      quality: 0.8,
+      quality: 0.6,
+      base64: true,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const images: ImagePickerResult[] = result.assets.map((asset, index) => {
         const fileName = asset.uri.split('/').pop() || `image_${Date.now()}_${index}.jpg`;
+        const mime = asset.type === 'video' ? 'video/mp4' : 'image/jpeg';
         return {
           uri: asset.uri,
           name: fileName,
-          type: asset.type === 'video' ? 'video/mp4' : 'image/jpeg',
+          type: mime,
+          data: toDataUrl(asset.base64, mime),
         };
       });
       onImageSelected(images);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error picking image:', error);
-    Alert.alert('Error', 'Failed to select image. Please try again.');
+    Alert.alert('Gallery Error', error?.message || 'Failed to open gallery.');
   }
 };

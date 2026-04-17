@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { ChevronUp, ChevronDown, Upload, X, CheckCircle, AlertTriangle } from 'lucide-react-native';
 import { showImagePickerOptions, ImagePickerResult } from '@/utils/imagePicker';
+import { FieldError, compactBorder } from '../FormFields';
 
 interface DefectsProps {
   formData: {
@@ -22,12 +23,14 @@ interface DefectsProps {
     defectPhotos: any[];
   };
   setFormData: (data: any) => void;
+  errors?: Record<string, string>;
 }
 
 const INSPECTION_LEVELS = ['L-I', 'L-II', 'L-III'];
 
-export default function Defects({ formData, setFormData }: DefectsProps) {
+export default function Defects({ formData, setFormData, errors = {} }: DefectsProps) {
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
+  const errorCount = Object.keys(errors).length;
 
   const isPassing =
     formData.criticalDefects <= formData.maxAllowedCritical &&
@@ -47,7 +50,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
     const newPhotos = images.map((img) => ({
       name: img.name,
       uri: img.uri,
-      data: img.uri,
+      data: img.data || img.uri,
     }));
     setFormData({ ...formData, defectPhotos: [...formData.defectPhotos, ...newPhotos] });
   };
@@ -63,15 +66,19 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
         <Text className="text-sm text-gray-500">Record AQL configuration and defect counts</Text>
       </View>
 
+      
+
       {/* AQL Config */}
       <View className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
         <Text className="text-sm font-bold text-gray-900 mb-3">AQL Configuration</Text>
 
         {/* Inspection Level */}
         <View className="mb-3">
-          <Text className="text-xs text-gray-500 font-semibold mb-1">Inspection Level</Text>
+          <Text className="text-xs text-gray-500 font-semibold mb-1">
+            Inspection Level <Text className="text-red-500">*</Text>
+          </Text>
           <TouchableOpacity
-            className="border border-gray-300 rounded-lg px-3 py-2 bg-white flex-row items-center justify-between"
+            className={`${compactBorder(errors.inspectionLevel)} flex-row items-center justify-between`}
             onPress={() => setShowLevelDropdown(!showLevelDropdown)}
           >
             <Text className="text-sm text-gray-900">{formData.inspectionLevel}</Text>
@@ -97,13 +104,16 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
 
         <View className="flex-row gap-2 mb-3">
           <View className="flex-1">
-            <Text className="text-xs text-gray-500 font-semibold mb-1">Sample Size</Text>
+            <Text className="text-xs text-gray-500 font-semibold mb-1">
+              Sample Size <Text className="text-red-500">*</Text>
+            </Text>
             <TextInput
-              className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm text-gray-900"
+              className={`${compactBorder(errors.sampleSize)} text-sm text-gray-900`}
               value={String(formData.sampleSize || '')}
               onChangeText={(v) => setFormData({ ...formData, sampleSize: Number(v) || 0 })}
               keyboardType="numeric"
             />
+            <FieldError msg={errors.sampleSize} />
           </View>
         </View>
 
@@ -247,51 +257,68 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
 
       {/* Defect Details */}
       <View className="mb-4">
-        <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Critical Defect Details</Text>
+        <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+          Critical Defect Details
+          {formData.criticalDefects > 0 ? <Text className="text-red-500"> *</Text> : null}
+        </Text>
         <TextInput
-          className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm text-gray-900 min-h-[60px]"
+          className={`${compactBorder(errors.criticalDefectDetails)} text-sm text-gray-900 min-h-[60px]`}
           value={formData.criticalDefectDetails}
           onChangeText={(v) => setFormData({ ...formData, criticalDefectDetails: v })}
           placeholder="Describe critical defects found..."
           multiline
           textAlignVertical="top"
         />
+        <FieldError msg={errors.criticalDefectDetails} />
       </View>
 
       <View className="mb-4">
-        <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Major Defect Details</Text>
+        <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+          Major Defect Details
+          {formData.majorDefects > 0 ? <Text className="text-red-500"> *</Text> : null}
+        </Text>
         <TextInput
-          className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm text-gray-900 min-h-[60px]"
+          className={`${compactBorder(errors.majorDefectDetails)} text-sm text-gray-900 min-h-[60px]`}
           value={formData.majorDefectDetails}
           onChangeText={(v) => setFormData({ ...formData, majorDefectDetails: v })}
           placeholder="Describe major defects found..."
           multiline
           textAlignVertical="top"
         />
+        <FieldError msg={errors.majorDefectDetails} />
       </View>
 
       <View className="mb-4">
-        <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Minor Defect Details</Text>
+        <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+          Minor Defect Details
+          {formData.minorDefects > 0 ? <Text className="text-red-500"> *</Text> : null}
+        </Text>
         <TextInput
-          className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm text-gray-900 min-h-[60px]"
+          className={`${compactBorder(errors.minorDefectDetails)} text-sm text-gray-900 min-h-[60px]`}
           value={formData.minorDefectDetails}
           onChangeText={(v) => setFormData({ ...formData, minorDefectDetails: v })}
           placeholder="Describe minor defects found..."
           multiline
           textAlignVertical="top"
         />
+        <FieldError msg={errors.minorDefectDetails} />
       </View>
 
       {/* Photos */}
       <View className="mt-2 mb-6">
-        <Text className="text-sm font-bold text-gray-900 mb-3">Defect Photos</Text>
+        <Text className="text-sm font-bold text-gray-900 mb-3">
+          Defect Photos <Text className="text-red-500">*</Text>
+        </Text>
         <TouchableOpacity
-          className="border-2 border-dashed border-gray-300 rounded-xl py-6 items-center bg-gray-50"
+          className={`border-2 border-dashed rounded-xl py-6 items-center ${
+            errors.defectPhotos ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-gray-50'
+          }`}
           onPress={() => showImagePickerOptions(handlePhotos)}
         >
           <Upload size={24} color="#9ca3af" />
           <Text className="text-sm text-gray-500 mt-2">Tap to add photos</Text>
         </TouchableOpacity>
+        <FieldError msg={errors.defectPhotos} />
 
         {formData.defectPhotos.length > 0 && (
           <View className="flex-row flex-wrap mt-3 gap-2">

@@ -27,8 +27,14 @@
       "favicon": "./assets/images/logo3.png"
     },
     "plugins": [
-      "expo-router"
-      
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photo library to attach inspection evidence.",
+          "cameraPermission": "The app needs camera access to capture inspection photos."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

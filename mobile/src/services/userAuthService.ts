@@ -73,6 +73,16 @@ class UserAuthService {
     }
   }
 
+  async googleLogin(data: { googleId: string; email: string; name: string; image?: string }): Promise<UserAuthResponse> {
+    try {
+      const response = await axios.post(`${this.baseURL}/google-callback`, data);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Google login failed';
+      throw new Error(errorMessage);
+    }
+  }
+
   async getCurrentUser(): Promise<UserProfileResponse> {
     const response = await axios.get(`${this.baseURL}/me`);
     return response.data;
@@ -108,6 +118,7 @@ class UserAuthService {
     try {
       await AsyncStorage.setItem('userToken', token);
       await AsyncStorage.setItem('userData', JSON.stringify(user));
+      await AsyncStorage.setItem('userID', user.id || user._id || '');
       if (rememberMe) {
         await AsyncStorage.setItem('rememberMe', 'true');
       }
@@ -135,7 +146,7 @@ class UserAuthService {
 
   async clearAuthData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove(['userToken', 'userData', 'rememberMe']);
+      await AsyncStorage.multiRemove(['userToken', 'userData', 'rememberMe', 'userID']);
     } catch (error) {
       console.error('Failed to clear auth data:', error);
     }

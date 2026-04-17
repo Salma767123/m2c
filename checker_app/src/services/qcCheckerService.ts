@@ -164,13 +164,25 @@ class QCCheckerService {
   }
 
   // Get assigned vendors
-  async getAssignedVendors(): Promise<{ success: boolean; data: any[] }> {
+  async getAssignedVendors(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<{
+    success: boolean;
+    data: {
+      vendors: any[];
+      pagination: { total: number; page: number; limit: number; totalPages: number };
+    };
+  }> {
     try {
       const token = await this.getCheckerToken();
       const response = await axios.get('/qc-checkers/vendors', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` },
+        params,
       });
       return response.data;
     } catch (error: any) {
@@ -194,17 +206,41 @@ class QCCheckerService {
   }
 
   // Get full vendor details (full vendor record + stats + recent inspections)
-  async getVendorDetails(vendorId: string): Promise<{ success: boolean; data: { vendor: any; stats: any; recentInspections: any[] } }> {
+  async getVendorDetails(vendorId: string, historyLimit?: number): Promise<{
+    success: boolean;
+    data: {
+      vendor: any;
+      stats: any;
+      recentInspections: any[];
+      upcomingInspections?: any[];
+      recentInspectionsMeta?: { total: number; returned: number; hasMore: boolean };
+    };
+  }> {
     try {
       const token = await this.getCheckerToken();
       const response = await axios.get(`/qc-checkers/vendors/${vendorId}/details`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` },
+        params: historyLimit ? { historyLimit } : undefined,
       });
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to fetch vendor details');
+    }
+  }
+
+  // Get active inspection for a vendor (includes vendor record for autofill)
+  async getActiveInspectionForVendor(
+    vendorId: string
+  ): Promise<{ success: boolean; inspection: any | null }> {
+    try {
+      const token = await this.getCheckerToken();
+      const response = await axios.get(
+        `/qc-checkers/vendors/${vendorId}/active-inspection`,
+        { headers: { 'Authorization': `Bearer ${token}` } },
+      );
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to fetch active inspection');
     }
   }
 
@@ -227,13 +263,25 @@ class QCCheckerService {
   // ============================
 
   // Get assigned products
-  async getAssignedProducts(): Promise<{ success: boolean; data: any[] }> {
+  async getAssignedProducts(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<{
+    success: boolean;
+    data: {
+      products: any[];
+      pagination: { total: number; page: number; limit: number; totalPages: number };
+    };
+  }> {
     try {
       const token = await this.getCheckerToken();
       const response = await axios.get('/qc-checkers/products', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` },
+        params,
       });
       return response.data;
     } catch (error: any) {
