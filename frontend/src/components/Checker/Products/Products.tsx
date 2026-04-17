@@ -100,6 +100,44 @@ export default function Products() {
     const [selectedProduct, setSelectedProduct] = useState<AssignedProduct | null>(null)
     const [viewingProductId, setViewingProductId] = useState<string | null>(null)
 
+    const viewParam = searchParams.get('view')
+    const idParam = searchParams.get('id')
+
+    useEffect(() => {
+        if (viewParam === 'detail' && idParam) {
+            setViewingProductId(idParam)
+            setSelectedProduct(null)
+        } else if (viewParam === 'inspection' && idParam && products.length > 0) {
+            const prod = products.find(p => p.id === idParam)
+            if (prod) setSelectedProduct(prod)
+            setViewingProductId(null)
+        } else if (!viewParam && !idParam) {
+            setViewingProductId(null)
+            setSelectedProduct(null)
+        }
+    }, [viewParam, idParam, products])
+
+    const handleViewDetails = (id: string) => {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('view', 'detail')
+        params.set('id', id)
+        router.push(`?${params.toString()}`)
+    }
+
+    const handleStartInspection = (product: AssignedProduct) => {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('view', 'inspection')
+        params.set('id', product.id)
+        router.push(`?${params.toString()}`)
+    }
+
+    const handleBackToList = () => {
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('view')
+        params.delete('id')
+        router.push(`?${params.toString()}`)
+    }
+
     // Reset to page 1 on search change (after first render so deep-linked ?page=N is honoured).
     const didMountRef = useRef(false)
     useEffect(() => {
@@ -112,13 +150,23 @@ export default function Products() {
 
     // Sync URL for shareability + back-button behaviour.
     useEffect(() => {
-        const params = new URLSearchParams()
+        const params = new URLSearchParams(searchParams.toString())
+        
         if (debouncedSearch) params.set('search', debouncedSearch)
+        else params.delete('search')
+        
         if (status) params.set('status', status)
+        else params.delete('status')
+        
         if (sort !== DEFAULT_SORT) params.set('sort', sort)
+        else params.delete('sort')
+        
         if (page !== 1) params.set('page', String(page))
+        else params.delete('page')
+        
         const qs = params.toString()
         router.replace(qs ? `?${qs}` : '?', { scroll: false })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [debouncedSearch, status, sort, page, router])
 
     const [sortBy, sortOrder] = useMemo(() => {
@@ -187,10 +235,10 @@ export default function Products() {
                     productName={selectedProduct.name}
                     vendorName={selectedProduct.vendor.companyName}
                     onComplete={() => {
-                        setSelectedProduct(null)
+                        handleBackToList()
                         loadProducts()
                     }}
-                    onCancel={() => setSelectedProduct(null)}
+                    onCancel={handleBackToList}
                 />
             </div>
         )
@@ -201,14 +249,9 @@ export default function Products() {
         return (
             <ProductDetail
                 productId={viewingProductId}
-                onBack={() => setViewingProductId(null)}
+                onBack={handleBackToList}
                 onStartInspection={
-                    viewed
-                        ? () => {
-                            setViewingProductId(null)
-                            setSelectedProduct(viewed)
-                        }
-                        : undefined
+                    viewed ? () => handleStartInspection(viewed) : undefined
                 }
             />
         )
@@ -400,7 +443,7 @@ export default function Products() {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => setViewingProductId(product.id)}
+                                                    onClick={() => handleViewDetails(product.id)}
                                                     className="text-slate-700 border-slate-200 hover:bg-slate-50 font-medium"
                                                     aria-label={`View details for ${product.name}`}
                                                 >
@@ -411,7 +454,7 @@ export default function Products() {
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => setSelectedProduct(product)}
+                                                        onClick={() => handleStartInspection(product)}
                                                         className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 font-medium"
                                                     >
                                                         <FileText className="h-4 w-4 mr-2" />

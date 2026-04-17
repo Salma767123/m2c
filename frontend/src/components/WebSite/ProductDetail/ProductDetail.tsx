@@ -10,6 +10,7 @@ import { Star, Heart, Truck, Shield, RotateCcw, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { wishlistService } from '@/services/wishlistService';
+import { trackProductView } from '@/services/analyticsService';
 import Image from 'next/image';
 
 interface ProductDetailProps {
@@ -36,7 +37,29 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
 
         if (response.success && response.data) {
           setProduct(response.data);
-          // Auto-select removed to show basic product info first
+
+          // Track product view for analytics heat map
+          let source = 'direct';
+          try {
+            const ref = typeof document !== 'undefined' ? document.referrer : '';
+            if (ref) {
+              if (ref.includes('/categories')) source = 'category';
+              else if (ref.includes('/search')) source = 'search';
+              else if (ref.includes('/products')) source = 'related';
+              else {
+                try {
+                  if (new URL(ref).pathname === '/') source = 'home';
+                } catch {/* ignore bad URL */}
+              }
+            }
+          } catch {/* keep default 'direct' */}
+
+          trackProductView({
+            productId: response.data.id,
+            productName: response.data.name,
+            category: response.data.category,
+            source,
+          });
         }
       } catch (error) {
         console.error('Failed to fetch product:', error);

@@ -85,128 +85,119 @@ const CouponModal = ({
         {/* Body */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
           {mode === 'view' && coupon ? (
-            // View Mode - Three Column Layout
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Left Column - Basic Info */}
-              <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Tag className="w-5 h-5 text-gray-700" />
-                    <h3 className="font-semibold text-gray-900">Basic Information</h3>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Coupon Code</label>
-                      <div className="text-gray-900 font-mono text-lg font-bold">{coupon.code}</div>
+            // View Mode
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Left Column - Basic Info */}
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Tag className="w-5 h-5 text-gray-700" />
+                      <h3 className="font-semibold text-gray-900">Basic Information</h3>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Status</label>
-                      {getStatusBadge(coupon.isActive, coupon.expiryDate)}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
-                      <div className="text-gray-900 text-sm">{coupon.description || '-'}</div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Coupon Code</label>
+                        <div className="text-gray-900 font-mono text-lg font-bold">{coupon.code}</div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Status</label>
+                        {getStatusBadge(coupon.isActive, coupon.expiryDate)}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
+                        <div className="text-gray-900 text-sm">{coupon.description || '-'}</div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Center Column - Discount Details */}
-              <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Percent className="w-5 h-5 text-gray-700" />
-                    <h3 className="font-semibold text-gray-900">Discount Details</h3>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Discount Type</label>
-                      <div className="text-gray-900 capitalize">{coupon.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount'}</div>
+                {/* Center Column - Discount Details */}
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Percent className="w-5 h-5 text-gray-700" />
+                      <h3 className="font-semibold text-gray-900">Discount Details</h3>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Discount Value</label>
-                      <div className="text-gray-900 text-2xl font-bold">
-                        {coupon.discountType === 'PERCENTAGE'
-                          ? `${coupon.discountValue}%`
-                          : `₹${coupon.discountValue}`}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Minimum Purchase</label>
-                      <div className="text-gray-900">₹{coupon.minPurchaseAmount || 0}</div>
-                    </div>
-
-                    {coupon.maxDiscountAmount && (
+                    <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Maximum Discount</label>
-                        <div className="text-gray-900">₹{coupon.maxDiscountAmount}</div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Discount Type</label>
+                        <div className="text-gray-900 capitalize">{coupon.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount'}</div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column - Usage & Validity */}
-              <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="w-5 h-5 text-gray-700" />
-                    <h3 className="font-semibold text-gray-900">Usage Statistics</h3>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Usage Limit</label>
-                      <div className="text-gray-900">{coupon.usageLimit || 'Unlimited'}</div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Used Count</label>
-                      <div className="text-gray-900 text-2xl font-bold">{coupon.usedCount || 0}</div>
-                    </div>
-
-                    {coupon.usageLimit && (
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Usage Progress</label>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div
-                            className="bg-gray-900 h-3 rounded-full transition-all"
-                            style={{ width: `${((coupon.usedCount || 0) / coupon.usageLimit) * 100}%` }}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">
-                          {Math.round(((coupon.usedCount || 0) / coupon.usageLimit) * 100)}% used
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Discount Value</label>
+                        <div className="text-gray-900 text-2xl font-bold">
+                          {coupon.discountType === 'PERCENTAGE'
+                            ? `${coupon.discountValue}%`
+                            : `₹${coupon.discountValue}`}
                         </div>
                       </div>
-                    )}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Minimum Purchase</label>
+                        <div className="text-gray-900">₹{coupon.minPurchaseAmount || 0}</div>
+                      </div>
+                      {coupon.maxDiscountAmount ? (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Maximum Discount</label>
+                          <div className="text-gray-900">₹{coupon.maxDiscountAmount}</div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Calendar className="w-5 h-5 text-gray-700" />
-                    <h3 className="font-semibold text-gray-900">Validity Period</h3>
+                {/* Right Column - Usage & Validity */}
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="w-5 h-5 text-gray-700" />
+                      <h3 className="font-semibold text-gray-900">Usage Statistics</h3>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Usage Limit</label>
+                        <div className="text-gray-900">{coupon.usageLimit || 'Unlimited'}</div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Used Count</label>
+                        <div className="text-gray-900 text-2xl font-bold">{coupon.usedCount || 0}</div>
+                      </div>
+                      {coupon.usageLimit ? (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Usage Progress</label>
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div
+                              className="bg-gray-900 h-3 rounded-full transition-all"
+                              style={{ width: `${((coupon.usedCount || 0) / coupon.usageLimit) * 100}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            {Math.round(((coupon.usedCount || 0) / coupon.usageLimit) * 100)}% used
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date</label>
-                      <div className="text-gray-900">{formatDate(coupon.startDate)}</div>
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calendar className="w-5 h-5 text-gray-700" />
+                      <h3 className="font-semibold text-gray-900">Validity Period</h3>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Expiry Date</label>
-                      <div className="text-gray-900">{formatDate(coupon.expiryDate)}</div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date</label>
+                        <div className="text-gray-900">{formatDate(coupon.startDate)}</div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Expiry Date</label>
+                        <div className="text-gray-900">{formatDate(coupon.expiryDate)}</div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+
             </div>
           ) : (
             // Create/Edit Mode - Form Layout
@@ -220,9 +211,7 @@ const CouponModal = ({
                       <Tag className="w-5 h-5 text-gray-700" />
                       <h3 className="font-semibold text-gray-900">Basic Information</h3>
                     </div>
-
                     <div className="space-y-4">
-                      {/* Coupon Code | Status */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -234,11 +223,10 @@ const CouponModal = ({
                             value={formData.code || ''}
                             onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent font-mono"
-                            placeholder="e.g., WELCOME10"
-                            disabled={mode === 'edit'} // Code usually immutable
+                            placeholder="e.g., FREESHIP3"
+                            disabled={mode === 'edit'}
                           />
                         </div>
-
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
                             Status <span className="text-red-500">*</span>
@@ -253,12 +241,8 @@ const CouponModal = ({
                           />
                         </div>
                       </div>
-
-                      {/* Description */}
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Description
-                        </label>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
                         <textarea
                           rows={4}
                           value={formData.description || ''}
@@ -276,9 +260,7 @@ const CouponModal = ({
                       <Percent className="w-5 h-5 text-gray-700" />
                       <h3 className="font-semibold text-gray-900">Discount Details</h3>
                     </div>
-
                     <div className="space-y-4">
-                      {/* Discount Type | Discount Value */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -293,7 +275,6 @@ const CouponModal = ({
                             onChange={(value) => setFormData({ ...formData, discountType: value as any })}
                           />
                         </div>
-
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
                             Discount Value <span className="text-red-500">*</span>
@@ -309,8 +290,6 @@ const CouponModal = ({
                           />
                         </div>
                       </div>
-
-                      {/* Minimum Purchase | Maximum Discount */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -326,7 +305,6 @@ const CouponModal = ({
                             placeholder="500"
                           />
                         </div>
-
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
                             Max Discount <span className="text-gray-500 text-xs">(Optional)</span>
@@ -345,15 +323,13 @@ const CouponModal = ({
                   </div>
                 </div>
 
-                {/* Bottom Row: Usage Limit | Validity Period */}
+                {/* Middle Row: Usage Limit | Validity Period */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Usage Limit */}
                   <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-2 mb-4">
                       <TrendingUp className="w-5 h-5 text-gray-700" />
                       <h3 className="font-semibold text-gray-900">Usage Limit</h3>
                     </div>
-
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         Usage Limit <span className="text-gray-500 text-xs">(Optional)</span>
@@ -373,15 +349,12 @@ const CouponModal = ({
                     </div>
                   </div>
 
-                  {/* Validity Period */}
                   <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-2 mb-4">
                       <Calendar className="w-5 h-5 text-gray-700" />
                       <h3 className="font-semibold text-gray-900">Validity Period</h3>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Start Date */}
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                           Start Date <span className="text-red-500">*</span>
@@ -394,8 +367,6 @@ const CouponModal = ({
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                         />
                       </div>
-
-                      {/* End Date */}
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                           Expiry Date <span className="text-red-500">*</span>
@@ -411,6 +382,7 @@ const CouponModal = ({
                     </div>
                   </div>
                 </div>
+
               </div>
 
               {/* Form Actions */}

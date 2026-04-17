@@ -12,7 +12,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Loader2
+  Loader2,
+  Truck
 } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
 import {
@@ -24,6 +25,7 @@ import {
   TableRow,
 } from '@/components/UI/Table';
 import CouponModal from './CouponModal';
+import FreeShippingModal from './FreeShippingModal';
 import { couponService, Coupon } from '@/services/couponService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
@@ -35,6 +37,7 @@ const CouponManagement = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
+  const [showFreeShippingModal, setShowFreeShippingModal] = useState(false);
 
   const initialFormData: Partial<Coupon> = {
     code: '',
@@ -45,8 +48,10 @@ const CouponManagement = () => {
     maxDiscountAmount: 0,
     usageLimit: 0,
     startDate: new Date().toISOString(),
-    expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Default 7 days
-    isActive: true
+    expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    isActive: true,
+    freeShipping: false,
+    freeShippingOrderNumbers: []
   };
 
   const [formData, setFormData] = useState<Partial<Coupon>>(initialFormData);
@@ -201,13 +206,22 @@ const CouponManagement = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Coupon Management</h1>
           <p className="text-gray-600">Create and manage discount coupons</p>
         </div>
-        <button
-          onClick={handleCreate}
-          className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Create Coupon
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowFreeShippingModal(true)}
+            className="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors flex items-center gap-2"
+          >
+            <Truck className="w-5 h-5" />
+            Free Shipping Offers
+          </button>
+          <button
+            onClick={handleCreate}
+            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Create Coupon
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -342,6 +356,16 @@ const CouponManagement = () => {
                         Min: ₹{coupon.minPurchaseAmount || 0}
                         {coupon.maxDiscountAmount && ` | Max: ₹${coupon.maxDiscountAmount}`}
                       </div>
+                      {coupon.freeShipping && (
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-50 text-green-700 text-[10px] font-semibold rounded border border-green-200">
+                            <Truck className="w-3 h-3" />
+                            {coupon.freeShippingOrderNumbers && coupon.freeShippingOrderNumbers.length > 0
+                              ? `Free Ship: ${coupon.freeShippingOrderNumbers.join(', ')} order(s)`
+                              : 'Free Shipping'}
+                          </span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
@@ -409,6 +433,13 @@ const CouponManagement = () => {
         formData={formData}
         setFormData={setFormData}
         onSubmit={handleSubmit}
+      />
+
+      {/* Free Shipping Modal */}
+      <FreeShippingModal
+        isOpen={showFreeShippingModal}
+        onClose={() => setShowFreeShippingModal(false)}
+        onSaved={fetchCoupons}
       />
     </div>
   );

@@ -186,19 +186,56 @@ export default function Order() {
   const [promoCode, setPromoCode] = useState("")
   const [appliedPromo, setAppliedPromo] = useState("")
   const [discountAmount, setDiscountAmount] = useState(0)
+  const [freeShippingApplied, setFreeShippingApplied] = useState(false)
+  const [freeShippingMessage, setFreeShippingMessage] = useState("")
 
   useEffect(() => {
     const savedCoupon = localStorage.getItem('appliedCoupon')
     if (savedCoupon) {
       try {
-        const { code, discountAmount } = JSON.parse(savedCoupon)
+        const { code, discountAmount, freeShipping, freeShippingMessage } = JSON.parse(savedCoupon)
         setAppliedPromo(code)
-        setDiscountAmount(discountAmount)
-      } catch (e) {
+        setDiscountAmount(discountAmount || 0)
+        setFreeShippingApplied(freeShipping || false)
+        setFreeShippingMessage(freeShippingMessage || "")
+      } catch {
         localStorage.removeItem('appliedCoupon')
       }
     }
-  }, [])
+    
+    // Check for free shipping offers automatically
+    checkFreeShippingOffers()
+  }, [cartItems, isAuthenticated]) // Add dependencies
+
+  // Check free shipping offers automatically
+  const checkFreeShippingOffers = async () => {
+    if (!isAuthenticated) return // Only for authenticated users
+    
+    try {
+      const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+      const userData = JSON.parse(localStorage.getItem('userData') || '{}')
+      
+      if (userData.id && subtotal > 0) {
+        const response = await couponService.applyFreeShippingOffer(userData.id, subtotal)
+        
+        if (response.success && response.data?.freeShipping) {
+          setFreeShippingApplied(true)
+          setFreeShippingMessage(response.message || "Free shipping available!")
+          
+          // Save free shipping info
+          const currentCoupon = localStorage.getItem('appliedCoupon')
+          const couponData = currentCoupon ? JSON.parse(currentCoupon) : {}
+          localStorage.setItem('appliedCoupon', JSON.stringify({
+            ...couponData,
+            freeShipping: true,
+            freeShippingMessage: response.message
+          }))
+        }
+      }
+    } catch (error) {
+      console.warn('Free shipping check failed:', error)
+    }
+  }
 
   if (!isHydrated || loading) {
     return (
@@ -244,10 +281,10 @@ export default function Order() {
         )
       )
       showSuccessToast('Updated', 'Cart item quantity updated')
-    } catch (error) {
-      console.error('Failed to update quantity:', error)
-      showErrorToast('Error', 'Failed to update quantity')
-    }
+      } catch (error: unknown) {
+        console.error('Failed to update quantity:', error)
+        showErrorToast('Error', 'Failed to update quantity')
+      }
   }
 
   const removeItem = async (id: string) => {
@@ -263,10 +300,10 @@ export default function Order() {
       await cartService.removeFromCart(id)
       setCartItems(items => items.filter(item => item.id !== id))
       showSuccessToast('Removed', 'Item removed from cart')
-    } catch (error) {
-      console.error('Failed to remove item:', error)
-      showErrorToast('Error', 'Failed to remove item')
-    }
+      } catch (error: unknown) {
+        console.error('Failed to remove item:', error)
+        showErrorToast('Error', 'Failed to remove item')
+      }
   }
 
   const applyPromoCode = async () => {
@@ -291,31 +328,36 @@ export default function Order() {
         // Save to local storage for Checkout page to retrieve
         localStorage.setItem('appliedCoupon', JSON.stringify({
           code: response.data.code,
-          discountAmount: response.data.discountAmount
+          discountAmount: response.data.discountAmount,
+          freeShipping: response.data.freeShipping || false,
+          freeShippingMessage: response.data.freeShipping ? "Free shipping included!" : ""
         }))
       } else {
         throw new Error(response.message || "Invalid coupon")
       }
-    } catch (error: any) {
-      console.error("Coupon error:", error)
-      setAppliedPromo("")
-      setDiscountAmount(0)
-      localStorage.removeItem('appliedCoupon')
-      showErrorToast("Error", error.message || "Failed to apply coupon")
-    }
+      } catch (error: unknown) {
+        console.error("Coupon error:", error)
+        setAppliedPromo("")
+        setDiscountAmount(0)
+        localStorage.removeItem('appliedCoupon')
+        const errorMessage = error instanceof Error ? error.message : "Failed to apply coupon"
+        showErrorToast("Error", errorMessage)
+      }
   }
 
   // Remove coupon
   const removeCoupon = () => {
     setAppliedPromo("")
     setDiscountAmount(0)
+    setFreeShippingApplied(false)
+    setFreeShippingMessage("")
     localStorage.removeItem('appliedCoupon')
     showSuccessToast("Removed", "Coupon removed")
   }
 
   const calculateSummary = (): OrderSummary => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    const shipping = 0
+    const shipping = freeShippingApplied ? 0 : 0 // Free shipping or standard free shipping
     const discount = discountAmount
 
     // Calculate tax based on individual product GST percentages
@@ -515,7 +557,7 @@ export default function Order() {
                     <div className="flex items-center gap-2">
                       <CheckCircle className="w-5 h-5" />
                       <div>
-                        <span className="font-medium block">Code "{appliedPromo}" applied!</span>
+                        <span className="font-medium block">Code &quot;{appliedPromo}&quot; applied!</span>
                         <span className="text-xs text-green-700">You saved ${discountAmount.toFixed(2)}</span>
                       </div>
                     </div>
@@ -526,6 +568,18 @@ export default function Order() {
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                  </div>
+                )}
+                
+                {freeShippingApplied && !appliedPromo && (
+                  <div className="mt-3 flex items-center justify-between text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-5 h-5" />
+                      <div>
+                        <span className="font-medium block">Free Shipping Available!</span>
+                        <span className="text-xs text-blue-700">{freeShippingMessage}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -544,7 +598,14 @@ export default function Order() {
                     <div className="flex justify-between">
                       <span className="text-slate-600">Shipping</span>
                       <span className="font-medium">
-                        {summary.shipping === 0 ? "Free" : `$${summary.shipping.toFixed(2)}`}
+                        {summary.shipping === 0 ? (
+                          <span className="text-green-600 flex items-center gap-1">
+                            <Truck className="w-4 h-4" />
+                            Free
+                          </span>
+                        ) : (
+                          `$${summary.shipping.toFixed(2)}`
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between">

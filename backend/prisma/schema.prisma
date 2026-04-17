@@ -870,21 +870,41 @@ model Coupon {
   discountValue     Float
   minPurchaseAmount Float?        @default(0)
   maxDiscountAmount Float?        // Max discount cap for percentage based coupons
-  
+
   startDate         DateTime      @default(now())
   expiryDate        DateTime
-  
+
   usageLimit        Int?          // Total times this coupon can be used globally
   usedCount         Int           @default(0)
-  
+
   perUserLimit      Int?          @default(1) // How many times a single user can use this
-  
+
   isActive          Boolean       @default(true)
-  
+
+  // Dynamic Free Shipping on Nth Orders
+  freeShipping      Boolean       @default(false)  // Whether this coupon grants free shipping
+  freeShippingOrderNumbers Int[]  // Which order numbers get free shipping (e.g., [3, 5, 10] = 3rd, 5th, 10th orders)
+
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
   @@map("coupons")
+}
+
+// ============================================
+// FREE SHIPPING OFFERS
+// ============================================
+
+model FreeShippingOffer {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  minOrderValue         Float     @default(0)
+  orderNumbers          Int[]     @default([]) // Which order numbers get free shipping (e.g., [3, 5, 10] = 3rd, 5th, 10th orders)
+  isActive              Boolean   @default(true)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("free_shipping_offers")
 }
 
 enum DiscountType {
@@ -1356,4 +1376,39 @@ model DeviceToken {
 
   @@index([userId, role])
   @@map("device_tokens")
+// ============================================
+// ANALYTICS & TRACKING
+// ============================================
+
+model PageView {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  page        String   // Page path e.g. "/products", "/checkout"
+  userId      String?  @db.ObjectId
+  sessionId   String?
+  referrer    String?
+  device      String?  // mobile, tablet, desktop
+  browser     String?
+  duration    Int?     // Time spent in seconds
+  createdAt   DateTime @default(now())
+
+  @@index([page])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("page_views")
+}
+
+model ProductView {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId   String   @db.ObjectId
+  productName String?
+  category    String?
+  userId      String?  @db.ObjectId
+  sessionId   String?
+  source      String?  // "search", "category", "home", "direct"
+  createdAt   DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+  @@index([category])
+  @@map("product_views")
 }

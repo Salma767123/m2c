@@ -128,6 +128,38 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
   const [showVendorDetail, setShowVendorDetail] = useState(false)
   const [selectedVendorData, setSelectedVendorData] = useState<Vendor | null>(null)
 
+  const viewParam = searchParams.get("view")
+  const vendorIdParam = searchParams.get("vendorId")
+
+  useEffect(() => {
+    if (viewParam === 'detail' && vendorIdParam) {
+      setShowVendorDetail(true)
+      setInProgressInspection(false)
+      if (vendors.length > 0) {
+        const vend = vendors.find(v => v.id === vendorIdParam)
+        if (vend) {
+          setSelectedVendorData(vend)
+          onVendorSelect(vend.id)
+        }
+      }
+    } else if (viewParam === 'inspection' && vendorIdParam) {
+      setInProgressInspection(true)
+      setShowVendorDetail(false)
+      if (vendors.length > 0) {
+        const vend = vendors.find(v => v.id === vendorIdParam)
+        if (vend) {
+          setSelectedVendorData(vend)
+          onVendorSelect(vend.id)
+        }
+      }
+    } else if (!viewParam && !vendorIdParam) {
+      setShowVendorDetail(false)
+      setInProgressInspection(false)
+      setSelectedVendorData(null)
+      onVendorSelect(null)
+    }
+  }, [viewParam, vendorIdParam, vendors, onVendorSelect])
+
   // Reset page to 1 whenever the debounced search changes (handles user typing a query).
   // We skip the very first run so that a deep-linked ?page=N URL is honored on mount.
   const didMountRef = useRef(false)
@@ -141,13 +173,23 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
 
   // Keep URL in sync with state (shareable, back-button friendly)
   useEffect(() => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams(searchParams.toString())
+    
     if (debouncedSearch) params.set("search", debouncedSearch)
+    else params.delete("search")
+    
     if (status) params.set("status", status)
+    else params.delete("status")
+    
     if (sort !== "submittedAt:desc") params.set("sort", sort)
+    else params.delete("sort")
+    
     if (page !== 1) params.set("page", String(page))
+    else params.delete("page")
+    
     const qs = params.toString()
     router.replace(qs ? `?${qs}` : "?", { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, status, sort, page, router])
 
   const [sortBy, sortOrder] = useMemo(() => {
@@ -194,30 +236,30 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
     loadVendors()
   }, [loadVendors])
 
+  const handleBackToList = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("view")
+    params.delete("vendorId")
+    router.push(`?${params.toString()}`)
+  }
+
   const handleCompleteInspection = () => {
-    setInProgressInspection(false)
-    setSelectedVendorData(null)
-    onVendorSelect(null)
+    handleBackToList()
     loadVendors()
   }
 
   const handleViewDetails = (vendor: Vendor) => {
-    setSelectedVendorData(vendor)
-    setShowVendorDetail(true)
-    onVendorSelect(vendor.id)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("view", "detail")
+    params.set("vendorId", vendor.id)
+    router.push(`?${params.toString()}`)
   }
 
   const handleStartInspection = (vendor: Vendor) => {
-    setSelectedVendorData(vendor)
-    setInProgressInspection(true)
-    setShowVendorDetail(false)
-    onVendorSelect(vendor.id)
-  }
-
-  const handleBackToList = () => {
-    setShowVendorDetail(false)
-    setSelectedVendorData(null)
-    onVendorSelect(null)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("view", "inspection")
+    params.set("vendorId", vendor.id)
+    router.push(`?${params.toString()}`)
   }
 
   const handleClearFilters = () => {
