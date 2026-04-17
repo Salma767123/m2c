@@ -2013,6 +2013,15 @@ const getAllProductsForAdmin = async (req, res) => {
               status: true
             }
           },
+          assignedQc: {
+            select: {
+              id: true,
+              checkerId: true,
+              name: true,
+              email: true,
+              status: true
+            }
+          },
           images: {
             where: { isPrimary: true },
             take: 1

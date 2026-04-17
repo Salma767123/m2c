@@ -7,7 +7,7 @@ import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { Eye, Check, X, Search, Filter, AlertCircle, UserPlus } from 'lucide-react'
+import { Eye, Check, X, Search, AlertCircle, UserPlus, UserCog, CheckCircle } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { adminProductService } from '@/services/adminProductService'
 import qcCheckerService from '@/services/qcCheckerService'
@@ -32,6 +32,14 @@ interface VendorProductRequest {
     ownerName: string
     businessEmail: string
   }
+  assignedQcId?: string | null
+  assignedQc?: {
+    id: string
+    checkerId: string
+    name?: string
+    email?: string
+    status?: string
+  } | null
   images?: Array<{
     url: string
     isPrimary: boolean
@@ -55,7 +63,6 @@ export default function VendorProductRequests() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION'>('PENDING')
-  const [selectedRequest, setSelectedRequest] = useState<VendorProductRequest | null>(null)
   const [showRejectionModal, setShowRejectionModal] = useState(false)
   const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null)
   const [showAssignModal, setShowAssignModal] = useState(false)
@@ -84,7 +91,7 @@ export default function VendorProductRequests() {
 
   const loadQcCheckers = async () => {
     try {
-      const response = await qcCheckerService.getAllQCCheckers();
+      const response = await qcCheckerService.getAllQCCheckers({ status: 'ACTIVE' });
       if (response.success && response.data) {
         setQcCheckers(response.data);
       }
@@ -253,7 +260,9 @@ export default function VendorProductRequests() {
   }
 
   const handleAssignClick = (requestId: string) => {
+    const req = requests.find(r => r.id === requestId)
     setAssigningRequestId(requestId)
+    setSelectedQcChecker(req?.assignedQcId ?? '')
     setShowAssignModal(true)
   }
 
@@ -263,18 +272,28 @@ export default function VendorProductRequests() {
       return
     }
 
+    const wasReassign = Boolean(requests.find(r => r.id === assigningRequestId)?.assignedQcId)
+
     try {
       const response = await adminProductService.assignQCChecker(assigningRequestId, selectedQcChecker)
 
       if (response.success) {
-        showSuccessToast('QC Checker Assigned', 'The product has been assigned for inspection.')
+        showSuccessToast(
+          wasReassign ? 'QC Checker Reassigned' : 'QC Checker Assigned',
+          wasReassign
+            ? 'The product has been reassigned to a new Quality Checker.'
+            : 'The product has been assigned for inspection.'
+        )
         setShowAssignModal(false)
         setAssigningRequestId(null)
         setSelectedQcChecker('')
         loadRequests() // Reload the list
       }
     } catch (error: any) {
-      showErrorToast('Assignment Failed', error.message || 'Unable to assign QC Checker.')
+      showErrorToast(
+        wasReassign ? 'Reassignment Failed' : 'Assignment Failed',
+        error.message || 'Unable to assign QC Checker.'
+      )
     }
   }
 
@@ -393,6 +412,7 @@ export default function VendorProductRequests() {
                   <TableHead>Stock</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Approval</TableHead>
+                  <TableHead>QC Checker</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -460,6 +480,25 @@ export default function VendorProductRequests() {
                       </div>
                     </TableCell>
                     <TableCell>
+                      {request.assignedQc?.name ? (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">
+                              {request.assignedQc.name}
+                            </div>
+                            {request.assignedQc.checkerId && (
+                              <div className="text-xs font-mono text-gray-400">
+                                {request.assignedQc.checkerId}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400 italic">Not assigned</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <span className="text-sm text-gray-600">
                         {new Date(request.createdAt).toLocaleDateString()}
                       </span>
@@ -497,15 +536,27 @@ export default function VendorProductRequests() {
                               <X className="h-4 w-4" />
                             </Button>
                             {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'REINSPECTION') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleAssignClick(request.id)}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                title={request.approvalStatus === 'REINSPECTION' ? "Reassign QC Checker" : "Assign QC Checker"}
-                              >
-                                <UserPlus className="h-4 w-4" />
-                              </Button>
+                              request.assignedQcId ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleAssignClick(request.id)}
+                                  className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                                  title="Reassign QC Checker"
+                                >
+                                  <UserCog className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleAssignClick(request.id)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  title="Assign QC Checker"
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                </Button>
+                              )
                             )}
                           </>
                         )}
@@ -745,50 +796,77 @@ export default function VendorProductRequests() {
       )}
 
       {/* Assign QC Checker Modal */}
-      {showAssignModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Assign QC Checker</h3>
-            <p className="text-gray-600 mb-4">
-              Select a Quality Checker to inspect this product before it can be approved.
-            </p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                QC Checker
-              </label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                value={selectedQcChecker}
-                onChange={(e) => setSelectedQcChecker(e.target.value)}
-              >
-                <option value="">Select a QC Checker</option>
-                {qcCheckers.map(qc => (
-                  <option key={qc.id} value={qc.id}>{qc.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowAssignModal(false)
-                  setAssigningRequestId(null)
-                  setSelectedQcChecker('')
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAssignQC}
-                className="bg-gray-900 hover:bg-gray-800 text-white"
-                disabled={!selectedQcChecker}
-              >
-                Assign
-              </Button>
+      {showAssignModal && (() => {
+        const assigningRequest = requests.find(r => r.id === assigningRequestId)
+        const currentQcId = assigningRequest?.assignedQcId ?? ''
+        const isReassign = Boolean(currentQcId)
+        const isUnchanged = isReassign && selectedQcChecker === currentQcId
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                {isReassign ? 'Reassign QC Checker' : 'Assign QC Checker'}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {isReassign
+                  ? 'Select a different Quality Checker to take over inspection of this product.'
+                  : 'Select a Quality Checker to inspect this product before it can be approved.'}
+              </p>
+              {isReassign && assigningRequest?.assignedQc?.name && (
+                <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Currently assigned</div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-gray-900">
+                      {assigningRequest.assignedQc.name}
+                    </span>
+                    {assigningRequest.assignedQc.checkerId && (
+                      <span className="text-xs font-mono text-gray-400">
+                        ({assigningRequest.assignedQc.checkerId})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  QC Checker
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                  value={selectedQcChecker}
+                  onChange={(e) => setSelectedQcChecker(e.target.value)}
+                >
+                  <option value="">Select a QC Checker</option>
+                  {qcCheckers.map(qc => (
+                    <option key={qc.id} value={qc.id}>{qc.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAssignModal(false)
+                    setAssigningRequestId(null)
+                    setSelectedQcChecker('')
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAssignQC}
+                  className="bg-gray-900 hover:bg-gray-800 text-white"
+                  disabled={!selectedQcChecker || isUnchanged}
+                  title={isUnchanged ? 'Select a different QC Checker to reassign' : undefined}
+                >
+                  {isReassign ? 'Reassign' : 'Assign'}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
