@@ -1363,3 +1363,40 @@ model Counter {
 
   @@map("counters")
 }
+
+// ============================================
+// ANALYTICS & TRACKING
+// ============================================
+
+model PageView {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  page        String   // Page path e.g. "/products", "/checkout"
+  userId      String?  @db.ObjectId
+  sessionId   String?
+  referrer    String?
+  device      String?  // mobile, tablet, desktop
+  browser     String?
+  duration    Int?     // Time spent in seconds
+  createdAt   DateTime @default(now())
+
+  @@index([page])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("page_views")
+}
+
+model ProductView {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId   String   @db.ObjectId
+  productName String?
+  category    String?
+  userId      String?  @db.ObjectId
+  sessionId   String?
+  source      String?  // "search", "category", "home", "direct"
+  createdAt   DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+  @@index([category])
+  @@map("product_views")
+}

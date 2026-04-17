@@ -135,6 +135,11 @@ const navigation: NavigationItem[] = [
     href: "/admin/dashboard/support",
   },
   {
+    title: "Analytics",
+    icon: FileBarChart,
+    href: "/admin/dashboard/analytics",
+  },
+  {
     title: "Reports",
     icon: FileText,
     href: "/admin/dashboard/reports",
