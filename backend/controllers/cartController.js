@@ -188,6 +188,10 @@ const getCart = async (req, res) => {
             material: true,
             rating: true,
             reviews: true,
+            singleUnitSize: true,
+            singleUnitColor: true,
+            singleUnitColorHex: true,
+            baseSku: true,
             images: {
               select: {
                 url: true,
@@ -226,7 +230,11 @@ const getCart = async (req, res) => {
             category: product.category,
             material: product.material,
             rating: product.rating,
-            reviews: product.reviews
+            reviews: product.reviews,
+            singleUnitSize: product.singleUnitSize,
+            singleUnitColor: product.singleUnitColor,
+            singleUnitColorHex: product.singleUnitColorHex,
+            baseSku: product.baseSku
           } : null
         };
       })

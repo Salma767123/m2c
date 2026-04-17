@@ -235,7 +235,10 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
     return (parseInt(newStock) || 0) + calculateTotalVariantStock()
   }
 
-  const stockDifference = getAggregateStock() - (inventoryItem?.currentStock || 0)
+  // Calculate the original aggregate from source-of-truth fields (baseStock + variant stocks)
+  const originalAggregate = (inventoryItem?.baseStock || 0)
+    + (product?.variants ? product.variants.reduce((sum, v) => sum + (v.stock || 0), 0) : 0)
+  const stockDifference = getAggregateStock() - originalAggregate
 
   const isIncrease = stockDifference > 0
   const isDecrease = stockDifference < 0
@@ -359,7 +362,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-gray-500">Current Stock</span>
                   <span className="text-2xl font-bold text-gray-900">
-                    {product?.hasVariants ? product.totalStock : inventoryItem.currentStock}
+                    {originalAggregate}
                   </span>
                 </div>
                 <div className="flex justify-between items-center mt-2">

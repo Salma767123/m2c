@@ -12,7 +12,8 @@ const {
   getAllInventory,
   getAllInventoryStats,
   getInventoryByVendor,
-  getVendorCategoriesByVendorId
+  getVendorCategoriesByVendorId,
+  recalculateAllStock
 } = require('../controllers/inventoryController');
 const { authenticateToken, requireVendorRole, requireRole } = require('../middleware/auth');
 
@@ -29,6 +30,7 @@ router.put('/admin/:id', authenticateToken, requireRole('admin'), updateInventor
 router.delete('/admin/:id', authenticateToken, requireRole('admin'), deleteInventoryItem);
 router.get('/admin/:id/history', authenticateToken, requireRole('admin'), getStockHistory);
 router.patch('/admin/:id/stock', authenticateToken, requireRole('admin'), updateStock);
+router.post('/admin/recalculate-stock', authenticateToken, requireRole('admin'), recalculateAllStock);
 
 // All vendor routes require vendor authentication
 router.use(authenticateToken);

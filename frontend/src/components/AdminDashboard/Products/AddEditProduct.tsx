@@ -171,9 +171,10 @@ interface AddEditProductProps {
   productId?: string
   isEdit?: boolean
   inventoryId?: string // Pre-select an inventory item when coming from inventory page
+  onProductNameLoad?: (name: string) => void
 }
 
-export default function AddEditProduct({ productId, isEdit = false, inventoryId }: AddEditProductProps) {
+export default function AddEditProduct({ productId, isEdit = false, inventoryId, onProductNameLoad }: AddEditProductProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
@@ -386,6 +387,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
           if (response.success && response.data) {
             const product = response.data
+
+            // Call callback to inform parent component about product name
+            if (onProductNameLoad && product.name) {
+              onProductNameLoad(product.name)
+            }
 
             // Map API response to form data
             setFormData({

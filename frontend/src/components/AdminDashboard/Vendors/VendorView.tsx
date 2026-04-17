@@ -591,26 +591,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button className="w-full justify-start" variant="outline">
-              <Mail className="h-4 w-4 mr-2" />
-              Send Message
-            </Button>
-            <Button className="w-full justify-start" variant="outline">
-              <FileText className="h-4 w-4 mr-2" />
-              Generate Report
-            </Button>
-            <Button className="w-full justify-start" variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export Data
-            </Button>
-          </CardContent>
-        </Card>
+
       </div>
     </div>
   )

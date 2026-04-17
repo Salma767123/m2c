@@ -100,6 +100,13 @@ export default function Order() {
                       finalImages = foundVariant.images;
                     }
                   }
+                } else if ((product as any).singleUnitSize || (product as any).singleUnitColor) {
+                  variantDetails = {
+                    size: (product as any).singleUnitSize || '',
+                    color: (product as any).singleUnitColor || '',
+                    colorHex: (product as any).singleUnitColorHex,
+                    sku: product.baseSku
+                  };
                 }
 
                 return {
@@ -165,6 +172,11 @@ export default function Order() {
                   color: item.variant.color,
                   colorHex: item.variant.colorHex,
                   sku: item.variant.sku
+                } : (item.product?.singleUnitSize || item.product?.singleUnitColor) ? {
+                  size: item.product.singleUnitSize || '',
+                  color: item.product.singleUnitColor || '',
+                  colorHex: item.product.singleUnitColorHex,
+                  sku: item.product.baseSku || ''
                 } : undefined
               }
             })
@@ -445,24 +457,28 @@ export default function Order() {
                                 </span>
                               )}
                             </div>
-                            {item.variantDetails && (
+                            {item.variantDetails && (item.variantDetails.color || item.variantDetails.size) && (
                               <div className="flex gap-4 mt-2 mb-2 text-sm text-slate-700 font-medium border-t border-slate-100 pt-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-slate-500">Color:</span>
-                                  <div className="flex items-center gap-1">
-                                    {item.variantDetails.colorHex && (
-                                      <div
-                                        className="w-3 h-3 rounded-full border border-slate-300"
-                                        style={{ backgroundColor: item.variantDetails.colorHex }}
-                                      />
-                                    )}
-                                    <span>{item.variantDetails.color}</span>
+                                {item.variantDetails.color && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-slate-500">Color:</span>
+                                    <div className="flex items-center gap-1">
+                                      {item.variantDetails.colorHex && (
+                                        <div
+                                          className="w-3 h-3 rounded-full border border-slate-300"
+                                          style={{ backgroundColor: item.variantDetails.colorHex }}
+                                        />
+                                      )}
+                                      <span>{item.variantDetails.color}</span>
+                                    </div>
                                   </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-slate-500">Size:</span>
-                                  <span>{item.variantDetails.size}</span>
-                                </div>
+                                )}
+                                {item.variantDetails.size && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-slate-500">Size:</span>
+                                    <span>{item.variantDetails.size}</span>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

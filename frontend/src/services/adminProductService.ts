@@ -46,6 +46,14 @@ export interface AdminProduct {
     businessEmail: string;
     status: string;
   };
+  assignedQcId?: string | null;
+  assignedQc?: {
+    id: string;
+    checkerId: string;
+    name?: string;
+    email?: string;
+    status?: string;
+  } | null;
   inventory?: {
     id: string;
     name: string;
@@ -101,7 +109,7 @@ class AdminProductService {
   async getAllProducts(params?: {
     page?: number;
     limit?: number;
-    approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED';
+    approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION';
     status?: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
     search?: string;
     vendorId?: string;

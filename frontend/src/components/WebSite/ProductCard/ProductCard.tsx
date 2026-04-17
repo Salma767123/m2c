@@ -169,12 +169,12 @@ const ProductCard = ({ product }: ProductCardProps) => {
     displayPrice = (product as any).price;
   }
 
-  // Derive actual stock — use totalStock as the authoritative aggregate value
+  // Derive actual stock — use totalStock, treat negative as 0
   const currentStock = isServiceProduct(product)
-    ? (product.totalStock ?? 0)
+    ? Math.max(product.totalStock ?? 0, 0)
     : (product as any).stock ?? 1; // Default to 1 for mock products without stock specified
 
-  const isActuallyInStock = product.inStock && currentStock > 0;
+  const isActuallyInStock = currentStock > 0;
 
   return (
     <Link href={`/products/${product.id}`} className="block h-full">

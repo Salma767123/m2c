@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -102,6 +103,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<{src: string, alt: string} | null>(null)
   const reportRef = useRef<HTMLDivElement>(null)
   const autoDownloadTriggered = useRef(false)
 
@@ -350,12 +352,12 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                 {(fd.factoryPhotos as PhotoItem[]).map((p, i) => {
                   const src = p?.data || p?.url || null
                   return src && typeof src === 'string' ? (
-                    <div key={i} className="relative group">
+                    <div key={i} className="relative group cursor-pointer" onClick={() => setSelectedImage({src, alt: p.name || `Photo ${i + 1}`})}>
                       <img
                         src={src}
                         alt={p.name || `Photo ${i + 1}`}
                         onError={(e) => { e.currentTarget.style.display = "none" }}
-                        className="w-full h-32 object-cover rounded-xl border border-slate-200 shadow-sm"
+                        className="w-full h-32 object-cover rounded-xl border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
                       />
                       {p.name && (
                         <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate opacity-0 group-hover:opacity-100 transition-opacity">
@@ -468,6 +470,30 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
       </div>
 
       </div>{/* end PDF capture area */}
+
+      {/* Fullscreen Image Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-5xl max-h-screen">
+            <button 
+              onClick={(e) => {e.stopPropagation(); setSelectedImage(null)}}
+              className="absolute -top-10 -right-4 p-2 text-white hover:text-gray-300"
+            >
+              <XCircle className="w-8 h-8" />
+            </button>
+            <img 
+              src={selectedImage.src} 
+              alt={selectedImage.alt}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <p className="text-center text-white mt-4 text-sm font-medium">{selectedImage.alt}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

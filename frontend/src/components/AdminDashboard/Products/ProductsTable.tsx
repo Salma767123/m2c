@@ -441,6 +441,11 @@ export default function ProductsTable() {
                     <div className="font-medium text-gray-900">
                       Vendor: {formatPrice(product.basePrice)}
                     </div>
+                    {product.originalPrice && (
+                      <div className="text-sm text-gray-500 line-through">
+                        Original: {formatPrice(product.originalPrice)}
+                      </div>
+                    )}
                     {product.adminFixedPrice && (
                       <div className="text-sm text-green-600 font-medium">
                         Admin: {formatPrice(product.adminFixedPrice)}

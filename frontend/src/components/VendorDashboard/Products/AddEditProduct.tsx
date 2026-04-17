@@ -847,6 +847,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       return
     }
 
+    // Cover image is mandatory
+    const hasCoverImage = formData.images?.some(img => img.imageType === 'cover')
+    if (!hasCoverImage) {
+      showErrorToast('Validation Error', 'Please upload a cover image for the product.')
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -2106,8 +2113,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   {/* Cover Image Section */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-gray-900">Cover Image</h4>
-                      <span className="text-xs text-gray-500">1 image only</span>
+                      <h4 className="font-medium text-gray-900">Cover Image <span className="text-red-500">*</span></h4>
+                      <span className="text-xs text-gray-500">1 image only (required)</span>
                     </div>
 
                     {/* Cover Image Upload */}

@@ -9,7 +9,11 @@ interface BreadcrumbItem {
   href?: string
 }
 
-export function Breadcrumb() {
+interface BreadcrumbProps {
+  customLabels?: Record<string, string>
+}
+
+export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
   const pathname = usePathname()
   
   // Map technical paths to user-friendly labels
@@ -66,10 +70,11 @@ export function Breadcrumb() {
         const segment = paths[i]
         currentPath += `/${segment}`
         
-        // Handle dynamic routes (like [id])
-        if (segment.match(/^\[.*\]$/) || /^\d+$/.test(segment)) {
-          // For dynamic segments, use a generic label or try to get from context
-          const label = segment.match(/^\[.*\]$/) ? 'Details' : `#${segment}`
+        // Handle dynamic routes (like [id]) or typical database IDs (numbers, mongo object id, uuid)
+        if (segment.match(/^\[.*\]$/) || /^\d+$/.test(segment) || /^[0-9a-fA-F]{24}$/.test(segment) || /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(segment)) {
+          // For dynamic segments, use custom label if provided, otherwise generic
+          const genericLabel = segment.match(/^\[.*\]$/) ? 'Details' : 'Details'
+          const label = customLabels[segment] || genericLabel
           
           // Don't add href for the last item (current page)
           if (i === paths.length - 1) {
@@ -79,7 +84,7 @@ export function Breadcrumb() {
           }
         } else {
           // Use mapped label or capitalize the segment
-          const label = pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
+          const label = customLabels[segment] || pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
           
           // Don't add href for the last item (current page)
           if (i === paths.length - 1) {
@@ -100,8 +105,9 @@ export function Breadcrumb() {
         currentPath += `/${segment}`
         
         // Handle dynamic routes
-        if (segment.match(/^\[.*\]$/) || /^\d+$/.test(segment)) {
-          const label = segment.match(/^\[.*\]$/) ? 'Details' : `#${segment}`
+        if (segment.match(/^\[.*\]$/) || /^\d+$/.test(segment) || /^[0-9a-fA-F]{24}$/.test(segment) || /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(segment)) {
+          const genericLabel = segment.match(/^\[.*\]$/) ? 'Details' : 'Details'
+          const label = customLabels[segment] || genericLabel
           
           if (i === paths.length - 1) {
             breadcrumbs.push({ label })
@@ -109,7 +115,7 @@ export function Breadcrumb() {
             breadcrumbs.push({ label, href: currentPath })
           }
         } else {
-          const label = pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
+          const label = customLabels[segment] || pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
           
           if (i === paths.length - 1) {
             breadcrumbs.push({ label })
@@ -127,7 +133,7 @@ export function Breadcrumb() {
         const segment = paths[i]
         currentPath += `/${segment}`
         
-        const label = pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
+        const label = customLabels[segment] || pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
         
         // Don't add href for the last item (current page)
         if (i === paths.length - 1) {

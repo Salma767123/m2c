@@ -143,7 +143,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
       // Add to cart via API
       await cartService.addToCart(product.id, quantity, selectedVariant?.id);
 
-      const variantInfo = selectedVariant ? ` (${selectedVariant.size} - ${selectedVariant.color})` : '';
+      const variantInfo = selectedVariant ? ` (${selectedVariant.size} - ${selectedVariant.color})` : 
+        (product.singleUnitSize || product.singleUnitColor ? ` (${[product.singleUnitSize, product.singleUnitColor].filter(Boolean).join(' - ')})` : '');
 
       showSuccessToast(
         'Added to Cart!',
@@ -174,7 +175,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
     if (!product) return;
 
     try {
-      const variantInfo = selectedVariant ? ` (${selectedVariant.size} - ${selectedVariant.color})` : '';
+      const variantInfo = selectedVariant ? ` (${selectedVariant.size} - ${selectedVariant.color})` : 
+        (product.singleUnitSize || product.singleUnitColor ? ` (${[product.singleUnitSize, product.singleUnitColor].filter(Boolean).join(' - ')})` : '');
       console.log(`Buy now ${product.name}${variantInfo}`);
 
       showSuccessToast(
@@ -238,14 +240,18 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
     ));
   };
 
-  // Get available stock based on selected variant or total product stock
+  // Get available stock based on selected variant or base stock
   const availableStock = selectedVariant
     ? selectedVariant.stock
-    : (product.totalStock ?? 0);
+    : (product.inventory?.baseStock ?? product.totalStock ?? 0);
 
   // Get current price based on selected variant or admin fixed price or base price
-  const currentPrice = selectedVariant?.adminFixedPrice || selectedVariant?.price || product.adminFixedPrice || product.basePrice;
-  const originalPrice = selectedVariant?.originalPrice || product.originalPrice;
+  const currentPrice = selectedVariant
+    ? (selectedVariant.adminFixedPrice ?? selectedVariant.price)
+    : (product.adminFixedPrice ?? product.basePrice);
+  const originalPrice = selectedVariant
+    ? selectedVariant.originalPrice
+    : product.originalPrice;
 
   // Get current image URL
   const currentImageUrl = displayImages[selectedImage]?.url;
@@ -424,7 +430,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                       {product.hasVariants && product.variants && product.variants.length > 0 && (
                         <div className="max-w-md">
                           <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                            Select Variant: {selectedVariant ? `${selectedVariant.size} - ${selectedVariant.color}` : 'Choose one'}
+                            Select Variant: {selectedVariant ? `${selectedVariant.size} - ${selectedVariant.color}` : 
+                              ([product.singleUnitSize, product.singleUnitColor].filter(Boolean).join(' - ') || 'Base Variant')}
                           </h3>
                           <div className="grid grid-cols-2 gap-2">
                             {/* Default Variant Option */}
@@ -469,7 +476,10 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                       <span className="text-xs text-gray-600">{product.singleUnitColor}</span>
                                     )}
                                   </div>
-                                  <div className="text-lg font-bold text-gray-900 mt-1">${(product.adminFixedPrice || product.basePrice).toFixed(2)}</div>
+                                  <div className="text-lg font-bold text-gray-900 mt-1">${(product.adminFixedPrice ?? product.basePrice).toFixed(2)}</div>
+                                  {product.originalPrice && product.originalPrice > (product.adminFixedPrice ?? product.basePrice) && (
+                                    <span className="text-xs text-gray-400 line-through">${product.originalPrice.toFixed(2)}</span>
+                                  )}
                                   <div className="text-xs text-gray-500">
                                     {(product.inventory?.baseStock ?? product.totalStock ?? 0) > 0
                                       ? `${product.inventory?.baseStock ?? product.totalStock} in stock`
@@ -520,8 +530,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                       <span className="text-xs text-gray-600">{variant.color}</span>
                                     </div>
                                     <div className="flex items-center gap-1 mt-1">
-                                      <span className="text-lg font-bold text-gray-900">${(variant.adminFixedPrice || variant.price).toFixed(2)}</span>
-                                      {variant.originalPrice && variant.originalPrice > (variant.adminFixedPrice || variant.price) && (
+                                      <span className="text-lg font-bold text-gray-900">${(variant.adminFixedPrice ?? variant.price).toFixed(2)}</span>
+                                      {variant.originalPrice && variant.originalPrice > (variant.adminFixedPrice ?? variant.price) && (
                                         <span className="text-xs text-gray-400 line-through">${variant.originalPrice.toFixed(2)}</span>
                                       )}
                                       {variant.discount && variant.discount > 0 && (
@@ -576,7 +586,7 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                       <div className="bg-linear-to-br from-gray-50 to-white p-4 rounded-xl shadow-lg border border-gray-100">
                         {/* Stock Status */}
                         <div className="mb-3">
-                          {product.inStock && availableStock > 0 ? (
+                          {availableStock > 0 ? (
                             <div className="flex items-center space-x-2">
                               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                               <span className="text-green-600 font-bold text-base">In stock</span>
@@ -604,7 +614,7 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                         )}
 
                         {/* Action Buttons */}
-                        {product.inStock && availableStock > 0 && (
+                        {availableStock > 0 && (
                           <>
                             {/* Quantity Selector */}
                             <div className="flex items-center justify-center gap-3 mb-3">
@@ -660,6 +670,18 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                   <div className="flex justify-between py-3 border-b border-gray-100">
                     <span className="font-semibold text-gray-700">Sub Category</span>
                     <span className="text-gray-600">{product.subCategory}</span>
+                  </div>
+                )}
+                {(!product.hasVariants) && product.singleUnitSize && (
+                  <div className="flex justify-between py-3 border-b border-gray-100">
+                    <span className="font-semibold text-gray-700">Size</span>
+                    <span className="text-gray-600">{product.singleUnitSize}</span>
+                  </div>
+                )}
+                {(!product.hasVariants) && product.singleUnitColor && (
+                  <div className="flex justify-between py-3 border-b border-gray-100">
+                    <span className="font-semibold text-gray-700">Color</span>
+                    <span className="text-gray-600">{product.singleUnitColor}</span>
                   </div>
                 )}
                 {product.material && (

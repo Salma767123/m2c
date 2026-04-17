@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -46,7 +47,7 @@ interface PhotoItem {
   name?: string
 }
 
-function PhotoGrid({ photos, label }: { photos: (string | PhotoItem)[] | undefined | null; label: string }) {
+function PhotoGrid({ photos, label, onImageClick }: { photos: (string | PhotoItem)[] | undefined | null; label: string; onImageClick?: (src: string, alt: string) => void }) {
   if (!photos || photos.length === 0) return null
   return (
     <div className="mt-4">
@@ -58,12 +59,12 @@ function PhotoGrid({ photos, label }: { photos: (string | PhotoItem)[] | undefin
           const src = typeof p === "string" ? p : p?.data || p?.url || null
           const alt = typeof p === "string" ? `${label} ${i + 1}` : p?.name || `${label} ${i + 1}`
           return src ? (
-            <div key={i} className="relative group">
+            <div key={i} className="relative group cursor-pointer" onClick={() => onImageClick?.(src, alt)}>
               <img
                 src={src}
                 alt={alt}
                 onError={(e) => { e.currentTarget.style.display = "none" }}
-                className="w-full h-32 object-cover rounded-xl border border-slate-200 shadow-sm"
+                className="w-full h-32 object-cover rounded-xl border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
               />
               {typeof p !== "string" && p?.name && (
                 <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate opacity-0 group-hover:opacity-100 transition-opacity">
@@ -156,6 +157,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<{src: string, alt: string} | null>(null)
   const reportRef = useRef<HTMLDivElement>(null)
   const autoDownloadTriggered = useRef(false)
 
@@ -359,7 +361,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         ) : (
           <p className="text-slate-400 text-sm">No items recorded.</p>
         )}
-        <PhotoGrid photos={fd.warehousePhotoEvidences} label="Warehouse Photos" />
+        <PhotoGrid photos={fd.warehousePhotoEvidences} label="Warehouse Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
       {/* Section 3: Measurements */}
@@ -398,7 +400,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         ) : (
           <p className="text-slate-400 text-sm">No measurements recorded.</p>
         )}
-        <PhotoGrid photos={fd.measurementPhotos} label="Measurement Photos" />
+        <PhotoGrid photos={fd.measurementPhotos} label="Measurement Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
       {/* Section 4: Packaging */}
@@ -420,7 +422,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
             )
           })}
         </div>
-        <PhotoGrid photos={fd.packagingPhotos} label="Packaging Photos" />
+        <PhotoGrid photos={fd.packagingPhotos} label="Packaging Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
       {/* Section 5: Defects */}
@@ -475,7 +477,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
             {fd.minorDefectDetails && <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3"><p className="text-xs font-semibold text-neutral-700 uppercase mb-1">Minor Defect Details</p><p className="text-sm text-neutral-900">{fd.minorDefectDetails}</p></div>}
           </div>
         )}
-        <PhotoGrid photos={fd.defectPhotos} label="Defect Photos" />
+        <PhotoGrid photos={fd.defectPhotos} label="Defect Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
       {/* Section 6: Testing */}
@@ -514,7 +516,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
                           {test.rightPhotos!.map((p, j) => {
                             const src = typeof p === "string" ? p : p?.data || p?.url
                             return src ? (
-                              <img key={j} src={src} alt={`Right ${j + 1}`} onError={(e) => { e.currentTarget.style.display = "none" }} className="w-full h-24 object-cover rounded-lg border border-emerald-200" />
+                              <img key={j} src={src} alt={`Right ${j + 1}`} onClick={() => setSelectedImage({src, alt: `Right ${j + 1}`})} onError={(e) => { e.currentTarget.style.display = "none" }} className="w-full h-24 object-cover rounded-lg border border-emerald-200 cursor-pointer transition-transform hover:scale-[1.02]" />
                             ) : null
                           })}
                         </div>
@@ -527,7 +529,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
                           {test.wrongPhotos!.map((p, j) => {
                             const src = typeof p === "string" ? p : p?.data || p?.url
                             return src ? (
-                              <img key={j} src={src} alt={`Wrong ${j + 1}`} onError={(e) => { e.currentTarget.style.display = "none" }} className="w-full h-24 object-cover rounded-lg border border-red-200" />
+                              <img key={j} src={src} alt={`Wrong ${j + 1}`} onClick={() => setSelectedImage({src, alt: `Wrong ${j + 1}`})} onError={(e) => { e.currentTarget.style.display = "none" }} className="w-full h-24 object-cover rounded-lg border border-red-200 cursor-pointer transition-transform hover:scale-[1.02]" />
                             ) : null
                           })}
                         </div>
@@ -541,7 +543,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         ) : (
           <p className="text-slate-400 text-sm">No tests recorded.</p>
         )}
-        <PhotoGrid photos={fd.testingPhotos} label="Testing Photos" />
+        <PhotoGrid photos={fd.testingPhotos} label="Testing Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
       {/* Section 7: Documentation */}
@@ -549,9 +551,9 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         <div className="mb-4">
           <InfoRow label="Inspector Signature" value={fd.inspectorSignature} />
         </div>
-        <PhotoGrid photos={fd.documentationPhotos} label="General Documentation Photos" />
-        <PhotoGrid photos={fd.photocopyDocuments} label="Photocopy Documents" />
-        <PhotoGrid photos={fd.companyIdCards} label="Company ID Cards" />
+        <PhotoGrid photos={fd.documentationPhotos} label="General Documentation Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+        <PhotoGrid photos={fd.photocopyDocuments} label="Photocopy Documents" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+        <PhotoGrid photos={fd.companyIdCards} label="Company ID Cards" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
       {/* Selfie Verification */}
@@ -624,6 +626,30 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       </div>
 
       </div>{/* end PDF capture area */}
+
+      {/* Fullscreen Image Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-5xl max-h-screen">
+            <button 
+              onClick={(e) => {e.stopPropagation(); setSelectedImage(null)}}
+              className="absolute -top-10 -right-4 p-2 text-white hover:text-gray-300"
+            >
+              <XCircle className="w-8 h-8" />
+            </button>
+            <img 
+              src={selectedImage.src} 
+              alt={selectedImage.alt}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <p className="text-center text-white mt-4 text-sm font-medium">{selectedImage.alt}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -196,22 +196,21 @@ const createOrder = async (req, res) => {
             });
 
             // Update Stock
+            // Aggregate total quantity per product for totalStock/inventory updates
+            const productTotalDeductions = {};
             for (const update of stockUpdates) {
-                const productUpdateData = {
-                    totalStock: { decrement: update.quantity }
-                };
-
-                // Check if the stock drops to 0 or below, set inStock to false
-                if (update.currentTotalStock - update.quantity <= 0) {
-                    productUpdateData.inStock = false;
+                if (!productTotalDeductions[update.id]) {
+                    productTotalDeductions[update.id] = {
+                        totalQuantity: 0,
+                        inventoryItemId: update.inventoryItemId,
+                        currentTotalStock: update.currentTotalStock
+                    };
                 }
+                productTotalDeductions[update.id].totalQuantity += update.quantity;
+            }
 
-                await tx.product.update({
-                    where: { id: update.id },
-                    data: productUpdateData
-                });
-
-                // Also decrement the specific variant's stock if applicable
+            for (const update of stockUpdates) {
+                // Decrement the specific variant's stock if applicable
                 if (update.variantId) {
                     await tx.productVariant.update({
                         where: { id: update.variantId },
@@ -221,29 +220,70 @@ const createOrder = async (req, res) => {
                     });
                 }
 
-                // Also reduce from Inventory model if linked
-                if (update.inventoryItemId) {
+                // Decrement inventory baseStock for base product items (no variant)
+                if (!update.variantId && update.inventoryItemId) {
                     await tx.inventory.update({
                         where: { id: update.inventoryItemId },
                         data: {
-                            currentStock: { decrement: update.quantity }
+                            baseStock: { decrement: update.quantity }
+                        }
+                    });
+                }
+            }
+
+            // Recalculate product totalStock and inventory currentStock from source-of-truth values
+            for (const [productId, agg] of Object.entries(productTotalDeductions)) {
+                // Re-read fresh variant stocks after Step 2 decrements
+                const freshProduct = await tx.product.findUnique({
+                    where: { id: productId },
+                    include: { variants: true }
+                });
+
+                const variantSum = freshProduct.variants
+                    ? freshProduct.variants.reduce((sum, v) => sum + v.stock, 0)
+                    : 0;
+
+                let newTotalStock;
+
+                if (agg.inventoryItemId) {
+                    // Re-read fresh baseStock after Step 2 decrement
+                    const freshInventory = await tx.inventory.findUnique({
+                        where: { id: agg.inventoryItemId }
+                    });
+                    newTotalStock = freshInventory.baseStock + variantSum;
+
+                    await tx.inventory.update({
+                        where: { id: agg.inventoryItemId },
+                        data: {
+                            currentStock: newTotalStock
                         }
                     });
 
-                    // Log stock change history
+                    // Log stock change history accurately reflecting the order deductions
                     await tx.stockChangeHistory.create({
                         data: {
-                            inventoryId: update.inventoryItemId,
-                            previousStock: update.currentTotalStock,
-                            newStock: Math.max(0, update.currentTotalStock - update.quantity),
-                            changeAmount: -Math.abs(update.quantity),
+                            inventoryId: agg.inventoryItemId,
+                            previousStock: newTotalStock + agg.totalQuantity,
+                            newStock: newTotalStock,
+                            changeAmount: -agg.totalQuantity,
                             reason: `Order placed: ${orderDisplayId}`,
                             changedBy: userId,
                             changedByType: 'system',
                             changedByName: user.name
                         }
                     });
+                } else {
+                    // No inventory link — just decrement totalStock
+                    newTotalStock = Math.max(0, agg.currentTotalStock - agg.totalQuantity);
                 }
+
+                await tx.product.update({
+                    where: { id: productId },
+                    data: {
+                        totalStock: newTotalStock,
+                        inStock: newTotalStock > 0
+                    }
+                });
             }
 
             // Create Vendor Settlements

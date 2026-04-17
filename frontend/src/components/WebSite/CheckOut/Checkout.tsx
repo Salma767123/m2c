@@ -552,6 +552,10 @@ export default function Checkout() {
                       ? item.variant?.images?.[0]
                       : item.product?.images?.[0]?.url;
 
+                    const itemColor = item.variant?.color || item.product?.singleUnitColor;
+                    const itemSize = item.variant?.size || item.product?.singleUnitSize;
+                    const itemColorHex = item.variant?.colorHex || item.product?.singleUnitColorHex;
+
                     return (
                       <div key={item.id} className="flex gap-3 text-sm border-b border-slate-100 pb-3 last:border-0 last:pb-0">
                         <div className="w-16 h-16 bg-gray-100 rounded-md shrink-0 overflow-hidden">
@@ -565,19 +569,21 @@ export default function Checkout() {
                           <p className="font-medium text-slate-900 line-clamp-1">{item.product?.name || "Product"}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-slate-500">Qty: {item.quantity}</span>
-                            {item.variant && (
+                            {(itemColor || itemSize) && (
                               <div className="flex items-center gap-2 text-xs text-slate-500 ml-2">
-                                <span className="flex items-center gap-1">
-                                  {item.variant.colorHex && (
-                                    <span
-                                      className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block"
-                                      style={{ backgroundColor: item.variant.colorHex }}
-                                    />
-                                  )}
-                                  {item.variant.color}
-                                </span>
-                                <span>|</span>
-                                <span>Size: {item.variant.size}</span>
+                                {itemColor && (
+                                  <span className="flex items-center gap-1">
+                                    {itemColorHex && (
+                                      <span
+                                        className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block"
+                                        style={{ backgroundColor: itemColorHex }}
+                                      />
+                                    )}
+                                    {itemColor}
+                                  </span>
+                                )}
+                                {itemColor && itemSize && <span>|</span>}
+                                {itemSize && <span>Size: {itemSize}</span>}
                               </div>
                             )}
                           </div>

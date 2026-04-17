@@ -1233,6 +1233,61 @@ const getVendorCategoriesByVendorId = async (req, res) => {
   }
 };
 
+// Admin: Recalculate all inventory currentStock and product totalStock from source-of-truth values
+const recalculateAllStock = async (req, res) => {
+  try {
+    const allInventory = await prisma.inventory.findMany({
+      include: {
+        products: {
+          include: { variants: true }
+        }
+      }
+    });
+
+    let fixedCount = 0;
+
+    for (const item of allInventory) {
+      const mainProduct = item.products?.[0];
+      const variantSum = mainProduct?.variants
+        ? mainProduct.variants.reduce((sum, v) => sum + v.stock, 0)
+        : 0;
+      const correctCurrentStock = item.baseStock + variantSum;
+
+      // Fix inventory currentStock if wrong
+      if (item.currentStock !== correctCurrentStock) {
+        await prisma.inventory.update({
+          where: { id: item.id },
+          data: { currentStock: correctCurrentStock }
+        });
+        fixedCount++;
+      }
+
+      // Fix product totalStock and inStock if wrong
+      if (mainProduct && mainProduct.totalStock !== correctCurrentStock) {
+        await prisma.product.update({
+          where: { id: mainProduct.id },
+          data: {
+            totalStock: correctCurrentStock,
+            inStock: correctCurrentStock > 0
+          }
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Recalculated stock for ${allInventory.length} inventory items. Fixed ${fixedCount} items.`
+    });
+  } catch (error) {
+    console.error('Error recalculating stock:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to recalculate stock',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createInventoryItem,
   getVendorInventory,
@@ -1246,5 +1301,6 @@ module.exports = {
   getAllInventory,
   getAllInventoryStats,
   getInventoryByVendor,
-  getVendorCategoriesByVendorId
+  getVendorCategoriesByVendorId,
+  recalculateAllStock
 };

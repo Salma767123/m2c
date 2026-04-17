@@ -406,11 +406,17 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                       <div className="bg-white p-3 rounded border">
                         <p className="text-xs text-gray-500 mb-1">Vendor Price</p>
                         <p className="text-sm font-semibold text-gray-900">₹{product.basePrice}</p>
                       </div>
+                      {product.originalPrice && (
+                        <div className="bg-white p-3 rounded border border-gray-200">
+                          <p className="text-xs text-gray-500 mb-1">Original Price</p>
+                          <p className="text-sm font-semibold text-gray-500 line-through">₹{product.originalPrice}</p>
+                        </div>
+                      )}
                       {product.adminFixedPrice && (
                         <div className="bg-white p-3 rounded border border-green-200">
                           <p className="text-xs text-gray-500 mb-1">Admin Price</p>
@@ -452,11 +458,17 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                       </div>
 
                       {/* Variant Info Grid */}
-                      <div className="grid grid-cols-3 gap-4 mb-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                         <div className="bg-white p-3 rounded border">
                           <p className="text-xs text-gray-500 mb-1">Vendor Price</p>
                           <p className="text-sm font-semibold text-gray-900">₹{variant.price}</p>
                         </div>
+                        {variant.originalPrice && (
+                          <div className="bg-white p-3 rounded border border-gray-200">
+                            <p className="text-xs text-gray-500 mb-1">Original Price</p>
+                            <p className="text-sm font-semibold text-gray-500 line-through">₹{variant.originalPrice}</p>
+                          </div>
+                        )}
                         {variant.adminFixedPrice && (
                           <div className="bg-white p-3 rounded border border-green-200">
                             <p className="text-xs text-gray-500 mb-1">Admin Price</p>
@@ -603,6 +615,9 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 <div>
                   <p className="text-sm font-medium text-gray-900">Pricing</p>
                   <p className="text-sm text-gray-600">Vendor Price: ₹{product.basePrice}</p>
+                  {product.originalPrice && (
+                    <p className="text-sm text-gray-500 line-through">Original Price: ₹{product.originalPrice}</p>
+                  )}
                   {product.adminFixedPrice && (
                     <p className="text-sm text-green-600 font-medium">Admin Price: ₹{product.adminFixedPrice}</p>
                   )}
