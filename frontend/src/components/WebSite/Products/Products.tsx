@@ -32,7 +32,6 @@ const Products = () => {
   const [totalItems, setTotalItems] = useState(0);
 
   // Filter states
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
   const [selectedRating, setSelectedRating] = useState(0);
   const [inStockOnly, setInStockOnly] = useState(false);
@@ -110,7 +109,6 @@ const Products = () => {
           sortBy: sortBy === 'price-low' || sortBy === 'price-high' ? 'basePrice' : sortBy,
           sortOrder: sortBy === 'price-low' ? 'asc' : 'desc',
           inStock: inStockOnly || undefined,
-          colors: selectedColors.length > 0 ? selectedColors.join(',') : undefined,
           minRating: selectedRating > 0 ? selectedRating : undefined
         };
         
@@ -139,7 +137,7 @@ const Products = () => {
     return () => {
       ignore = true;
     };
-  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedColors, selectedRating, searchStringParam]);
+  }, [currentPage, searchTerm, selectedCategory, selectedSubcategory, priceRange, sortBy, inStockOnly, selectedRating, searchStringParam]);
 
   // Handle URL change reflecting updated searches
   useEffect(() => {
@@ -165,12 +163,8 @@ const Products = () => {
     };
   }, []);
 
-  // Extract unique values for filters
-  const availableColors = ['Red', 'Blue', 'Green', 'Yellow', 'White', 'Black', 'Multi'];
-
   // Clear all filters
   const clearAllFilters = () => {
-    setSelectedColors([]);
     setPriceRange({ min: 0, max: 1000 });
     setSelectedRating(0);
     setSelectedCategory('All');
@@ -185,7 +179,8 @@ const Products = () => {
   // All filtering is now done server-side
   const filteredProducts = products;
 
-  const activeFiltersCount = selectedColors.length +
+  const activeFiltersCount = (selectedCategory !== 'All' ? 1 : 0) +
+    (selectedSubcategory ? 1 : 0) +
     (selectedRating > 0 ? 1 : 0) +
     (priceRange.min > 0 || priceRange.max < 1000 ? 1 : 0) +
     (inStockOnly ? 1 : 0);
@@ -237,51 +232,7 @@ const Products = () => {
                 Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
               </button>
 
-              {/* Category Filter */}
-              <div className="relative" ref={categoryDropdownRef}>
-                <button
-                  onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  className="inline-flex items-center justify-between min-w-[160px] px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                >
-                  <span className="truncate">{selectedCategory === 'All' ? 'All Categories' : selectedCategory}</span>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0" />
-                </button>
-                {showCategoryDropdown && (
-                  <div className="absolute right-0 z-10 w-56 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                    <div className="py-1">
-                      <button
-                        onClick={() => {
-                          setSelectedCategory('All');
-                          setCategoryName('');
-                          setSelectedSubcategory('');
-                          setSubcategoryName('');
-                          setShowCategoryDropdown(false);
-                          setCurrentPage(1);
-                        }}
-                        className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100"
-                      >
-                        All Categories
-                      </button>
-                      {categoriesList.map((cat) => (
-                        <button
-                          key={cat.id}
-                          onClick={() => {
-                            setSelectedCategory(cat.name);
-                            setCategoryName(cat.name);
-                            setSelectedSubcategory('');
-                            setSubcategoryName('');
-                            setShowCategoryDropdown(false);
-                            setCurrentPage(1);
-                          }}
-                          className="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100"
-                        >
-                          {cat.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Category Filter Moved to Sidebar */}
 
               {/* Sort */}
               <div className="relative" ref={sortDropdownRef}>
@@ -402,27 +353,69 @@ const Products = () => {
                       </div>
                     </div>
 
-                    {/* Color Filter */}
+                    {/* Category Filter */}
                     <div>
-                      <h4 className="text-base font-medium text-gray-900 mb-3">Color</h4>
-                      <div className="space-y-2">
-                        {availableColors.map((color) => (
-                          <label key={color} className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={selectedColors.includes(color)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedColors([...selectedColors, color]);
-                                } else {
-                                  setSelectedColors(selectedColors.filter(c => c !== color));
-                                }
-                                setCurrentPage(1);
-                              }}
-                              className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                            />
-                            <span className="ml-2 text-sm text-gray-700">{color}</span>
-                          </label>
+                      <h4 className="text-base font-medium text-gray-900 mb-3">Categories</h4>
+                      <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="category"
+                            checked={selectedCategory === 'All'}
+                            onChange={() => {
+                              setSelectedCategory('All');
+                              setCategoryName('');
+                              setSelectedSubcategory('');
+                              setSubcategoryName('');
+                              setCurrentPage(1);
+                            }}
+                            className="rounded-full border-gray-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          <span className="ml-2 text-sm text-gray-700 font-medium">All Categories</span>
+                        </label>
+                        {categoriesList.map((cat) => (
+                          <div key={cat.id} className="space-y-2">
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                name="category"
+                                checked={selectedCategory === cat.name && !selectedSubcategory}
+                                onChange={() => {
+                                  setSelectedCategory(cat.name);
+                                  setCategoryName(cat.name);
+                                  setSelectedSubcategory('');
+                                  setSubcategoryName('');
+                                  setCurrentPage(1);
+                                }}
+                                className="rounded-full border-gray-300 text-amber-600 focus:ring-amber-500"
+                              />
+                              <span className="ml-2 text-sm text-gray-700 font-medium">{cat.name}</span>
+                            </label>
+                            
+                            {/* Subcategories */}
+                            {cat.subcategories && cat.subcategories.length > 0 && selectedCategory === cat.name && (
+                              <div className="ml-6 space-y-2 mt-2 border-l-2 border-gray-200 pl-3">
+                                {cat.subcategories.map((sub: any) => (
+                                  <label key={sub.id} className="flex items-center">
+                                    <input
+                                      type="radio"
+                                      name="subcategory"
+                                      checked={selectedSubcategory === sub.name}
+                                      onChange={() => {
+                                        setSelectedCategory(cat.name); // Ensure parent is set
+                                        setCategoryName(cat.name);
+                                        setSelectedSubcategory(sub.name);
+                                        setSubcategoryName(sub.name);
+                                        setCurrentPage(1);
+                                      }}
+                                      className="rounded-full border-gray-300 text-amber-600 focus:ring-amber-500"
+                                    />
+                                    <span className="ml-2 text-sm text-gray-600">{sub.name}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </div>
                     </div>

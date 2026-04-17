@@ -10,8 +10,6 @@ import {
   Truck,
   CheckCircle,
   Star,
-  Heart,
-  ShoppingCart,
   Calendar,
   MapPin,
   CreditCard,
@@ -23,58 +21,13 @@ import {
   AlertCircle,
   Clock
 } from "lucide-react"
-import { products } from "@/components/mockData/products"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/UI/Card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import orderService, { Order as APIOrder } from "@/services/orderService"
 import ReviewModal from "./ReviewModal"
 
 interface OrderDetailProps {
   orderId: string
 }
-
-// Related products using actual product data
-const relatedProducts = [
-  {
-    id: parseInt(products[3].id),
-    name: products[3].name,
-    image: products[3].images[0],
-    price: products[3].price,
-    originalPrice: products[3].originalPrice,
-    rating: products[3].rating,
-    reviews: products[3].reviews,
-    category: products[3].category
-  },
-  {
-    id: parseInt(products[4].id),
-    name: products[4].name,
-    image: products[4].images[0],
-    price: products[4].price,
-    originalPrice: products[4].originalPrice,
-    rating: products[4].rating,
-    reviews: products[4].reviews,
-    category: products[4].category
-  },
-  {
-    id: parseInt(products[6].id),
-    name: products[6].name,
-    image: products[6].images[0],
-    price: products[6].price,
-    originalPrice: products[6].originalPrice,
-    rating: products[6].rating,
-    reviews: products[6].reviews,
-    category: products[6].category
-  },
-  {
-    id: parseInt(products[7].id),
-    name: products[7].name,
-    image: products[7].images[0],
-    price: products[7].price,
-    originalPrice: products[7].originalPrice,
-    rating: products[7].rating,
-    reviews: products[7].reviews,
-    category: products[7].category
-  }
-]
 
 // Helper to normalize status for display
 const formatStatus = (status: string) => {
@@ -158,6 +111,29 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   }
 
   const getQuantity = (productId: number) => quantities[productId] || 1
+
+  const handleDownloadInvoice = async () => {
+    if (!orderDetails?.id) return;
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+      const token = localStorage.getItem("userToken") || sessionStorage.getItem("userToken") || "";
+      const response = await fetch(`${baseUrl}/orders/${orderDetails.id}/invoice`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to generate invoice");
+      const html = await response.text();
+      const win = window.open("", "_blank");
+      if (win) {
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(() => win.print(), 300);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate invoice. Please try again later.");
+    }
+  };
 
   // Loading state
   if (loading) {
@@ -354,19 +330,12 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 {/* Action Buttons */}
                 <div className="mt-6 pt-6 border-t border-slate-200">
                   <div className="flex flex-wrap gap-3">
-                    {normalizedStatus !== "received" && normalizedStatus !== "cancelled" && (
-                      <button className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">
-                        <Eye className="w-4 h-4" />
-                        Track Order
-                      </button>
-                    )}
-                    <button className="flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors">
+                    <button
+                      onClick={handleDownloadInvoice}
+                      className="flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors"
+                    >
                       <Download className="w-4 h-4" />
-                      Download Invoice / Packing List
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors">
-                      <MessageCircle className="w-4 h-4" />
-                      Contact Support
+                      Download Invoice
                     </button>
                     {normalizedStatus === "received" && (
                       <button
@@ -469,82 +438,6 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
           </div>
         </div>
 
-        {/* Related Products - Separate Bottom Section */}
-        <div className="mt-12">
-          <Card className="border overflow-hidden">
-            <CardHeader className="border-b">
-              <CardTitle className="text-2xl">You Might Also Like</CardTitle>
-              <CardDescription>Products similar to your order</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {relatedProducts.map((product) => (
-                  <div key={product.id} className="group border border-slate-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:border-slate-300">
-                    <div className="relative mb-4">
-                      <div className="relative w-full h-64 bg-slate-100 rounded-lg overflow-hidden">
-                        <Image
-                          src={product.image}
-                          alt={product.name}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                      <button className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition-colors">
-                        <Heart className="w-4 h-4 text-slate-400 hover:text-red-500" />
-                      </button>
-                      {product.originalPrice && product.originalPrice > product.price && (
-                        <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-xs font-medium">
-                          {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                        {product.name}
-                      </h3>
-
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-4 h-4 ${i < Math.floor(product.rating)
-                                ? "text-yellow-400 fill-current"
-                                : "text-slate-300"
-                                }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-sm text-slate-600">
-                          {product.rating} ({product.reviews})
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-slate-900">
-                          ${product.price.toFixed(2)}
-                        </span>
-                        {product.originalPrice && product.originalPrice > product.price && (
-                          <span className="text-sm text-slate-500 line-through">
-                            ${product.originalPrice.toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-2">
-                        <button className="flex-1 bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-                          <ShoppingCart className="w-4 h-4" />
-                          Add to Cart
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
       <ReviewModal
         isOpen={reviewModalState.isOpen}

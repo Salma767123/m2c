@@ -116,11 +116,16 @@ const getAllCategories = async (req, res) => {
       }
     });
 
-    // Add product count (mock for now - will be real when Product model exists)
-    const categoriesWithStats = categories.map(category => ({
-      ...category,
-      productCount: Math.floor(Math.random() * 100), // Mock data
-      subcategoryCount: category._count.subcategories
+    // Add real product count
+    const categoriesWithStats = await Promise.all(categories.map(async (category) => {
+      const productCount = await prisma.product.count({
+        where: category.parentId ? { subCategory: category.name } : { category: category.name }
+      });
+      return {
+        ...category,
+        productCount,
+        subcategoryCount: category._count.subcategories
+      };
     }));
 
     // If building tree structure from flat list
@@ -185,10 +190,14 @@ const getCategoryById = async (req, res) => {
       });
     }
 
-    // Add mock product count
+    // Add real product count
+    const productCount = await prisma.product.count({
+      where: category.parentId ? { subCategory: category.name } : { category: category.name }
+    });
+
     const categoryWithStats = {
       ...category,
-      productCount: Math.floor(Math.random() * 100), // Mock data
+      productCount,
       subcategoryCount: category._count.subcategories
     };
 
@@ -735,11 +744,16 @@ const getSubcategories = async (req, res) => {
       }
     });
 
-    // Add mock product count
-    const subcategoriesWithStats = subcategories.map(sub => ({
-      ...sub,
-      productCount: Math.floor(Math.random() * 50), // Mock data
-      subcategoryCount: sub._count.subcategories
+    // Add real product count
+    const subcategoriesWithStats = await Promise.all(subcategories.map(async (sub) => {
+      const productCount = await prisma.product.count({
+        where: { subCategory: sub.name }
+      });
+      return {
+        ...sub,
+        productCount,
+        subcategoryCount: sub._count.subcategories
+      };
     }));
 
     res.json({
@@ -1078,10 +1092,14 @@ const getSubcategoryById = async (req, res) => {
       });
     }
 
-    // Add mock product count
+    // Add real product count
+    const productCount = await prisma.product.count({
+      where: { subCategory: subcategory.name }
+    });
+
     const subcategoryWithStats = {
       ...subcategory,
-      productCount: Math.floor(Math.random() * 50), // Mock data
+      productCount,
       subcategoryCount: subcategory._count.subcategories
     };
 
@@ -1434,13 +1452,16 @@ const searchCategories = async (req, res) => {
       }
     });
 
-    // Add mock product count and category path
+    // Add real product count and category path
     const categoriesWithExtras = await Promise.all(
       categories.map(async (category) => {
         const breadcrumb = await getCategoryPath(category.id);
+        const productCount = await prisma.product.count({
+          where: category.parentId ? { subCategory: category.name } : { category: category.name }
+        });
         return {
           ...category,
-          productCount: Math.floor(Math.random() * 100), // Mock data
+          productCount,
           subcategoryCount: category._count.subcategories,
           breadcrumb
         };
@@ -1490,24 +1511,30 @@ const getCategoryTree = async (req, res) => {
       }
     });
 
-    // Build tree structure with depth limit
-    const buildTree = (categories, parentId = null, currentDepth = 0) => {
+    // Build tree structure with depth limit (async since we fetch counts)
+    const buildTree = async (categories, parentId = null, currentDepth = 0) => {
       if (currentDepth >= parseInt(maxDepth)) {
         return [];
       }
 
-      return categories
-        .filter(cat => cat.parentId === parentId)
-        .map(category => ({
+      const filtered = categories.filter(cat => cat.parentId === parentId);
+      return Promise.all(filtered.map(async (category) => {
+        const productCount = await prisma.product.count({
+          where: category.parentId ? { subCategory: category.name } : { category: category.name }
+        });
+        const subcategories = await buildTree(categories, category.id, currentDepth + 1);
+        
+        return {
           ...category,
-          productCount: Math.floor(Math.random() * 100), // Mock data
+          productCount,
           subcategoryCount: category._count.subcategories,
           depth: currentDepth,
-          subcategories: buildTree(categories, category.id, currentDepth + 1)
-        }));
+          subcategories
+        };
+      }));
     };
 
-    const categoryTree = buildTree(allCategories);
+    const categoryTree = await buildTree(allCategories);
 
     res.json({
       success: true,
