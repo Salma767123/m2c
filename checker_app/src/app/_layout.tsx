@@ -78,7 +78,7 @@ export default function RootLayout() {
         <Stack.Screen name="vendors/[id]/inspection" options={{ headerShown: false }} />
         <Stack.Screen name="product-report/[id]" options={{ headerShown: false }} />
       </Stack>
-      <StatusBar style="light" backgroundColor="#000000" translucent={false} />
+      <StatusBar style="auto" />
       <NotificationBanner
         visible={notification.visible}
         title={notification.title}

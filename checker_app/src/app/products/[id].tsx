@@ -142,7 +142,6 @@ export default function ProductDetailScreen() {
 
   return (
     <View className="flex-1 bg-slate-50">
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <Header onBack={() => router.back()} insetsTop={insets.top} />
 
       <ScrollView
@@ -152,7 +151,6 @@ export default function ProductDetailScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563eb" colors={['#2563eb']} />
         }
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2563eb" colors={['#2563eb']} />}
       >
         {/* Hero */}
         <View className="bg-white px-4 pt-4 pb-5 border-b border-slate-100">
@@ -232,7 +230,7 @@ export default function ProductDetailScreen() {
             <Card title="Vendor">
               <InfoRow label="Company" value={v.companyName} />
               <InfoRow label="Owner" value={v.ownerName} />
-              <InfoRow label="Email" value={v.businessEmail || v.email} tappable={() => v.businessEmail && router} />
+              <InfoRow label="Email" value={v.businessEmail || v.email} onPress={() => {}} />
               <InfoRow label="Phone" value={v.businessPhone} />
               <InfoRow label="Factory" value={[v.factoryCity, v.factoryState].filter(Boolean).join(', ')} />
             </Card>
@@ -482,14 +480,19 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
+function InfoRow({ label, value, onPress }: { label: string; value?: string | null; onPress?: () => void }) {
   if (!value) return null;
-  return (
+  const Content = (
     <View className="py-2">
       <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{label}</Text>
-      <Text className="text-sm text-slate-900" style={{ lineHeight: 20 }} selectable>{value}</Text>
+      <Text className="text-sm text-slate-900" style={{ lineHeight: 20 }} selectable={!onPress}>{value}</Text>
     </View>
   );
+
+  if (onPress) {
+    return <TouchableOpacity onPress={onPress} activeOpacity={0.7}>{Content}</TouchableOpacity>;
+  }
+  return Content;
 }
 
 function SummaryStat({ label, value }: { label: string; value: string }) {

@@ -1376,6 +1376,7 @@ model DeviceToken {
 
   @@index([userId, role])
   @@map("device_tokens")
+}
 // ============================================
 // ANALYTICS & TRACKING
 // ============================================
@@ -1412,3 +1413,4 @@ model ProductView {
   @@index([category])
   @@map("product_views")
 }
+

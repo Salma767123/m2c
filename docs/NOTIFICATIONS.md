@@ -29,8 +29,13 @@
 **File:** `backend/config/firebase.js`
 
 ```js
-const admin = require('firebase-admin');
-const serviceAccount = require('../firebase-service-account.json');
+const admin = require("firebase-admin");
+
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+  throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON env var is required");
+}
+
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -41,10 +46,18 @@ module.exports = admin;
 ```
 
 **Service Account Key:**
+
 - Generated from Firebase Console → Project Settings → Service Accounts
-- Saved at `backend/firebase-service-account.json`
-- Added to `.gitignore` (never commit)
 - Project: `m2c-markdowns-2a6ed`
+- **Never committed** — loaded at runtime from the `FIREBASE_SERVICE_ACCOUNT_JSON` env var
+- Local dev: paste the full JSON blob on one line in `backend/.env`, wrapped in **single quotes** so dotenv keeps `\n` sequences literal:
+
+  ```env
+  FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"m2c-markdowns-2a6ed","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",...}'
+  ```
+
+- Production (Vercel / Render / Railway): paste the same JSON into the host's encrypted env-var UI. No quotes needed there — the UI handles escaping.
+- Rotation: Firebase Console → Service Accounts → **Generate new private key**, then replace the env var. Delete the old key in the console.
 
 ### Device Token Storage
 
@@ -71,17 +84,17 @@ model DeviceToken {
 
 #### Core Functions
 
-| Function | Purpose |
-|---|---|
-| `sendToDevice(token, {title, body, data})` | Send to a single FCM token |
-| `sendToTokens(tokens[], {title, body, data})` | Send to multiple tokens |
+| Function                                        | Purpose                       |
+| ----------------------------------------------- | ----------------------------- |
+| `sendToDevice(token, {title, body, data})`      | Send to a single FCM token    |
+| `sendToTokens(tokens[], {title, body, data})`   | Send to multiple tokens       |
 | `sendToUser(userId, role, {title, body, data})` | Send to all devices of a user |
-| `sendToRole(role, {title, body, data})` | Send to all users with a role |
+| `sendToRole(role, {title, body, data})`         | Send to all users with a role |
 
 #### Pre-built Notification Helpers
 
 ```js
-const { notifications } = require('../utils/notificationService');
+const { notifications } = require("../utils/notificationService");
 
 // QC Checker notifications (mobile)
 notifications.productAssigned(checkerId, productName);
@@ -104,22 +117,22 @@ await admin.messaging().send({
   token: deviceToken,
   notification: { title, body },
   data: {
-    type: 'PRODUCT_ASSIGNED',  // for client-side routing
-    screen: 'products',         // which screen to navigate to
+    type: "PRODUCT_ASSIGNED", // for client-side routing
+    screen: "products", // which screen to navigate to
   },
   android: {
-    priority: 'high',
+    priority: "high",
     notification: {
-      sound: 'default',
-      color: '#2563eb',         // blue accent on icon
-      priority: 'high',
+      sound: "default",
+      color: "#2563eb", // blue accent on icon
+      priority: "high",
       defaultVibrateTimings: true,
       defaultSound: true,
     },
   },
   apns: {
     payload: {
-      aps: { sound: 'default', badge: 1 },
+      aps: { sound: "default", badge: 1 },
     },
   },
 });
@@ -131,42 +144,45 @@ await admin.messaging().send({
 
 **File:** `backend/routes/notificationRoutes.js`
 
-| Method | Route | Auth | Purpose |
-|---|---|---|---|
-| POST | `/api/notifications/register-token` | Yes | Register device token on login |
-| DELETE | `/api/notifications/remove-token` | Yes | Remove token on logout |
+| Method | Route                               | Auth | Purpose                        |
+| ------ | ----------------------------------- | ---- | ------------------------------ |
+| POST   | `/api/notifications/register-token` | Yes  | Register device token on login |
+| DELETE | `/api/notifications/remove-token`   | Yes  | Remove token on logout         |
 
 **Register payload:**
+
 ```json
 { "token": "fcm-device-token-string", "platform": "android" }
 ```
 
 ### Wired Controllers
 
-| Controller | Function | Notification |
-|---|---|---|
-| `productController.js` | `assignQCCheckerToProduct` | `productAssigned(checkerId, productName)` |
-| `inspectionController.js` | `createInspection` | `inspectionScheduled(checkerId, vendorName, date)` |
+| Controller                | Function                   | Notification                                       |
+| ------------------------- | -------------------------- | -------------------------------------------------- |
+| `productController.js`    | `assignQCCheckerToProduct` | `productAssigned(checkerId, productName)`          |
+| `inspectionController.js` | `createInspection`         | `inspectionScheduled(checkerId, vendorName, date)` |
 
 #### How to Add a New Notification Trigger
 
 1. Import the service:
+
    ```js
-   const { notifications } = require('../utils/notificationService');
+   const { notifications } = require("../utils/notificationService");
    ```
 
 2. Call after the action succeeds (fire-and-forget):
+
    ```js
    notifications.yourHelper(userId, ...args).catch(console.error);
    ```
 
 3. If no pre-built helper exists, use the core function:
    ```js
-   const { sendToUser } = require('../utils/notificationService');
-   sendToUser(userId, 'QC_CHECKER', {
-     title: 'Your Title',
-     body: 'Your message body',
-     data: { type: 'YOUR_TYPE', screen: 'targetScreen' },
+   const { sendToUser } = require("../utils/notificationService");
+   sendToUser(userId, "QC_CHECKER", {
+     title: "Your Title",
+     body: "Your message body",
+     data: { type: "YOUR_TYPE", screen: "targetScreen" },
    }).catch(console.error);
    ```
 
@@ -188,12 +204,12 @@ When FCM returns `messaging/registration-token-not-registered` or `messaging/inv
 
 ### Config Files
 
-| File | Purpose |
-|---|---|
-| `checker_app/google-services.json` | Firebase Android config (package: `com.anonymous.m2c_app`) |
-| `checker_app/app.json` → `expo.android.googleServicesFile` | Points to `./google-services.json` |
-| `checker_app/app.json` → `expo.notification` | Custom icon + color |
-| `checker_app/app.json` → `expo.plugins` | `@react-native-firebase/app` + `@react-native-firebase/messaging` |
+| File                                                       | Purpose                                                           |
+| ---------------------------------------------------------- | ----------------------------------------------------------------- |
+| `checker_app/google-services.json`                         | Firebase Android config (package: `com.anonymous.m2c_app`)        |
+| `checker_app/app.json` → `expo.android.googleServicesFile` | Points to `./google-services.json`                                |
+| `checker_app/app.json` → `expo.notification`               | Custom icon + color                                               |
+| `checker_app/app.json` → `expo.plugins`                    | `@react-native-firebase/app` + `@react-native-firebase/messaging` |
 
 ### Notification Service
 
@@ -203,23 +219,29 @@ Uses **v22 modular API** (not deprecated namespaced API):
 
 ```ts
 import {
-  getMessaging, getToken, onMessage, onTokenRefresh,
-  setBackgroundMessageHandler, getInitialNotification,
-  onNotificationOpenedApp, requestPermission, AuthorizationStatus,
-} from '@react-native-firebase/messaging';
+  getMessaging,
+  getToken,
+  onMessage,
+  onTokenRefresh,
+  setBackgroundMessageHandler,
+  getInitialNotification,
+  onNotificationOpenedApp,
+  requestPermission,
+  AuthorizationStatus,
+} from "@react-native-firebase/messaging";
 ```
 
 #### Exported Functions
 
-| Function | When to Call | Purpose |
-|---|---|---|
-| `registerForPushNotifications()` | After login | Request permission + get token + register with backend |
-| `unregisterPushNotifications()` | On logout | Remove token from backend |
-| `setupBackgroundHandler()` | Top-level (outside component) | Handle background messages |
-| `setupForegroundMessageListener(callback)` | In root useEffect | Show in-app notification |
-| `setupTokenRefreshListener()` | In root useEffect | Re-register on token rotation |
-| `setupNotificationOpenedListener(callback)` | In root useEffect | Handle background tap |
-| `checkInitialNotification()` | In root useEffect | Handle cold-start tap |
+| Function                                    | When to Call                  | Purpose                                                |
+| ------------------------------------------- | ----------------------------- | ------------------------------------------------------ |
+| `registerForPushNotifications()`            | After login                   | Request permission + get token + register with backend |
+| `unregisterPushNotifications()`             | On logout                     | Remove token from backend                              |
+| `setupBackgroundHandler()`                  | Top-level (outside component) | Handle background messages                             |
+| `setupForegroundMessageListener(callback)`  | In root useEffect             | Show in-app notification                               |
+| `setupTokenRefreshListener()`               | In root useEffect             | Re-register on token rotation                          |
+| `setupNotificationOpenedListener(callback)` | In root useEffect             | Handle background tap                                  |
+| `checkInitialNotification()`                | In root useEffect             | Handle cold-start tap                                  |
 
 ### Wiring in the App
 
@@ -264,9 +286,11 @@ export default function RootLayout() {
 ```tsx
 if (result.success) {
   await qcCheckerService.storeCheckerAuth(token, checker);
-  const { registerForPushNotifications } = require('@/services/notificationService');
+  const {
+    registerForPushNotifications,
+  } = require("@/services/notificationService");
   registerForPushNotifications().catch(console.error);
-  router.replace('/(tabs)');
+  router.replace("/(tabs)");
 }
 ```
 
@@ -285,6 +309,7 @@ if (result.success) {
 #### Background (System Tray)
 
 Handled automatically by Android/iOS when the app is in the background. Styled via:
+
 - `color: '#2563eb'` — blue accent on notification icon
 - Custom notification icon — `checker_app/assets/notification-icon.png`
 - Sound + vibration enabled
@@ -320,23 +345,24 @@ npm install firebase
 Create `frontend/src/lib/firebase.ts`:
 
 ```ts
-import { initializeApp, getApps } from 'firebase/app';
-import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
+import { initializeApp, getApps } from "firebase/app";
+import {
+  getMessaging,
+  getToken,
+  onMessage,
+  isSupported,
+} from "firebase/messaging";
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyA-5wDb08SrUCnWYHinrXjRQcc4__zfHJk',
-  authDomain: 'm2c-markdowns-2a6ed.firebaseapp.com',
-  projectId: 'm2c-markdowns-2a6ed',
-  storageBucket: 'm2c-markdowns-2a6ed.firebasestorage.app',
-  messagingSenderId: '241389466458',
-  appId: 'YOUR_WEB_APP_ID',  // from Step 2
+  // from Step 2
 };
 
 // Initialize only once (Next.js hot reloads)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const app =
+  getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 export { app };
-export const VAPID_KEY = 'YOUR_VAPID_KEY';  // from Step 3
+export const VAPID_KEY = "YOUR_VAPID_KEY"; // from Step 3
 ```
 
 ### Step 5: Create Notification Service
@@ -344,11 +370,11 @@ export const VAPID_KEY = 'YOUR_VAPID_KEY';  // from Step 3
 Create `frontend/src/services/webNotificationService.ts`:
 
 ```ts
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { app, VAPID_KEY } from '@/lib/firebase';
-import axios from '@/lib/axios';
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { app, VAPID_KEY } from "@/lib/firebase";
+import axios from "@/lib/axios";
 
-const TOKEN_KEY = 'fcm_web_token';
+const TOKEN_KEY = "fcm_web_token";
 
 /**
  * Request permission + get token + register with backend.
@@ -357,14 +383,14 @@ const TOKEN_KEY = 'fcm_web_token';
 export async function registerWebPushToken(): Promise<string | null> {
   try {
     // Check browser supports notifications
-    if (!('Notification' in window)) {
-      console.log('Browser does not support notifications');
+    if (!("Notification" in window)) {
+      console.log("Browser does not support notifications");
       return null;
     }
 
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.log('Notification permission denied');
+    if (permission !== "granted") {
+      console.log("Notification permission denied");
       return null;
     }
 
@@ -375,17 +401,17 @@ export async function registerWebPushToken(): Promise<string | null> {
     // Only re-register if token changed
     const storedToken = localStorage.getItem(TOKEN_KEY);
     if (storedToken !== token) {
-      await axios.post('/notifications/register-token', {
+      await axios.post("/notifications/register-token", {
         token,
-        platform: 'web',
+        platform: "web",
       });
       localStorage.setItem(TOKEN_KEY, token);
-      console.log('Web FCM token registered');
+      console.log("Web FCM token registered");
     }
 
     return token;
   } catch (error) {
-    console.error('Failed to register web push:', error);
+    console.error("Failed to register web push:", error);
     return null;
   }
 }
@@ -397,11 +423,11 @@ export async function unregisterWebPushToken(): Promise<void> {
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     if (token) {
-      await axios.delete('/notifications/remove-token', { data: { token } });
+      await axios.delete("/notifications/remove-token", { data: { token } });
       localStorage.removeItem(TOKEN_KEY);
     }
   } catch (error) {
-    console.error('Failed to unregister web push:', error);
+    console.error("Failed to unregister web push:", error);
   }
 }
 
@@ -410,12 +436,12 @@ export async function unregisterWebPushToken(): Promise<void> {
  * Returns an unsubscribe function.
  */
 export function onForegroundMessage(
-  callback: (title: string, body: string, data: Record<string, string>) => void
+  callback: (title: string, body: string, data: Record<string, string>) => void,
 ): () => void {
   const messaging = getMessaging(app);
   return onMessage(messaging, (payload) => {
-    const title = payload.notification?.title || 'Notification';
-    const body = payload.notification?.body || '';
+    const title = payload.notification?.title || "Notification";
+    const body = payload.notification?.body || "";
     const data = (payload.data as Record<string, string>) || {};
     callback(title, body, data);
   });
@@ -428,64 +454,63 @@ Create `frontend/public/firebase-messaging-sw.js`:
 
 ```js
 // Firebase compat SDK for service workers (no bundler available)
-importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
+importScripts(
+  "https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js",
+);
+importScripts(
+  "https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js",
+);
 
-firebase.initializeApp({
-  apiKey: 'AIzaSyA-5wDb08SrUCnWYHinrXjRQcc4__zfHJk',
-  authDomain: 'm2c-markdowns-2a6ed.firebaseapp.com',
-  projectId: 'm2c-markdowns-2a6ed',
-  storageBucket: 'm2c-markdowns-2a6ed.firebasestorage.app',
-  messagingSenderId: '241389466458',
-  appId: 'YOUR_WEB_APP_ID',
-});
+firebase.initializeApp({});
 
 const messaging = firebase.messaging();
 
 // Background message handler — browser auto-shows notification
 messaging.onBackgroundMessage((payload) => {
-  console.log('Background message:', payload);
+  console.log("Background message:", payload);
 
   // Optional: customize the notification
-  const title = payload.notification?.title || 'M2C Notification';
+  const title = payload.notification?.title || "M2C Notification";
   const options = {
-    body: payload.notification?.body || '',
-    icon: '/logo3.png',          // your app icon in /public
-    badge: '/logo64.png',        // small badge icon
-    data: payload.data,           // passed to notification click handler
-    tag: payload.data?.type || 'default',  // group same-type notifications
+    body: payload.notification?.body || "",
+    icon: "/logo3.png", // your app icon in /public
+    badge: "/logo64.png", // small badge icon
+    data: payload.data, // passed to notification click handler
+    tag: payload.data?.type || "default", // group same-type notifications
   };
 
   self.registration.showNotification(title, options);
 });
 
 // Handle notification click — open the relevant page
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data || {};
-  
+
   // Map notification type to URL
   const urlMap = {
-    ORDER_RECEIVED: '/admin/orders',
-    PRODUCT_ASSIGNED: '/checker/dashboard/products',
-    VENDOR_ASSIGNED: '/checker/dashboard/vendors',
-    INSPECTION_SCHEDULED: '/checker/dashboard/vendors',
-    INSPECTION_COMPLETED: '/admin/inspections',
+    ORDER_RECEIVED: "/admin/orders",
+    PRODUCT_ASSIGNED: "/checker/dashboard/products",
+    VENDOR_ASSIGNED: "/checker/dashboard/vendors",
+    INSPECTION_SCHEDULED: "/checker/dashboard/vendors",
+    INSPECTION_COMPLETED: "/admin/inspections",
   };
-  
-  const url = urlMap[data.type] || '/';
+
+  const url = urlMap[data.type] || "/";
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Focus existing tab if open
-      for (const client of windowClients) {
-        if (client.url.includes(url) && 'focus' in client) {
-          return client.focus();
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((windowClients) => {
+        // Focus existing tab if open
+        for (const client of windowClients) {
+          if (client.url.includes(url) && "focus" in client) {
+            return client.focus();
+          }
         }
-      }
-      // Otherwise open new tab
-      return clients.openWindow(url);
-    })
+        // Otherwise open new tab
+        return clients.openWindow(url);
+      }),
   );
 });
 ```
@@ -497,16 +522,24 @@ self.addEventListener('notificationclick', (event) => {
 In your root layout or auth-aware component (e.g., `frontend/src/app/layout.tsx` or a client component):
 
 ```tsx
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { registerWebPushToken, onForegroundMessage } from '@/services/webNotificationService';
-import { showSuccessToast } from '@/lib/toast-utils';
+import { useEffect } from "react";
+import {
+  registerWebPushToken,
+  onForegroundMessage,
+} from "@/services/webNotificationService";
+import { showSuccessToast } from "@/lib/toast-utils";
 
-export function NotificationProvider({ children }: { children: React.ReactNode }) {
+export function NotificationProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   useEffect(() => {
     // Register token (only if logged in)
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('vendorToken');
+    const token =
+      localStorage.getItem("adminToken") || localStorage.getItem("vendorToken");
     if (token) {
       registerWebPushToken().catch(console.error);
     }
@@ -527,20 +560,18 @@ Wrap your app with `<NotificationProvider>`:
 
 ```tsx
 // In layout.tsx
-<NotificationProvider>
-  {children}
-</NotificationProvider>
+<NotificationProvider>{children}</NotificationProvider>
 ```
 
 ### Step 8: Register on Login, Remove on Logout
 
 ```tsx
 // After admin/vendor login success
-import { registerWebPushToken } from '@/services/webNotificationService';
+import { registerWebPushToken } from "@/services/webNotificationService";
 registerWebPushToken().catch(console.error);
 
 // On logout
-import { unregisterWebPushToken } from '@/services/webNotificationService';
+import { unregisterWebPushToken } from "@/services/webNotificationService";
 await unregisterWebPushToken();
 ```
 
@@ -553,9 +584,9 @@ onForegroundMessage((title, body, data) => {
   showSuccessToast(title, body, {
     onClick: () => {
       const urlMap: Record<string, string> = {
-        ORDER_RECEIVED: '/admin/orders',
-        PRODUCT_ASSIGNED: '/checker/dashboard/products',
-        INSPECTION_COMPLETED: '/admin/inspections',
+        ORDER_RECEIVED: "/admin/orders",
+        PRODUCT_ASSIGNED: "/checker/dashboard/products",
+        INSPECTION_COMPLETED: "/admin/inspections",
       };
       const url = urlMap[data.type];
       if (url) router.push(url);
@@ -570,16 +601,17 @@ onForegroundMessage((title, body, data) => {
 
 ### Web Notification Behavior Reference
 
-| App State | Notification Type | What Happens |
-|---|---|---|
-| **Foreground** (tab active) | All | `onMessage` fires → show toast/banner |
-| **Background** (tab open, not focused) | With `notification` payload | Browser auto-shows system notification |
-| **Closed** (no tab) | With `notification` payload | Service worker shows system notification |
-| **Click on notification** | All | `notificationclick` event → opens/focuses tab |
+| App State                              | Notification Type           | What Happens                                  |
+| -------------------------------------- | --------------------------- | --------------------------------------------- |
+| **Foreground** (tab active)            | All                         | `onMessage` fires → show toast/banner         |
+| **Background** (tab open, not focused) | With `notification` payload | Browser auto-shows system notification        |
+| **Closed** (no tab)                    | With `notification` payload | Service worker shows system notification      |
+| **Click on notification**              | All                         | `notificationclick` event → opens/focuses tab |
 
 ### Browser Support
 
 FCM web push works in all modern browsers with [Push API](https://caniuse.com/#feat=push-api) support:
+
 - Chrome 50+
 - Firefox 44+
 - Edge 17+
@@ -594,15 +626,15 @@ FCM web SDK **only works on HTTPS pages** (uses service workers). Localhost is e
 
 ## 4. Notification Types Reference
 
-| Type | Title | Body | Data | Target |
-|---|---|---|---|---|
-| `PRODUCT_ASSIGNED` | New Product Assigned | "{name}" assigned to you | `{ screen: 'products' }` | QC Checker |
-| `VENDOR_ASSIGNED` | New Vendor Assigned | "{name}" assigned to you | `{ screen: 'vendors' }` | QC Checker |
-| `INSPECTION_SCHEDULED` | Inspection Scheduled | Inspection for "{vendor}" on {date} | `{ screen: 'vendors' }` | QC Checker |
-| `PRODUCT_APPROVED` | Product Approved | "{name}" has been approved | — | Vendor |
-| `PRODUCT_REJECTED` | Product Rejected | "{name}" rejected: {reason} | — | Vendor |
-| `VENDOR_STATUS_CHANGED` | Vendor {status} | Application {status} | — | Vendor |
-| `INSPECTION_COMPLETED` | Inspection Completed | "{vendor}" — Result: {result} | — | All Admins |
+| Type                    | Title                | Body                                | Data                     | Target     |
+| ----------------------- | -------------------- | ----------------------------------- | ------------------------ | ---------- |
+| `PRODUCT_ASSIGNED`      | New Product Assigned | "{name}" assigned to you            | `{ screen: 'products' }` | QC Checker |
+| `VENDOR_ASSIGNED`       | New Vendor Assigned  | "{name}" assigned to you            | `{ screen: 'vendors' }`  | QC Checker |
+| `INSPECTION_SCHEDULED`  | Inspection Scheduled | Inspection for "{vendor}" on {date} | `{ screen: 'vendors' }`  | QC Checker |
+| `PRODUCT_APPROVED`      | Product Approved     | "{name}" has been approved          | —                        | Vendor     |
+| `PRODUCT_REJECTED`      | Product Rejected     | "{name}" rejected: {reason}         | —                        | Vendor     |
+| `VENDOR_STATUS_CHANGED` | Vendor {status}      | Application {status}                | —                        | Vendor     |
+| `INSPECTION_COMPLETED`  | Inspection Completed | "{vendor}" — Result: {result}       | —                        | All Admins |
 
 ---
 
@@ -672,6 +704,7 @@ grep '"package"' mobile/app.json
 ```
 
 Then in Firebase Console (`m2c-markdowns-2a6ed`):
+
 - Add App → Android → enter package name
 - Download `google-services.json` → save to `mobile/google-services.json`
 
@@ -707,6 +740,7 @@ cp checker_app/src/components/General/NotificationBanner.tsx mobile/src/componen
 ### Step 5: Wire into Root Layout
 
 Same pattern as checker_app — see Section 2 above:
+
 - Call `setupBackgroundHandler()` at top-level
 - Wire `setupForegroundMessageListener` + `setupTokenRefreshListener` in root `useEffect`
 - Add `<NotificationBanner />` component
@@ -718,7 +752,7 @@ In the mobile app's login success handler:
 
 ```tsx
 // After successful user/vendor login
-import { registerForPushNotifications } from '@/services/notificationService';
+import { registerForPushNotifications } from "@/services/notificationService";
 registerForPushNotifications().catch(console.error);
 ```
 
@@ -729,34 +763,34 @@ The backend's `/api/notifications/register-token` route already handles all role
 Examples for the mobile app's use cases:
 
 ```js
-const { sendToUser, sendToRole } = require('../utils/notificationService');
+const { sendToUser, sendToRole } = require("../utils/notificationService");
 
 // Order placed — notify vendor
-sendToUser(vendorId, 'VENDOR', {
-  title: 'New Order Received',
+sendToUser(vendorId, "VENDOR", {
+  title: "New Order Received",
   body: `Order #${orderId} — ${itemCount} items, ₹${total}`,
-  data: { type: 'ORDER_RECEIVED', orderId },
+  data: { type: "ORDER_RECEIVED", orderId },
 });
 
 // Order shipped — notify customer
-sendToUser(customerId, 'USER', {
-  title: 'Order Shipped',
+sendToUser(customerId, "USER", {
+  title: "Order Shipped",
   body: `Your order #${orderId} has been shipped!`,
-  data: { type: 'ORDER_SHIPPED', orderId },
+  data: { type: "ORDER_SHIPPED", orderId },
 });
 
 // Payment received — notify vendor
-sendToUser(vendorId, 'VENDOR', {
-  title: 'Payment Received',
+sendToUser(vendorId, "VENDOR", {
+  title: "Payment Received",
   body: `Payment of ₹${amount} for order #${orderId}`,
-  data: { type: 'PAYMENT_RECEIVED', orderId },
+  data: { type: "PAYMENT_RECEIVED", orderId },
 });
 
 // Promotion — notify all users
-sendToRole('USER', {
-  title: 'Flash Sale!',
-  body: '50% off on all products. Shop now!',
-  data: { type: 'PROMOTION' },
+sendToRole("USER", {
+  title: "Flash Sale!",
+  body: "50% off on all products. Shop now!",
+  data: { type: "PROMOTION" },
 });
 ```
 
@@ -773,30 +807,30 @@ eas build --platform android --profile development
 
 ### Suggested Mobile App Notification Types
 
-| Type | Title | Target | Trigger |
-|---|---|---|---|
-| `ORDER_RECEIVED` | New Order Received | Vendor | Customer places order |
-| `ORDER_CONFIRMED` | Order Confirmed | User | Vendor confirms order |
-| `ORDER_SHIPPED` | Order Shipped | User | Vendor ships order |
-| `ORDER_DELIVERED` | Order Delivered | User | Delivery confirmed |
-| `ORDER_CANCELLED` | Order Cancelled | User/Vendor | Either party cancels |
-| `PAYMENT_RECEIVED` | Payment Received | Vendor | Payment processed |
-| `REVIEW_RECEIVED` | New Review | Vendor | Customer leaves review |
-| `PROMOTION` | Flash Sale / Offer | All Users | Admin sends promo |
-| `VENDOR_APPROVED` | Application Approved | Vendor | Admin approves vendor |
+| Type               | Title                | Target      | Trigger                |
+| ------------------ | -------------------- | ----------- | ---------------------- |
+| `ORDER_RECEIVED`   | New Order Received   | Vendor      | Customer places order  |
+| `ORDER_CONFIRMED`  | Order Confirmed      | User        | Vendor confirms order  |
+| `ORDER_SHIPPED`    | Order Shipped        | User        | Vendor ships order     |
+| `ORDER_DELIVERED`  | Order Delivered      | User        | Delivery confirmed     |
+| `ORDER_CANCELLED`  | Order Cancelled      | User/Vendor | Either party cancels   |
+| `PAYMENT_RECEIVED` | Payment Received     | Vendor      | Payment processed      |
+| `REVIEW_RECEIVED`  | New Review           | Vendor      | Customer leaves review |
+| `PROMOTION`        | Flash Sale / Offer   | All Users   | Admin sends promo      |
+| `VENDOR_APPROVED`  | Application Approved | Vendor      | Admin approves vendor  |
 
 ---
 
 ## 7. Troubleshooting
 
-| Issue | Cause | Fix |
-|---|---|---|
-| No notification received | Token not registered | Check Metro logs for "FCM token registered" after login |
-| "Invalid token" on dashboard | Expired auth session | Logout + login again |
-| Foreground: no banner | `setupForegroundMessageListener` not wired | Check `_layout.tsx` useEffect |
-| Background: default icon | Needs rebuild with custom icon | `eas build --platform android --profile development` |
-| Web: permission denied | User blocked notifications | Check browser settings |
-| `messaging/registration-token-not-registered` | App uninstalled or token rotated | Auto-cleaned by service |
+| Issue                                         | Cause                                      | Fix                                                     |
+| --------------------------------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| No notification received                      | Token not registered                       | Check Metro logs for "FCM token registered" after login |
+| "Invalid token" on dashboard                  | Expired auth session                       | Logout + login again                                    |
+| Foreground: no banner                         | `setupForegroundMessageListener` not wired | Check `_layout.tsx` useEffect                           |
+| Background: default icon                      | Needs rebuild with custom icon             | `eas build --platform android --profile development`    |
+| Web: permission denied                        | User blocked notifications                 | Check browser settings                                  |
+| `messaging/registration-token-not-registered` | App uninstalled or token rotated           | Auto-cleaned by service                                 |
 
 ---
 
@@ -804,8 +838,8 @@ eas build --platform android --profile development
 
 ```
 backend/
-├── config/firebase.js              # Firebase Admin SDK init
-├── firebase-service-account.json    # Service account key (gitignored)
+├── config/firebase.js              # Firebase Admin SDK init (reads FIREBASE_SERVICE_ACCOUNT_JSON env)
+├── .env                             # FIREBASE_SERVICE_ACCOUNT_JSON lives here (gitignored)
 ├── utils/notificationService.js     # FCM send functions + helpers
 ├── routes/notificationRoutes.js     # register-token / remove-token API
 └── prisma/schema.prisma             # DeviceToken model
