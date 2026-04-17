@@ -40,7 +40,6 @@ export default function SplashScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center' }}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" translucent={false} />
 
       {/* Logo */}
       <Animated.View style={{ opacity, transform: [{ scale }], alignItems: 'center' }}>

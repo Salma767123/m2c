@@ -446,7 +446,6 @@ export default function FactoryInspectionScreen() {
 
   return (
     <View className="flex-1 bg-slate-50">
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
       <Header onBack={() => router.back()} />
 
       {/* Before-inspection selfie gate */}

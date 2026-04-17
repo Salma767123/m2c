@@ -83,7 +83,6 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" translucent={false} />
       <KeyboardAwareScrollView
         contentContainerStyle={{ paddingBottom: 20, flexGrow: 1, justifyContent: 'center' }}
         keyboardShouldPersistTaps="handled"
