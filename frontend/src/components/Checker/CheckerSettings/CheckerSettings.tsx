@@ -45,7 +45,7 @@ export default function SettingsPage() {
       <div className="p-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-900 mb-2">QC Settings</h1>
-          <p className="text-slate-600 text-lg">Manage your personal details and account information</p>
+          <p className="text-slate-600 text-lg">View your personal details and account information</p>
         </div>
 
         <div className="max-w-7xl mx-auto">
@@ -59,7 +59,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">Profile Information</h2>
-                    <p className="text-sm text-slate-600">Update your personal details and account information</p>
+                    <p className="text-sm text-slate-600">View your personal details and account information</p>
                   </div>
                 </div>
               </div>
@@ -85,9 +85,8 @@ export default function SettingsPage() {
                         <input
                           type="text"
                           value={profile?.name || ""}
-                          placeholder="Enter your full name"
                           readOnly
-                          className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed"
                         />
                       </div>
                       <div>
@@ -95,23 +94,10 @@ export default function SettingsPage() {
                         <input
                           type="email"
                           value={profile?.email || ""}
-                          placeholder="your@email.com"
                           readOnly
-                          className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed"
                         />
                       </div>
-                    </div>
-                    <div className="mt-6 pt-6 border-t border-slate-200 flex justify-between items-center">
-                      <div className="text-sm text-slate-600">
-                        <p>Last updated: <span className="font-medium">
-                          {profile?.updatedAt
-                            ? new Date(profile.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                            : "N/A"}
-                        </span></p>
-                      </div>
-                      <button className="bg-linear-to-r from-blue-600 to-blue-700 text-white font-semibold py-3 px-6 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md opacity-50 cursor-not-allowed" disabled>
-                        Save Changes
-                      </button>
                     </div>
                   </>
                 )}

@@ -14,7 +14,6 @@ import {
   ChevronDown,
   MessageSquare,
   Shield,
-  HelpCircle,
   LayoutDashboard,
   Factory,
   FileText,
@@ -208,20 +207,6 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
                   <div className="p-3 border-b border-gray-200 bg-gray-50">
                     <p className="font-semibold text-black">{checkerName}</p>
                     <p className="text-sm text-gray-500">QC Checker</p>
-                  </div>
-                  <div className="py-2">
-                    <button className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
-                      <User className="mr-3 h-4 w-4" />
-                      <span className="text-sm">Profile</span>
-                    </button>
-                    <button className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
-                      <Settings className="mr-3 h-4 w-4" />
-                      <span className="text-sm">Settings</span>
-                    </button>
-                    <button className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
-                      <HelpCircle className="mr-3 h-4 w-4" />
-                      <span className="text-sm">Help</span>
-                    </button>
                   </div>
                   <div className="border-t border-gray-200 p-2 bg-gray-50">
                     <button
