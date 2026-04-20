@@ -36,6 +36,7 @@ const Profile = () => {
     gender: 'male',
     address: {
       addressLine1: '',
+      addressLine2: '',
       city: '',
       state: '',
       zipCode: '',
@@ -78,6 +79,7 @@ const Profile = () => {
           gender: 'male', // Default, can be enhanced later
           address: {
             addressLine1: userData.address || '',
+            addressLine2: userData.addressLine2 || '',
             city: userData.city || '',
             state: userData.state || '',
             zipCode: userData.zipCode || '',
@@ -119,6 +121,7 @@ const Profile = () => {
         name: fullName,
         phoneNumber: editedProfile.phone,
         address: editedProfile.address.addressLine1,
+        addressLine2: editedProfile.address.addressLine2 || '',
         city: editedProfile.address.city,
         state: editedProfile.address.state,
         zipCode: editedProfile.address.zipCode,

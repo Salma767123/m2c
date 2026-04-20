@@ -36,6 +36,7 @@ export interface CheckoutFormData {
   email: string
   phone: string
   address: string
+  addressLine2: string
   city: string
   state: string
   zipCode: string
@@ -58,6 +59,7 @@ export interface CheckoutFormData {
 export default function Checkout() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
+  const [shippingValid, setShippingValid] = useState(false)
   const [loading, setLoading] = useState(true)
   const [placingOrder, setPlacingOrder] = useState(false)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
@@ -70,6 +72,7 @@ export default function Checkout() {
     email: "",
     phone: "",
     address: "",
+    addressLine2: "",
     city: "",
     state: "",
     zipCode: "",
@@ -175,6 +178,7 @@ export default function Checkout() {
           email: userData.email,
           phone: userData.phoneNumber || '',
           address: userData.address || '',
+          addressLine2: (userData as any).addressLine2 || '',
           city: userData.city || '',
           state: userData.state || '',
           zipCode: userData.zipCode || '',
@@ -279,6 +283,7 @@ export default function Checkout() {
         email: formData.email,
         phone: formData.phone,
         street: formData.address,
+        addressLine2: formData.addressLine2 || "",
         city: formData.city,
         state: formData.state,
         zipCode: formData.zipCode,
@@ -442,7 +447,7 @@ export default function Checkout() {
   )
 
   const renderShippingForm = () => (
-    <ShippingForm formData={formData} updateFormData={updateFormData} />
+    <ShippingForm formData={formData} updateFormData={updateFormData} disabled={placingOrder} onValidityChange={setShippingValid} />
   )
 
   const renderPaymentForm = () => (
@@ -512,6 +517,9 @@ export default function Checkout() {
                   </button>
                   <button
                     onClick={() => {
+                      if (currentStep === 1 && !shippingValid) {
+                        return;
+                      }
                       if (currentStep < 3) {
                         setCurrentStep(currentStep + 1)
                       } else {
@@ -523,7 +531,8 @@ export default function Checkout() {
                       cartItems.some(item =>
                         item.product?.inStock === false ||
                         (item.product?.availableStock !== undefined && item.quantity > item.product?.availableStock)
-                      )
+                      ) ||
+                      (currentStep === 1 && !shippingValid)
                     }
                     className="px-8 py-3 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                   >

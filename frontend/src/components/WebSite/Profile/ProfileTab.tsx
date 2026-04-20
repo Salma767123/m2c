@@ -141,7 +141,7 @@ export default function ProfileTab({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Address
+                Address Line 1
               </label>
               <input
                 type="text"
@@ -150,7 +150,25 @@ export default function ProfileTab({
                   handleInputChange("address.addressLine1", e.target.value)
                 }
                 disabled={!isEditing}
-                placeholder="Enter your full address"
+                placeholder="Street address, P.O. box"
+                autoComplete="address-line1"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:bg-slate-50 disabled:text-slate-500"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Address Line 2{" "}
+                <span className="text-slate-400 font-normal">(Apt, Suite, Unit &mdash; optional)</span>
+              </label>
+              <input
+                type="text"
+                value={editedProfile.address.addressLine2 || ''}
+                onChange={(e) =>
+                  handleInputChange("address.addressLine2", e.target.value)
+                }
+                disabled={!isEditing}
+                placeholder="Apartment, suite, unit, building, floor, etc."
+                autoComplete="address-line2"
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:bg-slate-50 disabled:text-slate-500"
               />
             </div>

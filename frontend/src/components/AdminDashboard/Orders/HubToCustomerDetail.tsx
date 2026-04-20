@@ -134,7 +134,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           <div>
             <p className="text-sm text-gray-600">Total Amount</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              ₹{order.totalAmount?.toLocaleString()}
+              ${order.totalAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
         </div>
@@ -165,7 +165,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
                   <div>
                     <p className="text-sm text-gray-600">Price</p>
                     <p className="text-base font-medium text-gray-900">
-                      ₹{item.unitPrice.toLocaleString()}
+                      ${item.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
@@ -218,11 +218,16 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           </div>
           <div className="md:col-span-2">
             <p className="text-sm text-gray-600">Delivery Address</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
-              {order.shippingAddress?.addressLine1} {order.shippingAddress?.addressLine2 && `, ${order.shippingAddress?.addressLine2}`}
-              <br />
-              {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.postalCode}
-            </p>
+            <div className="text-base font-medium text-gray-900 mt-1 leading-relaxed">
+              <p>{order.shippingAddress?.street}</p>
+              {order.shippingAddress?.addressLine2 && <p>{order.shippingAddress?.addressLine2}</p>}
+              <p>
+                {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.zipCode}
+              </p>
+              <p className="text-slate-500 font-medium italic mt-1 text-sm flex items-center gap-1">
+                {order.shippingAddress?.country || 'USA'} 🇺🇸
+              </p>
+            </div>
           </div>
         </div>
       </div>

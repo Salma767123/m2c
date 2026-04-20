@@ -36,6 +36,7 @@ model Admin {
   // Additional admin profile fields
   phoneNumber   String?
   address       String?
+  addressLine2  String?
   city          String?
   state         String?
   zipCode       String?
@@ -110,6 +111,7 @@ model User {
   // Additional user profile fields
   phoneNumber   String? 
   address       String?
+  addressLine2  String?
   city          String?
   state         String?
   zipCode       String?
@@ -148,6 +150,7 @@ model Address {
   name      String?
   phone     String?
   address   String
+  addressLine2 String?
   city      String
   state     String
   zipCode   String

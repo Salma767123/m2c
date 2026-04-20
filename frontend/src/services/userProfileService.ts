@@ -4,6 +4,7 @@ export interface UpdateUserProfileData {
   name: string;
   phoneNumber?: string;
   address?: string;
+  addressLine2?: string;
   city?: string;
   state?: string;
   zipCode?: string;
@@ -18,6 +19,7 @@ export interface UserProfileResponse {
     name: string;
     phoneNumber?: string;
     address?: string;
+    addressLine2?: string;
     city?: string;
     state?: string;
     zipCode?: string;

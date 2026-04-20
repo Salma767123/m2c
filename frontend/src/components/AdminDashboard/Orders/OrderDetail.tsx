@@ -188,7 +188,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                                 )}
                                                 <p className="text-sm text-gray-600 mt-1">Vendor: {item.vendorName}</p>
                                             </div>
-                                            <p className="text-base font-bold text-gray-900">₹{item.unitPrice.toLocaleString()}</p>
+                                            <p className="text-base font-bold text-gray-900">${item.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                         </div>
                                         <div className="flex gap-6 mt-4">
                                             <div>
@@ -197,7 +197,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                             </div>
                                             <div>
                                                 <p className="text-xs text-gray-500 uppercase">Subtotal</p>
-                                                <p className="text-sm font-medium text-gray-900">₹{item.totalPrice.toLocaleString()}</p>
+                                                <p className="text-sm font-medium text-gray-900">${item.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -207,7 +207,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         <div className="mt-6 border-t border-gray-100 pt-4 flex justify-end">
                             <div className="space-y-1 text-right">
                                 <p className="text-sm text-gray-600">Total Amount</p>
-                                <p className="text-xl font-bold text-teal-600">₹{order.totalAmount?.toLocaleString()}</p>
+                                <p className="text-xl font-bold text-teal-600">${order.totalAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                         </div>
                     </div>
@@ -279,11 +279,14 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 uppercase">Address</p>
-                                <p className="text-sm text-gray-900 leading-relaxed">
-                                    {order.shippingAddress?.addressLine1} {order.shippingAddress?.addressLine2 && `, ${order.shippingAddress?.addressLine2}`}
-                                    <br />
-                                    {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.postalCode}
-                                </p>
+                                <div className="text-sm text-gray-900 leading-relaxed mt-1">
+                                    <p className="font-medium">{order.shippingAddress?.street}</p>
+                                    {order.shippingAddress?.addressLine2 && <p>{order.shippingAddress?.addressLine2}</p>}
+                                    <p>{order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.zipCode}</p>
+                                    <p className="text-slate-500 font-medium italic mt-1 flex items-center gap-1">
+                                        {order.shippingAddress?.country || 'USA'} 🇺🇸
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -41,8 +41,8 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     gstNumber = '',
     address = '',
     state = '',
-    country = 'India',
-    currency = '₹',
+    country = 'United States',
+    currency = '$',
   } = adminSettings;
 
   // Fallback to website logo if no custom company logo is set
@@ -55,22 +55,22 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   const sym = currency === 'INR' ? '₹' : currency;
 
   const fmt = (n) =>
-    Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const fmtDate = (d) =>
-    new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    new Date(d).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 
   const addr = typeof shippingAddress === 'string'
     ? JSON.parse(shippingAddress)
     : shippingAddress;
 
   const shippingAddrStr = [
-    addr.name,
-    addr.addressLine1,
+    addr.firstName && addr.lastName ? `${addr.firstName} ${addr.lastName}` : addr.name,
+    addr.street || addr.addressLine1,
     addr.addressLine2,
     `${addr.city || ''}, ${addr.state || ''}`,
-    addr.pincode || addr.zipCode,
-    addr.country,
+    addr.zipCode || addr.pincode,
+    addr.country ? `${addr.country} 🇺🇸` : '',
   ].filter(Boolean).join('\n');
 
   const payStatusColor = paymentStatus === 'PAID' ? '#16a34a' : '#dc2626';

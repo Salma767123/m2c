@@ -187,18 +187,25 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                 </h2>
               </div>
               <div className="p-6">
-                <div className="space-y-2">
-                  <p className="font-semibold text-gray-900">
+                <div className="space-y-1">
+                  <p className="font-semibold text-gray-900 border-b border-gray-100 pb-1 mb-2">
                     {order.shippingAddress?.firstName} {order.shippingAddress?.lastName}
                   </p>
-                  <p className="text-gray-700">{order.shippingAddress?.street}</p>
-                  <p className="text-gray-700">
-                    {order.shippingAddress?.city}, {order.shippingAddress?.state} {order.shippingAddress?.zipCode}
-                  </p>
-                  <p className="text-gray-700">{order.shippingAddress?.country}</p>
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
-                    <Phone className="w-4 h-4 text-gray-600" />
-                    <span className="text-gray-700">{order.shippingAddress?.phone}</span>
+                  <div className="space-y-0.5 text-gray-700">
+                    <p>{order.shippingAddress?.street}</p>
+                    {order.shippingAddress?.addressLine2 && <p>{order.shippingAddress?.addressLine2}</p>}
+                    <p>
+                      {order.shippingAddress?.city}, {order.shippingAddress?.state} {order.shippingAddress?.zipCode}
+                    </p>
+                    <p className="flex items-center gap-1.5 mt-1 text-slate-500 font-medium italic text-sm">
+                      Shipping to: {order.shippingAddress?.country} 🇺🇸
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center gap-2 text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                      <Phone className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">{order.shippingAddress?.phone}</span>
+                    </div>
                   </div>
                 </div>
               </div>
