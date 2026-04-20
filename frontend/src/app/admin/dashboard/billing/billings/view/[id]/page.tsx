@@ -1,4 +1,5 @@
 import BillingDetail from "@/components/AdminDashboard/Billing/BillingDetail";
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 interface PageProps {
   params: Promise<{
@@ -9,8 +10,10 @@ interface PageProps {
 export default async function BillingDetailPage({ params }: PageProps) {
   const { id } = await params;
   return (
-    <div className="p-6">
-      <BillingDetail billingId={id} />
-    </div>
+    <PermissionGuard permission="view_billing">
+      <div className="p-6">
+        <BillingDetail billingId={id} />
+      </div>
+    </PermissionGuard>
   );
 }

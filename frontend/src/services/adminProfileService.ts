@@ -32,7 +32,6 @@ export const adminProfileService = {
       const response = await axios.get('/admin/profile');
       return response.data;
     } catch (error: any) {
-      console.error('Get profile error:', error);
       throw new Error(error.response?.data?.error || 'Failed to fetch profile');
     }
   },
@@ -43,7 +42,6 @@ export const adminProfileService = {
       const response = await axios.put('/admin/profile', data);
       return response.data;
     } catch (error: any) {
-      console.error('Update profile error:', error);
       throw new Error(error.response?.data?.error || 'Failed to update profile');
     }
   }

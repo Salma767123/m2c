@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { BarChart3, Flame, Globe } from 'lucide-react';
 import ProductHeatMap from '@/components/AdminDashboard/Analytics/ProductHeatMap';
 import PageAnalytics from '@/components/AdminDashboard/Analytics/PageAnalytics';
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard';
 
 const PERIODS = [
   { value: 'today', label: 'Today' },
@@ -24,6 +25,7 @@ export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState('heatmap');
 
   return (
+    <PermissionGuard permission="view_analytics">
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
@@ -78,5 +80,6 @@ export default function AnalyticsPage() {
       {activeTab === 'heatmap' && <ProductHeatMap period={period} />}
       {activeTab === 'pages' && <PageAnalytics period={period} />}
     </div>
+    </PermissionGuard>
   );
 }

@@ -119,6 +119,13 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // System roles are immutable on the backend — block here to give a clear UX
+    // message instead of letting the request hit a 400 error.
+    if (isEdit && role?.isSystem) {
+      showErrorToast('System roles cannot be modified')
+      return
+    }
+
     if (!validateForm()) {
       return
     }
@@ -175,6 +182,19 @@ export default function AddEditRole({ role, isEdit = false }: AddEditRoleProps) 
             </Button>
           </div>
         </div>
+
+        {/* Warning banner for system roles */}
+        {isEdit && role?.isSystem && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">This is a system role</p>
+              <p className="text-sm text-amber-700 mt-1">
+                The &quot;{role.name}&quot; role is protected and cannot be modified. To make changes, create a new custom role instead.
+              </p>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}

@@ -8,6 +8,7 @@ import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { Badge } from "../../UI/Badge";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import vendorService from "@/services/vendorService";
+import { hasPermission } from "@/lib/auth";
 
 interface InspectionData {
   vendorName?: string;
@@ -193,7 +194,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
             <p className="text-gray-600 mt-1">{vendor?.companyName || formData.vendorName || "Vendor"}</p>
           </div>
         </div>
-        {isCompleted && vendorStatus === 'UNDER_REVIEW' && (
+        {isCompleted && vendorStatus === 'UNDER_REVIEW' && hasPermission('edit_vendors') && (
           <button
             onClick={handleApprove}
             disabled={approving}
@@ -356,7 +357,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       )}
 
       {/* Approve Action at Bottom */}
-      {isCompleted && vendorStatus === 'UNDER_REVIEW' && (
+      {isCompleted && vendorStatus === 'UNDER_REVIEW' && hasPermission('edit_vendors') && (
         <Card className="border-2 border-emerald-200 bg-emerald-50">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

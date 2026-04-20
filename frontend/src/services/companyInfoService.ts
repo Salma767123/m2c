@@ -61,7 +61,6 @@ export const companyInfoService = {
       const response = await axios.get('/company-info');
       return response.data;
     } catch (error: any) {
-      console.error('Get company info error:', error);
       throw new Error(error.response?.data?.error || 'Failed to fetch company info');
     }
   },
@@ -72,7 +71,6 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/basic', data);
       return response.data;
     } catch (error: any) {
-      console.error('Update basic info error:', error);
       throw new Error(error.response?.data?.error || 'Failed to update basic information');
     }
   },
@@ -83,7 +81,6 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/legal', data);
       return response.data;
     } catch (error: any) {
-      console.error('Update legal info error:', error);
       throw new Error(error.response?.data?.error || 'Failed to update legal information');
     }
   },
@@ -94,7 +91,6 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/address', data);
       return response.data;
     } catch (error: any) {
-      console.error('Update address error:', error);
       throw new Error(error.response?.data?.error || 'Failed to update address');
     }
   },
@@ -105,7 +101,6 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/bank', data);
       return response.data;
     } catch (error: any) {
-      console.error('Update bank details error:', error);
       throw new Error(error.response?.data?.error || 'Failed to update bank details');
     }
   },
@@ -116,7 +111,6 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/logo', { companyLogo });
       return response.data;
     } catch (error: any) {
-      console.error('Update logo error:', error);
       throw new Error(error.response?.data?.error || 'Failed to update company logo');
     }
   }

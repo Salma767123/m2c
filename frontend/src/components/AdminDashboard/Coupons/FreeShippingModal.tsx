@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Truck, Info, Plus, Trash2, Package } from 'lucide-react';
 import { couponService, FreeShippingOffer } from '@/services/couponService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { hasPermission } from '@/lib/auth';
 
 const getOrdinalSuffix = (n: number) => {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -18,6 +19,9 @@ interface FreeShippingModalProps {
 }
 
 const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps) => {
+  const canEdit = hasPermission('edit_coupons');
+  const canCreate = hasPermission('create_coupons');
+  const canDelete = hasPermission('delete_coupons');
   const [freeShippingOffers, setFreeShippingOffers] = useState<FreeShippingOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -164,18 +168,22 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
                       </div>
                     </div>
                     <div className="flex items-center gap-1 ml-3">
-                      <button
-                        onClick={() => startEdit(offer)}
-                        className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(offer.id)}
-                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => startEdit(offer)}
+                          className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(offer.id)}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -248,25 +256,27 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-2">
-                {editingId && (
+              {((editingId && canEdit) || (!editingId && canCreate)) && (
+                <div className="flex gap-3 pt-2">
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={resetForm}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex-1 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:bg-gray-400 text-sm font-medium transition-colors"
                   >
-                    Cancel Edit
+                    {saving ? 'Saving...' : editingId ? 'Update Offer' : 'Create Offer'}
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex-1 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:bg-gray-400 text-sm font-medium transition-colors"
-                >
-                  {saving ? 'Saving...' : editingId ? 'Update Offer' : 'Create Offer'}
-                </button>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
 import axios from "@/lib/axios";
+import { hasPermission } from "@/lib/auth";
 
 interface InvoiceDetailProps {
   invoiceId: string; // can be order.id (ObjectId) or order.orderId (ORD-...) or order.invoiceNo (INV-...)
@@ -144,16 +145,18 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
             </div>
           </div>
         </div>
-        <button
-          onClick={handlePrint}
-          disabled={printing}
-          className="flex items-center gap-2 px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors font-medium"
-        >
-          {printing
-            ? <RefreshCw className="h-4 w-4 animate-spin" />
-            : <Printer className="h-4 w-4" />}
-          {printing ? "Generating…" : "Print Invoice"}
-        </button>
+        {hasPermission("view_billing") && (
+          <button
+            onClick={handlePrint}
+            disabled={printing}
+            className="flex items-center gap-2 px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors font-medium"
+          >
+            {printing
+              ? <RefreshCw className="h-4 w-4 animate-spin" />
+              : <Printer className="h-4 w-4" />}
+            {printing ? "Generating…" : "Print Invoice"}
+          </button>
+        )}
       </div>
 
       {/* ── Invoice Document ── */}

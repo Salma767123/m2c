@@ -21,6 +21,7 @@ import { formatDate } from '@/lib/utils'
 import RejectionModal from './RejectionModal'
 import SuspensionModal from './SuspensionModal'
 import { toast } from '@/hooks/use-toast'
+import { hasPermission } from '@/lib/auth'
 
 const getStatusBadge = (status: string) => {
   switch (status.toUpperCase()) {
@@ -242,12 +243,14 @@ export default function VendorsTable() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Vendors Management</CardTitle>
-          <Link href="/admin/dashboard/vendors/add">
-            <Button className="bg-[#313131] text-white hover:bg-[#222222]">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Vendor
-            </Button>
-          </Link>
+          {hasPermission('create_vendors') && (
+            <Link href="/admin/dashboard/vendors/add">
+              <Button className="bg-[#313131] text-white hover:bg-[#222222]">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Vendor
+              </Button>
+            </Link>
+          )}
         </div>
         
         {/* Filters */}
@@ -335,21 +338,25 @@ export default function VendorsTable() {
                     <TableCell>{formatDate(vendor.createdAt)}</TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        <Link href={`/admin/dashboard/vendors/view/${vendor.id}`}>
-                          <Button variant="ghost" size="sm" title="View Details">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <Link href={`/admin/dashboard/vendors/edit/${vendor.id}`}>
-                          <Button variant="ghost" size="sm" title="Edit Vendor">
-                            <Edit className="h-4 w-4 text-blue-500" />
-                          </Button>
-                        </Link>
-                        {(vendor.status === 'PENDING' || vendor.status === 'UNDER_REVIEW') && (
+                        {hasPermission('view_vendors') && (
+                          <Link href={`/admin/dashboard/vendors/view/${vendor.id}`}>
+                            <Button variant="ghost" size="sm" title="View Details">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        )}
+                        {hasPermission('edit_vendors') && (
+                          <Link href={`/admin/dashboard/vendors/edit/${vendor.id}`}>
+                            <Button variant="ghost" size="sm" title="Edit Vendor">
+                              <Edit className="h-4 w-4 text-blue-500" />
+                            </Button>
+                          </Link>
+                        )}
+                        {(vendor.status === 'PENDING' || vendor.status === 'UNDER_REVIEW') && hasPermission('edit_vendors') && (
                           <>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               className="text-green-600 hover:bg-green-50"
                               title="Approve Vendor"
                               onClick={() => handleApproveVendor(vendor.id)}
@@ -361,9 +368,9 @@ export default function VendorsTable() {
                                 <CheckCircle className="h-4 w-4" />
                               )}
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               className="text-red-600 hover:bg-red-50"
                               title="Reject Vendor"
                               onClick={() => handleRejectVendor(vendor)}
@@ -373,10 +380,10 @@ export default function VendorsTable() {
                             </Button>
                           </>
                         )}
-                        {vendor.status === 'APPROVED' && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                        {vendor.status === 'APPROVED' && hasPermission('edit_vendors') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-orange-600 hover:bg-orange-50"
                             title="Suspend Vendor"
                             onClick={() => handleSuspendVendor(vendor)}

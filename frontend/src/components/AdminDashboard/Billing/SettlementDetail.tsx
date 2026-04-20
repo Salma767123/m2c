@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, Building2, Calendar, CreditCard, CheckCircle, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showSuccessToast } from "@/lib/toast-utils";
+import { hasPermission } from "@/lib/auth";
 
 interface SettlementDetailProps {
   settlementId: string;
@@ -67,7 +68,7 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
             <p className="text-sm text-gray-600 mt-1">Settlement: {settlement.settlementNumber}</p>
           </div>
         </div>
-        {status === "Pending" && (
+        {status === "Pending" && hasPermission("manage_billing") && (
           <button
             onClick={handleMarkAsPaid}
             className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"

@@ -475,7 +475,6 @@ class QCCheckerService {
             localStorage.setItem('checkerData', JSON.stringify(checker));
             localStorage.setItem('checkerID', checker.checkerId);
         } catch (error) {
-            console.error('Failed to store checker auth data:', error);
         }
     }
 
@@ -505,7 +504,6 @@ class QCCheckerService {
             localStorage.removeItem('checkerData');
             localStorage.removeItem('checkerID');
         } catch (error) {
-            console.error('Failed to clear checker auth data:', error);
         }
     }
 

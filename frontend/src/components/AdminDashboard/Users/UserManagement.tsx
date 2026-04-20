@@ -134,15 +134,29 @@ export default function UserManagement() {
     }
   };
 
+  // Deterministic color picker — hashes the role name to a fixed palette so
+  // every role (including future custom ones) gets a stable color with no
+  // hardcoded "admin"/"manager" string matching.
+  const ROLE_PALETTE = [
+    'bg-purple-100 text-purple-800',
+    'bg-blue-100 text-blue-800',
+    'bg-green-100 text-green-800',
+    'bg-amber-100 text-amber-800',
+    'bg-rose-100 text-rose-800',
+    'bg-teal-100 text-teal-800',
+    'bg-indigo-100 text-indigo-800',
+    'bg-orange-100 text-orange-800',
+  ];
   const getRoleBadge = (role: string) => {
-    const roleLower = role.toLowerCase();
-    if (roleLower.includes('admin')) {
+    if (!role) return <Badge className="bg-gray-100 text-gray-800">—</Badge>;
+    // Super Admin always gets the distinctive purple treatment (case-insensitive match)
+    if (role.toLowerCase().trim() === 'super admin') {
       return <Badge className="bg-purple-100 text-purple-800">{role}</Badge>;
-    } else if (roleLower.includes('manager')) {
-      return <Badge className="bg-blue-100 text-blue-800">{role}</Badge>;
-    } else {
-      return <Badge className="bg-green-100 text-green-800">{role}</Badge>;
     }
+    let hash = 0;
+    for (let i = 0; i < role.length; i++) hash = (hash * 31 + role.charCodeAt(i)) >>> 0;
+    const cls = ROLE_PALETTE[hash % ROLE_PALETTE.length];
+    return <Badge className={cls}>{role}</Badge>;
   };
 
   return (
@@ -157,14 +171,16 @@ export default function UserManagement() {
           <p className="text-gray-600">Manage internal staff and their access levels (Ready for Add Staff)</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            onClick={handleAddStaff}
-            className="bg-primary hover:bg-primary/90 text-white shadow-lg px-6 py-2 rounded-lg font-semibold flex items-center transition-all hover:scale-105 active:scale-95"
-            style={{ backgroundColor: '#111827' }} // Ensuring it's dark as requested
-          >
-            <UserPlus className="h-5 w-5 mr-2" />
-            <span>Add Staff Member</span>
-          </Button>
+          {hasPermission('create_users') && (
+            <Button
+              onClick={handleAddStaff}
+              className="bg-primary hover:bg-primary/90 text-white shadow-lg px-6 py-2 rounded-lg font-semibold flex items-center transition-all hover:scale-105 active:scale-95"
+              style={{ backgroundColor: '#111827' }}
+            >
+              <UserPlus className="h-5 w-5 mr-2" />
+              <span>Add Staff Member</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -188,7 +204,7 @@ export default function UserManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{newThisMonth}</div>
-            <p className="text-xs text-gray-600">+12% from last month</p>
+            <p className="text-xs text-gray-600">Joined in the last 30 days</p>
           </CardContent>
         </Card>
 
@@ -381,14 +397,16 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hover:bg-gray-100"
-                          title="View User Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        {hasPermission('view_users') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-gray-100"
+                            title="View User Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
                         {hasPermission('edit_users') && (
                           <Button
                             variant="ghost"

@@ -14,6 +14,7 @@ import {
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { settlementService, Settlement } from "@/services/settlementService";
+import { hasPermission } from "@/lib/auth";
 
 export default function SettlementManagement() {
   const router = useRouter();
@@ -212,7 +213,7 @@ export default function SettlementManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        {(settlement.status === "Pending" || settlement.status === "Processing") && (
+                        {(settlement.status === "Pending" || settlement.status === "Processing") && hasPermission('manage_billing') && (
                           <button
                             onClick={() => handleMarkAsPaid(settlement)}
                             className="p-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-colors"

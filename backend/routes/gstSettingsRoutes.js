@@ -6,21 +6,17 @@ const {
     updateGSTSetting,
     deleteGSTSetting
 } = require('../controllers/gstSettingsController');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
 
 // All routes require authentication
 router.use(authenticateToken);
 
-// Get GST settings - accessible by admins
-router.get('/', requireRole(['admin', 'super_admin', 'vendor']), getGSTSettings);
+// Get GST settings - accessible by admins (any) and vendors (need it for product creation)
+router.get('/', requireRole(['admin', 'vendor']), getGSTSettings);
 
-// Create GST setting - accessible by admins
-router.post('/', requireRole(['admin', 'super_admin']), createGSTSetting);
-
-// Update GST setting - accessible by admins
-router.put('/:id', requireRole(['admin', 'super_admin']), updateGSTSetting);
-
-// Delete GST setting - accessible by admins
-router.delete('/:id', requireRole(['admin', 'super_admin']), deleteGSTSetting);
+// Mutating endpoints — admins with manage_settings only
+router.post('/', requireRole('admin'), requirePermission('manage_settings'), createGSTSetting);
+router.put('/:id', requireRole('admin'), requirePermission('manage_settings'), updateGSTSetting);
+router.delete('/:id', requireRole('admin'), requirePermission('manage_settings'), deleteGSTSetting);
 
 module.exports = router;

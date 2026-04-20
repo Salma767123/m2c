@@ -338,7 +338,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Vendor registration error:', error);
       throw error;
     }
   }
@@ -374,7 +373,6 @@ class VendorService {
         errorMessage = error.data.message;
       }
 
-      console.error('Vendor login error:', { error, errorMessage });
       throw new Error(errorMessage);
     }
   }
@@ -395,7 +393,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Get vendor profile error:', error);
       throw error;
     }
   }
@@ -416,7 +413,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Update vendor profile error:', error);
       throw error;
     }
   }
@@ -450,7 +446,6 @@ class VendorService {
       console.log('Vendors data received:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Get all vendors error:', error);
       throw error;
     }
   }
@@ -471,7 +466,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Get vendor by ID error:', error);
       throw error;
     }
   }
@@ -531,8 +525,6 @@ class VendorService {
       console.log('updateVendorById - Response:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('Update vendor by ID error:', error);
-      console.error('Error response:', error.response?.data);
       throw error;
     }
   }
@@ -553,7 +545,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Approve vendor error:', error);
       throw error;
     }
   }
@@ -574,7 +565,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Reject vendor error:', error);
       throw error;
     }
   }
@@ -595,7 +585,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Suspend vendor error:', error);
       throw error;
     }
   }
@@ -616,7 +605,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Verify vendor bank details error:', error);
       throw error;
     }
   }
@@ -656,7 +644,6 @@ class VendorService {
       });
       return response.data;
     } catch (error) {
-      console.error('Assign QC error:', error);
       throw error;
     }
   }
@@ -676,7 +663,6 @@ class VendorService {
       });
       return response.data;
     } catch (error) {
-      console.error('Get Inspection error:', error);
       throw error;
     }
   }
@@ -696,7 +682,6 @@ class VendorService {
       });
       return response.data;
     } catch (error) {
-      console.error('Get Inspection by ID error:', error);
       throw error;
     }
   }
@@ -735,7 +720,6 @@ class VendorService {
       });
       return response.data;
     } catch (error) {
-      console.error('Update Inspection error:', error);
       throw error;
     }
   }
@@ -774,7 +758,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Update vendor basic info error:', error);
       throw error;
     }
   }
@@ -788,7 +771,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Update vendor owner info error:', error);
       throw error;
     }
   }
@@ -808,7 +790,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Upload vendor logo error:', error);
       throw error;
     }
   }
@@ -822,7 +803,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Update vendor preferences error:', error);
       throw error;
     }
   }
@@ -836,7 +816,6 @@ class VendorService {
 
       return response.data;
     } catch (error: any) {
-      console.error('Get vendor bank details error:', error);
       throw error;
     }
   }
@@ -850,7 +829,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Upsert vendor bank details error:', error);
       throw error;
     }
   }
@@ -864,7 +842,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Get vendor documents error:', error);
       throw error;
     }
   }
@@ -886,7 +863,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Upload vendor document error:', error);
       throw error;
     }
   }
@@ -900,7 +876,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Delete vendor document error:', error);
       throw error;
     }
   }
@@ -918,7 +893,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Change vendor password error:', error);
       throw error;
     }
   }
@@ -932,7 +906,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Get vendor certifications error:', error);
       throw error;
     }
   }
@@ -971,7 +944,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Add vendor certification error:', error);
       throw error;
     }
   }
@@ -1014,7 +986,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Update vendor certification error:', error);
       throw error;
     }
   }
@@ -1028,7 +999,6 @@ class VendorService {
 
       return response.data;
     } catch (error) {
-      console.error('Delete vendor certification error:', error);
       throw error;
     }
   }

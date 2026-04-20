@@ -1,4 +1,5 @@
 import OrderDetail from "@/components/AdminDashboard/Orders/OrderDetail";
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 interface PageProps {
   params: Promise<{
@@ -9,8 +10,10 @@ interface PageProps {
 export default async function OrderDetailPage({ params }: PageProps) {
   const { id } = await params;
   return (
-    <div className="p-6">
-      <OrderDetail orderId={id} />
-    </div>
+    <PermissionGuard permission="view_orders">
+      <div className="p-6">
+        <OrderDetail orderId={id} />
+      </div>
+    </PermissionGuard>
   );
 }

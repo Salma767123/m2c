@@ -7,6 +7,7 @@ import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import { Mail, Phone, Building2, FileText, Eye, Trash2, CheckCircle, XCircle, Search, Globe } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { hasPermission } from '@/lib/auth';
 
 export default function VendorEnquiryManagement() {
   const [enquiries, setEnquiries] = useState<VendorEnquiry[]>([]);
@@ -198,15 +199,17 @@ export default function VendorEnquiryManagement() {
                       <td className="px-6 py-4">{getStatusBadge(enquiry.status)}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleViewEnquiry(enquiry)}
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {enquiry.status === 'pending' && (
+                          {hasPermission(['view_enquiries', 'manage_enquiries']) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleViewEnquiry(enquiry)}
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {enquiry.status === 'pending' && hasPermission('manage_enquiries') && (
                             <>
                               <Button
                                 size="sm"
@@ -228,15 +231,17 @@ export default function VendorEnquiryManagement() {
                               </Button>
                             </>
                           )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(enquiry.id)}
-                            className="text-red-600 hover:text-red-700"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {hasPermission('manage_enquiries') && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDelete(enquiry.id)}
+                              className="text-red-600 hover:text-red-700"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

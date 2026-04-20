@@ -3,8 +3,10 @@ import { Save, Edit, Globe, Sparkles, CheckCircle, AlertCircle, Upload, X, Image
 import { Card, CardContent } from '../../UI/Card';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { seoSettingsService, SEOSettings } from '@/services/seoSettingsService';
+import { hasPermission } from '@/lib/auth';
 
 export default function SEOSettingsTab() {
+    const canManage = hasPermission('manage_settings');
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [allSettings, setAllSettings] = useState<SEOSettings[]>([]);
@@ -181,13 +183,15 @@ export default function SEOSettingsTab() {
                                 {isPageConfigured(page) ? 'SEO configured' : 'Not configured'}
                             </p>
                             
-                            <button
-                                onClick={() => handleEditClick(page)}
-                                className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded-lg text-sm transition-colors"
-                            >
-                                <Edit className="w-3 h-3" />
-                                Configure SEO
-                            </button>
+                            {canManage && (
+                                <button
+                                    onClick={() => handleEditClick(page)}
+                                    className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded-lg text-sm transition-colors"
+                                >
+                                    <Edit className="w-3 h-3" />
+                                    Configure SEO
+                                </button>
+                            )}
                         </CardContent>
                     </Card>
                 ))}
@@ -353,14 +357,16 @@ export default function SEOSettingsTab() {
                             >
                                 Cancel
                             </button>
-                            <button
-                                onClick={handleSave}
-                                disabled={loading}
-                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Save className="h-4 w-4" />
-                                {loading ? 'Saving...' : 'Save Settings'}
-                            </button>
+                            {canManage && (
+                                <button
+                                    onClick={handleSave}
+                                    disabled={loading}
+                                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Save className="h-4 w-4" />
+                                    {loading ? 'Saving...' : 'Save Settings'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

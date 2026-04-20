@@ -9,6 +9,7 @@ import {
 import Dropdown from "@/components/UI/Dropdown";
 import { orderService, Order } from "@/services/orderService";
 import { showErrorToast } from "@/lib/toast-utils";
+import { hasPermission } from "@/lib/auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -219,14 +220,16 @@ export default function InvoiceManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <button
-                            onClick={() => router.push(`/admin/dashboard/billing/invoices/view/${order.id}`)}
-                            className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="View Invoice"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          {order.invoiceNo && (
+                          {hasPermission('view_billing') && (
+                            <button
+                              onClick={() => router.push(`/admin/dashboard/billing/invoices/view/${order.id}`)}
+                              className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="View Invoice"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          )}
+                          {order.invoiceNo && hasPermission('view_billing') && (
                             <button
                               onClick={() => handlePrintInvoice(order)}
                               className="p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"

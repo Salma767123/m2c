@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
 import { useRouter } from 'next/navigation'
+import { hasPermission } from '@/lib/auth'
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -19,6 +20,7 @@ const getStatusBadge = (status: string) => {
 
 export default function RecentOrders({ orders }: { orders: any[] }) {
   const router = useRouter()
+  const canViewOrders = hasPermission('view_orders')
 
   return (
     <Card>
@@ -49,10 +51,10 @@ export default function RecentOrders({ orders }: { orders: any[] }) {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {orders && orders.map((order) => (
-                <tr 
-                  key={order.id} 
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => router.push(`/admin/dashboard/orders/view/${order.id}`)}
+                <tr
+                  key={order.id}
+                  className={`hover:bg-gray-50 ${canViewOrders ? 'cursor-pointer' : ''}`}
+                  onClick={canViewOrders ? () => router.push(`/admin/dashboard/orders/view/${order.id}`) : undefined}
                 >
                   <td className="px-3 sm:px-6 py-4 text-sm font-medium text-blue-600">
                     <div className="truncate max-w-[120px] sm:max-w-none">

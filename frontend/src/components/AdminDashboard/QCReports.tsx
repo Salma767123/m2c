@@ -16,6 +16,7 @@ import { Factory, PackageCheck, Eye } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { showErrorToast } from '@/lib/toast-utils'
 import reportsService from '@/services/reportsService'
+import { hasPermission } from '@/lib/auth'
 
 export default function QCReports() {
     const router = useRouter()
@@ -140,13 +141,15 @@ export default function QCReports() {
                                             {formatDate(report.createdAt)}
                                         </TableCell>
                                         <TableCell>
-                                            <button
-                                                onClick={() => router.push(`/admin/dashboard/qc-reports/${report.id}?type=factory`)}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                                            >
-                                                <Eye className="w-3.5 h-3.5" />
-                                                View Details
-                                            </button>
+                                            {hasPermission('view_reports') && (
+                                                <button
+                                                    onClick={() => router.push(`/admin/dashboard/qc-reports/${report.id}?type=factory`)}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                                >
+                                                    <Eye className="w-3.5 h-3.5" />
+                                                    View Details
+                                                </button>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -204,13 +207,15 @@ export default function QCReports() {
                                                 {formatDate(product.updatedAt)}
                                             </TableCell>
                                             <TableCell>
-                                                <button
-                                                    onClick={() => router.push(`/admin/dashboard/qc-reports/${product.id}?type=product`)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                                                >
-                                                    <Eye className="w-3.5 h-3.5" />
-                                                    View Details
-                                                </button>
+                                                {hasPermission('view_reports') && (
+                                                    <button
+                                                        onClick={() => router.push(`/admin/dashboard/qc-reports/${product.id}?type=product`)}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                                    >
+                                                        <Eye className="w-3.5 h-3.5" />
+                                                        View Details
+                                                    </button>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     )

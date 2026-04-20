@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { sendStaffCredentialsEmail } = require('../utils/emailService');
 
 // ==========================================
@@ -213,45 +214,152 @@ exports.getStaff = async (req, res) => {
     }
 };
 
+// Get a single staff member by id — used by the edit page so we don't have
+// to download the entire staff list just to show one record.
+exports.getStaffById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const s = await prisma.admin.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                phoneNumber: true,
+                isActive: true,
+                isVerified: true,
+                createdAt: true,
+                lastLogin: true,
+                image: true,
+                address: true,
+                city: true,
+                state: true,
+                zipCode: true,
+                country: true,
+                role: { select: { id: true, name: true, permissions: true } }
+            }
+        });
+
+        if (!s) {
+            return res.status(404).json({ success: false, error: 'Staff member not found' });
+        }
+
+        let currentStatus = 'pending';
+        if (s.isActive && s.isVerified) currentStatus = 'active';
+        else if (!s.isActive) currentStatus = 'suspended';
+        else if (s.isActive && !s.isVerified) currentStatus = 'pending';
+
+        res.json({
+            success: true,
+            data: {
+                id: s.id,
+                firstName: s.name.split(' ')[0] || '',
+                lastName: s.name.split(' ').slice(1).join(' ') || '',
+                email: s.email,
+                phone: s.phoneNumber || 'N/A',
+                role: s.role ? s.role.name : 'Unknown',
+                roleId: s.role ? s.role.id : null,
+                permissions: s.role ? s.role.permissions : [],
+                status: currentStatus,
+                joinDate: s.createdAt,
+                lastLogin: s.lastLogin || s.createdAt,
+                totalOrders: 0,
+                totalSpent: 0,
+                avatar: s.image,
+                address: {
+                    addressLine1: s.address || 'N/A',
+                    city: s.city || 'N/A',
+                    state: s.state || 'N/A',
+                    zipCode: s.zipCode || 'N/A',
+                    country: s.country || 'N/A'
+                },
+                isEmailVerified: s.isVerified,
+                isPhoneVerified: !!s.phoneNumber
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching staff by id:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch staff member' });
+    }
+};
+
 // Create staff member
+// Generate a simple password from the user's email username + @ + random digits.
+// Example: email "azar@mntfuture.com" -> password "azar@482"
+//          email "john.doe@x.com"     -> password "john.doe@1923"
+const generateSimplePassword = (email) => {
+    const username = (email || 'user').split('@')[0].toLowerCase();
+    // 3-4 digit number for variety: 100-9999
+    const number = Math.floor(100 + Math.random() * 9900);
+    return `${username}@${number}`;
+};
+
 exports.createStaff = async (req, res) => {
     try {
         const { firstName, lastName, email, phone, roleId, password } = req.body;
 
+        // Role is required — creating staff without a role would lock them out of every
+        // permission-protected route, which is a broken state.
+        if (!roleId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Role is required when creating a staff member'
+            });
+        }
+
+        // Verify the role actually exists before saving
+        const role = await prisma.role.findUnique({ where: { id: roleId } });
+        if (!role) {
+            return res.status(400).json({
+                success: false,
+                error: 'Selected role does not exist'
+            });
+        }
+
         const existingAdmin = await prisma.admin.findUnique({ where: { email } });
         if (existingAdmin) return res.status(400).json({ success: false, error: 'Email already exists' });
 
-        const hashedPassword = await bcrypt.hash(password || 'Staff@123!!', 10);
+        // Use admin-provided password if any, otherwise generate one based on the email.
+        // The raw password is what gets emailed to the staff member.
+        const rawPassword = (password && password.trim().length >= 6)
+            ? password.trim()
+            : generateSimplePassword(email);
+
+        const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+        // Verification token — staff must verify their email before they can log in.
+        const verificationToken = crypto.randomBytes(32).toString('hex');
 
         const newStaff = await prisma.admin.create({
             data: {
                 name: `${firstName} ${lastName}`,
                 email,
                 phoneNumber: phone,
-                roleId: roleId || null,
+                roleId,
                 password: hashedPassword,
                 isActive: true,
-                isVerified: true,
+                isVerified: false,            // must verify via email link
+                verificationToken,
                 onboardingCompleted: true,
                 googleId: `STAFF_${Date.now()}_${Math.random().toString(36).substring(7)}`,
                 provider: 'local'
             }
         });
 
-        const rawPassword = password || 'Staff@123!!';
-
         try {
-            const loginLink = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/admin/login` : 'http://localhost:3000/admin/login';
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const loginLink = `${frontendUrl}/admin/login`;
+            const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
             await sendStaffCredentialsEmail({
                 to: email,
                 name: `${firstName} ${lastName}`,
                 email: email,
                 password: rawPassword,
-                loginLink: loginLink
+                loginLink,
+                verificationLink
             });
         } catch (emailError) {
             console.error('Failed to send staff credentials email:', emailError);
-            // Optionally we can return a message saying the staff is created but email failed
         }
 
         res.status(201).json({ success: true, data: newStaff });

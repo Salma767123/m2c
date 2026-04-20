@@ -14,6 +14,7 @@ import {
 import Dropdown from "@/components/UI/Dropdown";
 import { orderService, Order } from "@/services/orderService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { hasPermission } from "@/lib/auth";
 
 export default function VendorToHub() {
   const router = useRouter();
@@ -189,13 +190,15 @@ export default function VendorToHub() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <button
-                        onClick={() => handleViewOrder(order.id)}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="View Order"
-                      >
-                        <Eye className="h-5 w-5" />
-                      </button>
+                      {hasPermission('view_orders') && (
+                        <button
+                          onClick={() => handleViewOrder(order.id)}
+                          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="View Order"
+                        >
+                          <Eye className="h-5 w-5" />
+                        </button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import supportService, { SupportTicket } from "@/services/supportService";
+import { hasPermission } from "@/lib/auth";
 import { useEffect } from "react";
 
 export default function AdminSupport() {
@@ -277,13 +278,15 @@ export default function AdminSupport() {
                     <span className="text-sm text-gray-900">{ticket.messages?.length || 0}</span>
                   </TableCell>
                   <TableCell>
-                    <Link
-                      href={`/admin/dashboard/support/${ticket.id}`}
-                      className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium"
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View & Reply
-                    </Link>
+                    {hasPermission(['view_support', 'manage_support']) && (
+                      <Link
+                        href={`/admin/dashboard/support/${ticket.id}`}
+                        className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View & Reply
+                      </Link>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

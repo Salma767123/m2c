@@ -1,15 +1,14 @@
-import  ProductsTable  from '@/components/AdminDashboard/Products/ProductsTable'
+import ProductsTable from '@/components/AdminDashboard/Products/ProductsTable'
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
-import { Button } from '@/components/UI/Button'
-import { Plus } from 'lucide-react'
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function ProductsPage() {
   return (
-    <div className="space-y-4">
-      {/* Breadcrumb */}
-      <Breadcrumb />
-      {/* Products Table */}
-      <ProductsTable />
-    </div>
+    <PermissionGuard permission="view_products">
+      <div className="space-y-4">
+        <Breadcrumb />
+        <ProductsTable />
+      </div>
+    </PermissionGuard>
   )
 }

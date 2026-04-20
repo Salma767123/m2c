@@ -85,7 +85,6 @@ class WishlistService {
     try {
       localStorage.setItem('guestWishlist', JSON.stringify(productIds));
     } catch (error) {
-      console.error('Failed to save wishlist to localStorage:', error);
     }
   }
 
@@ -113,7 +112,6 @@ class WishlistService {
     try {
       localStorage.removeItem('guestWishlist');
     } catch (error) {
-      console.error('Failed to clear wishlist from localStorage:', error);
     }
   }
 }

@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { ArrowLeft, Download, Printer, Building2, Calendar, Package } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showSuccessToast } from "@/lib/toast-utils";
+import { hasPermission } from "@/lib/auth";
 
 interface BillingDetailProps {
   billingId: string;
@@ -168,22 +169,24 @@ export default function BillingDetail({ billingId }: BillingDetailProps) {
             <p className="text-sm text-gray-600 mt-1">Billing: {billing.billingNumber}</p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={handleDownload}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </button>
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center gap-2"
-          >
-            <Printer className="h-4 w-4" />
-            Print
-          </button>
-        </div>
+        {hasPermission('view_billing') && (
+          <div className="flex gap-3">
+            <button
+              onClick={handleDownload}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </button>
+            <button
+              onClick={handlePrint}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center gap-2"
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Billing Content */}

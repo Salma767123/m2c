@@ -1,7 +1,12 @@
 import CouponManagement from '@/components/AdminDashboard/Coupons/CouponManagement';
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 const CouponsPage = () => {
-  return <CouponManagement />;
+  return (
+    <PermissionGuard permission="view_coupons">
+      <CouponManagement />
+    </PermissionGuard>
+  );
 };
 
 export default CouponsPage;

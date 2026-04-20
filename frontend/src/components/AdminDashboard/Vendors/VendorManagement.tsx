@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
 import { Badge } from '@/components/UI/Badge';
+import { hasPermission } from '@/lib/auth';
 
 interface Vendor {
   id: string;
@@ -72,7 +73,7 @@ export default function VendorManagement() {
                       <Badge variant={vendor.status === 'PENDING' ? 'default' : 'secondary'}>
                         {vendor.status}
                       </Badge>
-                      {vendor.status === 'PENDING' && (
+                      {vendor.status === 'PENDING' && hasPermission('edit_vendors') && (
                         <>
                           <Button
                             size="sm"

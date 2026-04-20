@@ -5,6 +5,7 @@ import { Save, RefreshCw, CalendarClock, CalendarCheck, AlertTriangle, CheckCirc
 import { Card, CardContent } from "@/components/UI/Card";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { invoiceSettingsService, InvoiceSettingsData } from "@/services/invoiceSettingsService";
+import { hasPermission } from "@/lib/auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -210,14 +211,16 @@ export default function InvoiceSettings() {
                     <h2 className="text-xl font-bold text-gray-900">Invoice Settings</h2>
                     <p className="text-gray-600 mt-1">Configure how invoice numbers are generated</p>
                 </div>
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-                >
-                    {saving ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                    {saving ? "Saving…" : "Save Settings"}
-                </button>
+                {hasPermission("manage_billing") && (
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                    >
+                        {saving ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                        {saving ? "Saving…" : "Save Settings"}
+                    </button>
+                )}
             </div>
 
             {/* ── Invoice Numbering ── */}

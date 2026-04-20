@@ -292,7 +292,7 @@ const sendQCCheckerCredentialsEmail = async ({ to, name, checkerId, password, lo
 /**
  * Send Staff login credentials email
  */
-const sendStaffCredentialsEmail = async ({ to, name, email, password, loginLink }) => {
+const sendStaffCredentialsEmail = async ({ to, name, email, password, loginLink, verificationLink }) => {
   const transporter = createTransporter();
 
   const html = `
@@ -327,7 +327,7 @@ const sendStaffCredentialsEmail = async ({ to, name, email, password, loginLink 
                     Dear <strong>${name}</strong>,
                   </p>
                   <p style="margin:0 0 24px;color:#374151;font-size:16px;line-height:1.6;">
-                    Your Staff account has been successfully created by the admin. Please use the following credentials to log in to the Admin Portal:
+                    Your Staff account has been successfully created by the admin. Please <strong>verify your email first</strong>, then use the credentials below to log in to the Admin Portal.
                   </p>
 
                   <!-- Credentials Box -->
@@ -356,12 +356,30 @@ const sendStaffCredentialsEmail = async ({ to, name, email, password, loginLink 
                     </tr>
                   </table>
 
-                  <!-- CTA Button -->
+                  <!-- Step 1: Verify Email (primary action) -->
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
-                      <td align="center" style="padding:0 0 32px;">
-                        <a href="${loginLink}" 
-                           style="display:inline-block;background-color:#111827;color:#ffffff;text-decoration:none;padding:16px 40px;border-radius:8px;font-size:16px;font-weight:600;letter-spacing:0.3px;">
+                      <td align="center" style="padding:0 0 12px;">
+                        <p style="margin:0 0 12px;color:#111827;font-size:14px;font-weight:600;letter-spacing:0.3px;">
+                          Step 1 — Verify your email
+                        </p>
+                        <a href="${verificationLink}"
+                           style="display:inline-block;background-color:#16a34a;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:600;letter-spacing:0.3px;">
+                          Verify Email Address ✓
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Step 2: Login -->
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td align="center" style="padding:12px 0 32px;">
+                        <p style="margin:0 0 12px;color:#6b7280;font-size:13px;">
+                          Step 2 — After verification, log in:
+                        </p>
+                        <a href="${loginLink}"
+                           style="display:inline-block;background-color:#111827;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:600;letter-spacing:0.3px;">
                           Login to Admin Portal →
                         </a>
                       </td>
@@ -373,15 +391,16 @@ const sendStaffCredentialsEmail = async ({ to, name, email, password, loginLink 
                     <tr>
                       <td style="padding:16px 20px;">
                         <p style="margin:0;color:#92400e;font-size:14px;line-height:1.6;">
-                          <strong>⚠️ Security Note:</strong> Please change your password after first login. Keep these credentials confidential and do not share them with anyone.
+                          <strong>⚠️ Security Note:</strong> You must verify your email before you can log in. Please change your password after first login. Keep these credentials confidential and do not share them with anyone.
                         </p>
                       </td>
                     </tr>
                   </table>
 
-                  <p style="margin:28px 0 0;color:#6b7280;font-size:14px;line-height:1.6;">
-                    If the button doesn't work, copy and paste this link into your browser:<br>
-                    <a href="${loginLink}" style="color:#4f46e5;word-break:break-all;">${loginLink}</a>
+                  <p style="margin:28px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
+                    If the buttons don't work, copy and paste these links into your browser:<br>
+                    <strong>Verify:</strong> <a href="${verificationLink}" style="color:#16a34a;word-break:break-all;">${verificationLink}</a><br>
+                    <strong>Login:</strong> <a href="${loginLink}" style="color:#4f46e5;word-break:break-all;">${loginLink}</a>
                   </p>
                 </td>
               </tr>

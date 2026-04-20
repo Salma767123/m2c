@@ -271,9 +271,18 @@ const requirePermission = (requiredPermissions) => {
       });
     }
 
-    // Super Admin overrides all permissions
-    if (req.user.roleName === 'Super Admin') {
+    // Super Admin overrides all permissions (case/spacing insensitive)
+    const roleNameNorm = (req.user.roleName || '').toLowerCase().trim();
+    if (roleNameNorm === 'super admin') {
       return next();
+    }
+
+    // Admin has no role assigned — surface a clear error instead of silently 403'ing
+    if (!req.user.permissions || req.user.permissions.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: 'Your account has no role or permissions assigned. Please contact a Super Admin.'
+      });
     }
 
     const permissionsToCheck = Array.isArray(requiredPermissions)
@@ -281,7 +290,7 @@ const requirePermission = (requiredPermissions) => {
       : [requiredPermissions];
 
     const hasPermission = permissionsToCheck.some(permission =>
-      req.user.permissions && req.user.permissions.includes(permission)
+      req.user.permissions.includes(permission)
     );
 
     if (!hasPermission) {

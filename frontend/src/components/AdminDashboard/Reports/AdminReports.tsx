@@ -20,6 +20,7 @@ import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { hasPermission } from '@/lib/auth';
 
 type ReportTab = 'overview' | 'sales' | 'orders' | 'settlement' | 'financial' | 'vendors' | 'products' | 'customers';
 
@@ -211,14 +212,18 @@ export default function AdminReports() {
               onChange={(v) => setPeriod(v as ReportPeriod)}
             />
           </div>
-          <Button variant="outline" className="gap-2" onClick={exportToPDF} disabled={loading || !data}>
-            <FileText className="w-4 h-4" />
-            PDF
-          </Button>
-          <Button variant="outline" className="gap-2" onClick={exportToExcel} disabled={loading || !data}>
-            <Download className="w-4 h-4" />
-            Excel
-          </Button>
+          {hasPermission('export_reports') && (
+            <Button variant="outline" className="gap-2" onClick={exportToPDF} disabled={loading || !data}>
+              <FileText className="w-4 h-4" />
+              PDF
+            </Button>
+          )}
+          {hasPermission('export_reports') && (
+            <Button variant="outline" className="gap-2" onClick={exportToExcel} disabled={loading || !data}>
+              <Download className="w-4 h-4" />
+              Excel
+            </Button>
+          )}
           <Button variant="outline" className="gap-2" onClick={fetchReport} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Refresh

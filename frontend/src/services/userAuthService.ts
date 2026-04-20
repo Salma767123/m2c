@@ -126,7 +126,6 @@ class UserAuthService {
       storage.setItem('userToken', token);
       storage.setItem('userData', JSON.stringify(user));
     } catch (error) {
-      console.error('Failed to store auth data:', error);
     }
   }
 
@@ -160,7 +159,6 @@ class UserAuthService {
       sessionStorage.removeItem('userToken');
       sessionStorage.removeItem('userData');
     } catch (error) {
-      console.error('Failed to clear auth data:', error);
     }
   }
 

@@ -23,6 +23,7 @@ import {
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Image from 'next/image'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
+import { hasPermission } from '@/lib/auth'
 
 interface VendorProductRequestViewProps {
   requestId: string
@@ -296,7 +297,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           <Badge className={getStatusColor(product.approvalStatus)}>
             {product.approvalStatus.replace('_', ' ').charAt(0).toUpperCase() + product.approvalStatus.replace('_', ' ').slice(1).toLowerCase()}
           </Badge>
-          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION') && (
+          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION') && hasPermission('edit_products') && (
             <>
               {product.approvalStatus === 'QC_APPROVED' ? (
                 <Button

@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@/components/UI/Table';
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb';
+import { hasPermission } from '@/lib/auth';
 import Dropdown from '@/components/UI/Dropdown';
 import {
   Users as UsersIcon,
@@ -151,10 +152,12 @@ export default function CustomerManagement() {
           <p className="text-gray-600">Manage customer accounts and their status</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button className="bg-gray-900 hover:bg-gray-800 text-white">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add Customer
-          </Button>
+          {hasPermission('create_users') && (
+            <Button className="bg-gray-900 hover:bg-gray-800 text-white">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add Customer
+            </Button>
+          )}
         </div>
       </div>
       {/* Stats Cards */}
@@ -177,7 +180,7 @@ export default function CustomerManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{newThisMonth}</div>
-            <p className="text-xs text-gray-600">+15% from last month</p>
+            <p className="text-xs text-gray-600">Joined in the last 30 days</p>
           </CardContent>
         </Card>
 
@@ -385,43 +388,50 @@ export default function CustomerManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hover:bg-gray-100"
-                          title="View Customer Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hover:bg-gray-100"
-                          title="Edit Customer"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {customer.status === 'active' ? (
+                        {hasPermission('view_users') && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="hover:bg-yellow-100 text-yellow-600"
-                            title="Suspend Customer"
-                            onClick={() => handleStatusChange(customer.id, 'suspended')}
+                            className="hover:bg-gray-100"
+                            title="View Customer Details"
                           >
-                            <UserX className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </Button>
-                        ) : customer.status === 'suspended' ? (
+                        )}
+                        {hasPermission('edit_users') && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="hover:bg-green-100 text-green-600"
-                            title="Activate Customer"
-                            onClick={() => handleStatusChange(customer.id, 'active')}
+                            className="hover:bg-gray-100"
+                            title="Edit Customer"
                           >
-                            <UserCheck className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </Button>
-                        ) : (
+                        )}
+                        {hasPermission('edit_users') && (
+                          customer.status === 'active' ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:bg-yellow-100 text-yellow-600"
+                              title="Suspend Customer"
+                              onClick={() => handleStatusChange(customer.id, 'suspended')}
+                            >
+                              <UserX className="h-4 w-4" />
+                            </Button>
+                          ) : customer.status === 'suspended' ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:bg-green-100 text-green-600"
+                              title="Activate Customer"
+                              onClick={() => handleStatusChange(customer.id, 'active')}
+                            >
+                              <UserCheck className="h-4 w-4" />
+                            </Button>
+                          ) : null
+                        )}
+                        {customer.status !== 'active' && customer.status !== 'suspended' && hasPermission('delete_users') && (
                           <Button
                             variant="ghost"
                             size="sm"

@@ -360,6 +360,16 @@ const login = async (req, res) => {
       });
     }
 
+    // Email verification gate — block login until the user has clicked
+    // the verification link sent to their inbox.
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        code: 'EMAIL_NOT_VERIFIED',
+        error: "Please verify your email first. Check your inbox for the verification link.",
+      });
+    }
+
     // Update last login
     const updateData = { lastLogin: new Date() };
 
@@ -512,6 +522,7 @@ const googleCallback = async (req, res) => {
         ? await prisma.admin.update({
           where: { id: user.id },
           data: updateData,
+          include: { role: true }, // Keep role attached so login response includes permissions
         })
         : await prisma.user.update({
           where: { id: user.id },
@@ -532,10 +543,19 @@ const googleCallback = async (req, res) => {
         lastLogin: new Date(),
       };
 
+      // For admins auto-registered via Google, attach Super Admin role so they
+      // aren't locked out of permission-protected routes on first login.
+      if (isAdmin) {
+        const superAdminRole = await prisma.role.findUnique({ where: { name: 'Super Admin' } });
+        if (superAdminRole) {
+          createData.roleId = superAdminRole.id;
+        }
+      }
+
       // Note: FCM token should be saved via dedicated endpoint, not during OAuth
 
       user = isAdmin
-        ? await prisma.admin.create({ data: createData })
+        ? await prisma.admin.create({ data: createData, include: { role: true } })
         : await prisma.user.create({ data: createData });
       console.log("✅ Google user auto-registered:", user.id);
 
@@ -2059,28 +2079,7 @@ const superAdminLogin = async (req, res) => {
     // Only check admin collection for super admin login
     const admin = await prisma.admin.findUnique({
       where: { email },
-      select: {
-        id: true,
-        email: true,
-        password: true,
-        name: true,
-        image: true,
-        isActive: true,
-        isVerified: true,
-        phoneNumber: true,
-        address: true,
-        city: true,
-        state: true,
-        zipCode: true,
-        country: true,
-        dateOfBirth: true,
-        currency: true,
-        companyName: true,
-        gstNumber: true,
-        onboardingCompleted: true,
-        lastLogin: true,
-        provider: true
-      }
+      include: { role: true }
     });
 
     if (!admin) {
@@ -2125,6 +2124,19 @@ const superAdminLogin = async (req, res) => {
       return res.status(401).json({
         success: false,
         error: "Invalid admin credentials",
+      });
+    }
+
+    // Email verification gate — staff created by an admin must click the
+    // verification link emailed to them before they can log in. The default
+    // bootstrap admin (`initializeAdmin`) is already `isVerified: true`, so
+    // this does not affect existing Super Admin logins.
+    if (!admin.isVerified) {
+      console.log("❌ Admin email not verified");
+      return res.status(403).json({
+        success: false,
+        code: 'EMAIL_NOT_VERIFIED',
+        error: "Please verify your email first. Check your inbox for the verification link.",
       });
     }
 
@@ -2174,6 +2186,9 @@ const superAdminLogin = async (req, res) => {
           companyName: admin.companyName,
           gstNumber: admin.gstNumber,
           onboardingCompleted: admin.onboardingCompleted,
+          // Include role info so the frontend can do permission checks
+          roleName: admin.role ? admin.role.name : 'admin',
+          permissions: admin.role ? admin.role.permissions : []
         },
       },
     });

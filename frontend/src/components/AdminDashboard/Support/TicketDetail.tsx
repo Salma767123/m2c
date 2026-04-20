@@ -10,8 +10,10 @@ import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 
 import supportService, { SupportTicket, TicketMessage } from "@/services/supportService";
 import { useEffect } from "react";
+import { hasPermission } from "@/lib/auth";
 
 export default function TicketDetail({ ticketId }: { ticketId: string }) {
+  const canManage = hasPermission("manage_support");
   const [replyMessage, setReplyMessage] = useState("");
   const [ticketStatus, setTicketStatus] = useState("in-progress");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -204,31 +206,33 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           </Card>
 
           {/* Reply Form */}
-          <Card>
-            <CardContent className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Send Reply</h2>
-              <form onSubmit={handleSubmitReply} className="space-y-4">
-                <textarea
-                  value={replyMessage}
-                  onChange={(e) => setReplyMessage(e.target.value)}
-                  placeholder="Type your response to the vendor..."
-                  rows={5}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={isSubmitting || !replyMessage.trim()}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-                  >
-                    <Send className="w-4 h-4" />
-                    {isSubmitting ? "Sending..." : "Send Reply"}
-                  </button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          {canManage && (
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Send Reply</h2>
+                <form onSubmit={handleSubmitReply} className="space-y-4">
+                  <textarea
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="Type your response to the vendor..."
+                    rows={5}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting || !replyMessage.trim()}
+                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                    >
+                      <Send className="w-4 h-4" />
+                      {isSubmitting ? "Sending..." : "Send Reply"}
+                    </button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -251,45 +255,49 @@ export default function TicketDetail({ ticketId }: { ticketId: string }) {
           </Card>
 
           {/* Update Status */}
-          <Card>
-            <CardContent className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Update Status</h2>
-              <Dropdown
-                value={ticketStatus}
-                options={[
-                  { value: "open", label: "Open" },
-                  { value: "in-progress", label: "In Progress" },
-                  { value: "resolved", label: "Resolved" },
-                  { value: "closed", label: "Closed" },
-                ]}
-                onChange={handleStatusChange}
-                placeholder="Select status"
-              />
-            </CardContent>
-          </Card>
+          {canManage && (
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Update Status</h2>
+                <Dropdown
+                  value={ticketStatus}
+                  options={[
+                    { value: "open", label: "Open" },
+                    { value: "in-progress", label: "In Progress" },
+                    { value: "resolved", label: "Resolved" },
+                    { value: "closed", label: "Closed" },
+                  ]}
+                  onChange={handleStatusChange}
+                  placeholder="Select status"
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick Actions */}
-          <Card>
-            <CardContent className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-              <div className="space-y-2">
-                <button
-                  onClick={() => handleQuickAction("resolved")}
-                  className="w-full flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Mark as Resolved
-                </button>
-                <button
-                  onClick={() => handleQuickAction("request_info")}
-                  className="w-full flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  <Clock className="w-4 h-4" />
-                  Request More Info
-                </button>
-              </div>
-            </CardContent>
-          </Card>
+          {canManage && (
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleQuickAction("resolved")}
+                    className="w-full flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Mark as Resolved
+                  </button>
+                  <button
+                    onClick={() => handleQuickAction("request_info")}
+                    className="w-full flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <Clock className="w-4 h-4" />
+                    Request More Info
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

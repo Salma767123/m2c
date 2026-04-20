@@ -12,10 +12,11 @@ const {
     getQcFactoryReports,
     getQcProductReports,
 } = require('../controllers/reportsController');
-const { authenticateToken, requireAdminRole } = require('../middleware/auth');
+const { authenticateToken, requireAdminRole, requirePermission } = require('../middleware/auth');
 
 router.use(authenticateToken);
 router.use(requireAdminRole);
+router.use(requirePermission('view_reports'));
 
 router.get('/overview', getOverviewReport);
 router.get('/sales', getSalesReport);

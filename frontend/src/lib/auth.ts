@@ -33,14 +33,16 @@ export function hasPermission(permission: string | string[]): boolean {
     const auth = getStoredAuth()
     if (!auth || !auth.user) return false
 
-    // SuperAdmin override
-    if (auth.user.roleName === 'Super Admin' || auth.user.role === 'admin') return true;
+    // Super Admin bypass — case/spacing insensitive so a renamed role won't break it
+    if (auth.user.roleName && auth.user.roleName.toLowerCase().trim() === 'super admin') {
+      return true
+    }
 
     if (!auth.user.permissions) return false
 
     const permissionsToCheck = Array.isArray(permission) ? permission : [permission]
     return permissionsToCheck.some(p => auth.user.permissions?.includes(p))
-  } catch (e) {
+  } catch {
     return false
   }
 }

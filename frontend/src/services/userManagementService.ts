@@ -57,7 +57,6 @@ export const userManagementService = {
             const { data } = await axios.get('/admin/users/customers', { params });
             return data.data ?? [];
         } catch (error) {
-            console.error('Failed to fetch customers', error);
             return [];
         }
     },
@@ -76,7 +75,6 @@ export const userManagementService = {
             const { data } = await axios.get('/admin/users/staff', { params });
             return data.data ?? [];
         } catch (error) {
-            console.error('Failed to fetch staff', error);
             return [];
         }
     },
@@ -88,13 +86,9 @@ export const userManagementService = {
 
     getStaffById: async (id: string): Promise<Staff | null> => {
         try {
-            // Reusing getStaff for now or adding a specific endpoint if needed
-            // Backend currently doesn't have a specific getById, so we might need to add it 
-            // or just fetch all and filter. For now, let's assume we fetch all and find.
-            const staffList = await userManagementService.getStaff();
-            return staffList.find(s => s.id === id) || null;
+            const { data } = await axios.get(`/admin/users/staff/${id}`);
+            return data?.data ?? null;
         } catch (error) {
-            console.error('Failed to fetch staff by id', error);
             return null;
         }
     },

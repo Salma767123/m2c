@@ -1,3 +1,5 @@
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
+
 // Billing page temporarily commented out
 // import BillingManagement from "@/components/AdminDashboard/Billing/BillingManagement";
 
@@ -14,5 +16,9 @@
 // }
 
 export default function BillingsPage() {
-  return null;
+  return (
+    <PermissionGuard permission="view_billing">
+      {null}
+    </PermissionGuard>
+  );
 }

@@ -8,19 +8,19 @@ const {
   updateBankDetails,
   updateLogo
 } = require('../controllers/companyInfoController');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
 
 // All routes require authentication
 router.use(authenticateToken);
 
-// Get company info - accessible by all admins
-router.get('/', getCompanyInfo);
+// Get company info - accessible by anyone with view_settings or manage_settings
+router.get('/', requireRole('admin'), requirePermission(['view_settings', 'manage_settings']), getCompanyInfo);
 
-// Update routes - accessible by super_admin only
-router.put('/basic', requireRole('admin'), updateBasicInfo);
-router.put('/legal', requireRole('admin'), updateLegalInfo);
-router.put('/address', requireRole('admin'), updateAddress);
-router.put('/bank', requireRole('admin'), updateBankDetails);
-router.put('/logo', requireRole('admin'), updateLogo);
+// Update routes - require manage_settings
+router.put('/basic', requireRole('admin'), requirePermission('manage_settings'), updateBasicInfo);
+router.put('/legal', requireRole('admin'), requirePermission('manage_settings'), updateLegalInfo);
+router.put('/address', requireRole('admin'), requirePermission('manage_settings'), updateAddress);
+router.put('/bank', requireRole('admin'), requirePermission('manage_settings'), updateBankDetails);
+router.put('/logo', requireRole('admin'), requirePermission('manage_settings'), updateLogo);
 
 module.exports = router;

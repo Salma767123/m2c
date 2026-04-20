@@ -110,7 +110,6 @@ class CartService {
     try {
       localStorage.setItem('guestCart', JSON.stringify(items));
     } catch (error) {
-      console.error('Failed to save cart to localStorage:', error);
     }
   }
 
@@ -155,7 +154,6 @@ class CartService {
     try {
       localStorage.removeItem('guestCart');
     } catch (error) {
-      console.error('Failed to clear cart from localStorage:', error);
     }
   }
 

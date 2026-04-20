@@ -8,6 +8,7 @@ import { orderService, Order } from "@/services/orderService";
 import { hubService, Hub } from "@/services/hubService";
 import { MapPin as HubIcon } from "lucide-react";
 import axiosInstance from "@/lib/axios";
+import { hasPermission } from "@/lib/auth";
 
 interface OrderDetailProps {
     orderId: string;
@@ -142,16 +143,18 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 </div>
                 <div className="flex gap-3 items-center">
                     {/* Print Invoice Button */}
-                    <button
-                        onClick={handlePrintInvoice}
-                        disabled={invoiceLoading}
-                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                    >
-                        {invoiceLoading
-                            ? <span className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />
-                            : <FileText className="h-4 w-4" />}
-                        {invoiceLoading ? 'Generating…' : 'Print Invoice'}
-                    </button>
+                    {hasPermission('view_billing') && (
+                        <button
+                            onClick={handlePrintInvoice}
+                            disabled={invoiceLoading}
+                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                        >
+                            {invoiceLoading
+                                ? <span className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />
+                                : <FileText className="h-4 w-4" />}
+                            {invoiceLoading ? 'Generating…' : 'Print Invoice'}
+                        </button>
+                    )}
                     <span className={`px-4 py-2 rounded-lg font-medium border ${status === "DELIVERED" ? "bg-green-100 text-green-800 border-green-300" :
                         ["SHIPPED_TO_CUSTOMER", "IN_TRANSIT_TO_ADMIN_HUB"].includes(status) ? "bg-blue-100 text-blue-800 border-blue-300" :
                             "bg-yellow-100 text-yellow-800 border-yellow-300"
@@ -318,7 +321,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                 </p>
                                 <p className="text-xs text-teal-700 mt-1 italic">Vendor can now pack and ship this order.</p>
                             </div>
-                        ) : (
+                        ) : hasPermission('edit_orders') ? (
                             <div className="space-y-4">
                                 <p className="text-sm text-gray-600 italic">Assign a hub to allow the vendor to process this order.</p>
                                 <select
@@ -339,6 +342,8 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                     {isAssigningHub ? "Assigning..." : "Assign Hub"}
                                 </button>
                             </div>
+                        ) : (
+                            <p className="text-sm text-gray-500 italic">No hub assigned yet.</p>
                         )}
                     </div>
 

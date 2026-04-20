@@ -11,6 +11,7 @@ import { Eye, Check, X, Search, Filter, AlertCircle, UserPlus } from 'lucide-rea
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { adminProductService } from '@/services/adminProductService'
 import qcCheckerService from '@/services/qcCheckerService'
+import { hasPermission } from '@/lib/auth'
 
 interface VendorProductRequest {
   id: string
@@ -466,15 +467,17 @@ export default function VendorProductRequests() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewDetails(request)}
-                          className="text-gray-600 hover:text-gray-900"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION') && (
+                        {hasPermission('view_products') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDetails(request)}
+                            className="text-gray-600 hover:text-gray-900"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {(request.approvalStatus === 'PENDING' || request.approvalStatus === 'QC_APPROVED' || request.approvalStatus === 'REINSPECTION') && hasPermission('edit_products') && (
                           <>
                             {request.approvalStatus === 'QC_APPROVED' && (
                               <Button

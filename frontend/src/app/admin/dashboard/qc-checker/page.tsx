@@ -1,5 +1,10 @@
 import QCCheckerList from "@/components/AdminDashboard/QCChecker/QCCheckerList";
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function QCCheckerPage() {
-  return <QCCheckerList />;
+  return (
+    <PermissionGuard permission={["view_qc_checkers", "view_users"]}>
+      <QCCheckerList />
+    </PermissionGuard>
+  );
 }

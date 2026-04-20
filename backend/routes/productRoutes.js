@@ -21,7 +21,7 @@ const {
   getPublicProducts,
   getPublicProduct
 } = require('../controllers/productController');
-const { authenticateToken, requireVendorRole, requireAdminRole, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireVendorRole, requireAdminRole, requireRole, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -29,16 +29,16 @@ const router = express.Router();
 router.get('/public', getPublicProducts);
 router.get('/public/:id', getPublicProduct);
 
-// Admin routes (require admin authentication)
-router.get('/admin/all', authenticateToken, requireAdminRole, getAllProductsForAdmin);
-router.get('/admin/:id', authenticateToken, requireAdminRole, getProductForAdmin);
-router.post('/admin', authenticateToken, requireAdminRole, createProductByAdmin);
-router.put('/admin/:id', authenticateToken, requireAdminRole, updateProductByAdmin);
-router.delete('/admin/:id', authenticateToken, requireAdminRole, deleteProductByAdmin);
-router.put('/:id/approve', authenticateToken, requireAdminRole, approveProduct);
-router.put('/:id/reject', authenticateToken, requireAdminRole, rejectProduct);
-router.post('/admin/:id/assign-qc', authenticateToken, requireAdminRole, assignQCCheckerToProduct);
-router.put('/admin/:id/variants/stock', authenticateToken, requireAdminRole, updateVariantStocks);
+// Admin routes (require admin authentication + per-action permission)
+router.get('/admin/all', authenticateToken, requireAdminRole, requirePermission('view_products'), getAllProductsForAdmin);
+router.get('/admin/:id', authenticateToken, requireAdminRole, requirePermission('view_products'), getProductForAdmin);
+router.post('/admin', authenticateToken, requireAdminRole, requirePermission('create_products'), createProductByAdmin);
+router.put('/admin/:id', authenticateToken, requireAdminRole, requirePermission('edit_products'), updateProductByAdmin);
+router.delete('/admin/:id', authenticateToken, requireAdminRole, requirePermission('delete_products'), deleteProductByAdmin);
+router.put('/:id/approve', authenticateToken, requireAdminRole, requirePermission('edit_products'), approveProduct);
+router.put('/:id/reject', authenticateToken, requireAdminRole, requirePermission('edit_products'), rejectProduct);
+router.post('/admin/:id/assign-qc', authenticateToken, requireAdminRole, requirePermission('edit_products'), assignQCCheckerToProduct);
+router.put('/admin/:id/variants/stock', authenticateToken, requireAdminRole, requirePermission('edit_products'), updateVariantStocks);
 
 // Vendor routes - specific named routes MUST come before /:id
 // Product statistics

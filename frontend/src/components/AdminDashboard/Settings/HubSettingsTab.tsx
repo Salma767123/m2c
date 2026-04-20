@@ -5,8 +5,10 @@ import { MapPin, Plus, Edit, Trash2, Save, X, Loader2 } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import hubService, { Hub } from "@/services/hubService";
+import { hasPermission } from "@/lib/auth";
 
 export default function HubSettingsTab() {
+  const canManage = hasPermission("manage_settings");
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -179,13 +181,15 @@ export default function HubSettingsTab() {
             Manage delivery hubs and their locations
           </p>
         </div>
-        <button
-          onClick={handleAddHub}
-          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Hub
-        </button>
+        {canManage && (
+          <button
+            onClick={handleAddHub}
+            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Hub
+          </button>
+        )}
       </div>
 
       {/* Hubs List */}
@@ -234,22 +238,24 @@ export default function HubSettingsTab() {
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEditHub(hub)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                >
-                  <Edit className="h-4 w-4" />
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDeleteHub(hub.id)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors text-sm"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </button>
-              </div>
+              {canManage && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEditHub(hub)}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteHub(hub.id)}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors text-sm"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -265,13 +271,15 @@ export default function HubSettingsTab() {
             <p className="text-gray-600 mb-4">
               Get started by adding your first delivery hub
             </p>
-            <button
-              onClick={handleAddHub}
-              className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Hub
-            </button>
+            {canManage && (
+              <button
+                onClick={handleAddHub}
+                className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Add Hub
+              </button>
+            )}
           </CardContent>
         </Card>
       )}

@@ -3,8 +3,10 @@ import { Save, Upload, X, Image, Trash2, GripVertical, Plus, Eye, EyeOff } from 
 import { Card, CardContent } from '../../UI/Card';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { bannerService, BannerImage } from '@/services/bannerService';
+import { hasPermission } from '@/lib/auth';
 
 export default function BannerSettingsTab() {
+    const canManage = hasPermission('manage_settings');
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [banners, setBanners] = useState<BannerImage[]>([]);
@@ -268,23 +270,25 @@ export default function BannerSettingsTab() {
                         </div>
 
                         {/* Submit Button */}
-                        <button
-                            onClick={handleAddBanner}
-                            disabled={!selectedFile || uploading}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                        >
-                            {uploading ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                    Uploading...
-                                </>
-                            ) : (
-                                <>
-                                    <Plus className="h-4 w-4" />
-                                    Add Banner
-                                </>
-                            )}
-                        </button>
+                        {canManage && (
+                            <button
+                                onClick={handleAddBanner}
+                                disabled={!selectedFile || uploading}
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                            >
+                                {uploading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        Uploading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="h-4 w-4" />
+                                        Add Banner
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -404,38 +408,40 @@ export default function BannerSettingsTab() {
                                             </div>
 
                                             {/* Actions */}
-                                            <div className="flex items-center gap-2 flex-shrink-0">
-                                                <button
-                                                    onClick={() => handleToggleActive(banner)}
-                                                    className={`p-2 rounded-lg transition-colors ${
-                                                        banner.isActive
-                                                            ? 'text-green-600 hover:bg-green-50'
-                                                            : 'text-gray-400 hover:bg-gray-100'
-                                                    }`}
-                                                    title={banner.isActive ? 'Hide banner' : 'Show banner'}
-                                                >
-                                                    {banner.isActive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                                                </button>
-                                                <button
-                                                    onClick={() => startEditing(banner)}
-                                                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-                                                    title="Edit banner"
-                                                >
-                                                    <Save className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteBanner(banner.id)}
-                                                    disabled={deletingId === banner.id}
-                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                                                    title="Delete banner"
-                                                >
-                                                    {deletingId === banner.id ? (
-                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
-                                                    ) : (
-                                                        <Trash2 className="h-4 w-4" />
-                                                    )}
-                                                </button>
-                                            </div>
+                                            {canManage && (
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    <button
+                                                        onClick={() => handleToggleActive(banner)}
+                                                        className={`p-2 rounded-lg transition-colors ${
+                                                            banner.isActive
+                                                                ? 'text-green-600 hover:bg-green-50'
+                                                                : 'text-gray-400 hover:bg-gray-100'
+                                                        }`}
+                                                        title={banner.isActive ? 'Hide banner' : 'Show banner'}
+                                                    >
+                                                        {banner.isActive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => startEditing(banner)}
+                                                        className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                                                        title="Edit banner"
+                                                    >
+                                                        <Save className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteBanner(banner.id)}
+                                                        disabled={deletingId === banner.id}
+                                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                                        title="Delete banner"
+                                                    >
+                                                        {deletingId === banner.id ? (
+                                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+                                                        ) : (
+                                                            <Trash2 className="h-4 w-4" />
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

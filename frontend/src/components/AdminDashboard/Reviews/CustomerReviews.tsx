@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import reviewService, { AdminReview } from "@/services/reviewService";
+import { hasPermission } from "@/lib/auth";
 
 export default function CustomerReviews() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
@@ -299,40 +300,46 @@ export default function CustomerReviews() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setSelectedReview(review)}
-                          className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="View Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        {review.isApproved ? (
+                        {hasPermission('view_reviews') && (
                           <button
-                            onClick={() => handleReject(review.id)}
-                            disabled={actionLoading === review.id}
-                            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                            title="Reject"
+                            onClick={() => setSelectedReview(review)}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="View Details"
                           >
-                            <XCircle className="h-4 w-4" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleApprove(review.id)}
-                            disabled={actionLoading === review.id}
-                            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
-                            title="Approve"
-                          >
-                            <CheckCircle className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </button>
                         )}
-                        <button
-                          onClick={() => handleDelete(review.id)}
-                          disabled={actionLoading === review.id}
-                          className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {hasPermission('moderate_reviews') && (
+                          review.isApproved ? (
+                            <button
+                              onClick={() => handleReject(review.id)}
+                              disabled={actionLoading === review.id}
+                              className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                              title="Reject"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleApprove(review.id)}
+                              disabled={actionLoading === review.id}
+                              className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                              title="Approve"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                          )
+                        )}
+                        {hasPermission('delete_reviews') && (
+                          <button
+                            onClick={() => handleDelete(review.id)}
+                            disabled={actionLoading === review.id}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

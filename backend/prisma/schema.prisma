@@ -1376,6 +1376,11 @@ model DeviceToken {
 
   @@index([userId, role])
   @@map("device_tokens")
+
+}
+
+
+
 // ============================================
 // ANALYTICS & TRACKING
 // ============================================

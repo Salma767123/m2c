@@ -6,7 +6,7 @@ const {
   updateRazorpaySettings,
   updatePayUSettings
 } = require('../controllers/paymentSettingsController');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
 
 // Public route - no authentication required
 router.get('/public', getPublicPaymentSettings);
@@ -14,11 +14,11 @@ router.get('/public', getPublicPaymentSettings);
 // All other routes require authentication
 router.use(authenticateToken);
 
-// Get payment settings - accessible by admins
-router.get('/', requireRole('admin'), getPaymentSettings);
+// Get payment settings — view_settings or manage_settings
+router.get('/', requireRole('admin'), requirePermission(['view_settings', 'manage_settings']), getPaymentSettings);
 
-// Update routes - accessible by admins
-router.put('/razorpay', requireRole('admin'), updateRazorpaySettings);
-router.put('/payu', requireRole('admin'), updatePayUSettings);
+// Mutating routes — manage_settings only
+router.put('/razorpay', requireRole('admin'), requirePermission('manage_settings'), updateRazorpaySettings);
+router.put('/payu', requireRole('admin'), requirePermission('manage_settings'), updatePayUSettings);
 
 module.exports = router;

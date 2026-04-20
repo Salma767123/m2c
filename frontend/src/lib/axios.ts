@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import { showErrorToast } from './toast-utils';
 
 // Create axios instance with base configuration
 const axiosInstance: AxiosInstance = axios.create({
@@ -89,19 +90,16 @@ axiosInstance.interceptors.response.use(
           }
           break;
         case 403:
-          // Forbidden
-          console.error('Access forbidden:', data?.error || 'Insufficient permissions');
+          showErrorToast('Access Denied', data?.error || 'You do not have permission to perform this action');
           break;
         case 404:
-          // Not found
-          console.error('Resource not found:', data?.error || 'The requested resource was not found');
+          // Not found — let the caller decide whether to surface
           break;
         case 500:
-          // Server error
-          console.error('Server error:', data?.error || 'Internal server error');
+          showErrorToast('Server Error', data?.error || 'Internal server error. Please try again.');
           break;
         default:
-          console.error('API Error:', data?.error || `HTTP ${status}`);
+          break;
       }
 
       // Return a more user-friendly error without creating a new Error object
@@ -109,11 +107,9 @@ axiosInstance.interceptors.response.use(
       return Promise.reject({ message: errorMessage, status, data });
     } else if (error.request) {
       // Network error
-      console.error('Network error:', error.message);
+      showErrorToast('Network Error', 'Please check your internet connection.');
       return Promise.reject({ message: 'Network error. Please check your connection.', status: 0, data: null });
     } else {
-      // Other error
-      console.error('Request error:', error.message);
       return Promise.reject({ message: error.message || 'Request failed', status: 0, data: null });
     }
   }

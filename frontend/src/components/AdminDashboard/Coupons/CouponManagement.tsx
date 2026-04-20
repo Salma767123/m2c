@@ -28,6 +28,7 @@ import CouponModal from './CouponModal';
 import FreeShippingModal from './FreeShippingModal';
 import { couponService, Coupon } from '@/services/couponService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { hasPermission } from '@/lib/auth';
 
 const CouponManagement = () => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -207,20 +208,24 @@ const CouponManagement = () => {
           <p className="text-gray-600">Create and manage discount coupons</p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowFreeShippingModal(true)}
-            className="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors flex items-center gap-2"
-          >
-            <Truck className="w-5 h-5" />
-            Free Shipping Offers
-          </button>
-          <button
-            onClick={handleCreate}
-            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Create Coupon
-          </button>
+          {hasPermission(['edit_coupons', 'create_coupons']) && (
+            <button
+              onClick={() => setShowFreeShippingModal(true)}
+              className="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors flex items-center gap-2"
+            >
+              <Truck className="w-5 h-5" />
+              Free Shipping Offers
+            </button>
+          )}
+          {hasPermission('create_coupons') && (
+            <button
+              onClick={handleCreate}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Create Coupon
+            </button>
+          )}
         </div>
       </div>
 
@@ -393,27 +398,33 @@ const CouponManagement = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleView(coupon)}
-                          className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                          title="View"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEdit(coupon)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(coupon.id)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {hasPermission('view_coupons') && (
+                          <button
+                            onClick={() => handleView(coupon)}
+                            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                            title="View"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
+                        {hasPermission('edit_coupons') && (
+                          <button
+                            onClick={() => handleEdit(coupon)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
+                        {hasPermission('delete_coupons') && (
+                          <button
+                            onClick={() => handleDelete(coupon.id)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

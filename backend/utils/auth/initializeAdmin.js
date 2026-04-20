@@ -27,6 +27,28 @@ async function initializeAdmin() {
       console.log(`   ID: ${existingAdmin.id}`);
       console.log(`   Email: ${existingAdmin.email}`);
       console.log(`   Name: ${existingAdmin.name}`);
+
+      // Self-heal: if the default admin has no role, attach Super Admin
+      // so they don't get locked out of permission-protected routes.
+      if (!existingAdmin.roleId) {
+        let superAdminRole = await prisma.role.findUnique({ where: { name: 'Super Admin' } });
+        if (!superAdminRole) {
+          superAdminRole = await prisma.role.create({
+            data: {
+              name: 'Super Admin',
+              description: 'Full system access — bypasses all permission checks',
+              permissions: [],
+              isSystem: true
+            }
+          });
+        }
+        await prisma.admin.update({
+          where: { id: existingAdmin.id },
+          data: { roleId: superAdminRole.id }
+        });
+        console.log("✅ Existing default admin linked to 'Super Admin' role");
+      }
+
       return { success: true, message: "Admin already exists", admin: existingAdmin };
     }
 
@@ -36,7 +58,22 @@ async function initializeAdmin() {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(adminPassword, saltRounds);
 
-    // Create admin user
+    // Make sure a "Super Admin" role exists so the default admin can use
+    // permission-protected routes. Without this the RBAC middleware would 403 them.
+    let superAdminRole = await prisma.role.findUnique({ where: { name: 'Super Admin' } });
+    if (!superAdminRole) {
+      superAdminRole = await prisma.role.create({
+        data: {
+          name: 'Super Admin',
+          description: 'Full system access — bypasses all permission checks',
+          permissions: [],
+          isSystem: true
+        }
+      });
+      console.log("✅ 'Super Admin' role seeded");
+    }
+
+    // Create admin user with Super Admin role attached
     const adminUser = await prisma.admin.create({
       data: {
         email: adminEmail,
@@ -45,12 +82,14 @@ async function initializeAdmin() {
         isVerified: true,
         isActive: true,
         provider: "local",
+        roleId: superAdminRole.id,
       },
     });
 
     console.log("✅ Admin user created successfully!");
     console.log(`   ID: ${adminUser.id}`);
     console.log(`   Email: ${adminUser.email}`);
+    console.log(`   Role: Super Admin`);
 
     // Create default working hours (24/7 operation)
     const existingWorkingHours = await prisma.workingHour.count({

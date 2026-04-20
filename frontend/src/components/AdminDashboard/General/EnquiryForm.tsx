@@ -29,8 +29,11 @@ import {
 } from '@/components/UI/Table';
 import { enquiryService, type VendorEnquiry } from '@/services/enquiryService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { hasPermission } from '@/lib/auth';
 
 const EnquiryForm = () => {
+  const canView = hasPermission('view_enquiries') || hasPermission('manage_enquiries');
+  const canManage = hasPermission('manage_enquiries');
   const [enquiries, setEnquiries] = useState<VendorEnquiry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -312,13 +315,15 @@ const EnquiryForm = () => {
                     </TableCell>
                     <TableCell>{getStatusBadge(enquiry.status)}</TableCell>
                     <TableCell>
-                      <button
-                        onClick={() => handleViewDetails(enquiry)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                        View
-                      </button>
+                      {canView && (
+                        <button
+                          onClick={() => handleViewDetails(enquiry)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -439,18 +444,20 @@ const EnquiryForm = () => {
             {/* Modal Footer */}
             <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
               {/* Delete button on left */}
-              <button
-                onClick={() => handleDelete(selectedEnquiry.id)}
-                disabled={!!deletingId}
-                className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
-              >
-                {deletingId === selectedEnquiry.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-                Delete
-              </button>
+              {canManage ? (
+                <button
+                  onClick={() => handleDelete(selectedEnquiry.id)}
+                  disabled={!!deletingId}
+                  className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
+                >
+                  {deletingId === selectedEnquiry.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  Delete
+                </button>
+              ) : <div />}
 
               {/* Action buttons on right */}
               <div className="flex items-center gap-3">
@@ -460,7 +467,7 @@ const EnquiryForm = () => {
                 >
                   Close
                 </button>
-                {selectedEnquiry.status === 'pending' && (
+                {selectedEnquiry.status === 'pending' && canManage && (
                   <>
                     <button
                       onClick={() => handleReject(selectedEnquiry.id)}

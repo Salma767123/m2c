@@ -18,6 +18,7 @@ import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import axiosInstance from '@/lib/axios'
 import inventoryService from '@/services/inventoryService'
+import { hasPermission } from '@/lib/auth'
 import StockHistoryModal from '@/components/Shared/StockHistoryModal'
 
 interface InventoryItem {
@@ -204,12 +205,14 @@ export default function Inventory() {
           <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
           <p className="text-gray-600">Track and manage your product inventory</p>
         </div>
-        <Link href="/admin/dashboard/inventory/add">
-          <Button className="bg-[#313131] text-white hover:bg-[#222222]">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Inventory Item
-          </Button>
-        </Link>
+        {hasPermission('create_inventory') && (
+          <Link href="/admin/dashboard/inventory/add">
+            <Button className="bg-[#313131] text-white hover:bg-[#222222]">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Inventory Item
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Inventory Stats */}
@@ -375,46 +378,54 @@ export default function Inventory() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            {item.hasProductCreated && item.productApprovalStatus === 'APPROVED' ? (
+                            {hasPermission('edit_inventory') && (
+                              item.hasProductCreated && item.productApprovalStatus === 'APPROVED' ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleUpdateStock(item)}
+                                >
+                                  Update Stock
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled
+                                  className="opacity-50 cursor-not-allowed"
+                                  title={!item.hasProductCreated ? 'Create a product first' : `Product status: ${item.productApprovalStatus}`}
+                                >
+                                  Update Stock
+                                </Button>
+                              )
+                            )}
+                            {hasPermission('view_inventory') && (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleUpdateStock(item)}
+                                onClick={() => handleViewHistory(item)}
                               >
-                                Update Stock
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled
-                                className="opacity-50 cursor-not-allowed"
-                                title={!item.hasProductCreated ? 'Create a product first' : `Product status: ${item.productApprovalStatus}`}
-                              >
-                                Update Stock
+                                <History className="h-4 w-4" />
                               </Button>
                             )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewHistory(item)}
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
-                            <Link href={`/admin/dashboard/inventory/edit/${item.id}`}>
-                              <Button variant="outline" size="sm">
-                                <Edit className="h-4 w-4" />
+                            {hasPermission('edit_inventory') && (
+                              <Link href={`/admin/dashboard/inventory/edit/${item.id}`}>
+                                <Button variant="outline" size="sm">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            )}
+                            {hasPermission('delete_inventory') && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={`${item.hasProductCreated ? 'opacity-50 cursor-not-allowed' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
+                                onClick={() => handleDelete(item)}
+                                title={item.hasProductCreated ? "Cannot delete: Product created from this item" : "Delete item"}
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
-                            </Link>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={`${item.hasProductCreated ? 'opacity-50 cursor-not-allowed' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
-                              onClick={() => handleDelete(item)}
-                              title={item.hasProductCreated ? "Cannot delete: Product created from this item" : "Delete item"}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

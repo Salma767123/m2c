@@ -87,7 +87,6 @@ class AdminDashboardService {
 
             return response.data;
         } catch (error) {
-            console.error('Get dashboard stats error:', error);
             throw error;
         }
     }

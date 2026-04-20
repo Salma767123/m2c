@@ -13,6 +13,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { paymentSettingsService } from "@/services/paymentSettingsService";
 import { adminProfileService } from "@/services/adminProfileService";
 import { companyInfoService } from "@/services/companyInfoService";
+import { hasPermission } from "@/lib/auth";
 
 type UserRole = "super_admin" | "admin" | "employee";
 
@@ -30,6 +31,7 @@ interface UserProfile {
 }
 
 export default function Settings() {
+  const canManageSettings = hasPermission("manage_settings");
   // Simulate getting current user role - replace with actual auth
   const [currentUser] = useState<UserProfile>({
     id: "1",
@@ -114,7 +116,7 @@ export default function Settings() {
 
   // Access control
   const canAccessAdminSettings = currentUser.role === "super_admin" || currentUser.role === "admin";
-  const isReadOnly = currentUser.role === "employee";
+  const isReadOnly = currentUser.role === "employee" || !canManageSettings;
 
   // Fetch data on component mount
   useEffect(() => {
@@ -725,7 +727,7 @@ export default function Settings() {
                       <Upload className="h-4 w-4" />
                       Choose Logo
                     </label>
-                    {logoPreview && (
+                    {logoPreview && canManageSettings && (
                       <>
                         <button
                           onClick={handleSaveLogo}
@@ -818,7 +820,7 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {currentUser.role === "super_admin" && (
+                {currentUser.role === "super_admin" && canManageSettings && (
                   <div className="mt-6">
                     <button
                       type="submit"
@@ -910,7 +912,7 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {currentUser.role === "super_admin" && (
+                {currentUser.role === "super_admin" && canManageSettings && (
                   <div className="mt-6">
                     <button
                       type="submit"
@@ -995,7 +997,7 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {currentUser.role === "super_admin" && (
+                {currentUser.role === "super_admin" && canManageSettings && (
                   <div className="mt-6">
                     <button
                       type="submit"
@@ -1068,7 +1070,7 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {currentUser.role === "super_admin" && (
+                {currentUser.role === "super_admin" && canManageSettings && (
                   <div className="mt-6">
                     <button
                       type="submit"
@@ -1265,7 +1267,7 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    {currentUser.role === "super_admin" && (
+                    {currentUser.role === "super_admin" && canManageSettings && (
                       <div className="mt-6 flex items-center gap-3">
                         <button
                           type="submit"
@@ -1404,7 +1406,7 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    {currentUser.role === "super_admin" && (
+                    {currentUser.role === "super_admin" && canManageSettings && (
                       <div className="mt-6 flex items-center gap-3">
                         <button
                           type="submit"

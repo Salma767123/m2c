@@ -8,6 +8,7 @@ import { Button } from '@/components/UI/Button'
 import { Edit, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { categoryService, Category } from '@/services/categoryService'
+import { hasPermission } from '@/lib/auth'
 
 interface ViewCategoryProps {
   categoryId: string
@@ -90,16 +91,20 @@ export default function ViewCategory({ categoryId }: ViewCategoryProps) {
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
-            <Button variant="outline">
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Category
+          {hasPermission('edit_categories') && (
+            <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
+              <Button variant="outline">
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Category
+              </Button>
+            </Link>
+          )}
+          {hasPermission('delete_categories') && (
+            <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:text-red-800">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
             </Button>
-          </Link>
-          <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:text-red-800">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
+          )}
         </div>
       </div>
 

@@ -138,7 +138,7 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
   // Show loading state if vendor data is not available
   if (loading || !vendor) {
     return (
-      <header className="bg-white/30 border-b border-gray-200 p-2 font-sans sticky top-0 z-30">
+      <header className="p-2 font-sans sticky top-0 z-30">
         <div className="px-6 py-4 bg-white rounded-full border border-gray-300 p-2 mb-2 shadow-md">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -158,7 +158,7 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
   }
 
   return (
-    <header className="bg-white/30 border-b border-gray-200 p-2 font-sans sticky top-0 z-30">
+    <header className=" p-2 font-sans sticky top-0 z-30">
       <div className="px-6 py-4 bg-white rounded-full border border-gray-300 p-2 mb-2 shadow-md">
         <div className="flex items-center justify-between">
           {/* Left Section */}

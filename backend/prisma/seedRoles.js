@@ -6,6 +6,9 @@ const defaultRoles = [
         name: 'Super Admin',
         description: 'Full system access with all permissions',
         isSystem: true,
+        // Super Admin bypasses permission checks via role name match. We still
+        // list every permission so the UI shows the full set when admins view
+        // this role, and this array stays in sync with availablePermissions.
         permissions: [
             'view_dashboard',
             'view_users', 'create_users', 'edit_users', 'delete_users',
@@ -16,7 +19,14 @@ const defaultRoles = [
             'view_inventory', 'create_inventory', 'edit_inventory', 'delete_inventory',
             'view_reports', 'export_reports',
             'view_settings', 'manage_settings',
-            'view_reviews', 'moderate_reviews', 'delete_reviews'
+            'view_reviews', 'moderate_reviews', 'delete_reviews',
+            'view_coupons', 'create_coupons', 'edit_coupons', 'delete_coupons',
+            'view_analytics',
+            'view_support', 'manage_support',
+            'view_billing', 'manage_billing',
+            'view_enquiries', 'manage_enquiries',
+            'view_qc_checkers', 'create_qc_checkers', 'edit_qc_checkers', 'delete_qc_checkers',
+            'view_roles', 'create_roles', 'edit_roles', 'delete_roles'
         ]
     },
     {
@@ -33,7 +43,14 @@ const defaultRoles = [
             'view_inventory', 'create_inventory', 'edit_inventory',
             'view_reports', 'export_reports',
             'view_settings',
-            'view_reviews', 'moderate_reviews'
+            'view_reviews', 'moderate_reviews',
+            'view_coupons', 'create_coupons', 'edit_coupons',
+            'view_analytics',
+            'view_support', 'manage_support',
+            'view_billing',
+            'view_enquiries', 'manage_enquiries',
+            'view_qc_checkers', 'create_qc_checkers', 'edit_qc_checkers',
+            'view_roles'
         ]
     },
     {
@@ -44,7 +61,10 @@ const defaultRoles = [
             'view_dashboard',
             'view_products', 'create_products', 'edit_products',
             'view_orders', 'create_orders', 'edit_orders',
-            'view_reports'
+            'view_reports',
+            'view_analytics',
+            'view_support',
+            'view_billing'
         ]
     }
 ];

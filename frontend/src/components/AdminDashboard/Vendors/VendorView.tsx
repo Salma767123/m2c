@@ -33,6 +33,7 @@ import VendorService, { VendorProfile } from '@/services/vendorService'
 import { toast } from '@/hooks/use-toast'
 import RejectionModal from './RejectionModal'
 import SuspensionModal from './SuspensionModal'
+import { hasPermission } from '@/lib/auth'
 
 interface VendorViewProps {
   vendorId: string
@@ -261,7 +262,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
               {getStatusBadge(vendor.status)}
 
               {/* Action Buttons */}
-              {vendor.status === 'PENDING' && (
+              {vendor.status === 'PENDING' && hasPermission('edit_vendors') && (
                 <>
                   <Button
                     onClick={handleApprove}
@@ -295,7 +296,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 </>
               )}
 
-              {vendor.status === 'APPROVED' && (
+              {vendor.status === 'APPROVED' && hasPermission('edit_vendors') && (
                 <Button
                   onClick={handleSuspend}
                   disabled={actionLoading === 'suspend'}
@@ -313,13 +314,15 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 </Button>
               )}
 
-              <Button
-                onClick={() => router.push(`/admin/dashboard/vendors/edit/${vendor.id}`)}
-                className="bg-[#313131] text-white hover:bg-[#222222]"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Vendor
-              </Button>
+              {hasPermission('edit_vendors') && (
+                <Button
+                  onClick={() => router.push(`/admin/dashboard/vendors/edit/${vendor.id}`)}
+                  className="bg-[#313131] text-white hover:bg-[#222222]"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Vendor
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1045,7 +1048,7 @@ function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, 
               ) : (
                 <div className="flex items-center gap-4">
                   <Badge className="bg-yellow-100 text-yellow-800">Pending Verification</Badge>
-                  {onVerify && (
+                  {onVerify && hasPermission('edit_vendors') && (
                     <Button
                       size="sm"
                       onClick={onVerify}

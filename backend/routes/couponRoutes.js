@@ -16,7 +16,7 @@ const {
     deleteFreeShippingOffer,
     checkFreeShipping
 } = require('../controllers/couponController');
-const { authenticateToken, requireAdminRole } = require('../middleware/auth');
+const { authenticateToken, requireAdminRole, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -27,17 +27,17 @@ router.post('/check-free-shipping', checkFreeShipping);
 router.get('/promotional', getPromotionalCoupons); // Public endpoint for promotional display
 
 // Free shipping offer routes (Admin only) - MUST come before /:id route
-router.post('/free-shipping', authenticateToken, requireAdminRole, createFreeShippingOffer);
-router.get('/free-shipping', authenticateToken, requireAdminRole, getFreeShippingOffers);
-router.get('/free-shipping/:id', authenticateToken, requireAdminRole, getFreeShippingOffer);
-router.put('/free-shipping/:id', authenticateToken, requireAdminRole, updateFreeShippingOffer);
-router.delete('/free-shipping/:id', authenticateToken, requireAdminRole, deleteFreeShippingOffer);
+router.post('/free-shipping', authenticateToken, requireAdminRole, requirePermission('create_coupons'), createFreeShippingOffer);
+router.get('/free-shipping', authenticateToken, requireAdminRole, requirePermission('view_coupons'), getFreeShippingOffers);
+router.get('/free-shipping/:id', authenticateToken, requireAdminRole, requirePermission('view_coupons'), getFreeShippingOffer);
+router.put('/free-shipping/:id', authenticateToken, requireAdminRole, requirePermission('edit_coupons'), updateFreeShippingOffer);
+router.delete('/free-shipping/:id', authenticateToken, requireAdminRole, requirePermission('delete_coupons'), deleteFreeShippingOffer);
 
 // Admin routes (require admin authentication) - /:id route MUST come after specific routes
-router.post('/', authenticateToken, requireAdminRole, createCoupon);
-router.get('/', authenticateToken, requireAdminRole, getCoupons);
-router.get('/:id', authenticateToken, requireAdminRole, getCoupon);
-router.put('/:id', authenticateToken, requireAdminRole, updateCoupon);
-router.delete('/:id', authenticateToken, requireAdminRole, deleteCoupon);
+router.post('/', authenticateToken, requireAdminRole, requirePermission('create_coupons'), createCoupon);
+router.get('/', authenticateToken, requireAdminRole, requirePermission('view_coupons'), getCoupons);
+router.get('/:id', authenticateToken, requireAdminRole, requirePermission('view_coupons'), getCoupon);
+router.put('/:id', authenticateToken, requireAdminRole, requirePermission('edit_coupons'), updateCoupon);
+router.delete('/:id', authenticateToken, requireAdminRole, requirePermission('delete_coupons'), deleteCoupon);
 
 module.exports = router;

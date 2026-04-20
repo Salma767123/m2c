@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/UI/Table";
 import Dropdown from "@/components/UI/Dropdown";
+import { hasPermission } from "@/lib/auth";
 
 interface Billing {
   id: string;
@@ -209,13 +210,15 @@ export default function BillingManagement() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => handleViewBilling(billing.id)}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="View Billing"
-                      >
-                        <Eye className="h-5 w-5" />
-                      </button>
+                      {hasPermission('view_billing') && (
+                        <button
+                          onClick={() => handleViewBilling(billing.id)}
+                          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="View Billing"
+                        >
+                          <Eye className="h-5 w-5" />
+                        </button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

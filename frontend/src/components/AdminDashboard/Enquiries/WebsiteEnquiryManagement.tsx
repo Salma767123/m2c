@@ -7,6 +7,7 @@ import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
 import { Mail, Phone, Calendar, Eye, Trash2, MessageSquare, Search, Filter } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { hasPermission } from '@/lib/auth';
 
 export default function WebsiteEnquiryManagement() {
   const [enquiries, setEnquiries] = useState<ContactEnquiry[]>([]);
@@ -201,23 +202,27 @@ export default function WebsiteEnquiryManagement() {
                       <td className="px-6 py-4">{getStatusBadge(enquiry.status)}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleViewEnquiry(enquiry)}
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(enquiry.id)}
-                            className="text-red-600 hover:text-red-700"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {hasPermission(['view_enquiries', 'manage_enquiries']) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleViewEnquiry(enquiry)}
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {hasPermission('manage_enquiries') && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDelete(enquiry.id)}
+                              className="text-red-600 hover:text-red-700"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -271,14 +276,16 @@ export default function WebsiteEnquiryManagement() {
                   <div>{getStatusBadge(selectedEnquiry.status)}</div>
                 </div>
 
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button onClick={() => handleUpdateStatus('replied')} className="flex-1">
-                    Mark as Replied
-                  </Button>
-                  <Button onClick={() => handleUpdateStatus('closed')} variant="outline" className="flex-1">
-                    Close Enquiry
-                  </Button>
-                </div>
+                {hasPermission('manage_enquiries') && (
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button onClick={() => handleUpdateStatus('replied')} className="flex-1">
+                      Mark as Replied
+                    </Button>
+                    <Button onClick={() => handleUpdateStatus('closed')} variant="outline" className="flex-1">
+                      Close Enquiry
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

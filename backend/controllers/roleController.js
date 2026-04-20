@@ -42,7 +42,33 @@ const availablePermissions = [
     // Reviews
     { id: '30', name: 'view_reviews', description: 'View reviews', module: 'Reviews' },
     { id: '31', name: 'moderate_reviews', description: 'Moderate reviews', module: 'Reviews' },
-    { id: '32', name: 'delete_reviews', description: 'Delete reviews', module: 'Reviews' }
+    { id: '32', name: 'delete_reviews', description: 'Delete reviews', module: 'Reviews' },
+    // Coupons
+    { id: '33', name: 'view_coupons', description: 'View coupons list', module: 'Coupons' },
+    { id: '34', name: 'create_coupons', description: 'Create new coupons', module: 'Coupons' },
+    { id: '35', name: 'edit_coupons', description: 'Edit existing coupons', module: 'Coupons' },
+    { id: '36', name: 'delete_coupons', description: 'Delete coupons', module: 'Coupons' },
+    // Analytics
+    { id: '37', name: 'view_analytics', description: 'View analytics dashboards', module: 'Analytics' },
+    // Support
+    { id: '38', name: 'view_support', description: 'View support tickets', module: 'Support' },
+    { id: '39', name: 'manage_support', description: 'Reply to and resolve tickets', module: 'Support' },
+    // Billing & Invoices
+    { id: '40', name: 'view_billing', description: 'View invoices and settlements', module: 'Billing' },
+    { id: '41', name: 'manage_billing', description: 'Process billing and settlements', module: 'Billing' },
+    // Enquiries (vendor + website)
+    { id: '42', name: 'view_enquiries', description: 'View customer / vendor enquiries', module: 'Enquiries' },
+    { id: '43', name: 'manage_enquiries', description: 'Approve, reject, or reply to enquiries', module: 'Enquiries' },
+    // QC Checker
+    { id: '44', name: 'view_qc_checkers', description: 'View QC checkers list', module: 'QC Checker' },
+    { id: '45', name: 'create_qc_checkers', description: 'Create new QC checkers', module: 'QC Checker' },
+    { id: '46', name: 'edit_qc_checkers', description: 'Edit QC checkers and resend credentials', module: 'QC Checker' },
+    { id: '47', name: 'delete_qc_checkers', description: 'Delete QC checkers', module: 'QC Checker' },
+    // Roles & Permissions
+    { id: '48', name: 'view_roles', description: 'View roles and permissions', module: 'Roles & Permissions' },
+    { id: '49', name: 'create_roles', description: 'Create new roles', module: 'Roles & Permissions' },
+    { id: '50', name: 'edit_roles', description: 'Edit existing roles and assign permissions', module: 'Roles & Permissions' },
+    { id: '51', name: 'delete_roles', description: 'Delete roles', module: 'Roles & Permissions' }
 ];
 
 // Get all roles
@@ -91,6 +117,14 @@ exports.getPermissions = async (req, res) => {
     }
 };
 
+// Validate that every permission string in `perms` matches a known permission.
+// Returns array of unknown permissions (empty if all valid).
+const validatePermissions = (perms) => {
+    if (!Array.isArray(perms)) return [];
+    const validNames = new Set(availablePermissions.map(p => p.name));
+    return perms.filter(p => !validNames.has(p));
+};
+
 // Create a new role
 exports.createRole = async (req, res) => {
     try {
@@ -100,6 +134,15 @@ exports.createRole = async (req, res) => {
         const existing = await prisma.role.findUnique({ where: { name } });
         if (existing) {
             return res.status(400).json({ success: false, error: 'Role name already exists' });
+        }
+
+        // Reject typos / invalid permission strings to prevent silently locking users out
+        const invalid = validatePermissions(permissions);
+        if (invalid.length > 0) {
+            return res.status(400).json({
+                success: false,
+                error: `Invalid permission(s): ${invalid.join(', ')}`
+            });
         }
 
         const role = await prisma.role.create({
@@ -138,6 +181,17 @@ exports.updateRole = async (req, res) => {
             const existingName = await prisma.role.findUnique({ where: { name } });
             if (existingName) {
                 return res.status(400).json({ success: false, error: 'Role name already exists' });
+            }
+        }
+
+        // Reject invalid permission names
+        if (permissions !== undefined) {
+            const invalid = validatePermissions(permissions);
+            if (invalid.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Invalid permission(s): ${invalid.join(', ')}`
+                });
             }
         }
 

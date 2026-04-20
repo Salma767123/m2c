@@ -44,6 +44,8 @@ interface LoginResponse {
     companyName?: string
     gstNumber?: string
     onboardingCompleted?: boolean
+    roleName?: string
+    permissions?: string[]
   }
   token: string
 }

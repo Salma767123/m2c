@@ -8,16 +8,16 @@ const {
     deleteContactEnquiry,
     getContactEnquiryStats
 } = require('../controllers/contactEnquiryController');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
 
 // Public route - Submit contact enquiry
 router.post('/submit', submitContactEnquiry);
 
-// Admin routes - Require authentication and admin role
-router.get('/', authenticateToken, requireRole(['ADMIN']), getAllContactEnquiries);
-router.get('/stats', authenticateToken, requireRole(['ADMIN']), getContactEnquiryStats);
-router.get('/:id', authenticateToken, requireRole(['ADMIN']), getContactEnquiryById);
-router.put('/:id/status', authenticateToken, requireRole(['ADMIN']), updateContactEnquiryStatus);
-router.delete('/:id', authenticateToken, requireRole(['ADMIN']), deleteContactEnquiry);
+// Admin routes — gated by the Enquiries module permissions
+router.get('/', authenticateToken, requireRole('admin'), requirePermission(['view_enquiries', 'manage_enquiries']), getAllContactEnquiries);
+router.get('/stats', authenticateToken, requireRole('admin'), requirePermission(['view_enquiries', 'manage_enquiries']), getContactEnquiryStats);
+router.get('/:id', authenticateToken, requireRole('admin'), requirePermission(['view_enquiries', 'manage_enquiries']), getContactEnquiryById);
+router.put('/:id/status', authenticateToken, requireRole('admin'), requirePermission('manage_enquiries'), updateContactEnquiryStatus);
+router.delete('/:id', authenticateToken, requireRole('admin'), requirePermission('manage_enquiries'), deleteContactEnquiry);
 
 module.exports = router;

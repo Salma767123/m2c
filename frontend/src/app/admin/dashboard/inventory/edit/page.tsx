@@ -1,9 +1,12 @@
 import AddEditInventory from "@/components/AdminDashboard/Inventory/AddEditInventory";
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
-export default function Page() {
+export default function EditInventoryRootPage() {
   return (
-    <div className="p-6">
-      <AddEditInventory />
-    </div>
+    <PermissionGuard permission="edit_inventory">
+      <div className="p-6">
+        <AddEditInventory />
+      </div>
+    </PermissionGuard>
   );
 }

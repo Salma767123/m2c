@@ -1,17 +1,16 @@
 import VendorsTable from '@/components/AdminDashboard/Vendors/VendorsTable'
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
-import { Button } from '@/components/UI/Button'
-import { Plus } from 'lucide-react'
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function VendorsPage() {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <PermissionGuard permission="view_vendors">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
           <Breadcrumb />
+        </div>
+        <VendorsTable />
       </div>
-
-      {/* Vendors Table */}
-      <VendorsTable />
-    </div>
+    </PermissionGuard>
   )
 }

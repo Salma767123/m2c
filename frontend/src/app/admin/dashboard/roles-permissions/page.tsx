@@ -1,12 +1,15 @@
 import RolesPermissions from '@/components/AdminDashboard/RolesPermissions/RolesPermissions'
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function RolesPermissionsPage() {
   return (
-    <div className="space-y-6">
-      <Breadcrumb />
-      <RolesPermissions />
-    </div>
+    <PermissionGuard permission={["view_roles", "edit_roles", "manage_settings"]}>
+      <div className="space-y-6">
+        <Breadcrumb />
+        <RolesPermissions />
+      </div>
+    </PermissionGuard>
   )
 }
 

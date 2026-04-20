@@ -1,12 +1,16 @@
 'use client'
 
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import UpdateStockPage from '@/components/AdminDashboard/Inventory/UpdateStockPage'
+import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function UpdateStock() {
   const params = useParams()
-  const router = useRouter()
   const inventoryId = params.id as string
 
-  return <UpdateStockPage inventoryId={inventoryId} />
+  return (
+    <PermissionGuard permission="edit_inventory">
+      <UpdateStockPage inventoryId={inventoryId} />
+    </PermissionGuard>
+  )
 }

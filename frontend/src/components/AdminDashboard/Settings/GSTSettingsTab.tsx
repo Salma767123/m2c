@@ -5,8 +5,10 @@ import { Plus, Trash2, CheckCircle, XCircle, Percent } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { gstSettingsService, GSTSetting } from "@/services/gstSettingsService";
+import { hasPermission } from "@/lib/auth";
 
 export default function GSTSettingsTab() {
+    const canManage = hasPermission("manage_settings");
     const [settings, setSettings] = useState<GSTSetting[]>([]);
     const [loading, setLoading] = useState(false);
     const [creating, setCreating] = useState(false);
@@ -91,6 +93,7 @@ export default function GSTSettingsTab() {
     return (
         <div className="space-y-6">
             {/* Create New GST Setting */}
+            {canManage && (
             <Card>
                 <CardContent className="p-6">
                     <div className="flex items-center gap-3 mb-4">
@@ -140,6 +143,7 @@ export default function GSTSettingsTab() {
                     </form>
                 </CardContent>
             </Card>
+            )}
 
             {/* List Existing Settings */}
             <Card>
@@ -170,11 +174,12 @@ export default function GSTSettingsTab() {
                                             <td className="py-3 px-4 text-gray-600">{setting.description || "-"}</td>
                                             <td className="py-3 px-4">
                                                 <button
-                                                    onClick={() => handleToggleActive(setting)}
+                                                    onClick={() => canManage && handleToggleActive(setting)}
+                                                    disabled={!canManage}
                                                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${setting.isActive
                                                             ? "bg-green-100 text-green-800"
                                                             : "bg-gray-100 text-gray-800"
-                                                        }`}
+                                                        } ${!canManage ? "cursor-not-allowed opacity-70" : ""}`}
                                                 >
                                                     {setting.isActive ? (
                                                         <>
@@ -188,13 +193,15 @@ export default function GSTSettingsTab() {
                                                 </button>
                                             </td>
                                             <td className="py-3 px-4 text-right">
-                                                <button
-                                                    onClick={() => handleDelete(setting.id)}
-                                                    className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                {canManage && (
+                                                    <button
+                                                        onClick={() => handleDelete(setting.id)}
+                                                        className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}

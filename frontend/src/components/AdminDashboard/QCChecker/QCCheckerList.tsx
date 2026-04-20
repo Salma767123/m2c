@@ -9,6 +9,7 @@ import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { hasPermission } from "@/lib/auth";
 
 export default function QCCheckerList() {
   const [checkers, setCheckers] = useState<QCCheckerData[]>([]);
@@ -119,13 +120,15 @@ export default function QCCheckerList() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <Link
-            href="/admin/dashboard/qc-checker/create"
-            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-          >
-            <UserPlus className="h-5 w-5" />
-            Add QC Checker
-          </Link>
+          {hasPermission('create_qc_checkers') && (
+            <Link
+              href="/admin/dashboard/qc-checker/create"
+              className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            >
+              <UserPlus className="h-5 w-5" />
+              Add QC Checker
+            </Link>
+          )}
         </div>
       </div>
 
@@ -253,22 +256,26 @@ export default function QCCheckerList() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleResendCredentials(checker.id, checker.email)}
-                          disabled={resendingId === checker.id}
-                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50"
-                          title="Resend Credentials"
-                        >
-                          <Send className={`h-4 w-4 ${resendingId === checker.id ? 'animate-pulse' : ''}`} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(checker.id, checker.name)}
-                          disabled={deletingId === checker.id}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                          title="Delete Checker"
-                        >
-                          <Trash2 className={`h-4 w-4 ${deletingId === checker.id ? 'animate-pulse' : ''}`} />
-                        </button>
+                        {hasPermission('edit_qc_checkers') && (
+                          <button
+                            onClick={() => handleResendCredentials(checker.id, checker.email)}
+                            disabled={resendingId === checker.id}
+                            className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Resend Credentials"
+                          >
+                            <Send className={`h-4 w-4 ${resendingId === checker.id ? 'animate-pulse' : ''}`} />
+                          </button>
+                        )}
+                        {hasPermission('delete_qc_checkers') && (
+                          <button
+                            onClick={() => handleDelete(checker.id, checker.name)}
+                            disabled={deletingId === checker.id}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Delete Checker"
+                          >
+                            <Trash2 className={`h-4 w-4 ${deletingId === checker.id ? 'animate-pulse' : ''}`} />
+                          </button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -278,13 +285,15 @@ export default function QCCheckerList() {
                   <TableCell colSpan={8}>
                     <div className="p-12 text-center">
                       <p className="text-gray-500">No QC checkers found</p>
-                      <Link
-                        href="/admin/dashboard/qc-checker/create"
-                        className="inline-flex items-center gap-2 mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        <UserPlus className="h-4 w-4" />
-                        Add your first QC Checker
-                      </Link>
+                      {hasPermission('create_qc_checkers') && (
+                        <Link
+                          href="/admin/dashboard/qc-checker/create"
+                          className="inline-flex items-center gap-2 mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          Add your first QC Checker
+                        </Link>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

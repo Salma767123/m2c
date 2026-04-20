@@ -18,6 +18,7 @@ import { formatDate, formatPrice } from "@/lib/utils"
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Dropdown from '@/components/UI/Dropdown'
 import { adminProductService } from '@/services/adminProductService'
+import { hasPermission } from '@/lib/auth'
 
 interface Product {
   id: string
@@ -301,11 +302,13 @@ export default function ProductsTable() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Products Management</CardTitle>
-          <Link href="/admin/dashboard/products/add">
-            <Button className="bg-[#313131] text-white hover:bg-[#222222]">
-              Add Product
-            </Button>
-          </Link>
+          {hasPermission('create_products') && (
+            <Link href="/admin/dashboard/products/add">
+              <Button className="bg-[#313131] text-white hover:bg-[#222222]">
+                Add Product
+              </Button>
+            </Link>
+          )}
         </div>
         
         {/* Search and Filters Row */}
@@ -467,27 +470,27 @@ export default function ProductsTable() {
                 <TableCell>{formatDate(new Date(product.createdAt))}</TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-2">
-                    <Link href={`/admin/dashboard/products/vendor-requests/view/${product.id}`}>
-                      <Button variant="ghost" size="sm" className="hover:bg-gray-50">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </Link>
-
-                    {product.approvalStatus === 'QC_APPROVED' && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hover:bg-green-50 text-green-600"
-                          onClick={() => handleApproveClick(product.id)}
-                          title="Approve & Set Price"
-                        >
-                          <CheckCircle className="h-4 w-4" />
+                    {hasPermission('view_products') && (
+                      <Link href={`/admin/dashboard/products/vendor-requests/view/${product.id}`}>
+                        <Button variant="ghost" size="sm" className="hover:bg-gray-50">
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      </>
+                      </Link>
                     )}
 
-                    {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED') && (
+                    {product.approvalStatus === 'QC_APPROVED' && hasPermission('edit_products') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hover:bg-green-50 text-green-600"
+                        onClick={() => handleApproveClick(product.id)}
+                        title="Approve & Set Price"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED') && hasPermission('edit_products') && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -499,19 +502,23 @@ export default function ProductsTable() {
                       </Button>
                     )}
 
-                    <Link href={`/admin/dashboard/products/edit/${product.id}`}>
-                      <Button variant="ghost" size="sm" className="hover:bg-gray-50">
-                        <Edit className="h-4 w-4" />
+                    {hasPermission('edit_products') && (
+                      <Link href={`/admin/dashboard/products/edit/${product.id}`}>
+                        <Button variant="ghost" size="sm" className="hover:bg-gray-50">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    )}
+                    {hasPermission('delete_products') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hover:bg-red-50 text-red-600"
+                        onClick={() => handleDeleteProduct(product.id, product.name)}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="hover:bg-red-50 text-red-600"
-                      onClick={() => handleDeleteProduct(product.id, product.name)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

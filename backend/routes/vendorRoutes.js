@@ -14,7 +14,7 @@ const {
   assignQc,
   verifyVendorBankDetails
 } = require('../controllers/vendorController');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
 const { vendorUploadFields, handleUploadError } = require('../middleware/upload');
 
 const router = express.Router();
@@ -28,14 +28,14 @@ router.get('/profile', authenticateToken, getVendorProfile);
 router.put('/profile', authenticateToken, updateVendorProfile);
 
 // Admin only routes
-router.get('/all', authenticateToken, requireRole('admin'), getAllVendors);
-router.get('/:vendorId', authenticateToken, requireRole('admin'), getVendorById);
-router.put('/:vendorId', authenticateToken, requireRole('admin'), vendorUploadFields, handleUploadError, updateVendorById);
-router.put('/:vendorId/approve', authenticateToken, requireRole('admin'), approveVendor);
-router.put('/:vendorId/reject', authenticateToken, requireRole('admin'), rejectVendor);
-router.put('/:vendorId/suspend', authenticateToken, requireRole('admin'), suspendVendor);
-router.put('/:vendorId/verify-bank', authenticateToken, requireRole('admin'), verifyVendorBankDetails);
-router.post('/assign-qc', authenticateToken, requireRole('admin'), assignQc);
+router.get('/all', authenticateToken, requireRole('admin'), requirePermission('view_vendors'), getAllVendors);
+router.get('/:vendorId', authenticateToken, requireRole('admin'), requirePermission('view_vendors'), getVendorById);
+router.put('/:vendorId', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), vendorUploadFields, handleUploadError, updateVendorById);
+router.put('/:vendorId/approve', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), approveVendor);
+router.put('/:vendorId/reject', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), rejectVendor);
+router.put('/:vendorId/suspend', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), suspendVendor);
+router.put('/:vendorId/verify-bank', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), verifyVendorBankDetails);
+router.post('/assign-qc', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), assignQc);
 
 // Test email endpoint (development only)
 router.get('/test-email', testVendorEmail);

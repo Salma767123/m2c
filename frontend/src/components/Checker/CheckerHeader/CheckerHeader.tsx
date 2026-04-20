@@ -103,7 +103,7 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
   const unreadCount = notifications.filter(n => n.unread).length
 
   return (
-    <header className="bg-white/30 border-b border-gray-200 p-2 font-sans sticky top-0 z-30">
+    <header className=" p-2 font-sans sticky top-0 z-30">
       <div className="px-6 py-4 bg-white rounded-full border border-gray-300 p-2 mb-2 shadow-md">
         <div className="flex items-center justify-between">
           {/* Left Section */}

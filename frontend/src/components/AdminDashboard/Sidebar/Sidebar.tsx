@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { getStoredAuth, logout } from "@/lib/auth";
+import { getStoredAuth, logout, hasPermission } from "@/lib/auth";
 import {
   LayoutDashboard,
   Users,
@@ -31,6 +31,7 @@ import {
 interface SubMenuItem {
   title: string;
   href: string;
+  permission?: string | string[];
 }
 
 interface NavigationItem {
@@ -38,6 +39,7 @@ interface NavigationItem {
   icon: any;
   href?: string; // For single links
   subItems?: SubMenuItem[]; // For expandable sections
+  permission?: string | string[]; // Required permission(s) — omit for "any admin"
 }
 
 const navigation: NavigationItem[] = [
@@ -45,114 +47,130 @@ const navigation: NavigationItem[] = [
     title: "Dashboard",
     icon: LayoutDashboard,
     href: "/admin/dashboard",
+    permission: "view_dashboard",
   },
   {
     title: "Orders",
     icon: ShoppingCart,
+    permission: "view_orders",
     subItems: [
-      { title: "Vendor to Hub", href: "/admin/dashboard/orders/vendor-to-hub" },
-      { title: "Hub to Customer", href: "/admin/dashboard/orders/hub-to-customer" },
+      { title: "Vendor to Hub", href: "/admin/dashboard/orders/vendor-to-hub", permission: "view_orders" },
+      { title: "Hub to Customer", href: "/admin/dashboard/orders/hub-to-customer", permission: "view_orders" },
     ],
   },
   {
     title: "General",
     icon: Layers,
+    permission: ["view_enquiries", "manage_enquiries"],
     subItems: [
-      { title: "Vendor Enquiries", href: "/admin/dashboard/general/enquiry-form" },
-      { title: "Website Enquiries", href: "/admin/dashboard/general/website-enquiries" },
+      { title: "Vendor Enquiries", href: "/admin/dashboard/general/enquiry-form", permission: ["view_enquiries", "manage_enquiries"] },
+      { title: "Website Enquiries", href: "/admin/dashboard/general/website-enquiries", permission: ["view_enquiries", "manage_enquiries"] },
     ],
   },
   {
     title: "Vendors",
     icon: Store,
+    permission: "view_vendors",
     subItems: [
-      { title: "All Vendors", href: "/admin/dashboard/vendors" },
-      { title: "Assign QC Checker", href: "/admin/dashboard/vendors/assign-qc" },
+      { title: "All Vendors", href: "/admin/dashboard/vendors", permission: "view_vendors" },
+      { title: "Assign QC Checker", href: "/admin/dashboard/vendors/assign-qc", permission: "edit_vendors" },
     ],
   },
   {
     title: "QC Checker",
     icon: ClipboardCheck,
-    href: "/admin/dashboard/qc-checker"
+    href: "/admin/dashboard/qc-checker",
+    permission: ["view_qc_checkers", "view_users"],
   },
   {
     title: "Categories",
     icon: Tags,
     href: "/admin/dashboard/categories",
+    permission: "view_categories",
   },
   {
     title: "Coupons",
     icon: Ticket,
     href: "/admin/dashboard/coupons",
+    permission: "view_coupons",
   },
   {
     title: "Inventory",
     icon: Warehouse,
     href: "/admin/dashboard/inventory",
+    permission: "view_inventory",
   },
   {
     title: "Products",
     icon: Package,
+    permission: "view_products",
     subItems: [
-      { title: "All Products", href: "/admin/dashboard/products" },
-      { title: "Vendor Requests", href: "/admin/dashboard/products/vendor-requests" },
+      { title: "All Products", href: "/admin/dashboard/products", permission: "view_products" },
+      { title: "Vendor Requests", href: "/admin/dashboard/products/vendor-requests", permission: "view_products" },
     ],
   },
   {
     title: "Users",
     icon: Users,
+    permission: "view_users",
     subItems: [
-      { title: "User Management", href: "/admin/dashboard/users/user-management" },
-      { title: "Customer Management", href: "/admin/dashboard/users/customer-management" },
+      { title: "User Management", href: "/admin/dashboard/users/user-management", permission: "view_users" },
+      { title: "Customer Management", href: "/admin/dashboard/users/customer-management", permission: "view_users" },
     ],
   },
   {
     title: "Roles & Permissions",
     icon: Shield,
     href: "/admin/dashboard/roles-permissions",
+    permission: ["view_roles", "edit_roles", "manage_settings"],
   },
   {
     title: "Reviews",
     icon: MessageSquare,
+    permission: "view_reviews",
     subItems: [
-      { title: "Customer Reviews", href: "/admin/dashboard/reviews/customer" },
-      { title: "Vendor Product Reviews", href: "/admin/dashboard/reviews/vendor-products" },
+      { title: "Customer Reviews", href: "/admin/dashboard/reviews/customer", permission: "view_reviews" },
+      { title: "Vendor Product Reviews", href: "/admin/dashboard/reviews/vendor-products", permission: "view_reviews" },
     ],
   },
   {
     title: "Invoice & Billing",
     icon: FileBarChart,
+    permission: ["view_billing", "manage_billing"],
     subItems: [
-      { title: "Invoices", href: "/admin/dashboard/billing/invoices" },
-      // { title: "Billings", href: "/admin/dashboard/billing/billings" }, // commented out
-      { title: "Settlement", href: "/admin/dashboard/billing/settlement" },
+      { title: "Invoices", href: "/admin/dashboard/billing/invoices", permission: ["view_billing", "manage_billing"] },
+      { title: "Settlement", href: "/admin/dashboard/billing/settlement", permission: ["view_billing", "manage_billing"] },
     ],
   },
-
   {
     title: "Support",
     icon: Headphones,
     href: "/admin/dashboard/support",
+    permission: ["view_support", "manage_support"],
   },
   {
     title: "Analytics",
     icon: FileBarChart,
     href: "/admin/dashboard/analytics",
+    permission: "view_analytics",
   },
   {
     title: "Reports",
     icon: FileText,
     href: "/admin/dashboard/reports",
+    permission: "view_reports",
   },
   {
     title: "QC Reports",
     icon: ClipboardCheck,
     href: "/admin/dashboard/qc-reports",
+    permission: "view_reports",
   },
   {
     title: "Settings",
     icon: Settings,
     href: "/admin/dashboard/settings",
+    permission: ["view_settings", "manage_settings"],
   },
 ];
 
@@ -170,6 +188,20 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
       setAdminName(auth.user.name || "Super Admin");
     }
   }, []);
+
+  // Filter navigation by user permissions. Items without `permission` are
+  // shown to every admin. Sub-items are filtered too — if a parent ends up
+  // with zero visible sub-items it's dropped entirely.
+  const visibleNavigation = navigation
+    .filter((item) => (item.permission ? hasPermission(item.permission) : true))
+    .map((item) => {
+      if (!item.subItems) return item;
+      const visibleSubItems = item.subItems.filter((sub) =>
+        sub.permission ? hasPermission(sub.permission) : true
+      );
+      return { ...item, subItems: visibleSubItems };
+    })
+    .filter((item) => !item.subItems || item.subItems.length > 0);
 
   // Simple active check functions
   const isMainItemActive = (href: string) => {
@@ -276,7 +308,7 @@ export default function AdminSidebar({ isCollapsed = false, onToggleCollapse }: 
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const isExpanded = expandedItems.includes(item.title);
           const Icon = item.icon;
 

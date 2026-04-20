@@ -17,6 +17,7 @@ router.delete('/customers/:id', requirePermission('delete_users'), userManagemen
 // INTERNAL STAFF ROUTES
 // ------------------------------------
 router.get('/staff', requirePermission('view_users'), userManagementController.getStaff);
+router.get('/staff/:id', requirePermission('view_users'), userManagementController.getStaffById);
 router.post('/staff', requirePermission('create_users'), userManagementController.createStaff);
 router.put('/staff/:id', requirePermission('edit_users'), userManagementController.updateStaff);
 router.put('/staff/:id/status', requirePermission('edit_users'), userManagementController.updateStaffStatus);

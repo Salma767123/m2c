@@ -16,18 +16,13 @@ import {
   Users,
   Lock,
   Crown,
-  Settings,
-  Filter,
-  Activity,
-  Star,
-  Calendar,
-  MoreVertical,
-  UserCheck,
-  Eye,
-  ChevronRight
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+import { hasPermission } from '@/lib/auth'
 export default function RolesPermissions() {
+  const canCreate = hasPermission('create_roles') || hasPermission('manage_settings')
+  const canEdit = hasPermission('edit_roles') || hasPermission('manage_settings')
+  const canDelete = hasPermission('delete_roles') || hasPermission('manage_settings')
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'roles' | 'permissions' | 'users'>('roles')
   const [roles, setRoles] = useState<Role[]>([])
@@ -112,13 +107,15 @@ export default function RolesPermissions() {
             <h1 className="text-2xl font-bold text-black">Roles & Permissions</h1>
             <p className="text-gray-600 mt-1">Manage user roles and system permissions</p>
           </div>
-          <Button
-            onClick={handleCreateRole}
-            className="bg-black hover:bg-gray-800 text-white"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create Role
-          </Button>
+          {canCreate && (
+            <Button
+              onClick={handleCreateRole}
+              className="bg-black hover:bg-gray-800 text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Role
+            </Button>
+          )}
         </div>
       </div>
 
@@ -245,25 +242,44 @@ export default function RolesPermissions() {
                     </div>
 
                     <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditRole(role)}
-                        className="flex-1"
-                      >
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
-                      {!role.isSystem && (
+                      {role.isSystem ? (
+                        // System roles cannot be edited or deleted (backend rejects with 400).
+                        // Show a disabled placeholder so the UX matches the constraint.
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDeleteRole(role)}
-                          className="text-gray-600"
+                          disabled
+                          className="flex-1 cursor-not-allowed opacity-60"
+                          title="System roles cannot be modified"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Edit className="w-3 h-3 mr-1" />
+                          Locked
                         </Button>
-                      )}
+                      ) : (canEdit || canDelete) ? (
+                        <>
+                          {canEdit && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditRole(role)}
+                              className="flex-1"
+                            >
+                              <Edit className="w-3 h-3 mr-1" />
+                              Edit
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteRole(role)}
+                              className="text-gray-600"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </>
+                      ) : null}
                     </div>
                   </CardContent>
                 </Card>
@@ -302,15 +318,31 @@ export default function RolesPermissions() {
               <CardHeader className="bg-gray-50 border-b border-gray-200">
                 <CardTitle className="text-lg font-semibold text-black">User Assignments</CardTitle>
               </CardHeader>
-              <CardContent className="p-8">
-                <div className="text-center">
-                  <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-black mb-2">User Assignments</h3>
-                  <p className="text-gray-600 mb-4">
-                    Manage user role assignments and permissions.
+              <CardContent className="p-6">
+                {/* Per-role user count summary drawn from the live API */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                  {filteredRoles.map((role) => (
+                    <div key={role.id} className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{role.name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {role.userCount} {role.userCount === 1 ? 'user' : 'users'}
+                        </p>
+                      </div>
+                      <Users className="w-5 h-5 text-gray-400" />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="text-center border-t border-gray-100 pt-6">
+                  <p className="text-gray-600 mb-4 text-sm">
+                    Manage staff accounts and their role assignments on the Users page.
                   </p>
-                  <Button className="bg-black hover:bg-gray-800 text-white">
-                    View All Users
+                  <Button
+                    onClick={() => router.push('/admin/dashboard/users')}
+                    className="bg-black hover:bg-gray-800 text-white"
+                  >
+                    Go to User Management
                   </Button>
                 </div>
               </CardContent>
@@ -332,30 +364,64 @@ export default function RolesPermissions() {
                 </div>
               </div>
 
-              <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-4">
-                <p className="text-gray-800 text-sm">
-                  Are you sure you want to delete <strong>"{roleToDelete.name}"</strong>?
-                  This will affect <strong>{roleToDelete.userCount} users</strong>.
-                </p>
-              </div>
-
-              <div className="flex space-x-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteModal(false)}
-                  className="flex-1"
-                  disabled={isLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={confirmDeleteRole}
-                  className="flex-1 bg-black hover:bg-gray-800 text-white"
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Deleting...' : 'Delete'}
-                </Button>
-              </div>
+              {/* If the role is still assigned to users, the backend will 400.
+                  Show a blocking message with a helpful next-step instead of
+                  letting the admin run into the rejection. */}
+              {roleToDelete.userCount > 0 ? (
+                <>
+                  <div className="bg-amber-50 border border-amber-200 rounded p-3 mb-4">
+                    <p className="text-amber-900 text-sm">
+                      <strong>"{roleToDelete.name}"</strong> is still assigned to{' '}
+                      <strong>{roleToDelete.userCount} {roleToDelete.userCount === 1 ? 'user' : 'users'}</strong>.
+                      Reassign them to another role before deleting this one.
+                    </p>
+                  </div>
+                  <div className="flex space-x-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowDeleteModal(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowDeleteModal(false)
+                        router.push('/admin/dashboard/users')
+                      }}
+                      className="flex-1 bg-black hover:bg-gray-800 text-white"
+                    >
+                      Reassign Users
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-4">
+                    <p className="text-gray-800 text-sm">
+                      Are you sure you want to delete <strong>"{roleToDelete.name}"</strong>?
+                      No users are currently assigned to this role.
+                    </p>
+                  </div>
+                  <div className="flex space-x-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowDeleteModal(false)}
+                      className="flex-1"
+                      disabled={isLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={confirmDeleteRole}
+                      className="flex-1 bg-black hover:bg-gray-800 text-white"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Deleting...' : 'Delete'}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
