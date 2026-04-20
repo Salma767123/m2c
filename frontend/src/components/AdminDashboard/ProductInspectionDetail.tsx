@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-    ArrowLeft, Package, ShieldCheck, ClipboardList,
+    ArrowLeft, Package, ShieldCheck,
     CheckCircle, XCircle, AlertTriangle,
-    Layers, Ruler, Truck, Zap, Camera, User, Download
+    Layers, Ruler, Truck, Camera, Download, FlaskConical, Star
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import productService from '@/services/productService'
@@ -353,132 +353,205 @@ export default function ProductInspectionDetail({ productId }: Props) {
                     <PhotoGallery photos={formData.packagingPhotos} title="Packaging Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
                 </Section>
 
-                {/* Section 4: Defects & AQL */}
-                <Section title="Defects Analysis (AQL)" icon={XCircle} accent="bg-red-50 text-red-800">
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-                        <InfoCard label="Insp. Level" value={formData.inspectionLevel} />
+                {/* Section 5: Defects & AQL — compact AQL table + defect-detail cards (mirrors Checker portal) */}
+                <Section title="Defects & AQL" icon={XCircle} accent="bg-orange-50 text-orange-800">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                        <InfoCard label="Inspection Level" value={formData.inspectionLevel} />
                         <InfoCard label="Sample Size" value={formData.sampleSize} />
-                        <InfoCard label="AQL Crit" value={formData.aqlCritical} />
-                        <InfoCard label="AQL Maj" value={formData.aqlMajor} />
-                        <InfoCard label="AQL Min" value={formData.aqlMinor} />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div className="p-4 bg-red-50/50 rounded-xl border border-red-100">
-                            <div className="flex justify-between items-center mb-3">
-                                <h4 className="font-bold text-red-700 text-sm">Critical Defects</h4>
-                                <span className="text-xl font-black text-red-800">{formData.criticalDefects} / {formData.maxAllowedCritical}</span>
-                            </div>
-                            <p className="text-xs text-red-600 italic">{formData.criticalDefectDetails || 'No critical defects found'}</p>
-                        </div>
-                        <div className="p-4 bg-orange-50/50 rounded-xl border border-orange-100">
-                            <div className="flex justify-between items-center mb-3">
-                                <h4 className="font-bold text-orange-700 text-sm">Major Defects</h4>
-                                <span className="text-xl font-black text-orange-800">{formData.majorDefects} / {formData.maxAllowedMajor}</span>
-                            </div>
-                            <p className="text-xs text-orange-600 italic">{formData.majorDefectDetails || 'No major defects recorded'}</p>
-                        </div>
-                        <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100">
-                            <div className="flex justify-between items-center mb-3">
-                                <h4 className="font-bold text-amber-700 text-sm">Minor Defects</h4>
-                                <span className="text-xl font-black text-amber-800">{formData.minorDefects} / {formData.maxAllowedMinor}</span>
-                            </div>
-                            <p className="text-xs text-amber-600 italic">{formData.minorDefectDetails || 'No minor defects recorded'}</p>
-                        </div>
+                    <div className="overflow-x-auto mb-4">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-200">
+                                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Type</th>
+                                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">AQL Level</th>
+                                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Max Allowed</th>
+                                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Found</th>
+                                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {[
+                                    { label: 'Critical', aql: formData.aqlCritical, max: formData.maxAllowedCritical, found: formData.criticalDefects },
+                                    { label: 'Major', aql: formData.aqlMajor, max: formData.maxAllowedMajor, found: formData.majorDefects },
+                                    { label: 'Minor', aql: formData.aqlMinor, max: formData.maxAllowedMinor, found: formData.minorDefects },
+                                ].map((row) => {
+                                    const exceeded = row.found != null && row.max != null && Number(row.found) > Number(row.max)
+                                    return (
+                                        <tr key={row.label} className="border-b border-slate-100">
+                                            <td className="py-2 px-3 font-medium text-slate-700">{row.label}</td>
+                                            <td className="py-2 px-3 text-slate-600">{row.aql ?? '—'}</td>
+                                            <td className="py-2 px-3 text-slate-600">{row.max ?? '—'}</td>
+                                            <td className="py-2 px-3 text-slate-600">{row.found ?? '—'}</td>
+                                            <td className="py-2 px-3">
+                                                {row.found != null ? (
+                                                    exceeded ? (
+                                                        <span className="text-xs font-semibold text-red-600 flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />Exceeded</span>
+                                                    ) : (
+                                                        <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" />Within Limit</span>
+                                                    )
+                                                ) : <span className="text-slate-400">—</span>}
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
                     </div>
-                    <PhotoGallery photos={formData.defectPhotos} title="Defect Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
-                </Section>
 
-                {/* Section 5: On-site Functional Tests */}
-                <Section title="On-site Functional Tests" icon={Zap} accent="bg-purple-50 text-purple-800">
-                    <div className="space-y-4 mb-6">
-                        {(formData.tests || []).map((test: any, i: number) => (
-                            <div key={i} className="flex flex-col gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-bold text-slate-900">{test.label}</p>
-                                        <p className="text-xs text-slate-500">{test.detail}</p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {test.pass && <StatusChip value="PASS" />}
-                                        {test.fail && <StatusChip value="FAIL" />}
-                                    </div>
+                    {(formData.criticalDefectDetails || formData.majorDefectDetails || formData.minorDefectDetails) && (
+                        <div className="space-y-2 mb-4">
+                            {formData.criticalDefectDetails && (
+                                <div className="bg-red-50 border border-red-100 rounded-lg p-3">
+                                    <p className="text-xs font-semibold text-red-700 uppercase mb-1">Critical Defect Details</p>
+                                    <p className="text-sm text-red-900">{formData.criticalDefectDetails}</p>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    {(test.rightPhotos || []).map((p: any, j: number) => {
-                                        const src = p.url || p.data
-                                        return src ? (
-                                        <div key={`r-${j}`} className="aspect-square relative group cursor-pointer" onClick={() => setSelectedImage({src, alt: `Right ${j + 1}`})}>
-                                            <img src={src} alt="Right" className="w-full h-full object-cover rounded-lg border border-green-200 transition-transform group-hover:scale-[1.02]" />
-                                            <div className="absolute top-1 left-1 bg-green-500/80 text-white text-[8px] px-1 rounded">RIGHT</div>
-                                        </div>
-                                        ) : null
-                                    })}
-                                    {(test.wrongPhotos || []).map((p: any, j: number) => {
-                                        const src = p.url || p.data
-                                        return src ? (
-                                        <div key={`w-${j}`} className="aspect-square relative group cursor-pointer" onClick={() => setSelectedImage({src, alt: `Wrong ${j + 1}`})}>
-                                            <img src={src} alt="Wrong" className="w-full h-full object-cover rounded-lg border border-red-200 transition-transform group-hover:scale-[1.02]" />
-                                            <div className="absolute top-1 left-1 bg-red-500/80 text-white text-[8px] px-1 rounded">WRONG</div>
-                                        </div>
-                                        ) : null
-                                    })}
+                            )}
+                            {formData.majorDefectDetails && (
+                                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                                    <p className="text-xs font-semibold text-amber-700 uppercase mb-1">Major Defect Details</p>
+                                    <p className="text-sm text-amber-900">{formData.majorDefectDetails}</p>
                                 </div>
-                            </div>
-                        ))}
-                        {(!formData.tests || formData.tests.length === 0) && (
-                            <p className="text-sm text-slate-400 text-center py-4 bg-slate-50 rounded-xl">No specific on-site tests recorded.</p>
-                        )}
-                    </div>
-                    <PhotoGallery photos={formData.testingPhotos} title="General Testing Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
-                </Section>
-
-                {/* Section 6: Documentation & Identification */}
-                <Section title="Final Documentation & Verification" icon={ClipboardList} accent="bg-emerald-50 text-emerald-800">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-6">
-                            <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                                <p className="text-[10px] font-bold text-emerald-700 uppercase mb-2 flex items-center gap-2">
-                                    <User className="w-3 h-3" />
-                                    Inspector Signature/Initials
-                                </p>
-                                <p className="text-lg font-display italic font-semibold text-slate-900">{formData.inspectorSignature || '—'}</p>
-                            </div>
-                            <PhotoGallery photos={formData.documentationPhotos} title="Documentation Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
-                        </div>
-                        <div className="space-y-6">
-                            <PhotoGallery photos={formData.photocopyDocuments} title="Photocopy Documents" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
-                            <PhotoGallery photos={formData.companyIdCards} title="Company ID Cards" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
-                        </div>
-                    </div>
-                </Section>
-
-                {/* Section 7: Final Decision */}
-                <div className={`rounded-2xl border-2 p-8 ${formData.finalDecision === 'Approved' ? 'bg-green-50 border-green-200' : formData.finalDecision === 'Rejected' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                    <div className="flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left">
-                        <div className={`p-4 rounded-full ${formData.finalDecision === 'Approved' ? 'bg-green-100' : formData.finalDecision === 'Rejected' ? 'bg-red-100' : 'bg-yellow-100'}`}>
-                            {formData.finalDecision === 'Approved' ? <CheckCircle className="w-12 h-12 text-green-600" /> : formData.finalDecision === 'Rejected' ? <XCircle className="w-12 h-12 text-red-600" /> : <AlertTriangle className="w-12 h-12 text-yellow-600" />}
-                        </div>
-                        <div className="flex-1">
-                            <h2 className={`text-3xl font-black mb-2 ${formData.finalDecision === 'Approved' ? 'text-green-900' : formData.finalDecision === 'Rejected' ? 'text-red-900' : 'text-yellow-900'}`}>
-                                Overall Decision: {formData.finalDecision?.toUpperCase() || 'UNKNOWN'}
-                            </h2>
-                            <p className="text-slate-700 font-medium mb-4">
-                                Reviewer Remarks: {formData.reviewerRemarks || 'No final remarks provided by the inspector.'}
-                            </p>
-                            {product.rejectionReason && (
-                                <div className="p-4 bg-white/50 rounded-xl border border-red-200 mt-4">
-                                    <p className="text-xs font-bold text-red-600 uppercase mb-1">Official Rejection Reason</p>
-                                    <p className="text-sm text-red-900">{product.rejectionReason}</p>
+                            )}
+                            {formData.minorDefectDetails && (
+                                <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
+                                    <p className="text-xs font-semibold text-neutral-700 uppercase mb-1">Minor Defect Details</p>
+                                    <p className="text-sm text-neutral-900">{formData.minorDefectDetails}</p>
                                 </div>
                             )}
                         </div>
-                        <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-slate-200 text-center min-w-[120px]">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Report Date</p>
-                            <p className="text-sm font-bold text-slate-900">{new Date(product.updatedAt).toLocaleDateString()}</p>
+                    )}
+
+                    <PhotoGallery photos={formData.defectPhotos} title="Defect Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+                </Section>
+
+                {/* Section 6: On-site Testing — mirrors Checker portal */}
+                <Section title="On-site Testing" icon={FlaskConical} accent="bg-rose-50 text-rose-800">
+                    {(formData.tests && formData.tests.length > 0) ? (
+                        <div className="space-y-4">
+                            {formData.tests.map((test: any, i: number) => {
+                                const passed = test.pass === true
+                                const failed = test.fail === true
+                                return (
+                                    <div key={test.id || i} className="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div>
+                                                <p className="font-semibold text-slate-900 text-sm">{test.label || `Test ${i + 1}`}</p>
+                                                {test.detail && <p className="text-xs text-slate-500 mt-0.5">{test.detail}</p>}
+                                            </div>
+                                            {passed && (
+                                                <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                                                    <CheckCircle className="w-3.5 h-3.5" /> PASS
+                                                </span>
+                                            )}
+                                            {failed && (
+                                                <span className="flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full">
+                                                    <XCircle className="w-3.5 h-3.5" /> FAIL
+                                                </span>
+                                            )}
+                                            {!passed && !failed && (
+                                                <span className="text-xs text-slate-400">No decision</span>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {(test.rightPhotos?.length ?? 0) > 0 && (
+                                                <div>
+                                                    <p className="text-xs font-medium text-emerald-600 mb-2">Right/Correct Photos ({test.rightPhotos.length})</p>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {test.rightPhotos.map((p: any, j: number) => {
+                                                            const src = typeof p === 'string' ? p : p?.data || p?.url
+                                                            return src ? (
+                                                                <img
+                                                                    key={j}
+                                                                    src={src}
+                                                                    alt={`Right ${j + 1}`}
+                                                                    onClick={() => setSelectedImage({ src, alt: `Right ${j + 1}` })}
+                                                                    onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                                                    className="w-full h-24 object-cover rounded-lg border border-emerald-200 cursor-pointer transition-transform hover:scale-[1.02]"
+                                                                />
+                                                            ) : null
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {(test.wrongPhotos?.length ?? 0) > 0 && (
+                                                <div>
+                                                    <p className="text-xs font-medium text-red-600 mb-2">Wrong/Incorrect Photos ({test.wrongPhotos.length})</p>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {test.wrongPhotos.map((p: any, j: number) => {
+                                                            const src = typeof p === 'string' ? p : p?.data || p?.url
+                                                            return src ? (
+                                                                <img
+                                                                    key={j}
+                                                                    src={src}
+                                                                    alt={`Wrong ${j + 1}`}
+                                                                    onClick={() => setSelectedImage({ src, alt: `Wrong ${j + 1}` })}
+                                                                    onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                                                    className="w-full h-24 object-cover rounded-lg border border-red-200 cursor-pointer transition-transform hover:scale-[1.02]"
+                                                                />
+                                                            ) : null
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
+                    ) : (
+                        <p className="text-slate-400 text-sm">No tests recorded.</p>
+                    )}
+                    <div className="mt-4">
+                        <PhotoGallery photos={formData.testingPhotos} title="Testing Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
                     </div>
-                </div>
+                </Section>
+
+                {/* Documentation — mirrors Checker portal */}
+                <Section title="Documentation" icon={Camera} accent="bg-sky-50 text-sky-800">
+                    <div className="mb-4">
+                        <InfoCard label="Inspector Signature" value={formData.inspectorSignature} />
+                    </div>
+                    <PhotoGallery photos={formData.documentationPhotos} title="General Documentation Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+                    <PhotoGallery photos={formData.photocopyDocuments} title="Photocopy Documents" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+                    <PhotoGallery photos={formData.companyIdCards} title="Company ID Cards" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+                </Section>
+
+                {/* Review & Final Decision — mirrors Checker portal */}
+                <Section title="Review & Final Decision" icon={Star} accent="bg-amber-50 text-amber-800">
+                    <div className="flex items-center gap-4 mb-4 flex-wrap">
+                        <span className="text-sm font-medium text-slate-700">Final Decision:</span>
+                        {formData.finalDecision === 'Approved' ? (
+                            <span className="flex items-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-100 px-4 py-1.5 rounded-full">
+                                <CheckCircle className="w-4 h-4" /> Approved
+                            </span>
+                        ) : formData.finalDecision === 'Rejected' ? (
+                            <span className="flex items-center gap-1.5 text-sm font-bold text-red-700 bg-red-100 px-4 py-1.5 rounded-full">
+                                <XCircle className="w-4 h-4" /> Rejected
+                            </span>
+                        ) : (
+                            <span className="text-sm text-slate-400">{formData.finalDecision || '—'}</span>
+                        )}
+                        <span className="ml-auto text-xs text-slate-500">
+                            Report Date: <span className="font-semibold text-slate-700">{product.updatedAt ? new Date(product.updatedAt).toLocaleDateString('en-IN') : '—'}</span>
+                        </span>
+                    </div>
+
+                    {formData.reviewerRemarks && (
+                        <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-4 mb-4">
+                            <p className="text-xs font-semibold text-neutral-700 uppercase mb-1">Reviewer Remarks</p>
+                            <p className="text-sm text-neutral-900">{formData.reviewerRemarks}</p>
+                        </div>
+                    )}
+
+                    {product.rejectionReason && (
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                            <p className="text-xs font-semibold text-red-700 uppercase mb-1">Official Rejection Reason</p>
+                            <p className="text-sm text-red-900">{product.rejectionReason}</p>
+                        </div>
+                    )}
+                </Section>
 
             </div>
 
