@@ -36,6 +36,7 @@ model Admin {
   // Additional admin profile fields
   phoneNumber   String?
   address       String?
+  addressLine2  String?
   city          String?
   state         String?
   zipCode       String?
@@ -110,6 +111,7 @@ model User {
   // Additional user profile fields
   phoneNumber   String? 
   address       String?
+  addressLine2  String?
   city          String?
   state         String?
   zipCode       String?
@@ -148,6 +150,7 @@ model Address {
   name      String?
   phone     String?
   address   String
+  addressLine2 String?
   city      String
   state     String
   zipCode   String
@@ -326,7 +329,14 @@ model Vendor {
   inspections           Inspection[]
   settlements           Settlement[]
 
-  
+  // Admin delivery rating aggregates — recomputed whenever an admin submits a
+  // review on a vendor-to-hub order. `rating` is the average over all admin
+  // reviews scored for this vendor (1-5); `ratingCount` is the sample size.
+  rating                Float?
+  ratingCount           Int       @default(0)
+  adminReviews          AdminReview[]
+
+
   // System fields
   applicationStep       Int       @default(1) // Current step in application process
   completedSteps        Int[]     @default([]) // Array of completed step numbers
@@ -762,6 +772,10 @@ model Order {
   // Order Status & Tracking
   status                OrderStatus @default(ORDER_CREATED)
   trackingReference     String?   // Internal tracking reference
+  // Vendor → Hub shipment details (captured when vendor clicks "Ship to Hub")
+  vendorCarrier         String?
+  vendorTrackingId      String?
+  vendorShippedAt       DateTime?
   assignedHubId         String?   @db.ObjectId
   hub                   Hub?      @relation(fields: [assignedHubId], references: [id])
 
@@ -784,6 +798,9 @@ model Order {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  @@index([status])
+  @@index([createdAt])
+  @@index([assignedHubId])
   @@map("orders")
 }
 
@@ -837,24 +854,31 @@ model AdminReview {
   id                    String    @id @default(auto()) @map("_id") @db.ObjectId
   orderId               String    @unique @db.ObjectId
   order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+
+  // Denormalized vendor reference so aggregate queries don't need to join
+  // through OrderItem on every read. Populated at review-create time from
+  // the order's primary vendor item.
+  vendorId              String?   @db.ObjectId
+  vendor                Vendor?   @relation(fields: [vendorId], references: [id])
+
   // Review Details
   reviewComments        String?
   qualityCheckNotes     String?
   rating                Int?      // 1-5 rating
   approved              Boolean   @default(false)
-  
+
   // Admin Information
   reviewedBy            String?   @db.ObjectId // Admin ID
   reviewedAt            DateTime?
-  
+
   // Rejection Details (if applicable)
   rejectionReason       String?
   returnToVendor        Boolean   @default(false)
-  
+
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  @@index([vendorId])
   @@map("admin_reviews")
 }
 

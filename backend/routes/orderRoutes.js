@@ -61,6 +61,9 @@ router.delete('/admin-reviews/:id', requireAdminRole, adminReviewController.dele
 // VENDOR ROUTES (/api/orders/vendor/*)
 // ============================================
 router.get('/vendor', requireVendorRole, vendorOrderController.getVendorOrders);
+// More-specific /vendor/reviews must be registered BEFORE /vendor/:id so Express
+// doesn't treat "reviews" as an order id.
+router.get('/vendor/reviews', requireVendorRole, vendorOrderController.getVendorReviews);
 router.get('/vendor/:id', requireVendorRole, vendorOrderController.getVendorOrderById);
 router.put('/vendor/:id/status', requireVendorRole, vendorOrderController.updateVendorOrderStatus);
 

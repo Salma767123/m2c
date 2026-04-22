@@ -161,6 +161,8 @@ export interface VendorProfile {
   documents: any[];
   bankDetails?: any;
   references: any[];
+  rating?: number | null;
+  ratingCount?: number;
   _count?: {
     certifications: number;
     documents: number;
@@ -424,7 +426,6 @@ class VendorService {
   // Admin: Get all vendors with filters
   static async getAllVendors(filters: VendorFilters = {}): Promise<VendorsListResponse> {
     const token = this.getAdminToken();
-    console.log('Admin token check:', token ? 'Token found' : 'No token found');
 
     if (!token) {
       throw new Error('No admin authentication token found');
@@ -437,7 +438,6 @@ class VendorService {
     if (filters.limit) queryParams.append('limit', filters.limit.toString());
 
     const url = `/vendors/all?${queryParams.toString()}`;
-    console.log('Making request to:', url);
 
     try {
       const response = await axiosInstance.get(url, {
@@ -446,8 +446,6 @@ class VendorService {
         },
       });
 
-      console.log('Response status:', response.status);
-      console.log('Vendors data received:', response.data);
       return response.data;
     } catch (error) {
       console.error('Get all vendors error:', error);
@@ -479,16 +477,12 @@ class VendorService {
   // Admin: Update vendor by ID
   static async updateVendorById(vendorId: string, vendorData: any) {
     const token = this.getAdminToken();
-    console.log('updateVendorById - Admin token:', token ? 'Found' : 'Not found');
 
     if (!token) {
       throw new Error('No admin authentication token found');
     }
 
     try {
-      console.log('updateVendorById - Sending request to:', `/vendors/${vendorId}`);
-      console.log('updateVendorById - Data:', vendorData);
-
       // Prepare FormData for file uploads
       const formData = new FormData();
 
@@ -528,7 +522,6 @@ class VendorService {
         },
       });
 
-      console.log('updateVendorById - Response:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Update vendor by ID error:', error);

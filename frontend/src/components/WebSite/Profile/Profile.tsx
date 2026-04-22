@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  User,  
-  SquarePen, 
-  Save, 
-  X,  
-  Bell, 
-  Package, 
+import {
+  User,
+  SquarePen,
+  Save,
+  X,
+  MapPin,
+  Package,
   LogOut
 } from 'lucide-react';
 import ProfileTab from '@/components/WebSite/Profile/ProfileTab';
+import AddressBook from '@/components/WebSite/Profile/AddressBook';
 import OrderHistory from '@/components/WebSite/Profile/OrderHistory';
 // import Notifications from '@/components/WebSite/Profile/Notifications';
 import type { UserProfile } from '@/components/WebSite/Profile/types';
@@ -34,13 +35,6 @@ const Profile = () => {
     email: '',
     phone: '',
     gender: 'male',
-    address: {
-      addressLine1: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: 'United States'
-    },
     joinDate: new Date().toISOString().split('T')[0],
     preferences: {
       newsletter: false,
@@ -76,13 +70,6 @@ const Profile = () => {
           email: userData.email,
           phone: userData.phoneNumber || '',
           gender: 'male', // Default, can be enhanced later
-          address: {
-            addressLine1: userData.address || '',
-            city: userData.city || '',
-            state: userData.state || '',
-            zipCode: userData.zipCode || '',
-            country: userData.country || 'United States'
-          },
           joinDate: new Date(userData.createdAt).toISOString().split('T')[0],
           preferences: {
             newsletter: false,
@@ -114,15 +101,11 @@ const Profile = () => {
         return;
       }
       
-      // Prepare update data
+      // Profile update now only covers personal info. Addresses are managed
+      // separately in the Saved Addresses tab.
       const updateData = {
         name: fullName,
         phoneNumber: editedProfile.phone,
-        address: editedProfile.address.addressLine1,
-        city: editedProfile.address.city,
-        state: editedProfile.address.state,
-        zipCode: editedProfile.address.zipCode,
-        country: editedProfile.address.country
       };
       
       const response = await userProfileService.updateProfile(updateData);
@@ -164,8 +147,8 @@ const Profile = () => {
 
   const tabs = [
     { id: 'profile', label: 'Profile Information', icon: User },
+    { id: 'addresses', label: 'Saved Addresses', icon: MapPin },
     { id: 'orders', label: 'Order History', icon: Package },
-    // { id: 'notifications', label: 'Notifications', icon: Bell }
   ];
 
   const renderProfileTab = () => (
@@ -275,7 +258,7 @@ const Profile = () => {
           {/* Main Content */}
           <div className="flex-1">
             {activeTab === 'profile' && renderProfileTab()}
-            {/* {activeTab === 'notifications' && renderNotificationsTab()} */}
+            {activeTab === 'addresses' && <AddressBook />}
             {activeTab === 'orders' && <OrderHistory />}
           </div>
         </div>

@@ -270,15 +270,20 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           </div>
           <div className="md:col-span-2">
             <p className="text-sm text-gray-600">Delivery Address</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
-              {order.shippingAddress ? (
+            <div className="text-base font-medium text-gray-900 mt-1 leading-relaxed">
+              {order?.shippingAddress ? (
                 <>
-                  {order.shippingAddress.address || order.shippingAddress.street}<br />
-                  {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode || order.shippingAddress.postalCode}<br />
-                  {order.shippingAddress.country}
+                  <p>{order.shippingAddress.address || order.shippingAddress.street}</p>
+                  {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
+                  <p>
+                    {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode || order.shippingAddress.postalCode}
+                  </p>
+                  <p className="text-slate-500 font-medium italic mt-1 text-sm">
+                    {order.shippingAddress.country}
+                  </p>
                 </>
               ) : "N/A"}
-            </p>
+            </div>
           </div>
         </div>
       </div>

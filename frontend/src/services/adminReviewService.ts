@@ -3,6 +3,7 @@ import axios from '@/lib/axios';
 export interface AdminOrderReview {
     id: string;
     orderId: string;
+    vendorId?: string;
     reviewComments?: string;
     qualityCheckNotes?: string;
     rating?: number;
@@ -54,6 +55,7 @@ export interface AdminOrderReviewsResponse {
         approved: number;
         rejected: number;
     };
+    ratingDistribution?: Record<number, number>;
 }
 
 class AdminReviewService {
@@ -63,12 +65,13 @@ class AdminReviewService {
         status?: string;
         page?: number;
         limit?: number;
+        vendorId?: string;
     }): Promise<AdminOrderReviewsResponse> {
         try {
             const response = await axios.get('/orders/admin-reviews', { params });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to fetch admin reviews');
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to fetch admin reviews');
         }
     }
 
@@ -78,7 +81,7 @@ class AdminReviewService {
             const response = await axios.get(`/orders/admin-reviews/order/${orderId}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to fetch admin review');
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to fetch admin review');
         }
     }
 
@@ -95,7 +98,7 @@ class AdminReviewService {
             const response = await axios.post(`/orders/admin-reviews/order/${orderId}`, reviewData);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to save admin review');
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to save admin review');
         }
     }
 
@@ -105,7 +108,7 @@ class AdminReviewService {
             const response = await axios.delete(`/orders/admin-reviews/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to delete admin review');
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to delete admin review');
         }
     }
 }

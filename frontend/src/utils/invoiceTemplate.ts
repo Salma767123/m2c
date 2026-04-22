@@ -10,8 +10,9 @@ interface CustomerOrderItem {
 }
 
 interface ShippingAddress {
-  name: string;
-  addressLine1: string;
+  firstName: string;
+  lastName: string;
+  street: string;
   addressLine2?: string;
   landmark?: string;
   city: string;
@@ -202,11 +203,11 @@ export const generateInvoiceHTML = (order: CustomerOrder): string => {
             <div class="section-title">Shipping Address</div>
             <div class="detail-row">
               <span class="detail-label">Name:</span>
-              ${order.shippingAddress.name}
+              ${order.shippingAddress.firstName} ${order.shippingAddress.lastName}
             </div>
             <div class="detail-row">
-              <span class="detail-label">Address Line 1:</span>
-              ${order.shippingAddress.addressLine1}
+              <span class="detail-label">Address:</span>
+              ${order.shippingAddress.street}
             </div>
             ${order.shippingAddress.addressLine2 ? `
             <div class="detail-row">
@@ -226,7 +227,7 @@ export const generateInvoiceHTML = (order: CustomerOrder): string => {
             </div>
             <div class="detail-row">
               <span class="detail-label">Country:</span>
-              ${order.shippingAddress.country}
+              ${order.shippingAddress.country} 🇺🇸
             </div>
             <div class="detail-row">
               <span class="detail-label">Phone:</span>

@@ -1,22 +1,39 @@
 'use client';
 
-import { Package, DollarSign, TrendingUp, ShoppingCart } from 'lucide-react';
+import { Package, DollarSign, Star, ShoppingCart } from 'lucide-react';
 import StatsGrid from './components/StatsGrid';
 import AnalyticsOverview from './components/AnalyticsOverview';
 import RecentProducts from './components/RecentProducts';
 import RecentOrders from './components/RecentOrders';
 import { useState, useEffect } from 'react';
 import VendorDashboardService, { VendorDashboardStats } from '@/services/vendorDashboardService';
+import { orderService } from '@/services/orderService';
+
+type RatingSummary = { rating: number | null; ratingCount: number };
 
 export default function Dashboard() {
   const [data, setData] = useState<VendorDashboardStats | null>(null);
+  const [rating, setRating] = useState<RatingSummary | null>(null);
+  const [ratingError, setRatingError] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const stats = await VendorDashboardService.getDashboardStats();
+        const [stats, reviews] = await Promise.all([
+          VendorDashboardService.getDashboardStats(),
+          orderService.getVendorReviews().catch(() => {
+            setRatingError(true);
+            return null;
+          }),
+        ]);
         setData(stats);
+        if (reviews?.success) {
+          setRating({
+            rating: reviews.data.overall.rating,
+            ratingCount: reviews.data.overall.ratingCount,
+          });
+        }
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
       } finally {
@@ -62,13 +79,23 @@ export default function Dashboard() {
       iconBg: 'bg-blue-100',
     },
     {
-      title: 'Growth Rate',
-      value: '0%',
-      change: '0%',
-      icon: TrendingUp,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50 border-orange-200',
-      iconBg: 'bg-orange-100',
+      title: 'Admin Rating',
+      value:
+        ratingError
+          ? '—'
+          : rating !== null && rating.rating !== null && rating.ratingCount > 0
+            ? `★ ${rating.rating.toFixed(1)}`
+            : 'No reviews',
+      change:
+        ratingError
+          ? 'Unable to load'
+          : rating !== null && rating.ratingCount > 0
+            ? `${rating.ratingCount} review${rating.ratingCount === 1 ? '' : 's'}`
+            : 'Ship your first order',
+      icon: Star,
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-50 border-yellow-200',
+      iconBg: 'bg-yellow-100',
     }
   ];
 

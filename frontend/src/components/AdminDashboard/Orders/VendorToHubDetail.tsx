@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, MapPin } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, MapPin, Copy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
@@ -190,7 +190,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <div>
             <p className="text-sm text-gray-600">Order Date</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              {new Date(order.createdAt).toLocaleDateString()}
+              {new Date(order.createdAt).toLocaleDateString("en-IN")}
             </p>
           </div>
           <div>
@@ -268,15 +268,16 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-2">Shipping Address</h3>
-            <p className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600">
               {order.shippingAddress ? (
                 <>
-                  {order.shippingAddress.address || order.shippingAddress.street}<br />
-                  {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}<br />
-                  {order.shippingAddress.country}
+                  <p>{order.shippingAddress.address || order.shippingAddress.street}</p>
+                  {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
+                  <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
+                  <p>{order.shippingAddress.country}</p>
                 </>
               ) : "N/A"}
-            </p>
+            </div>
           </div>
         </div>
       </div>
@@ -378,18 +379,58 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
         })()}
       </div>
 
-      {/* Vendor Shipping Details - Not fully tracked in basic status atm but mocked visualization */}
+      {/* Vendor Shipping Details — populated when vendor clicks "Ship to Hub" */}
       {(["IN_TRANSIT_TO_ADMIN_HUB", "RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(order.status)) && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-4">
             <Truck className="h-5 w-5 text-gray-600" />
             <h2 className="text-lg font-semibold text-gray-900">Vendor Shipping Details</h2>
           </div>
-          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-4">
-            <p className="text-sm text-blue-800">
-              Shipping information currently tracked manually or via integrated system.
-            </p>
-          </div>
+          {order.vendorCarrier && order.vendorTrackingId ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Carrier</p>
+                <p className="text-base font-medium text-gray-900 mt-1">{order.vendorCarrier}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Tracking ID</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-base font-mono font-medium text-gray-900 break-all">
+                    {order.vendorTrackingId}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(order.vendorTrackingId || "");
+                        showSuccessToast("Tracking ID copied");
+                      } catch {
+                        showErrorToast("Copy failed");
+                      }
+                    }}
+                    className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors shrink-0"
+                    title="Copy tracking ID"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              {order.vendorShippedAt && (
+                <div>
+                  <p className="text-sm text-gray-600">Shipped On</p>
+                  <p className="text-base font-medium text-gray-900 mt-1">
+                    {new Date(order.vendorShippedAt).toLocaleString("en-IN")}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                Shipping details not recorded for this order. (Legacy order shipped before tracking was captured.)
+              </p>
+            </div>
+          )}
         </div>
       )}
 

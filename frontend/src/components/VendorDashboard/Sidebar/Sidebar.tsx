@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Settings,
   ShoppingCart,
+  Star,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -55,6 +56,11 @@ const navigation: NavigationItem[] = [
     title: "Earnings",
     icon: DollarSign,
     href: "/vendor/dashboard/earnings/payouts",
+  },
+  {
+    title: "Reviews",
+    icon: Star,
+    href: "/vendor/dashboard/reviews",
   },
   {
     title: "Reports",
