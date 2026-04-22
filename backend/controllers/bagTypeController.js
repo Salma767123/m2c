@@ -43,7 +43,7 @@ const getBagTypes = async (req, res) => {
         if (isActive === 'true') where.isActive = true;
         if (isActive === 'false') where.isActive = false;
 
-        const [bagTypes, total, activeCount, inactiveCount] = await Promise.all([
+        const [bagTypes, total, activeCount, inactiveCount, salesAgg, salesPerBag] = await Promise.all([
             prisma.bagType.findMany({
                 where,
                 orderBy: { sortOrder: 'asc' },
@@ -53,6 +53,17 @@ const getBagTypes = async (req, res) => {
             prisma.bagType.count({ where }),
             prisma.bagType.count({ where: { isActive: true } }),
             prisma.bagType.count({ where: { isActive: false } }),
+            prisma.order.aggregate({
+                where: { bagTypeId: { not: null } },
+                _count: true,
+                _sum: { bagTypePrice: true },
+            }),
+            prisma.order.groupBy({
+                by: ['bagTypeId'],
+                where: { bagTypeId: { not: null } },
+                _count: true,
+                _sum: { bagTypePrice: true },
+            }),
         ]);
 
         res.json({
@@ -68,6 +79,13 @@ const getBagTypes = async (req, res) => {
                 total: activeCount + inactiveCount,
                 active: activeCount,
                 inactive: inactiveCount,
+                totalBagsSold: salesAgg._count || 0,
+                totalRevenue: salesAgg._sum?.bagTypePrice || 0,
+                perBagType: salesPerBag.map(s => ({
+                    bagTypeId: s.bagTypeId,
+                    sold: s._count,
+                    revenue: s._sum?.bagTypePrice || 0,
+                })),
             },
         });
     } catch (error) {
