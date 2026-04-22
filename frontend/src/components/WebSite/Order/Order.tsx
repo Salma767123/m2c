@@ -635,7 +635,7 @@ export default function OrderList() {
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-slate-900 text-sm line-clamp-2 group-hover:text-blue-600 transition-colors">{item.name}</h4>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-slate-900 font-semibold text-sm">₹{item.basePrice ?? item.adminFixedPrice}</span>
+                            <span className="text-slate-900 font-semibold text-sm">${item.basePrice ?? item.adminFixedPrice}</span>
                           </div>
                           {item.rating && (
                             <div className="flex items-center gap-1 mt-1">
@@ -676,7 +676,7 @@ export default function OrderList() {
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-slate-900 text-sm line-clamp-2 group-hover:text-green-600 transition-colors">{item.name}</h4>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-slate-900 font-semibold text-sm">₹{item.basePrice ?? item.adminFixedPrice}</span>
+                            <span className="text-slate-900 font-semibold text-sm">${item.basePrice ?? item.adminFixedPrice}</span>
                             {item.discount && (
                               <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{item.discount}% OFF</span>
                             )}

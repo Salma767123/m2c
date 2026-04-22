@@ -316,10 +316,10 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-lg font-bold text-slate-900">
-                            ₹{item.totalPrice.toFixed(2)}
+                            ${item.totalPrice.toFixed(2)}
                           </span>
                           <span className="text-sm text-slate-500">
-                            ₹{item.unitPrice.toFixed(2)} each
+                            ${item.unitPrice.toFixed(2)} each
                           </span>
                         </div>
                       </div>
@@ -363,34 +363,34 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 <CardContent className="p-6 space-y-4">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Subtotal</span>
-                    <span className="font-medium">₹{orderDetails.subtotal.toFixed(2)}</span>
+                    <span className="font-medium">${orderDetails.subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Shipping</span>
                     <span className="font-medium text-green-600">
-                      {orderDetails.shippingCost > 0 ? `₹${orderDetails.shippingCost.toFixed(2)}` : 'Free'}
+                      {orderDetails.shippingCost > 0 ? `$${orderDetails.shippingCost.toFixed(2)}` : 'Free'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Tax</span>
-                    <span className="font-medium">₹{orderDetails.tax.toFixed(2)}</span>
+                    <span className="font-medium">${orderDetails.tax.toFixed(2)}</span>
                   </div>
                   {orderDetails.discount > 0 && (
                     <div className="flex justify-between">
                       <span className="text-slate-600">Discount</span>
-                      <span className="font-medium text-green-600">-₹{orderDetails.discount.toFixed(2)}</span>
+                      <span className="font-medium text-green-600">-${orderDetails.discount.toFixed(2)}</span>
                     </div>
                   )}
                   {orderDetails.bagTypePrice && orderDetails.bagTypePrice > 0 && (
                     <div className="flex justify-between">
                       <span className="text-slate-600">Bag ({orderDetails.bagTypeName})</span>
-                      <span className="font-medium">₹{orderDetails.bagTypePrice.toFixed(2)}</span>
+                      <span className="font-medium">${orderDetails.bagTypePrice.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="border-t border-slate-200 pt-4">
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <span>₹{orderDetails.totalAmount.toFixed(2)}</span>
+                      <span>${orderDetails.totalAmount.toFixed(2)}</span>
                     </div>
                   </div>
                 </CardContent>

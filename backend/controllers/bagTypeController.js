@@ -27,8 +27,8 @@ const getActiveBagTypes = async (req, res) => {
 const getBagTypes = async (req, res) => {
     try {
         const { page = 1, limit = 10, search, isActive } = req.query;
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
+        const pageNum = Math.max(1, parseInt(page) || 1);
+        const limitNum = Math.max(1, Math.min(100, parseInt(limit) || 10));
         const skip = (pageNum - 1) * limitNum;
 
         const where = {};
@@ -43,7 +43,7 @@ const getBagTypes = async (req, res) => {
         if (isActive === 'true') where.isActive = true;
         if (isActive === 'false') where.isActive = false;
 
-        const [bagTypes, total] = await Promise.all([
+        const [bagTypes, total, activeCount, inactiveCount] = await Promise.all([
             prisma.bagType.findMany({
                 where,
                 orderBy: { sortOrder: 'asc' },
@@ -51,6 +51,8 @@ const getBagTypes = async (req, res) => {
                 take: limitNum,
             }),
             prisma.bagType.count({ where }),
+            prisma.bagType.count({ where: { isActive: true } }),
+            prisma.bagType.count({ where: { isActive: false } }),
         ]);
 
         res.json({
@@ -61,6 +63,11 @@ const getBagTypes = async (req, res) => {
                 limit: limitNum,
                 total,
                 pages: Math.ceil(total / limitNum),
+            },
+            stats: {
+                total: activeCount + inactiveCount,
+                active: activeCount,
+                inactive: inactiveCount,
             },
         });
     } catch (error) {
@@ -92,23 +99,32 @@ const createBagType = async (req, res) => {
     try {
         const { name, description, price, image, isActive = true, sortOrder = 0 } = req.body;
 
-        if (!name || price === undefined || price === null) {
+        if (!name || !String(name).trim() || price === undefined || price === null) {
             return res.status(400).json({ success: false, message: 'Name and price are required' });
         }
 
-        if (typeof price !== 'number' || price < 0) {
-            return res.status(400).json({ success: false, message: 'Price must be a non-negative number' });
+        if (!Number.isFinite(price) || price < 0) {
+            return res.status(400).json({ success: false, message: 'Price must be a non-negative finite number' });
         }
 
-        // Upload image if base64
+        // Validate and upload image if base64
         let imageUrl = image || null;
-        if (image) {
+        if (image && typeof image === 'string' && image.startsWith('data:')) {
+            if (!/^data:image\/(jpeg|jpg|png|webp|gif);base64,/.test(image)) {
+                return res.status(400).json({ success: false, message: 'Only JPEG, PNG, WebP, or GIF images are allowed' });
+            }
+            const base64Data = image.split(',')[1];
+            if (base64Data && Math.ceil(base64Data.length * 0.75) > 5 * 1024 * 1024) {
+                return res.status(400).json({ success: false, message: 'Image must be under 5 MB' });
+            }
             imageUrl = await uploadDataUriIfBase64(image, { folder: 'bag-types' });
         }
 
+        const trimmedName = String(name).trim();
+
         const bagType = await prisma.bagType.create({
             data: {
-                name,
+                name: trimmedName,
                 description: description || null,
                 price,
                 image: imageUrl,
@@ -135,20 +151,31 @@ const updateBagType = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Bag type not found' });
         }
 
-        if (price !== undefined && (typeof price !== 'number' || price < 0)) {
-            return res.status(400).json({ success: false, message: 'Price must be a non-negative number' });
+        if (price !== undefined && (!Number.isFinite(price) || price < 0)) {
+            return res.status(400).json({ success: false, message: 'Price must be a non-negative finite number' });
         }
 
         const updateData = {};
-        if (name !== undefined) updateData.name = name;
+        if (name !== undefined) updateData.name = String(name).trim() || existing.name;
         if (description !== undefined) updateData.description = description;
         if (price !== undefined) updateData.price = price;
         if (isActive !== undefined) updateData.isActive = isActive;
         if (sortOrder !== undefined) updateData.sortOrder = parseInt(sortOrder) || 0;
 
-        // Upload new image if base64, keep existing if not provided
+        // Validate and upload new image if base64, keep existing if not provided
         if (image !== undefined) {
-            updateData.image = image ? await uploadDataUriIfBase64(image, { folder: 'bag-types' }) : null;
+            if (image && typeof image === 'string' && image.startsWith('data:')) {
+                if (!/^data:image\/(jpeg|jpg|png|webp|gif);base64,/.test(image)) {
+                    return res.status(400).json({ success: false, message: 'Only JPEG, PNG, WebP, or GIF images are allowed' });
+                }
+                const base64Data = image.split(',')[1];
+                if (base64Data && Math.ceil(base64Data.length * 0.75) > 5 * 1024 * 1024) {
+                    return res.status(400).json({ success: false, message: 'Image must be under 5 MB' });
+                }
+                updateData.image = await uploadDataUriIfBase64(image, { folder: 'bag-types' });
+            } else {
+                updateData.image = image || null;
+            }
         }
 
         const bagType = await prisma.bagType.update({

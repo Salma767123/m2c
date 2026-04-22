@@ -200,25 +200,31 @@ export default function Order() {
     fetchCart()
   }, [])
 
-  // Fetch bag types and restore selection
+  // Fetch bag types and restore selection (restore AFTER fetch to validate against active list)
   useEffect(() => {
     const loadBagTypes = async () => {
       const response = await bagTypeService.getActiveBagTypes()
       if (response.success && response.data) {
         setAvailableBagTypes(response.data)
+
+        // Restore selection from localStorage, validate against fetched list
+        const savedBag = localStorage.getItem('selectedBagType')
+        if (savedBag) {
+          try {
+            const { id } = JSON.parse(savedBag)
+            const stillActive = response.data.find(b => b.id === id)
+            if (stillActive) {
+              setSelectedBagTypeId(id)
+            } else {
+              localStorage.removeItem('selectedBagType') // bag was deleted/deactivated
+            }
+          } catch {
+            localStorage.removeItem('selectedBagType')
+          }
+        }
       }
     }
     loadBagTypes()
-
-    const savedBag = localStorage.getItem('selectedBagType')
-    if (savedBag) {
-      try {
-        const { id } = JSON.parse(savedBag)
-        setSelectedBagTypeId(id)
-      } catch {
-        localStorage.removeItem('selectedBagType')
-      }
-    }
   }, [])
 
   const handleBagSelection = (bagTypeId: string | null) => {

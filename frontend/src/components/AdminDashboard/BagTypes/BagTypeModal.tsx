@@ -233,7 +233,7 @@ export default function BagTypeModal({ isOpen, onClose, mode, bagType, onSubmit,
               </button>
               <button
                 type="submit"
-                disabled={loading || !formData.name || !formData.price}
+                disabled={loading || !formData.name?.trim() || formData.price === undefined || formData.price < 0}
                 className="px-5 py-2.5 bg-[#222222] text-white rounded-lg hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 {loading ? 'Saving...' : mode === 'create' ? 'Create' : 'Update'}

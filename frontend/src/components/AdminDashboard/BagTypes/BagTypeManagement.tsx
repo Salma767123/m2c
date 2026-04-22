@@ -35,6 +35,7 @@ export default function BagTypeManagement() {
   const [saving, setSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 0 });
+  const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0 });
 
   const fetchBagTypes = useCallback(async () => {
     try {
@@ -48,6 +49,7 @@ export default function BagTypeManagement() {
       if (response.success) {
         setBagTypes(response.data);
         setPagination(response.pagination);
+        if (response.stats) setStats(response.stats);
       }
     } catch (error) {
       console.error('Failed to fetch bag types:', error);
@@ -86,7 +88,8 @@ export default function BagTypeManagement() {
   const handleDelete = async (bagType: BagType) => {
     if (!confirm(`Delete "${bagType.name}"? This cannot be undone.`)) return;
     try {
-      await bagTypeService.deleteBagType(bagType.id);
+      const result = await bagTypeService.deleteBagType(bagType.id);
+      if (!result.success) throw new Error(result.message || 'Delete failed');
       showSuccessToast('Bag type deleted');
       fetchBagTypes();
     } catch {
@@ -113,8 +116,8 @@ export default function BagTypeManagement() {
     }
   };
 
-  const activeCount = bagTypes.filter(b => b.isActive).length;
-  const inactiveCount = bagTypes.filter(b => !b.isActive).length;
+  const activeCount = stats.active;
+  const inactiveCount = stats.inactive;
 
   const rangeStart = pagination.total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, pagination.total);
@@ -141,7 +144,7 @@ export default function BagTypeManagement() {
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-gray-600">Total</div>
-            <div className="text-2xl font-bold text-gray-900">{pagination.total}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>

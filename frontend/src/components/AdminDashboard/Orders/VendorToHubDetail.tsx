@@ -149,6 +149,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
     : "Not Assigned";
 
   const shipmentAmount = shipment.items?.reduce((acc, item) => acc + item.totalPrice, 0) || 0;
+  const order = shipment.order;
 
   return (
     <div className="space-y-6">

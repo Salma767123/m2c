@@ -29,6 +29,7 @@ class BagTypeService {
         success: boolean;
         data: BagType[];
         pagination: { page: number; limit: number; total: number; pages: number };
+        stats: { total: number; active: number; inactive: number };
     }> {
         const response = await axios.get('/bag-types', { params });
         return response.data;

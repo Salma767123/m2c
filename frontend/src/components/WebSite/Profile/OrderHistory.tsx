@@ -166,7 +166,7 @@ export default function OrderHistory() {
                     </span>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-slate-900">₹{order.totalAmount.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-slate-900">${order.totalAmount.toFixed(2)}</p>
                     <p className="text-xs text-slate-500">{order.paymentStatus}</p>
                   </div>
                 </div>
@@ -200,8 +200,8 @@ export default function OrderHistory() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-slate-900">₹{(item.totalPrice).toFixed(2)}</p>
-                        <p className="text-sm text-slate-600">₹{item.unitPrice.toFixed(2)} each</p>
+                        <p className="font-semibold text-slate-900">${(item.totalPrice).toFixed(2)}</p>
+                        <p className="text-sm text-slate-600">${item.unitPrice.toFixed(2)} each</p>
                       </div>
                     </div>
                   ))}
