@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, Copy } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, Copy, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
@@ -202,7 +202,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <Package className="h-5 w-5 text-gray-600" />
           <h2 className="text-lg font-semibold text-gray-900">Order Information</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <p className="text-sm text-gray-600">Order Date</p>
             <p className="text-base font-medium text-gray-900 mt-1">
@@ -227,24 +227,72 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               {assignedHub}
             </p>
           </div>
+          <div>
+            <p className="text-sm text-gray-600">Tracking Ref</p>
+            <p className="text-base font-medium text-gray-900 mt-1">
+              {order.trackingReference || "N/A"}
+            </p>
+          </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Amount Breakdown</p>
-          <div className="max-w-md space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Vendor Subtotal</span>
-              <span className="font-medium text-gray-900">
-                ₹{shipmentAmount.toLocaleString("en-IN")}
-              </span>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-gray-200">
+          <div>
+            <p className="text-sm text-gray-600">Subtotal</p>
+            <p className="text-base font-medium text-gray-900 mt-1">
+              ₹{order.subtotal?.toLocaleString() || 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Tax</p>
+            <p className="text-base font-medium text-gray-900 mt-1">
+              ₹{order.tax?.toLocaleString() || 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Shipping</p>
+            <p className="text-base font-medium text-gray-900 mt-1">
+              ₹{order.shippingCost?.toLocaleString() || 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Discount</p>
+            <p className="text-base font-medium text-green-600 mt-1">
+              -₹{order.discount?.toLocaleString() || 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Total Amount</p>
+            <p className="text-lg font-bold text-gray-900 mt-1">
+              ₹{order.totalAmount?.toLocaleString() || 0}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Customer Details */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex items-center gap-2 mb-4">
+          <MapPin className="h-5 w-5 text-gray-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Customer Info</h3>
+            <p className="text-sm text-gray-600">{order.customerName}</p>
+            <p className="text-sm text-gray-600">{order.customerEmail}</p>
+            <p className="text-sm text-gray-600">{order.customerPhone}</p>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Shipping Address</h3>
+            <div className="text-sm text-gray-600">
+              {order.shippingAddress ? (
+                <>
+                  <p>{order.shippingAddress.address || order.shippingAddress.street}</p>
+                  {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
+                  <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
+                  <p>{order.shippingAddress.country}</p>
+                </>
+              ) : "N/A"}
             </div>
-            {shipment.order && (
-              <div className="flex justify-between pt-2 border-t border-gray-200">
-                <span className="text-gray-500 text-xs">Full Order Total</span>
-                <span className="text-gray-500 text-xs">
-                  ₹{(shipment.order.totalAmount ?? 0).toLocaleString("en-IN")}
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -263,18 +311,38 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               <div className="flex-1">
                 <h3 className="text-base font-semibold text-gray-900">{item.productName}</h3>
                 <p className="text-sm text-gray-600 mt-1">SKU: {item.sku}</p>
-                {item.variantId && (
-                  <p className="text-sm text-gray-600 mt-1">Size: {item.size} | Color: {item.color}</p>
+                {(item.size || item.color) && (
+                  <div className="flex items-center gap-2 mt-1">
+                    {item.size && <p className="text-sm text-gray-600">Size: {item.size}</p>}
+                    {item.size && item.color && <span className="text-gray-300">|</span>}
+                    {item.color && (
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm text-gray-600">Color:</p>
+                        <div 
+                          className="w-4 h-4 rounded-full border border-gray-300 shadow-sm"
+                          style={{ backgroundColor: item.colorHex || item.color }}
+                          title={item.color}
+                        />
+                        <span className="text-xs text-gray-500 capitalize">{item.color}</span>
+                      </div>
+                    )}
+                  </div>
                 )}
-                <div className="flex gap-6 mt-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                   <div>
                     <p className="text-sm text-gray-600">Quantity</p>
                     <p className="text-base font-medium text-gray-900">{item.quantity}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Price</p>
+                    <p className="text-sm text-gray-600">Unit Price</p>
                     <p className="text-base font-medium text-gray-900">
-                      ₹{item.unitPrice.toLocaleString("en-IN")}
+                      ₹{item.unitPrice?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Price</p>
+                    <p className="text-base font-medium text-gray-900">
+                      ₹{item.totalPrice?.toLocaleString() || (item.unitPrice * item.quantity).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -284,29 +352,27 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
         </div>
       </div>
 
-      {/* Payment Information */}
-      {shipment.order && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center gap-2 mb-4">
-            <CreditCard className="h-5 w-5 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Payment Information</h2>
+      {/* Payment Method */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex items-center gap-2 mb-4">
+          <CreditCard className="h-5 w-5 text-gray-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Payment Information</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm text-gray-600">Payment Method</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentMethod || "N/A"}</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Payment Method</p>
-              <p className="text-base font-medium text-gray-900 mt-1">{shipment.order.paymentMethod}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Transaction ID</p>
-              <p className="text-base font-medium text-gray-900 mt-1">{shipment.order.paymentId || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Payment Status</p>
-              <p className="text-base font-medium text-green-600 mt-1">{shipment.order.paymentStatus}</p>
-            </div>
+          <div>
+            <p className="text-sm text-gray-600">Transaction ID</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentId || "N/A"}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Payment Status</p>
+            <p className="text-base font-medium text-green-600 mt-1">{order.paymentStatus || "PENDING"}</p>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Vendor Details */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">

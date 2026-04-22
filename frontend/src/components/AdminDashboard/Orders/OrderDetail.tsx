@@ -183,8 +183,22 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                             <div>
                                                 <h3 className="text-base font-semibold text-gray-900">{item.productName}</h3>
                                                 <p className="text-sm text-gray-600 mt-1">SKU: {item.sku}</p>
-                                                {item.variantId && (
-                                                    <p className="text-sm text-gray-600 mt-1">Size: {item.size} | Color: {item.color}</p>
+                                                {(item.size || item.color) && (
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        {item.size && <p className="text-sm text-gray-600">Size: {item.size}</p>}
+                                                        {item.size && item.color && <span className="text-gray-300">|</span>}
+                                                        {item.color && (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <p className="text-sm text-gray-600">Color:</p>
+                                                                <div 
+                                                                    className="w-4 h-4 rounded-full border border-gray-300 shadow-sm"
+                                                                    style={{ backgroundColor: item.colorHex || item.color }}
+                                                                    title={item.color}
+                                                                />
+                                                                <span className="text-xs text-gray-500 capitalize">{item.color}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                                 <p className="text-sm text-gray-600 mt-1">Vendor: {item.vendorName}</p>
                                             </div>
