@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { CheckCircle, Package, Truck, Mail, Download, ArrowRight, Clock, AlertCircle, CreditCard, MapPin, Phone, Loader2 } from "lucide-react"
+import { CheckCircle, Package, Truck, Mail, Download, ArrowRight, Clock, AlertCircle, CreditCard, MapPin, Phone, Loader2, ShoppingBag } from "lucide-react"
 import { useState, useEffect } from "react"
 import orderService, { Order } from "@/services/orderService"
 import { useSearchParams } from "next/navigation"
@@ -247,6 +247,17 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                     </div>
                   )
                   )}
+
+                  {/* Bag Add-on */}
+                  {order.bagTypeName && order.bagTypePrice && order.bagTypePrice > 0 && (
+                    <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-amber-600" />
+                        <span>Bag: {order.bagTypeName}</span>
+                      </div>
+                      <span className="font-medium text-gray-900">${order.bagTypePrice.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t border-gray-200 pt-4 space-y-3">
@@ -266,6 +277,12 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
                       <span className="font-medium">-${order.discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {order.bagTypePrice && order.bagTypePrice > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Bag ({order.bagTypeName})</span>
+                      <span className="font-medium">${order.bagTypePrice.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold text-gray-900 pt-3 border-t border-gray-200">

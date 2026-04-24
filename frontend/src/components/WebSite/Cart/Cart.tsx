@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { cartService } from "@/services/cartService"
 import { couponService } from "@/services/couponService"
@@ -67,6 +67,7 @@ export default function Order() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [availableBagTypes, setAvailableBagTypes] = useState<BagType[]>([])
   const [selectedBagTypeId, setSelectedBagTypeId] = useState<string | null>(null)
+  const selectedBagRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const fetchCart = async () => {
@@ -226,6 +227,13 @@ export default function Order() {
     }
     loadBagTypes()
   }, [])
+
+  // Scroll the pre-selected bag into view after restore
+  useEffect(() => {
+    if (selectedBagTypeId && selectedBagRef.current) {
+      selectedBagRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [selectedBagTypeId, availableBagTypes])
 
   const handleBagSelection = (bagTypeId: string | null) => {
     setSelectedBagTypeId(bagTypeId)
@@ -653,9 +661,9 @@ export default function Order() {
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
                   <div className="flex items-center gap-2 mb-4">
                     <ShoppingBag className="w-5 h-5 text-slate-700" />
-                    <h3 className="text-lg font-semibold text-slate-900">Add a Bag</h3>
+                    <h3 className="text-lg font-semibold text-slate-900">Add a Bag ({availableBagTypes.length})</h3>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-[280px] overflow-y-auto">
                     {/* No bag option */}
                     <button
                       onClick={() => handleBagSelection(null)}
@@ -676,6 +684,7 @@ export default function Order() {
                     {availableBagTypes.map(bag => (
                       <button
                         key={bag.id}
+                        ref={selectedBagTypeId === bag.id ? selectedBagRef : undefined}
                         onClick={() => handleBagSelection(bag.id)}
                         className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
                           selectedBagTypeId === bag.id

@@ -31,6 +31,8 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     tax = 0,
     discount = 0,
     totalAmount = 0,
+    bagTypeName,
+    bagTypePrice = 0,
     paymentMethod,
     paymentStatus,
   } = order;
@@ -195,6 +197,11 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
         <tr>
           <td style="padding:6px 0; color:#16a34a;">Discount</td>
           <td style="padding:6px 0; text-align:right; font-weight:600; color:#16a34a;">− ${sym}${fmt(discount)}</td>
+        </tr>` : ''}
+        ${bagTypePrice > 0 ? `
+        <tr>
+          <td style="padding:6px 0; color:#6b7280;">Bag (${bagTypeName || 'Add-on'})</td>
+          <td style="padding:6px 0; text-align:right; font-weight:600;">${sym}${fmt(bagTypePrice)}</td>
         </tr>` : ''}
         <tr style="border-top:2px solid #111827;">
           <td style="padding:10px 0; font-size:16px; font-weight:800; color:#111827;">Grand Total</td>

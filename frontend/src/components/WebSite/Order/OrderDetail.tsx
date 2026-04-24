@@ -19,7 +19,8 @@ import {
   Download,
   MessageCircle,
   AlertCircle,
-  Clock
+  Clock,
+  ShoppingBag
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import orderService, { Order as APIOrder } from "@/services/orderService"
@@ -325,6 +326,17 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       </div>
                     </div>
                   ))}
+
+                  {/* Bag Add-on */}
+                  {orderDetails.bagTypeName && orderDetails.bagTypePrice && orderDetails.bagTypePrice > 0 && (
+                    <div className="flex items-center justify-between px-4 py-3 bg-amber-50/50 border border-amber-100 rounded-xl text-sm">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <ShoppingBag className="w-4 h-4 text-amber-600" />
+                        <span>Bag: {orderDetails.bagTypeName}</span>
+                      </div>
+                      <span className="font-semibold text-slate-900">${orderDetails.bagTypePrice.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}

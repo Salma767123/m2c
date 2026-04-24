@@ -10,7 +10,8 @@ import {
   Truck,
   Lock,
   Shield,
-  Loader2
+  Loader2,
+  ShoppingBag
 } from "lucide-react"
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
@@ -787,6 +788,17 @@ export default function Checkout() {
                       </div>
                     )
                   })}
+
+                  {/* Bag Add-on */}
+                  {bagTypeName && bagTypePrice > 0 && (
+                    <div className="flex items-center justify-between px-1 py-2 text-sm text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-amber-600" />
+                        <span>Bag: {bagTypeName}</span>
+                      </div>
+                      <span className="font-medium text-slate-900">${bagTypePrice.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4 mb-6 border-t border-slate-200 pt-4">

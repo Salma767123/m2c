@@ -140,6 +140,19 @@ const createBagType = async (req, res) => {
 
         const trimmedName = String(name).trim();
 
+        // Check for duplicate name
+        const existing = await prisma.bagType.findFirst({ where: { name: { equals: trimmedName, mode: 'insensitive' } } });
+        if (existing) {
+            return res.status(400).json({ success: false, message: 'A bag type with this name already exists' });
+        }
+
+        // Auto-assign sort order if not explicitly provided
+        let finalSortOrder = Math.max(0, parseInt(sortOrder) || 0);
+        if (!sortOrder && sortOrder !== 0) {
+            const maxSort = await prisma.bagType.aggregate({ _max: { sortOrder: true } });
+            finalSortOrder = (maxSort._max?.sortOrder ?? 0) + 1;
+        }
+
         const bagType = await prisma.bagType.create({
             data: {
                 name: trimmedName,
@@ -147,7 +160,7 @@ const createBagType = async (req, res) => {
                 price,
                 image: imageUrl,
                 isActive,
-                sortOrder: parseInt(sortOrder) || 0,
+                sortOrder: finalSortOrder,
             },
         });
 
@@ -173,12 +186,26 @@ const updateBagType = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Price must be a non-negative finite number' });
         }
 
+        // Check for duplicate name (excluding self)
+        if (name !== undefined) {
+            const trimmed = String(name).trim();
+            if (!trimmed) {
+                return res.status(400).json({ success: false, message: 'Name cannot be empty' });
+            }
+            const duplicate = await prisma.bagType.findFirst({
+                where: { name: { equals: trimmed, mode: 'insensitive' }, id: { not: id } },
+            });
+            if (duplicate) {
+                return res.status(400).json({ success: false, message: 'A bag type with this name already exists' });
+            }
+        }
+
         const updateData = {};
         if (name !== undefined) updateData.name = String(name).trim() || existing.name;
         if (description !== undefined) updateData.description = description;
         if (price !== undefined) updateData.price = price;
         if (isActive !== undefined) updateData.isActive = isActive;
-        if (sortOrder !== undefined) updateData.sortOrder = parseInt(sortOrder) || 0;
+        if (sortOrder !== undefined) updateData.sortOrder = Math.max(0, parseInt(sortOrder) || 0);
 
         // Validate and upload new image if base64, keep existing if not provided
         if (image !== undefined) {

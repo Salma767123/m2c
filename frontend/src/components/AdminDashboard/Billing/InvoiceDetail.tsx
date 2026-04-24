@@ -281,6 +281,12 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
                   <span className="font-medium text-green-600">− {fmtINR(order.discount)}</span>
                 </div>
               )}
+              {order.bagTypePrice && order.bagTypePrice > 0 && (
+                <div className="flex justify-between py-1 border-b border-gray-100">
+                  <span className="text-gray-600">Bag ({order.bagTypeName})</span>
+                  <span className="font-medium">{fmtINR(order.bagTypePrice)}</span>
+                </div>
+              )}
               <div className="flex justify-between py-3 px-4 bg-gray-900 text-white rounded-lg mt-2">
                 <span className="font-bold text-base">Grand Total</span>
                 <span className="font-bold text-base">{fmtINR(order.totalAmount)}</span>

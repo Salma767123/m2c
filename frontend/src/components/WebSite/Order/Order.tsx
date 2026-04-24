@@ -16,7 +16,8 @@ import {
   Plus,
   ShoppingCart,
   AlertCircle,
-  ChevronLeft
+  ChevronLeft,
+  ShoppingBag
 } from "lucide-react"
 import Dropdown from "@/components/UI/Dropdown"
 import orderService, { Order as APIOrder } from "@/services/orderService"
@@ -45,6 +46,8 @@ interface Order {
   trackingNumber?: string
   estimatedDelivery?: string
   paymentStatus?: string
+  bagTypeName?: string
+  bagTypePrice?: number
 }
 
 // ── Constants ───────────────────────────────────────────
@@ -103,7 +106,9 @@ export default function OrderList() {
             color: item.color
           })),
           trackingNumber: apiOrder.trackingReference,
-          estimatedDelivery: apiOrder.estimatedDelivery
+          estimatedDelivery: apiOrder.estimatedDelivery,
+          bagTypeName: apiOrder.bagTypeName,
+          bagTypePrice: apiOrder.bagTypePrice
         }))
         setOrders(transformedOrders)
         setCurrentPage(1)
@@ -373,6 +378,17 @@ export default function OrderList() {
                             </div>
                           ))}
 
+                          {/* Bag Add-on */}
+                          {order.bagTypeName && order.bagTypePrice && order.bagTypePrice > 0 && (
+                            <div className="flex items-center justify-between px-3 py-2 text-sm text-slate-600">
+                              <div className="flex items-center gap-2">
+                                <ShoppingBag className="w-4 h-4 text-amber-600" />
+                                <span>Bag: {order.bagTypeName}</span>
+                              </div>
+                              <span className="font-medium text-slate-900">${order.bagTypePrice.toFixed(2)}</span>
+                            </div>
+                          )}
+
                           {/* More/Less Button */}
                           {order.items.length > 2 && (
                             <div className="flex justify-center pt-2">
@@ -526,6 +542,17 @@ export default function OrderList() {
                               </div>
                             </div>
                           ))}
+
+                          {/* Bag Add-on */}
+                          {order.bagTypeName && order.bagTypePrice && order.bagTypePrice > 0 && (
+                            <div className="flex items-center justify-between px-3 py-2 text-sm text-slate-600">
+                              <div className="flex items-center gap-2">
+                                <ShoppingBag className="w-4 h-4 text-amber-600" />
+                                <span>Bag: {order.bagTypeName}</span>
+                              </div>
+                              <span className="font-medium text-slate-900">${order.bagTypePrice.toFixed(2)}</span>
+                            </div>
+                          )}
 
                           {/* More/Less Button */}
                           {order.items.length > 2 && (
