@@ -152,6 +152,7 @@ const vendorDashboardRoutes = require("./routes/vendorDashboardRoutes");
 const seoSettingsRoutes = require("./routes/seoSettingsRoutes");
 const bannerRoutes = require("./routes/bannerRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
+const bagTypeRoutes = require("./routes/bagTypeRoutes");
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -187,6 +188,7 @@ app.use("/api/vendor-dashboard", vendorDashboardRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/seo-settings", seoSettingsRoutes);
 app.use("/api/banners", bannerRoutes);
+app.use("/api/bag-types", bagTypeRoutes);
 const notificationRoutes = require("./routes/notificationRoutes");
 app.use("/api/notifications", notificationRoutes);
 // 404 handler

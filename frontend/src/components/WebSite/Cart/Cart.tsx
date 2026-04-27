@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { cartService } from "@/services/cartService"
 import { couponService } from "@/services/couponService"
 import { publicProductService, PublicProduct } from "@/services/publicProductService"
 import { userAuthService } from "@/services/userAuthService"
+import bagTypeService, { BagType } from "@/services/bagTypeService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import {
   ShoppingCart,
@@ -21,7 +22,8 @@ import {
   ArrowRight,
   Package,
   Clock,
-  CheckCircle
+  CheckCircle,
+  ShoppingBag
 } from "lucide-react"
 
 interface OrderItem {
@@ -54,6 +56,7 @@ interface OrderSummary {
   shipping: number
   tax: number
   discount: number
+  bagCost: number
   total: number
 }
 
@@ -62,6 +65,9 @@ export default function Order() {
   const [isHydrated, setIsHydrated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [availableBagTypes, setAvailableBagTypes] = useState<BagType[]>([])
+  const [selectedBagTypeId, setSelectedBagTypeId] = useState<string | null>(null)
+  const selectedBagRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const fetchCart = async () => {
@@ -194,6 +200,52 @@ export default function Order() {
 
     fetchCart()
   }, [])
+
+  // Fetch bag types and restore selection (restore AFTER fetch to validate against active list)
+  useEffect(() => {
+    const loadBagTypes = async () => {
+      const response = await bagTypeService.getActiveBagTypes()
+      if (response.success && response.data) {
+        setAvailableBagTypes(response.data)
+
+        // Restore selection from localStorage, validate against fetched list
+        const savedBag = localStorage.getItem('selectedBagType')
+        if (savedBag) {
+          try {
+            const { id } = JSON.parse(savedBag)
+            const stillActive = response.data.find(b => b.id === id)
+            if (stillActive) {
+              setSelectedBagTypeId(id)
+            } else {
+              localStorage.removeItem('selectedBagType') // bag was deleted/deactivated
+            }
+          } catch {
+            localStorage.removeItem('selectedBagType')
+          }
+        }
+      }
+    }
+    loadBagTypes()
+  }, [])
+
+  // Scroll the pre-selected bag into view after restore
+  useEffect(() => {
+    if (selectedBagTypeId && selectedBagRef.current) {
+      selectedBagRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [selectedBagTypeId, availableBagTypes])
+
+  const handleBagSelection = (bagTypeId: string | null) => {
+    setSelectedBagTypeId(bagTypeId)
+    if (bagTypeId) {
+      const bag = availableBagTypes.find(b => b.id === bagTypeId)
+      if (bag) {
+        localStorage.setItem('selectedBagType', JSON.stringify({ id: bag.id, name: bag.name, price: bag.price }))
+      }
+    } else {
+      localStorage.removeItem('selectedBagType')
+    }
+  }
 
   const [promoCode, setPromoCode] = useState("")
   const [appliedPromo, setAppliedPromo] = useState("")
@@ -379,9 +431,13 @@ export default function Order() {
       return sum + (itemSubtotal * gstRate)
     }, 0)
 
-    const total = subtotal + shipping + tax - discount
+    // Bag add-on cost
+    const selectedBag = availableBagTypes.find(b => b.id === selectedBagTypeId)
+    const bagCost = selectedBag ? selectedBag.price : 0
 
-    return { subtotal, shipping, tax, discount, total: total > 0 ? total : 0 }
+    const total = subtotal + shipping + tax - discount + bagCost
+
+    return { subtotal, shipping, tax, discount, bagCost, total: total > 0 ? total : 0 }
   }
 
   const summary = calculateSummary()
@@ -600,6 +656,65 @@ export default function Order() {
                 )}
               </div>
 
+              {/* Bag Add-on */}
+              {availableBagTypes.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ShoppingBag className="w-5 h-5 text-slate-700" />
+                    <h3 className="text-lg font-semibold text-slate-900">Add a Bag ({availableBagTypes.length})</h3>
+                  </div>
+                  <div className="space-y-3 max-h-[280px] overflow-y-auto">
+                    {/* No bag option */}
+                    <button
+                      onClick={() => handleBagSelection(null)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                        !selectedBagTypeId
+                          ? 'border-[#222222] bg-slate-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        !selectedBagTypeId ? 'border-[#222222]' : 'border-slate-300'
+                      }`}>
+                        {!selectedBagTypeId && <div className="w-2 h-2 rounded-full bg-[#222222]" />}
+                      </div>
+                      <span className="text-sm text-slate-600">No bag needed</span>
+                    </button>
+
+                    {availableBagTypes.map(bag => (
+                      <button
+                        key={bag.id}
+                        ref={selectedBagTypeId === bag.id ? selectedBagRef : undefined}
+                        onClick={() => handleBagSelection(bag.id)}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                          selectedBagTypeId === bag.id
+                            ? 'border-[#222222] bg-slate-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          selectedBagTypeId === bag.id ? 'border-[#222222]' : 'border-slate-300'
+                        }`}>
+                          {selectedBagTypeId === bag.id && <div className="w-2 h-2 rounded-full bg-[#222222]" />}
+                        </div>
+                        {bag.image ? (
+                          <img src={bag.image} alt={bag.name} className="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center shrink-0">
+                            <ShoppingBag className="w-5 h-5 text-slate-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900">{bag.name}</p>
+                          {bag.description && <p className="text-xs text-slate-500 truncate">{bag.description}</p>}
+                        </div>
+                        <span className="text-sm font-bold text-slate-900 shrink-0">${bag.price.toFixed(2)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden sticky top-8">
                 <div className="px-6 py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
                   <h2 className="text-xl font-bold text-slate-900">Order Summary</h2>
@@ -648,6 +763,14 @@ export default function Order() {
                       <div className="flex justify-between text-green-600">
                         <span>Discount</span>
                         <span className="font-medium">-${summary.discount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {summary.bagCost > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">
+                          Bag ({availableBagTypes.find(b => b.id === selectedBagTypeId)?.name})
+                        </span>
+                        <span className="font-medium">${summary.bagCost.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="border-t border-slate-200 pt-4">

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, MapPin } from "lucide-react";
+import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, Copy, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
-import { orderService, Order } from "@/services/orderService";
+import { orderService, VendorShipment } from "@/services/orderService";
 import adminReviewService from "@/services/adminReviewService";
 import { hasPermission } from "@/lib/auth";
 
@@ -17,7 +17,7 @@ import { hubService, Hub } from "@/services/hubService";
 
 export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   const router = useRouter();
-  const [order, setOrder] = useState<Order | null>(null);
+  const [shipment, setShipment] = useState<VendorShipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const [showHubModal, setShowHubModal] = useState(false);
@@ -29,12 +29,16 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   const [hoveredRating, setHoveredRating] = useState(0);
   const [review, setReview] = useState("");
   const [notice, setNotice] = useState("");
+  const [isApproved, setIsApproved] = useState(true);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [returnToVendor, setReturnToVendor] = useState(false);
 
   const [hubs, setHubs] = useState<Hub[]>([]);
 
   useEffect(() => {
-    fetchOrderDetails();
+    fetchShipmentDetails();
     fetchHubs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   const fetchHubs = async () => {
@@ -48,29 +52,31 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
     }
   };
 
-  const fetchOrderDetails = async () => {
+  const fetchShipmentDetails = async () => {
     try {
       setIsLoading(true);
-      const res = await orderService.getAdminOrderById(orderId);
+      const res = await orderService.getAdminShipmentById(orderId);
       if (res.success) {
-        setOrder(res.data);
+        setShipment(res.data);
       }
     } catch (error: any) {
-      showErrorToast(error.message || "Failed to fetch order details");
+      showErrorToast(error.message || "Failed to fetch shipment details");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleUpdateStatus = async (newStatus: string, assignedHubId?: string) => {
+    if (!shipment) return;
     try {
-      const res = await orderService.updateAdminOrderStatus(orderId, newStatus, assignedHubId);
+      const res = await orderService.updateAdminShipmentStatus(shipment.id, newStatus, assignedHubId);
       if (res.success) {
-        showSuccessToast(`Order marked as ${newStatus.replace(/_/g, " ")}`);
-        setOrder(res.data);
+        showSuccessToast(`Shipment marked as ${newStatus.replace(/_/g, " ")}`);
+        // Re-fetch to get full data including order reference
+        await fetchShipmentDetails();
       }
     } catch (error: any) {
-      showErrorToast(error.message || "Failed to update order status");
+      showErrorToast(error.message || "Failed to update shipment status");
     }
   };
 
@@ -83,7 +89,6 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       showErrorToast("Please select a hub");
       return;
     }
-
     setShowHubModal(false);
     handleUpdateStatus("VENDOR_PROCESSING", selectedHub);
   };
@@ -93,6 +98,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   };
 
   const handleSubmitReview = async () => {
+    if (!shipment) return;
     if (rating === 0) {
       showErrorToast("Please provide a rating");
       return;
@@ -101,41 +107,50 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       showErrorToast("Please provide a review");
       return;
     }
+    if (!isApproved && !rejectionReason.trim()) {
+      showErrorToast("Please provide a rejection reason");
+      return;
+    }
 
     try {
-      // Save the admin review to the database
-      await adminReviewService.createOrUpdateAdminReview(order!.id, {
+      await adminReviewService.createOrUpdateShipmentReview(shipment.id, {
         rating,
         reviewComments: review.trim(),
         qualityCheckNotes: notice.trim() || undefined,
-        approved: true,
+        approved: isApproved,
+        rejectionReason: !isApproved ? rejectionReason.trim() : undefined,
+        returnToVendor: !isApproved ? returnToVendor : undefined,
       });
 
-      // Update order status
-      await handleUpdateStatus("APPROVED_BY_ADMIN_HUB");
+      const nextStatus = isApproved ? "APPROVED_BY_ADMIN_HUB" : "REJECTED_BY_ADMIN_HUB";
+      await handleUpdateStatus(nextStatus);
       setShowReviewModal(false);
-      showSuccessToast("Review submitted successfully");
+      showSuccessToast(isApproved ? "Shipment approved" : "Shipment rejected");
 
-      // Redirect to Hub to Customer orders after a short delay
-      setTimeout(() => {
-        router.push("/admin/dashboard/orders/hub-to-customer");
-      }, 1500);
+      if (isApproved) {
+        setTimeout(() => {
+          router.push("/admin/dashboard/orders/hub-to-customer");
+        }, 1500);
+      }
     } catch (error: any) {
       showErrorToast(error.message || "Failed to submit review");
     }
   };
 
   if (isLoading) {
-    return <div className="p-6 text-center text-gray-500">Loading order details...</div>;
+    return <div className="p-6 text-center text-gray-500">Loading shipment details...</div>;
   }
 
-  if (!order) {
-    return <div className="p-6 text-center text-red-500">Order not found</div>;
+  if (!shipment) {
+    return <div className="p-6 text-center text-red-500">Shipment not found</div>;
   }
 
-  const assignedHub = order.assignedHubId
-    ? (order.hub?.name || hubs.find(h => h.id === order.assignedHubId)?.name || "Assigned Hub")
+  const assignedHub = shipment.assignedHubId
+    ? (shipment.hub?.name || hubs.find(h => h.id === shipment.assignedHubId)?.name || "Assigned Hub")
     : "Not Assigned";
+
+  const shipmentAmount = shipment.items?.reduce((acc, item) => acc + item.totalPrice, 0) || 0;
+  const order = shipment.order;
 
   return (
     <div className="space-y-6">
@@ -150,11 +165,13 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Vendor to Hub Order</h1>
-            <p className="text-sm text-gray-600 mt-1">Order ID: {order.orderId}</p>
+            <p className="text-sm text-gray-600 mt-1">
+              Order ID: {shipment.order?.orderId || shipment.shipmentId}
+            </p>
           </div>
         </div>
         <div className="flex gap-3">
-          {order.status === "ORDER_CREATED" && hasPermission('edit_orders') && (
+          {shipment.status === "ORDER_CREATED" && hasPermission('edit_orders') && (
             <button
               onClick={handleProceed}
               className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
@@ -162,7 +179,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               Assign Hub / Proceed
             </button>
           )}
-          {order.status === "IN_TRANSIT_TO_ADMIN_HUB" && hasPermission('edit_orders') && (
+          {shipment.status === "IN_TRANSIT_TO_ADMIN_HUB" && hasPermission('edit_orders') && (
             <button
               onClick={handleMarkAsReceived}
               className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium"
@@ -170,7 +187,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               Mark as Received at Hub
             </button>
           )}
-          {order.status === "RECEIVED_AT_ADMIN_HUB" && hasPermission('edit_orders') && (
+          {shipment.status === "RECEIVED_AT_ADMIN_HUB" && hasPermission('edit_orders') && (
             <button
               onClick={() => setShowReviewModal(true)}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -181,45 +198,103 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
         </div>
       </div>
 
-      {/* Order Details */}
+      {/* Order Information */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <div className="flex items-center gap-2 mb-4">
           <Package className="h-5 w-5 text-gray-600" />
           <h2 className="text-lg font-semibold text-gray-900">Order Information</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <p className="text-sm text-gray-600">Order Date</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              {new Date(order.createdAt).toLocaleDateString()}
+              {new Date(shipment.order?.createdAt || shipment.createdAt).toLocaleDateString("en-IN")}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Status</p>
-            <p className={`text-base font-medium mt-1 ${order.status === "ORDER_CREATED" ? "text-yellow-600" :
-              order.status === "VENDOR_PROCESSING" ? "text-blue-600" :
-                order.status === "PACKED_BY_VENDOR" ? "text-purple-600" :
-                  order.status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
-                    ["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "DELIVERED", "SHIPPED_TO_CUSTOMER"].includes(order.status) ? "text-green-600" :
+            <p className={`text-base font-medium mt-1 ${shipment.status === "ORDER_CREATED" ? "text-yellow-600" :
+              shipment.status === "VENDOR_PROCESSING" ? "text-blue-600" :
+                shipment.status === "PACKED_BY_VENDOR" ? "text-purple-600" :
+                  shipment.status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
+                    ["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "DELIVERED", "SHIPPED_TO_CUSTOMER"].includes(shipment.status) ? "text-green-600" :
                       "text-gray-600"
               }`}>
-              {order.status.replace(/_/g, " ")}
+              {shipment.status.replace(/_/g, " ")}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Assigned Hub</p>
-            <p className={`text-base font-medium mt-1 ${assignedHub === "Not Assigned" ? "text-red-600" : "text-gray-900"
-              }`}>
+            <p className={`text-base font-medium mt-1 ${assignedHub === "Not Assigned" ? "text-red-600" : "text-gray-900"}`}>
               {assignedHub}
             </p>
           </div>
+          <div>
+            <p className="text-sm text-gray-600">Tracking Ref</p>
+            <p className="text-base font-medium text-gray-900 mt-1">
+              {order.trackingReference || "N/A"}
+            </p>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-gray-200">
+          <div>
+            <p className="text-sm text-gray-600">Subtotal</p>
+            <p className="text-base font-medium text-gray-900 mt-1">
+              ₹{order.subtotal?.toLocaleString() || 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Tax</p>
+            <p className="text-base font-medium text-gray-900 mt-1">
+              ₹{order.tax?.toLocaleString() || 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Shipping</p>
+            <p className="text-base font-medium text-gray-900 mt-1">
+              ₹{order.shippingCost?.toLocaleString() || 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Discount</p>
+            <p className="text-base font-medium text-green-600 mt-1">
+              -₹{order.discount?.toLocaleString() || 0}
+            </p>
+          </div>
           <div>
             <p className="text-sm text-gray-600">Total Amount</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
-              ₹{order.totalAmount?.toLocaleString()}
+            <p className="text-lg font-bold text-gray-900 mt-1">
+              ₹{order.totalAmount?.toLocaleString() || 0}
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Customer Details */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex items-center gap-2 mb-4">
+          <MapPin className="h-5 w-5 text-gray-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Customer Info</h3>
+            <p className="text-sm text-gray-600">{order.customerName}</p>
+            <p className="text-sm text-gray-600">{order.customerEmail}</p>
+            <p className="text-sm text-gray-600">{order.customerPhone}</p>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Shipping Address</h3>
+            <div className="text-sm text-gray-600">
+              {order.shippingAddress ? (
+                <>
+                  <p>{order.shippingAddress.address || order.shippingAddress.street}</p>
+                  {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
+                  <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
+                  <p>{order.shippingAddress.country}</p>
+                </>
+              ) : "N/A"}
+            </div>
           </div>
         </div>
       </div>
@@ -228,7 +303,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h2>
         <div className="space-y-4">
-          {order.items?.map((item: any) => (
+          {shipment.items?.map((item) => (
             <div key={item.id} className="flex gap-4 p-4 border border-gray-100 rounded-lg">
               <img
                 src={item.productImage || "/assets/images/placeholder.jpg"}
@@ -238,18 +313,38 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               <div className="flex-1">
                 <h3 className="text-base font-semibold text-gray-900">{item.productName}</h3>
                 <p className="text-sm text-gray-600 mt-1">SKU: {item.sku}</p>
-                {item.variantId && (
-                  <p className="text-sm text-gray-600 mt-1">Size: {item.size} | Color: {item.color}</p>
+                {(item.size || item.color) && (
+                  <div className="flex items-center gap-2 mt-1">
+                    {item.size && <p className="text-sm text-gray-600">Size: {item.size}</p>}
+                    {item.size && item.color && <span className="text-gray-300">|</span>}
+                    {item.color && (
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm text-gray-600">Color:</p>
+                        <div 
+                          className="w-4 h-4 rounded-full border border-gray-300 shadow-sm"
+                          style={{ backgroundColor: item.colorHex || item.color }}
+                          title={item.color}
+                        />
+                        <span className="text-xs text-gray-500 capitalize">{item.color}</span>
+                      </div>
+                    )}
+                  </div>
                 )}
-                <div className="flex gap-6 mt-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                   <div>
                     <p className="text-sm text-gray-600">Quantity</p>
                     <p className="text-base font-medium text-gray-900">{item.quantity}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Price</p>
+                    <p className="text-sm text-gray-600">Unit Price</p>
                     <p className="text-base font-medium text-gray-900">
-                      ₹{item.unitPrice.toLocaleString()}
+                      ₹{item.unitPrice?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Price</p>
+                    <p className="text-base font-medium text-gray-900">
+                      ₹{item.totalPrice?.toLocaleString() || (item.unitPrice * item.quantity).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -268,7 +363,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-gray-600">Payment Method</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentMethod}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentMethod || "N/A"}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Transaction ID</p>
@@ -276,7 +371,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
           <div>
             <p className="text-sm text-gray-600">Payment Status</p>
-            <p className="text-base font-medium text-green-600 mt-1">{order.paymentStatus}</p>
+            <p className="text-base font-medium text-green-600 mt-1">{order.paymentStatus || "PENDING"}</p>
           </div>
         </div>
       </div>
@@ -287,32 +382,66 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <Building2 className="h-5 w-5 text-gray-600" />
           <h2 className="text-lg font-semibold text-gray-900">Vendor Information</h2>
         </div>
-        {/* We can grab vendor info from the first item since order processing from VendorToHub implies items from same vendor */}
-        {(() => {
-          const vendorName = order.items?.[0]?.vendorName || "Unknown Vendor";
-          return (
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Vendor Name</p>
-                <p className="text-base font-medium text-gray-900 mt-1">{vendorName}</p>
-              </div>
-            </div>
-          );
-        })()}
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <p className="text-sm text-gray-600">Vendor Name</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorName}</p>
+          </div>
+        </div>
       </div>
 
-      {/* Vendor Shipping Details - Not fully tracked in basic status atm but mocked visualization */}
-      {(["IN_TRANSIT_TO_ADMIN_HUB", "RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(order.status)) && (
+      {/* Vendor Shipping Details */}
+      {(["IN_TRANSIT_TO_ADMIN_HUB", "RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(shipment.status)) && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-4">
             <Truck className="h-5 w-5 text-gray-600" />
             <h2 className="text-lg font-semibold text-gray-900">Vendor Shipping Details</h2>
           </div>
-          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-4">
-            <p className="text-sm text-blue-800">
-              Shipping information currently tracked manually or via integrated system.
-            </p>
-          </div>
+          {shipment.vendorCarrier && shipment.vendorTrackingId ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Carrier</p>
+                <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorCarrier}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Tracking ID</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-base font-mono font-medium text-gray-900 break-all">
+                    {shipment.vendorTrackingId}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(shipment.vendorTrackingId || "");
+                        showSuccessToast("Tracking ID copied");
+                      } catch {
+                        showErrorToast("Copy failed");
+                      }
+                    }}
+                    className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors shrink-0"
+                    title="Copy tracking ID"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              {shipment.vendorShippedAt && (
+                <div>
+                  <p className="text-sm text-gray-600">Shipped On</p>
+                  <p className="text-base font-medium text-gray-900 mt-1">
+                    {new Date(shipment.vendorShippedAt).toLocaleString("en-IN")}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                Shipping details not recorded for this shipment. (Legacy order shipped before tracking was captured.)
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -322,19 +451,16 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Assign to Hub</h2>
-              <p className="text-sm text-gray-600 mt-1">Select a hub to assign this order</p>
+              <p className="text-sm text-gray-600 mt-1">Select a hub to assign this shipment</p>
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Product Info Summary */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Product Summary</h3>
-                <p className="text-sm text-gray-600">
-                  Total Items: {order.items.length}
-                </p>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Shipment Summary</h3>
+                <p className="text-sm text-gray-600">Vendor: {shipment.vendorName}</p>
+                <p className="text-sm text-gray-600">Items: {shipment.items.length}</p>
               </div>
 
-              {/* Hub Selection */}
               <div>
                 <Dropdown
                   label="Select Hub"
@@ -374,7 +500,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Review Vendor Delivery</h2>
-                <p className="text-sm text-gray-600 mt-1">Provide feedback on the received order</p>
+                <p className="text-sm text-gray-600 mt-1">Provide feedback on the received shipment</p>
               </div>
               <button
                 onClick={() => setShowReviewModal(false)}
@@ -385,11 +511,10 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Order Info */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Reviewing Delivery From Vendor</h3>
-                <p className="text-sm text-gray-600">Order ID: {order.orderId}</p>
-                <p className="text-sm text-gray-600">Vendor: {order.items?.[0]?.vendorName || "Unknown"}</p>
+                <p className="text-sm text-gray-600">Order ID: {shipment.order?.orderId || shipment.shipmentId}</p>
+                <p className="text-sm text-gray-600">Vendor: {shipment.vendorName}</p>
               </div>
 
               {/* Rating */}
@@ -440,7 +565,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               {/* Notice */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notice (Optional)
+                  Quality Check Notes (Optional)
                 </label>
                 <textarea
                   value={notice}
@@ -450,6 +575,60 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
                 />
               </div>
+
+              {/* Approval Decision */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Decision</label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsApproved(true)}
+                    className={`flex-1 py-2.5 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${isApproved
+                      ? "border-green-500 bg-green-50 text-green-800"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    }`}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsApproved(false)}
+                    className={`flex-1 py-2.5 px-4 rounded-lg border-2 text-sm font-medium transition-colors ${!isApproved
+                      ? "border-red-500 bg-red-50 text-red-800"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    }`}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+
+              {/* Rejection fields — shown only when rejecting */}
+              {!isApproved && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Rejection Reason <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Explain why the shipment is being rejected..."
+                      rows={3}
+                      className="w-full px-4 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                    />
+                  </div>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={returnToVendor}
+                      onChange={(e) => setReturnToVendor(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                    />
+                    <span className="text-sm text-gray-700">Return items to vendor</span>
+                  </label>
+                </>
+              )}
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
@@ -461,9 +640,12 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               </button>
               <button
                 onClick={handleSubmitReview}
-                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                className={`px-6 py-2 rounded-lg transition-colors font-medium ${isApproved
+                  ? "bg-green-600 text-white hover:bg-green-700"
+                  : "bg-red-600 text-white hover:bg-red-700"
+                }`}
               >
-                Submit Review
+                {isApproved ? "Approve Shipment" : "Reject Shipment"}
               </button>
             </div>
           </div>

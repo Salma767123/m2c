@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Package, MapPin, Truck, X } from "lucide-react";
+import { ArrowLeft, Package, MapPin, Truck, X, RefreshCw, XCircle, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import Dropdown from "@/components/UI/Dropdown";
-import { orderService, Order } from "@/services/orderService";
+import { orderService, VendorShipment } from "@/services/orderService";
 
 interface OrderDetailProps {
   orderId: string;
@@ -25,12 +25,15 @@ const carriers = [
 
 export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
   const router = useRouter();
-  const [order, setOrder] = useState<Order | null>(null);
+  const [shipment, setShipment] = useState<VendorShipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const [showShippingModal, setShowShippingModal] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState("");
   const [trackingId, setTrackingId] = useState("");
+  const [showReshipModal, setShowReshipModal] = useState(false);
+  const [reshipLoading, setReshipLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -41,7 +44,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       setIsLoading(true);
       const res = await orderService.getVendorOrderById(orderId);
       if (res.success) {
-        setOrder(res.data);
+        setShipment(res.data);
       }
     } catch (error: any) {
       showErrorToast(error.message || "Failed to load order details");
@@ -50,15 +53,20 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
     }
   };
 
-  const handleUpdateStatus = async (newStatus: string) => {
+  const handleUpdateStatus = async (
+    newStatus: string,
+    shipmentDetails?: { carrier: string; trackingId: string }
+  ) => {
+    if (!shipment) return;
     try {
-      const res = await orderService.updateVendorOrderStatus(orderId, newStatus);
+      const res = await orderService.updateVendorOrderStatus(shipment.id, newStatus, shipmentDetails);
       if (res.success) {
         showSuccessToast(`Order marked as ${newStatus.replace(/_/g, " ")}`);
-        setOrder(res.data);
+        setShipment(res.data);
       }
     } catch (error: any) {
       showErrorToast(error.message || "Failed to update status");
+      throw error;
     }
   };
 
@@ -66,38 +74,78 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
     handleUpdateStatus("PACKED_BY_VENDOR");
   };
 
+  const handleReship = async () => {
+    if (!shipment) return;
+    try {
+      setReshipLoading(true);
+      const res = await orderService.reshipVendorOrder(shipment.id);
+      if (res.success) {
+        showSuccessToast("Reship created successfully", "Pack and ship the replacement to the hub.");
+        setShowReshipModal(false);
+        // Navigate to the new shipment's detail page
+        router.push(`/vendor/dashboard/orders/view/${res.data.id}`);
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to create reship");
+    } finally {
+      setReshipLoading(false);
+    }
+  };
+
+  const handleCancelRejected = async () => {
+    if (!shipment || cancelLoading) return;
+    try {
+      setCancelLoading(true);
+      const res = await orderService.updateVendorOrderStatus(shipment.id, "CANCELLED");
+      if (res.success) {
+        showSuccessToast("Shipment cancelled");
+        setShipment(res.data);
+      }
+    } catch (error: any) {
+      showErrorToast(error.message || "Failed to cancel shipment");
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   const handleOpenShippingModal = () => {
     setShowShippingModal(true);
   };
 
-  const handleConfirmShipping = () => {
+  const handleConfirmShipping = async () => {
     if (!selectedCarrier) {
       showErrorToast("Please select a carrier");
       return;
     }
-    if (!trackingId.trim()) {
+    const trimmedTracking = trackingId.trim();
+    if (!trimmedTracking) {
       showErrorToast("Please enter tracking ID");
       return;
     }
 
-    handleUpdateStatus("IN_TRANSIT_TO_ADMIN_HUB");
-    setShowShippingModal(false);
-
-    // Redirect back to orders list
-    setTimeout(() => {
-      router.push("/vendor/dashboard/orders");
-    }, 1500);
+    try {
+      await handleUpdateStatus("IN_TRANSIT_TO_ADMIN_HUB", {
+        carrier: selectedCarrier,
+        trackingId: trimmedTracking,
+      });
+      setShowShippingModal(false);
+      setTimeout(() => {
+        router.push("/vendor/dashboard/orders");
+      }, 1500);
+    } catch {
+      // Keep modal open so user can retry; toast already shown
+    }
   };
 
   if (isLoading) {
     return <div className="p-6 text-center text-gray-500">Loading order details...</div>;
   }
 
-  if (!order) {
+  if (!shipment) {
     return <div className="p-6 text-center text-red-500">Order not found</div>;
   }
 
-  const status = order.status;
+  const status = shipment.status;
 
   return (
     <div className="space-y-6">
@@ -112,19 +160,19 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
-            <p className="text-sm text-gray-600 mt-1">Order ID: {order.orderId}</p>
+            <p className="text-sm text-gray-600 mt-1">Order ID: {shipment.order?.orderId || shipment.shipmentId}</p>
           </div>
         </div>
         <div className="flex gap-3">
           {(status === "ORDER_CREATED" || status === "VENDOR_PROCESSING") && (
             <button
               onClick={handleMarkAsPacked}
-              disabled={!order.assignedHubId}
-              className={`px-6 py-2 rounded-lg transition-colors font-medium ${order.assignedHubId
+              disabled={!shipment.assignedHubId}
+              className={`px-6 py-2 rounded-lg transition-colors font-medium ${shipment.assignedHubId
                   ? "bg-purple-600 text-white hover:bg-purple-700"
                   : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 }`}
-              title={!order.assignedHubId ? "Wait for admin to assign a hub" : ""}
+              title={!shipment.assignedHubId ? "Wait for admin to assign a hub" : ""}
             >
               Mark as Packed
             </button>
@@ -132,12 +180,12 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           {status === "PACKED_BY_VENDOR" && (
             <button
               onClick={handleOpenShippingModal}
-              disabled={!order.assignedHubId}
-              className={`px-6 py-2 rounded-lg transition-colors font-medium ${order.assignedHubId
+              disabled={!shipment.assignedHubId}
+              className={`px-6 py-2 rounded-lg transition-colors font-medium ${shipment.assignedHubId
                   ? "bg-gray-900 text-white hover:bg-gray-800"
                   : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 }`}
-              title={!order.assignedHubId ? "Wait for admin to assign a hub" : ""}
+              title={!shipment.assignedHubId ? "Wait for admin to assign a hub" : ""}
             >
               Ship to Hub
             </button>
@@ -150,6 +198,31 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           {["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(status) && (
             <div className="px-6 py-2 bg-green-100 text-green-800 rounded-lg font-medium border border-green-300">
               Handled by Admin Hub ({status.replace(/_/g, " ")})
+            </div>
+          )}
+          {status === "REJECTED_BY_ADMIN_HUB" && (
+            <>
+              <button
+                onClick={() => setShowReshipModal(true)}
+                disabled={cancelLoading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Reship
+              </button>
+              <button
+                onClick={handleCancelRejected}
+                disabled={cancelLoading || reshipLoading}
+                className="px-6 py-2 bg-white text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <XCircle className="h-4 w-4" />
+                {cancelLoading ? "Cancelling..." : "Accept & Cancel"}
+              </button>
+            </>
+          )}
+          {status === "CANCELLED" && (
+            <div className="px-6 py-2 bg-red-100 text-red-800 rounded-lg font-medium border border-red-300">
+              Cancelled
             </div>
           )}
         </div>
@@ -165,7 +238,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           <div>
             <p className="text-sm text-gray-600">Order Date</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              {new Date(order.createdAt).toLocaleDateString()}
+              {new Date(shipment.order?.createdAt || shipment.createdAt).toLocaleDateString("en-IN")}
             </p>
           </div>
           <div>
@@ -173,7 +246,9 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
             <p className={`text-base font-medium mt-1 ${status === "VENDOR_PROCESSING" ? "text-blue-600" :
               status === "PACKED_BY_VENDOR" ? "text-purple-600" :
                 status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
-                  "text-green-600"
+                  status === "REJECTED_BY_ADMIN_HUB" ? "text-red-600" :
+                    status === "CANCELLED" ? "text-red-600" :
+                      "text-green-600"
               }`}>
               {status.replace(/_/g, " ")}
             </p>
@@ -181,7 +256,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           <div>
             <p className="text-sm text-gray-600">Total Amount</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              ₹{order.items.reduce((acc: number, item: any) => acc + item.totalPrice, 0).toLocaleString()}
+              ₹{shipment.items.reduce((acc: number, item: any) => acc + item.totalPrice, 0).toLocaleString("en-IN")}
             </p>
           </div>
         </div>
@@ -191,7 +266,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h2>
         <div className="space-y-4">
-          {order.items.map((item: any) => (
+          {shipment.items.map((item: any) => (
             <div key={item.id} className="flex gap-4 p-4 border border-gray-100 rounded-lg">
               <img
                 src={item.productImage || "/assets/images/placeholder.jpg"}
@@ -212,7 +287,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
                   <div>
                     <p className="text-sm text-gray-600">Price per Unit</p>
                     <p className="text-base font-medium text-gray-900">
-                      ₹{item.unitPrice.toLocaleString()}
+                      ₹{item.unitPrice.toLocaleString("en-IN")}
                     </p>
                   </div>
                 </div>
@@ -229,28 +304,28 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           <h2 className="text-lg font-semibold text-gray-900">Delivery Hub</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {order.assignedHubId ? (
+          {shipment.assignedHubId ? (
             <>
               <div>
                 <p className="text-sm text-gray-600">Hub Name</p>
                 <p className="text-base font-medium text-gray-900 mt-1">
-                  {order.hub?.name || "Admin Central Hub"}
+                  {shipment.hub?.name || "Admin Central Hub"}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Contact</p>
                 <p className="text-base font-medium text-gray-900 mt-1">
-                  {order.hub?.phone || order.hub?.email || "System Generated"}
+                  {shipment.hub?.phone || shipment.hub?.email || "System Generated"}
                 </p>
               </div>
               <div className="md:col-span-2">
                 <p className="text-sm text-gray-600">Address</p>
                 <p className="text-base font-medium text-gray-900 mt-1 leading-relaxed">
-                  {order.hub ? (
+                  {shipment.hub ? (
                     <>
-                      {order.hub.address}
+                      {shipment.hub.address}
                       <br />
-                      {order.hub.city}, {order.hub.state} {order.hub.zipCode}
+                      {shipment.hub.city}, {shipment.hub.state} {shipment.hub.zipCode}
                     </>
                   ) : (
                     "Please ship to the designated M2C administrative hub."
@@ -268,6 +343,104 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           )}
         </div>
       </div>
+
+      {/* Shipping Details — shown once vendor has shipped */}
+      {shipment.vendorCarrier && shipment.vendorTrackingId && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center gap-2 mb-4">
+            <Truck className="h-5 w-5 text-gray-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Shipping Details</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Carrier</p>
+              <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorCarrier}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Tracking ID</p>
+              <p className="text-base font-mono font-medium text-gray-900 mt-1 break-all">
+                {shipment.vendorTrackingId}
+              </p>
+            </div>
+            {shipment.vendorShippedAt && (
+              <div>
+                <p className="text-sm text-gray-600">Shipped On</p>
+                <p className="text-base font-medium text-gray-900 mt-1">
+                  {new Date(shipment.vendorShippedAt).toLocaleString("en-IN")}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Admin Review & Feedback */}
+      {shipment.adminReview && (
+        <div className={`rounded-lg shadow-sm border p-6 ${shipment.adminReview.approved ? "bg-white border-gray-200" : "bg-red-50 border-red-200"}`}>
+          <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <h2 className="text-lg font-semibold text-gray-900">Admin Hub Feedback</h2>
+            </div>
+            <span className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full ${shipment.adminReview.approved ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+              {shipment.adminReview.approved ? "Approved" : "Rejected"}
+            </span>
+          </div>
+
+          {typeof shipment.adminReview.rating === "number" && shipment.adminReview.rating > 0 && (
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-1">Rating</p>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <svg
+                    key={n}
+                    className={`h-5 w-5 ${n <= (shipment.adminReview?.rating ?? 0) ? "text-yellow-400" : "text-gray-300"}`}
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.966a1 1 0 00.95.69h4.169c.969 0 1.371 1.24.588 1.81l-3.375 2.455a1 1 0 00-.363 1.118l1.287 3.966c.3.921-.755 1.688-1.54 1.118l-3.376-2.455a1 1 0 00-1.175 0l-3.375 2.455c-.784.57-1.838-.197-1.539-1.118l1.287-3.966a1 1 0 00-.363-1.118L2.05 9.393c-.783-.57-.38-1.81.588-1.81h4.17a1 1 0 00.95-.69l1.286-3.966z" />
+                  </svg>
+                ))}
+                <span className="ml-2 text-sm text-gray-700 font-medium">
+                  {shipment.adminReview.rating} out of 5
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {shipment.adminReview.reviewComments && (
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-1">Review</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{shipment.adminReview.reviewComments}</p>
+              </div>
+            )}
+            {shipment.adminReview.qualityCheckNotes && (
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-1">Quality Check Notes</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{shipment.adminReview.qualityCheckNotes}</p>
+              </div>
+            )}
+            {!shipment.adminReview.approved && shipment.adminReview.rejectionReason && (
+              <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-red-800 mb-1">Reason for Rejection</p>
+                <p className="text-sm text-red-800 whitespace-pre-wrap">{shipment.adminReview.rejectionReason}</p>
+                {shipment.adminReview.returnToVendor && (
+                  <p className="text-xs text-red-700 mt-2 italic">This order will be returned to you.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {shipment.adminReview.reviewedAt && (
+            <p className="text-xs text-gray-500 mt-4">
+              Reviewed on {new Date(shipment.adminReview.reviewedAt).toLocaleString("en-IN")}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Processing Instructions */}
       {!["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(status) && (
@@ -311,7 +484,6 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Carrier Selection */}
               <div>
                 <Dropdown
                   label="Select Carrier"
@@ -321,8 +493,6 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
                   placeholder="Choose a carrier"
                 />
               </div>
-
-              {/* Tracking ID */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Tracking ID
@@ -352,6 +522,75 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
                 className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
               >
                 Confirm Shipping
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reship Confirmation Modal */}
+      {showReshipModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <RefreshCw className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Reship Order</h2>
+                  <p className="text-sm text-gray-600">Create a replacement shipment</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-800">
+                    <p className="font-medium mb-1">This will:</p>
+                    <ul className="list-disc list-inside space-y-1 text-amber-700">
+                      <li>Cancel the rejected shipment</li>
+                      <li>Create a new shipment with the same items</li>
+                      <li>You&apos;ll need to pack and ship the replacement</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {shipment?.adminReview?.rejectionReason && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-xs font-semibold text-red-800 mb-1">Rejection Reason:</p>
+                  <p className="text-sm text-red-700">{shipment.adminReview.rejectionReason}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowReshipModal(false)}
+                disabled={reshipLoading}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReship}
+                disabled={reshipLoading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
+              >
+                {reshipLoading ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Confirm Reship
+                  </>
+                )}
               </button>
             </div>
           </div>

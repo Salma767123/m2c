@@ -10,6 +10,7 @@ router.use(authenticateToken, requireAdminRole);
 // CUSTOMER MANAGEMENT ROUTES
 // ------------------------------------
 router.get('/customers', requirePermission('view_users'), userManagementController.getCustomers);
+router.get('/customers/:id', requirePermission('view_users'), userManagementController.getCustomerById);
 router.put('/customers/:id/status', requirePermission('edit_users'), userManagementController.updateCustomerStatus);
 router.delete('/customers/:id', requirePermission('delete_users'), userManagementController.deleteCustomer);
 

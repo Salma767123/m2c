@@ -16,6 +16,8 @@ import { useDebounce } from "@/hooks/useDebounce"
 
 const PAGE_SIZE = 12
 const DEFAULT_SORT = "updatedAt:desc"
+// Reserve vertical space for a full page so pagination/layout doesn't jump when result count shrinks.
+const TABLE_MIN_HEIGHT_PX = PAGE_SIZE * 65
 
 const SORT_OPTIONS = [
   { value: "updatedAt:desc", label: "Latest first" },
@@ -210,7 +212,7 @@ export default function ProductReportsTab() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden" style={{ minHeight: TABLE_MIN_HEIGHT_PX }}>
         {loading && products.length === 0 ? (
           <div className="animate-pulse">
             <div className="grid grid-cols-7 gap-4 px-6 py-4 border-b border-slate-100">

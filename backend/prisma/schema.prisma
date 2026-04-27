@@ -36,6 +36,7 @@ model Admin {
   // Additional admin profile fields
   phoneNumber   String?
   address       String?
+  addressLine2  String?
   city          String?
   state         String?
   zipCode       String?
@@ -110,6 +111,7 @@ model User {
   // Additional user profile fields
   phoneNumber   String? 
   address       String?
+  addressLine2  String?
   city          String?
   state         String?
   zipCode       String?
@@ -148,6 +150,7 @@ model Address {
   name      String?
   phone     String?
   address   String
+  addressLine2 String?
   city      String
   state     String
   zipCode   String
@@ -326,7 +329,14 @@ model Vendor {
   inspections           Inspection[]
   settlements           Settlement[]
 
-  
+  // Admin delivery rating aggregates — recomputed whenever an admin submits a
+  // review on a vendor-to-hub order. `rating` is the average over all admin
+  // reviews scored for this vendor (1-5); `ratingCount` is the sample size.
+  rating                Float?
+  ratingCount           Int       @default(0)
+  adminReviews          AdminReview[]
+
+
   // System fields
   applicationStep       Int       @default(1) // Current step in application process
   completedSteps        Int[]     @default([]) // Array of completed step numbers
@@ -755,22 +765,38 @@ model Order {
   totalAmount           Float
   couponCode            String?
 
+  // Bag Add-on
+  bagTypeId             String?   @db.ObjectId
+  bagTypeName           String?
+  bagTypePrice          Float?    @default(0)
+
   // Payment Information
   paymentStatus         PaymentStatus @default(PENDING)
   paymentMethod         String?
   paymentId             String?
 
   // Order Status & Tracking
+  // NOTE: status is now a computed aggregate of all VendorShipment statuses.
+  // It is persisted for backward compatibility and efficient queries.
   status                OrderStatus @default(ORDER_CREATED)
   trackingReference     String?   // Internal tracking reference
+
+  // DEPRECATED: Vendor shipping details now live on VendorShipment.
+  // Retained for backward compatibility with pre-migration orders.
+  vendorCarrier         String?
+  vendorTrackingId      String?
+  vendorShippedAt       DateTime?
   assignedHubId         String?   @db.ObjectId
   hub                   Hub?      @relation(fields: [assignedHubId], references: [id])
 
   // Vendor Information (for single vendor orders)
   vendorId              String?   @db.ObjectId
 
+  // Vendor Shipments (one per vendor in this order)
+  shipments             VendorShipment[]
+
   // Admin Hub Processing
-  adminReview           AdminReview?
+  adminReview           AdminReview[]
 
   // Status History
   statusHistory         OrderStatusHistory[]
@@ -785,6 +811,9 @@ model Order {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  @@index([status])
+  @@index([createdAt])
+  @@index([assignedHubId])
   @@map("orders")
 }
 
@@ -812,7 +841,11 @@ model OrderItem {
   // Vendor Information
   vendorId              String    @db.ObjectId
   vendorName            String
-  
+
+  // Link to VendorShipment (set at order creation time)
+  shipmentId            String?   @db.ObjectId
+  shipment              VendorShipment? @relation(fields: [shipmentId], references: [id])
+
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -836,27 +869,100 @@ model OrderStatusHistory {
 
 model AdminReview {
   id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  orderId               String    @unique @db.ObjectId
-  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+
+  // Primary link: one review per VendorShipment.
+  // Not @unique because existing pre-migration rows have null shipmentId
+  // (MongoDB unique indexes reject multiple nulls). Uniqueness enforced in app code.
+  shipmentId            String?   @db.ObjectId
+  shipment              VendorShipment? @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  // Denormalized order reference (for listing queries).
+  // No longer @unique — a multi-vendor order can have multiple reviews.
+  orderId               String?   @db.ObjectId
+  order                 Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Denormalized vendor reference for aggregate rating queries.
+  vendorId              String?   @db.ObjectId
+  vendor                Vendor?   @relation(fields: [vendorId], references: [id])
+
   // Review Details
   reviewComments        String?
   qualityCheckNotes     String?
   rating                Int?      // 1-5 rating
   approved              Boolean   @default(false)
-  
+
   // Admin Information
   reviewedBy            String?   @db.ObjectId // Admin ID
   reviewedAt            DateTime?
-  
+
   // Rejection Details (if applicable)
   rejectionReason       String?
   returnToVendor        Boolean   @default(false)
-  
+
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  @@index([vendorId])
+  @@index([orderId])
+  @@index([shipmentId])
   @@map("admin_reviews")
+}
+
+// ============================================
+// VENDOR SHIPMENT (per-vendor fulfillment unit)
+// ============================================
+
+model VendorShipment {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  shipmentId            String    @unique // Human-readable e.g. ORD-2024-123456789-V1
+  orderId               String    @db.ObjectId
+  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorId              String    @db.ObjectId
+  vendorName            String
+
+  // Independent status lifecycle per vendor
+  status                OrderStatus @default(ORDER_CREATED)
+
+  // Per-shipment shipping details
+  vendorCarrier         String?
+  vendorTrackingId      String?
+  vendorShippedAt       DateTime?
+
+  // Per-shipment hub assignment
+  assignedHubId         String?   @db.ObjectId
+  hub                   Hub?      @relation(fields: [assignedHubId], references: [id])
+
+  // Items belonging to this shipment
+  items                 OrderItem[]
+
+  // Per-shipment admin review (logically 1:1, enforced in app code)
+  adminReviews          AdminReview[]
+
+  // Status history
+  statusHistory         ShipmentStatusHistory[]
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([vendorId])
+  @@index([status])
+  @@map("vendor_shipments")
+}
+
+model ShipmentStatusHistory {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  shipmentId            String    @db.ObjectId
+  shipment              VendorShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  status                OrderStatus
+  comment               String?
+  updatedBy             String?   // Admin/Vendor ID who updated
+  updatedByType         String?   // "admin", "vendor", "system"
+
+  timestamp             DateTime  @default(now())
+
+  @@map("shipment_status_history")
 }
 
 // ============================================
@@ -906,6 +1012,25 @@ model FreeShippingOffer {
   updatedAt             DateTime  @updatedAt
 
   @@map("free_shipping_offers")
+}
+
+// ============================================
+// BAG TYPE MANAGEMENT
+// ============================================
+
+model BagType {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  price       Float
+  image       String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("bag_types")
 }
 
 enum DiscountType {
@@ -1075,7 +1200,8 @@ model Hub {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   orders      Order[]
-  
+  shipments   VendorShipment[]
+
   @@map("hubs")
 }
 

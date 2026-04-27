@@ -416,6 +416,7 @@ const login = async (req, res) => {
           isVerified: user.isVerified,
           phoneNumber: user.phoneNumber,
           address: user.address,
+          addressLine2: user.addressLine2,
           city: user.city,
           state: user.state,
           zipCode: user.zipCode,
@@ -634,6 +635,7 @@ const googleCallback = async (req, res) => {
           isVerified: user.isVerified,
           phoneNumber: user.phoneNumber,
           address: user.address,
+          addressLine2: user.addressLine2,
           city: user.city,
           state: user.state,
           zipCode: user.zipCode,
@@ -1074,6 +1076,7 @@ const getCurrentUser = async (req, res) => {
         createdAt: true,
         phoneNumber: true,
         address: true,
+        addressLine2: true,
         city: true,
         state: true,
         zipCode: true,
@@ -1098,6 +1101,7 @@ const getCurrentUser = async (req, res) => {
           createdAt: true,
           phoneNumber: true,
           address: true,
+          addressLine2: true,
           city: true,
           state: true,
           zipCode: true,
@@ -1227,6 +1231,7 @@ const updateProfile = async (req, res) => {
       image,
       phoneNumber,
       address,
+      addressLine2,
       city,
       state,
       zipCode,
@@ -1252,6 +1257,7 @@ const updateProfile = async (req, res) => {
       ...(image !== undefined && { image }),
       ...(phoneNumber !== undefined && { phoneNumber }),
       ...(address !== undefined && { address }),
+      ...(addressLine2 !== undefined && { addressLine2 }),
       ...(city !== undefined && { city }),
       ...(state !== undefined && { state }),
       ...(zipCode !== undefined && { zipCode }),
@@ -1280,6 +1286,7 @@ const updateProfile = async (req, res) => {
           provider: true,
           phoneNumber: true,
           address: true,
+          addressLine2: true,
           city: true,
           state: true,
           zipCode: true,
@@ -1307,6 +1314,7 @@ const updateProfile = async (req, res) => {
               image: updatedUser.image,
               phoneNumber: updatedUser.phoneNumber,
               address: updatedUser.address,
+              addressLine2: updatedUser.addressLine2,
               city: updatedUser.city,
               state: updatedUser.state,
               zipCode: updatedUser.zipCode,
@@ -1326,6 +1334,7 @@ const updateProfile = async (req, res) => {
               image: updatedUser.image,
               phoneNumber: updatedUser.phoneNumber,
               address: updatedUser.address,
+              addressLine2: updatedUser.addressLine2,
               city: updatedUser.city,
               state: updatedUser.state,
               zipCode: updatedUser.zipCode,
@@ -1396,6 +1405,7 @@ const updateProfile = async (req, res) => {
           isActive: true,
           phoneNumber: true,
           address: true,
+          addressLine2: true,
           city: true,
           state: true,
           zipCode: true,
@@ -1493,47 +1503,91 @@ const googleAuthFailure = (req, res) => {
   res.redirect(`${process.env.FRONTEND_URL}/signin?error=auth_cancelled`);
 };
 
+// ============================================
+// Address Management
+// Schema fields: type, name, phone, address, addressLine2, city, state, zipCode, country, isDefault
+// Business rules: max 3 addresses per user, exactly one default when user has any addresses.
+// ============================================
+
+const MAX_ADDRESSES_PER_USER = 3;
+const ADDRESS_TYPES = ["home", "work", "other"];
+
+const VALID_US_STATES = new Set([
+  "AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA",
+  "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM",
+  "NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA",
+  "WV","WI","WY"
+]);
+
+function validateAddressPayload(body) {
+  const {
+    type,
+    name,
+    phone,
+    address,
+    addressLine2,
+    city,
+    state,
+    zipCode,
+    country,
+  } = body || {};
+
+  if (!type || !ADDRESS_TYPES.includes(String(type).toLowerCase())) {
+    return "Address type must be home, work, or other";
+  }
+  if (!name || !String(name).trim()) return "Name is required";
+  if (!phone || !String(phone).trim()) return "Phone is required";
+  const phoneDigits = String(phone).replace(/\D/g, "");
+  if (phoneDigits.length !== 10 && !(phoneDigits.length === 11 && phoneDigits.startsWith("1"))) {
+    return "Enter a valid US phone number";
+  }
+  if (!address || String(address).trim().length < 3) return "Address is required (min 3 chars)";
+  if (addressLine2 && String(addressLine2).length > 100) return "Address Line 2 too long";
+  if (!city || !String(city).trim()) return "City is required";
+  if (!state) return "State is required";
+  if (!VALID_US_STATES.has(String(state).toUpperCase())) return "State must be a valid US state code";
+  if (!zipCode || !/^\d{5}(-\d{4})?$/.test(String(zipCode).trim())) {
+    return "ZIP must be 12345 or 12345-6789";
+  }
+  if (country && String(country).trim() && String(country).trim().toLowerCase() !== "united states") {
+    return "Only United States addresses are supported";
+  }
+  return null;
+}
+
+function normalizeAddressData(body) {
+  return {
+    type: String(body.type).toLowerCase(),
+    name: String(body.name).trim(),
+    phone: String(body.phone).trim(),
+    address: String(body.address).trim(),
+    addressLine2: body.addressLine2 ? String(body.addressLine2).trim() : "",
+    city: String(body.city).trim(),
+    state: String(body.state).toUpperCase(),
+    zipCode: String(body.zipCode).trim(),
+    country: "United States",
+  };
+}
+
 // Get user addresses
 const getAddresses = async (req, res) => {
   try {
     const userId = req.userId;
 
-    // Find user in both collections to determine user type
-    let user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-    let userType = "user";
-
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      user = await prisma.admin.findUnique({
-        where: { id: userId },
-      });
-      userType = "admin";
+      return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found",
-      });
-    }
-
-    // Get addresses for the user
     const addresses = await prisma.address.findMany({
       where: { userId },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
     });
 
-    res.json({
-      success: true,
-      data: addresses,
-    });
+    res.json({ success: true, data: addresses });
   } catch (error) {
     console.error("Get addresses error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to get addresses",
-    });
+    res.status(500).json({ success: false, error: "Failed to get addresses" });
   }
 };
 
@@ -1541,69 +1595,40 @@ const getAddresses = async (req, res) => {
 const addAddress = async (req, res) => {
   try {
     const userId = req.userId;
-    const {
-      label,
-      fullName,
-      phoneNumber,
-      addressLine1,
-      addressLine2,
-      city,
-      district,
-      state,
-      zipCode,
-      country,
-    } = req.body;
 
-    // Validation
-    if (
-      !label ||
-      !fullName ||
-      !phoneNumber ||
-      !addressLine1 ||
-      !city ||
-      !state ||
-      !zipCode ||
-      !country
-    ) {
+    const validationError = validateAddressPayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ success: false, error: validationError });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    const existingCount = await prisma.address.count({ where: { userId } });
+    if (existingCount >= MAX_ADDRESSES_PER_USER) {
       return res.status(400).json({
         success: false,
-        error: "All required fields must be provided",
+        error: `You can save up to ${MAX_ADDRESSES_PER_USER} addresses. Please delete one before adding a new one.`,
       });
     }
 
-    // Find user to ensure they exist
-    let user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const data = normalizeAddressData(req.body);
+    const requestedDefault = !!req.body.isDefault;
+    // First address is always default; otherwise honor requested flag.
+    const shouldBeDefault = existingCount === 0 || requestedDefault;
 
-    if (!user) {
-      user = await prisma.admin.findUnique({
-        where: { id: userId },
+    const newAddress = await prisma.$transaction(async (tx) => {
+      if (shouldBeDefault) {
+        await tx.address.updateMany({
+          where: { userId, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+      return tx.address.create({
+        data: { ...data, userId, isDefault: shouldBeDefault },
       });
-    }
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found",
-      });
-    }
-
-    // Create new address
-    const newAddress = await prisma.address.create({
-      data: {
-        userId,
-        label,
-        fullName,
-        phoneNumber,
-        addressLine1,
-        addressLine2: addressLine2 || "",
-        city,
-        district: district || "",
-        state,
-        zipCode,
-        country,
-      },
     });
 
     res.status(201).json({
@@ -1613,10 +1638,7 @@ const addAddress = async (req, res) => {
     });
   } catch (error) {
     console.error("Add address error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to add address",
-    });
+    res.status(500).json({ success: false, error: "Failed to add address" });
   }
 };
 
@@ -1625,44 +1647,15 @@ const updateAddress = async (req, res) => {
   try {
     const userId = req.userId;
     const addressId = req.params.id;
-    const {
-      label,
-      fullName,
-      phoneNumber,
-      addressLine1,
-      addressLine2,
-      city,
-      district,
-      state,
-      zipCode,
-      country,
-    } = req.body;
 
-    // Validation
-    if (
-      !label ||
-      !fullName ||
-      !phoneNumber ||
-      !addressLine1 ||
-      !city ||
-      !state ||
-      !zipCode ||
-      !country
-    ) {
-      return res.status(400).json({
-        success: false,
-        error: "All required fields must be provided",
-      });
+    const validationError = validateAddressPayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ success: false, error: validationError });
     }
 
-    // Check if address exists and belongs to user
     const existingAddress = await prisma.address.findFirst({
-      where: {
-        id: addressId,
-        userId,
-      },
+      where: { id: addressId, userId },
     });
-
     if (!existingAddress) {
       return res.status(404).json({
         success: false,
@@ -1670,21 +1663,26 @@ const updateAddress = async (req, res) => {
       });
     }
 
-    // Update address
-    const updatedAddress = await prisma.address.update({
-      where: { id: addressId },
-      data: {
-        label,
-        fullName,
-        phoneNumber,
-        addressLine1,
-        addressLine2: addressLine2 || "",
-        city,
-        district: district || "",
-        state,
-        zipCode,
-        country,
-      },
+    const data = normalizeAddressData(req.body);
+    const wantsDefault = req.body.isDefault === true;
+    // If this address is currently the only default and caller passes false, still keep it default
+    // to preserve the "exactly one default" invariant.
+    const keepAsDefault = existingAddress.isDefault && !wantsDefault
+      ? (await prisma.address.count({ where: { userId, isDefault: true, NOT: { id: addressId } } })) === 0
+      : false;
+    const shouldBeDefault = wantsDefault || keepAsDefault;
+
+    const updatedAddress = await prisma.$transaction(async (tx) => {
+      if (shouldBeDefault) {
+        await tx.address.updateMany({
+          where: { userId, isDefault: true, NOT: { id: addressId } },
+          data: { isDefault: false },
+        });
+      }
+      return tx.address.update({
+        where: { id: addressId },
+        data: { ...data, isDefault: shouldBeDefault || existingAddress.isDefault },
+      });
     });
 
     res.json({
@@ -1694,27 +1692,19 @@ const updateAddress = async (req, res) => {
     });
   } catch (error) {
     console.error("Update address error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to update address",
-    });
+    res.status(500).json({ success: false, error: "Failed to update address" });
   }
 };
 
-// Delete address
+// Delete address. If deleting the default, promote the most recently updated remaining address.
 const deleteAddress = async (req, res) => {
   try {
     const userId = req.userId;
     const addressId = req.params.id;
 
-    // Check if address exists and belongs to user
     const existingAddress = await prisma.address.findFirst({
-      where: {
-        id: addressId,
-        userId,
-      },
+      where: { id: addressId, userId },
     });
-
     if (!existingAddress) {
       return res.status(404).json({
         success: false,
@@ -1722,21 +1712,65 @@ const deleteAddress = async (req, res) => {
       });
     }
 
-    // Delete address
-    await prisma.address.delete({
-      where: { id: addressId },
+    await prisma.$transaction(async (tx) => {
+      await tx.address.delete({ where: { id: addressId } });
+
+      if (existingAddress.isDefault) {
+        const nextDefault = await tx.address.findFirst({
+          where: { userId },
+          orderBy: { updatedAt: "desc" },
+        });
+        if (nextDefault) {
+          await tx.address.update({
+            where: { id: nextDefault.id },
+            data: { isDefault: true },
+          });
+        }
+      }
+    });
+
+    res.json({ success: true, message: "Address deleted successfully" });
+  } catch (error) {
+    console.error("Delete address error:", error);
+    res.status(500).json({ success: false, error: "Failed to delete address" });
+  }
+};
+
+// Set a specific address as default
+const setDefaultAddress = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const addressId = req.params.id;
+
+    const existingAddress = await prisma.address.findFirst({
+      where: { id: addressId, userId },
+    });
+    if (!existingAddress) {
+      return res.status(404).json({
+        success: false,
+        error: "Address not found or access denied",
+      });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.address.updateMany({
+        where: { userId, isDefault: true, NOT: { id: addressId } },
+        data: { isDefault: false },
+      });
+      return tx.address.update({
+        where: { id: addressId },
+        data: { isDefault: true },
+      });
     });
 
     res.json({
       success: true,
-      message: "Address deleted successfully",
+      message: "Default address updated",
+      data: updated,
     });
   } catch (error) {
-    console.error("Delete address error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to delete address",
-    });
+    console.error("Set default address error:", error);
+    res.status(500).json({ success: false, error: "Failed to set default address" });
   }
 };
 
@@ -2177,6 +2211,7 @@ const superAdminLogin = async (req, res) => {
           isVerified: admin.isVerified,
           phoneNumber: admin.phoneNumber,
           address: admin.address,
+          addressLine2: admin.addressLine2,
           city: admin.city,
           state: admin.state,
           zipCode: admin.zipCode,
@@ -2220,5 +2255,6 @@ module.exports = {
   addAddress,
   updateAddress,
   deleteAddress,
+  setDefaultAddress,
   getUserStats,
 };

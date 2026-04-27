@@ -194,6 +194,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           ? new Date(product.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
           : "—",
         filename: `Product_Report_${product.name.replace(/\s+/g, "_")}_${product.baseSku || productId}.pdf`,
+        inspectorName: (product as { assignedQc?: { name?: string } }).assignedQc?.name,
       }).catch(() => { /* silent */ })
     }
     const timer = setTimeout(tryDownload, 500)
@@ -258,6 +259,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           ? new Date(product.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
           : "—",
         filename: `Product_Report_${product.name.replace(/\s+/g, "_")}_${product.baseSku || productId}.pdf`,
+        inspectorName: (product as { assignedQc?: { name?: string } }).assignedQc?.name,
       })
     } catch {
       alert("Failed to generate PDF. Please try again.")
@@ -368,30 +370,28 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       <Section title="Section 3 — Measurements" icon={Ruler} accent="bg-purple-50 text-purple-800">
         {measurements.length > 0 ? (
           <div className="overflow-x-auto mb-4">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Sample</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Carton L (cm)</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Carton W (cm)</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Carton H (cm)</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Product L (cm)</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Product W (cm)</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Retail Wt (kg)</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase">Gross Wt (kg)</th>
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-purple-50/50 text-purple-800 font-semibold">
+                <tr>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider">Sample Name</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Carton (L×W×H) cm</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Product (L×W) cm</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Retail Wt (kg)</th>
+                  <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Gross Wt (kg)</th>
                 </tr>
               </thead>
               <tbody>
                 {measurements.map((m, i) => (
-                  <tr key={i} className="border-b border-slate-100">
-                    <td className="py-2 px-3 font-medium text-slate-700">{m.sampleName || `#${i + 1}`}</td>
-                    <td className="py-2 px-3 text-slate-600">{m.cartonLength ?? "—"}</td>
-                    <td className="py-2 px-3 text-slate-600">{m.cartonWidth ?? "—"}</td>
-                    <td className="py-2 px-3 text-slate-600">{m.cartonHeight ?? "—"}</td>
-                    <td className="py-2 px-3 text-slate-600">{m.productLength ?? "—"}</td>
-                    <td className="py-2 px-3 text-slate-600">{m.productWidth ?? "—"}</td>
-                    <td className="py-2 px-3 text-slate-600">{m.retailWeight ?? "—"}</td>
-                    <td className="py-2 px-3 text-slate-600">{m.cartonGrossWeight ?? "—"}</td>
+                  <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50">
+                    <td className="p-3 font-medium text-slate-900">{m.sampleName || `#${i + 1}`}</td>
+                    <td className="p-3 text-center text-slate-600">
+                      {m.cartonLength ?? 0} × {m.cartonWidth ?? 0} × {m.cartonHeight ?? 0}
+                    </td>
+                    <td className="p-3 text-center text-slate-600">
+                      {m.productLength ?? 0} × {m.productWidth ?? 0}
+                    </td>
+                    <td className="p-3 font-bold text-center text-purple-600">{m.retailWeight ?? 0}</td>
+                    <td className="p-3 font-bold text-center text-purple-600">{m.cartonGrossWeight ?? 0}</td>
                   </tr>
                 ))}
               </tbody>

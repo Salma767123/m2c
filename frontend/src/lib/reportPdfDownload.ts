@@ -14,6 +14,18 @@ interface DownloadReportPdfOptions {
   title: string
   submittedDate: string
   filename: string
+  /**
+   * `canonical` (default) = the checker's signable source of truth. Appends a sign-off page
+   * with Inspector Name / Date pre-filled and an attestation line.
+   * `internal` = admin / viewer copy. No signature page; a non-canonical footer banner is
+   * added to the last content page and the filename is suffixed with `(Internal).pdf` unless
+   * the caller has already provided a custom filename.
+   */
+  variant?: 'canonical' | 'internal'
+  /** Full name of the QC checker who submitted the inspection — auto-populates the signature page. */
+  inspectorName?: string
+  /** Display name / email of the admin downloading the report — stamped on internal copies. */
+  downloadedBy?: string
 }
 
 async function loadImageAsDataUrl(src: string): Promise<string> {
@@ -74,6 +86,9 @@ export async function downloadReportPdf({
   title,
   submittedDate,
   filename,
+  variant = 'canonical',
+  inspectorName,
+  downloadedBy,
 }: DownloadReportPdfOptions): Promise<void> {
   // Load logo
   let logoData: string | null = null
@@ -112,7 +127,8 @@ export async function downloadReportPdf({
     contentPages++
     tempHeight -= usableHeight
   }
-  const totalPages = contentPages + 1 // +1 for signature page
+  // Canonical variant appends a signature page; internal does not.
+  const totalPages = variant === 'canonical' ? contentPages + 1 : contentPages
 
   // Now render content pages
   let remainingHeight = imgHeight
@@ -153,94 +169,124 @@ export async function downloadReportPdf({
     pageNum++
   }
 
-  // Signature page
-  pdf.addPage()
-  addHeader(pdf, logoData, pageWidth, margin)
+  if (variant === 'canonical') {
+    // Signature page — only for the checker's canonical copy.
+    pdf.addPage()
+    addHeader(pdf, logoData, pageWidth, margin)
 
-  let y = 35
+    let y = 35
 
-  // Title
-  pdf.setFontSize(16)
-  pdf.setFont("helvetica", "bold")
-  pdf.setTextColor(BRAND_R, BRAND_G, BRAND_B)
-  pdf.text(title, pageWidth / 2, y, { align: "center" })
-  y += 12
+    // Title
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(BRAND_R, BRAND_G, BRAND_B)
+    pdf.text(title, pageWidth / 2, y, { align: "center" })
+    y += 12
 
-  pdf.setFontSize(10)
-  pdf.setFont("helvetica", "normal")
-  pdf.setTextColor(100, 100, 100)
-  pdf.text("Authorization & Sign-off", pageWidth / 2, y, { align: "center" })
-  y += 15
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    pdf.setTextColor(100, 100, 100)
+    pdf.text("Authorization & Sign-off", pageWidth / 2, y, { align: "center" })
+    y += 15
 
-  // Divider
-  pdf.setDrawColor(BRAND_R, BRAND_G, BRAND_B)
-  pdf.setLineWidth(0.8)
-  pdf.line(margin + 10, y, pageWidth - margin - 10, y)
-  y += 20
+    // Divider
+    pdf.setDrawColor(BRAND_R, BRAND_G, BRAND_B)
+    pdf.setLineWidth(0.8)
+    pdf.line(margin + 10, y, pageWidth - margin - 10, y)
+    y += 20
 
-  pdf.setTextColor(0, 0, 0)
-  pdf.setFontSize(11)
+    pdf.setTextColor(0, 0, 0)
+    pdf.setFontSize(11)
 
-  const leftX = margin + 15
-  const lineStartX = leftX + 55
-  const lineEndX = pageWidth - margin - 15
+    const leftX = margin + 15
+    const lineStartX = leftX + 55
+    const lineEndX = pageWidth - margin - 15
 
-  // Inspector Signature
-  pdf.setFont("helvetica", "bold")
-  pdf.text("Inspector Signature:", leftX, y)
-  pdf.setDrawColor(150, 150, 150)
-  pdf.setLineWidth(0.3)
-  pdf.line(lineStartX, y + 1, lineEndX, y + 1)
-  y += 25
+    // Inspector Signature — digital attestation line replaces the blank
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Inspector Signature:", leftX, y)
+    pdf.setFont("helvetica", "italic")
+    pdf.setTextColor(80, 80, 80)
+    pdf.text("Digitally signed & submitted via QC Portal", lineStartX, y)
+    pdf.setTextColor(0, 0, 0)
+    pdf.setDrawColor(150, 150, 150)
+    pdf.setLineWidth(0.3)
+    pdf.line(lineStartX, y + 1, lineEndX, y + 1)
+    y += 25
 
-  // Inspector Name
-  pdf.text("Inspector Name:", leftX, y)
-  pdf.line(lineStartX, y + 1, lineEndX, y + 1)
-  y += 25
+    // Inspector Name — auto-populated with the checker's name
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Inspector Name:", leftX, y)
+    if (inspectorName) {
+      pdf.setFont("helvetica", "normal")
+      pdf.text(inspectorName, lineStartX, y)
+    }
+    pdf.line(lineStartX, y + 1, lineEndX, y + 1)
+    y += 25
 
-  // Date
-  pdf.text("Date:", leftX, y)
-  pdf.setFont("helvetica", "normal")
-  pdf.text(submittedDate, lineStartX, y)
-  pdf.line(lineStartX, y + 1, lineEndX, y + 1)
-  y += 25
+    // Date
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Date:", leftX, y)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(submittedDate, lineStartX, y)
+    pdf.line(lineStartX, y + 1, lineEndX, y + 1)
+    y += 25
 
-  // Company Stamp
-  pdf.setFont("helvetica", "bold")
-  pdf.text("Company Stamp:", leftX, y)
-  y += 5
-  pdf.setDrawColor(180, 180, 180)
-  pdf.setLineWidth(0.3)
-  pdf.setLineDashPattern([2, 2], 0)
-  pdf.rect(lineStartX, y - 3, 55, 35)
-  pdf.setLineDashPattern([], 0)
-  y += 45
+    // Company Stamp
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Company Stamp:", leftX, y)
+    y += 5
+    pdf.setDrawColor(180, 180, 180)
+    pdf.setLineWidth(0.3)
+    pdf.setLineDashPattern([2, 2], 0)
+    pdf.rect(lineStartX, y - 3, 55, 35)
+    pdf.setLineDashPattern([], 0)
+    y += 45
 
-  // Divider
-  pdf.setDrawColor(BRAND_R, BRAND_G, BRAND_B)
-  pdf.setLineWidth(0.8)
-  pdf.line(margin + 10, y, pageWidth - margin - 10, y)
-  y += 10
+    // Divider
+    pdf.setDrawColor(BRAND_R, BRAND_G, BRAND_B)
+    pdf.setLineWidth(0.8)
+    pdf.line(margin + 10, y, pageWidth - margin - 10, y)
+    y += 10
 
-  // Footer note
-  pdf.setFontSize(8)
-  pdf.setFont("helvetica", "italic")
-  pdf.setTextColor(120, 120, 120)
-  pdf.text(
-    "This is a system-generated report. Valid only with authorized signature and company stamp.",
-    pageWidth / 2,
-    y,
-    { align: "center" }
-  )
-  y += 5
-  pdf.text(
-    `Report generated on: ${new Date().toLocaleString("en-IN")}`,
-    pageWidth / 2,
-    y,
-    { align: "center" }
-  )
+    // Footer note
+    pdf.setFontSize(8)
+    pdf.setFont("helvetica", "italic")
+    pdf.setTextColor(120, 120, 120)
+    pdf.text(
+      "This is a system-generated report. Valid only with authorized signature and company stamp.",
+      pageWidth / 2,
+      y,
+      { align: "center" }
+    )
+    y += 5
+    pdf.text(
+      `Report generated on: ${new Date().toLocaleString("en-IN")}`,
+      pageWidth / 2,
+      y,
+      { align: "center" }
+    )
 
-  addFooter(pdf, pageWidth, pageHeight, margin, totalPages, totalPages)
+    addFooter(pdf, pageWidth, pageHeight, margin, totalPages, totalPages)
+  } else {
+    // Internal copy — stamp a "not canonical" notice above the final page footer.
+    const bannerY = pageHeight - footerSpace - 8
+    pdf.setFillColor(250, 243, 224) // light amber
+    pdf.setDrawColor(200, 150, 50)
+    pdf.setLineWidth(0.3)
+    pdf.rect(margin, bannerY - 4, pageWidth - margin * 2, 8, 'FD')
+    pdf.setFontSize(7)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(130, 80, 10)
+    pdf.text(
+      "INTERNAL REVIEW COPY — not a signed record.",
+      margin + 3,
+      bannerY + 1
+    )
+    pdf.setFont("helvetica", "normal")
+    const stamp = `Downloaded${downloadedBy ? ` by ${downloadedBy}` : ''} on ${new Date().toLocaleString("en-IN")}`
+    pdf.text(stamp, pageWidth - margin - 3, bannerY + 1, { align: "right" })
+  }
 
   pdf.save(filename)
 }

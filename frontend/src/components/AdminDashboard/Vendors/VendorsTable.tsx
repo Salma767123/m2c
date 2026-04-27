@@ -46,11 +46,12 @@ const getLocationString = (vendor: VendorProfile): string => {
   return parts.length > 0 ? parts.join(', ') : 'Not specified'
 }
 
-const getRating = (vendor: VendorProfile): number => {
-  // For now, return a default rating since it's not in the backend model
-  // This could be calculated based on reviews/feedback in the future
-  return 4.5
-}
+// Admin delivery rating aggregate. Backend computes the average over all
+// admin reviews submitted for this vendor's orders; `ratingCount` is the
+// sample size. Until the first admin review lands for a vendor, the field is
+// null and the UI shows a "No reviews" placeholder.
+const hasRating = (vendor: VendorProfile): boolean =>
+  typeof vendor.rating === 'number' && (vendor.ratingCount ?? 0) > 0
 
 export default function VendorsTable() {
   const [vendors, setVendors] = useState<VendorProfile[]>([])
@@ -330,10 +331,15 @@ export default function VendorsTable() {
                     <TableCell>{getLocationString(vendor)}</TableCell>
                     <TableCell>{getStatusBadge(vendor.status)}</TableCell>
                     <TableCell>
-                      <div className="flex items-center">
-                        <span className="text-yellow-400">★</span>
-                        <span className="ml-1">{getRating(vendor)}</span>
-                      </div>
+                      {hasRating(vendor) ? (
+                        <div className="flex items-center" title={`Based on ${vendor.ratingCount} admin review${(vendor.ratingCount ?? 0) === 1 ? '' : 's'}`}>
+                          <span className="text-yellow-400">★</span>
+                          <span className="ml-1 font-medium">{vendor.rating?.toFixed(1)}</span>
+                          <span className="ml-1 text-xs text-gray-500">({vendor.ratingCount})</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">No reviews yet</span>
+                      )}
                     </TableCell>
                     <TableCell>{formatDate(vendor.createdAt)}</TableCell>
                     <TableCell>

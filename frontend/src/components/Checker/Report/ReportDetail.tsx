@@ -143,6 +143,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
           ? new Date(inspection.completedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
           : "—",
         filename: `Factory_Report_${vendorName.replace(/\s+/g, "_")}_${reportId.slice(-8).toUpperCase()}.pdf`,
+        inspectorName: inspection.checker?.name,
       }).catch(() => { /* silent */ })
     }
     const timer = setTimeout(tryDownload, 500)
@@ -213,6 +214,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
           ? new Date(inspection.completedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
           : "—",
         filename: `Factory_Report_${vendorName.replace(/\s+/g, "_")}_${reportId.slice(-8).toUpperCase()}.pdf`,
+        inspectorName: inspection.checker?.name,
       })
     } catch {
       alert("Failed to generate PDF. Please try again.")

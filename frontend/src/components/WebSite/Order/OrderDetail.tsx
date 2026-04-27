@@ -19,7 +19,8 @@ import {
   Download,
   MessageCircle,
   AlertCircle,
-  Clock
+  Clock,
+  ShoppingBag
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import orderService, { Order as APIOrder } from "@/services/orderService"
@@ -198,7 +199,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
 
   return (
     <div className="min-h-screen bg-white py-8 font-sans">
-      <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Link href="/order">
           <button className="flex items-center gap-2 text-white bg-[#222222] p-3 rounded-md mb-4 transition-colors">
             <ArrowLeft className="w-4 h-4" />
@@ -206,25 +207,25 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
           </button>
         </Link>
 
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-1">Order Details</h1>
+              <p className="text-slate-600">Order #{orderDetails.orderId}</p>
+            </div>
+            <div>
+              <div className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-medium ${getStatusColorClass(orderDetails.status)}`}>
+                <Package className="w-4 h-4 mr-1" />
+                {formatStatus(orderDetails.status)}
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Order Items */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Order Details</h1>
-                  <p className="text-slate-600">Order #{orderDetails.orderId}</p>
-                </div>
-                <div className="text-right">
-                  <div className={`inline-flex items-center px-3 py-2 rounded-full p-2 text-base font-medium ${getStatusColorClass(orderDetails.status)}`}>
-                    <Package className="w-4 h-4 mr-1" />
-                    {formatStatus(orderDetails.status)}
-                  </div>
-                </div>
-              </div>
-            </div>
             {/* Order Status Timeline */}
             <Card className="border">
               <CardHeader>
@@ -316,15 +317,26 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-lg font-bold text-slate-900">
-                            ₹{item.totalPrice.toFixed(2)}
+                            ${item.totalPrice.toFixed(2)}
                           </span>
                           <span className="text-sm text-slate-500">
-                            ₹{item.unitPrice.toFixed(2)} each
+                            ${item.unitPrice.toFixed(2)} each
                           </span>
                         </div>
                       </div>
                     </div>
                   ))}
+
+                  {/* Bag Add-on */}
+                  {orderDetails.bagTypeName && orderDetails.bagTypePrice && orderDetails.bagTypePrice > 0 && (
+                    <div className="flex items-center justify-between px-4 py-3 bg-amber-50/50 border border-amber-100 rounded-xl text-sm">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <ShoppingBag className="w-4 h-4 text-amber-600" />
+                        <span>Bag: {orderDetails.bagTypeName}</span>
+                      </div>
+                      <span className="font-semibold text-slate-900">${orderDetails.bagTypePrice.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -353,88 +365,96 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
           </div>
 
           {/* Order Summary & Details */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Order Summary */}
-            <Card className="border overflow-hidden sticky top-8">
-              <CardHeader className="border-b bg-slate-100">
-                <CardTitle className="text-xl">Order Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Subtotal</span>
-                  <span className="font-medium">₹{orderDetails.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Shipping</span>
-                  <span className="font-medium text-green-600">
-                    {orderDetails.shippingCost > 0 ? `₹${orderDetails.shippingCost.toFixed(2)}` : 'Free'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Tax</span>
-                  <span className="font-medium">₹{orderDetails.tax.toFixed(2)}</span>
-                </div>
-                {orderDetails.discount > 0 && (
+          <div className="lg:col-span-1">
+            <div className="lg:sticky lg:top-8 space-y-6">
+              {/* Order Summary */}
+              <Card className="border overflow-hidden">
+                <CardHeader className="border-b bg-slate-100">
+                  <CardTitle className="text-xl">Order Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
                   <div className="flex justify-between">
-                    <span className="text-slate-600">Discount</span>
-                    <span className="font-medium text-green-600">-₹{orderDetails.discount.toFixed(2)}</span>
+                    <span className="text-slate-600">Subtotal</span>
+                    <span className="font-medium">${orderDetails.subtotal.toFixed(2)}</span>
                   </div>
-                )}
-                <div className="border-t border-slate-200 pt-4">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span>₹{orderDetails.totalAmount.toFixed(2)}</span>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Shipping</span>
+                    <span className="font-medium text-green-600">
+                      {orderDetails.shippingCost > 0 ? `$${orderDetails.shippingCost.toFixed(2)}` : 'Free'}
+                    </span>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Delivery Information */}
-            <Card className="border overflow-hidden">
-              <CardHeader className="border-b bg-slate-100">
-                <CardTitle className="text-xl">Delivery Info</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <p className="font-medium text-slate-900">
-                      {normalizedStatus === "received" ? "Delivered" : "Estimated Delivery"}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {normalizedStatus === "received"
-                        ? `Delivered on ${new Date(orderDetails.createdAt).toLocaleDateString()}`
-                        : orderDetails.estimatedDelivery
-                          ? new Date(orderDetails.estimatedDelivery).toLocaleDateString()
-                          : "To be updated"
-                      }
-                    </p>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Tax</span>
+                    <span className="font-medium">${orderDetails.tax.toFixed(2)}</span>
                   </div>
-                </div>
-                {shippingAddr && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-green-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-slate-900">Shipping Address</p>
-                      <div className="text-sm text-slate-600">
-                        {shippingAddr.firstName && <p>{shippingAddr.firstName} {shippingAddr.lastName}</p>}
-                        {shippingAddr.street && <p>{shippingAddr.street}</p>}
-                        {shippingAddr.city && <p>{shippingAddr.city}, {shippingAddr.state} {shippingAddr.zipCode}</p>}
-                        {shippingAddr.phone && <p>{shippingAddr.phone}</p>}
-                      </div>
+                  {orderDetails.discount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Discount</span>
+                      <span className="font-medium text-green-600">-${orderDetails.discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {orderDetails.bagTypePrice && orderDetails.bagTypePrice > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Bag ({orderDetails.bagTypeName})</span>
+                      <span className="font-medium">${orderDetails.bagTypePrice.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-200 pt-4">
+                    <div className="flex justify-between text-lg font-bold">
+                      <span>Total</span>
+                      <span>${orderDetails.totalAmount.toFixed(2)}</span>
                     </div>
                   </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-purple-600" />
-                  <div>
-                    <p className="font-medium text-slate-900">Payment Method</p>
-                    <p className="text-sm text-slate-600">{orderDetails.paymentMethod || "N/A"}</p>
-                    <p className="text-xs text-slate-500 mt-1">Status: {orderDetails.paymentStatus}</p>
+                </CardContent>
+              </Card>
+
+              {/* Delivery Information */}
+              <Card className="border overflow-hidden">
+                <CardHeader className="border-b bg-slate-100">
+                  <CardTitle className="text-xl">Delivery Info</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-5 h-5 text-blue-600 shrink-0" />
+                    <div>
+                      <p className="font-medium text-slate-900">
+                        {normalizedStatus === "received" ? "Delivered" : "Estimated Delivery"}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {normalizedStatus === "received"
+                          ? `Delivered on ${new Date(orderDetails.createdAt).toLocaleDateString()}`
+                          : orderDetails.estimatedDelivery
+                            ? new Date(orderDetails.estimatedDelivery).toLocaleDateString()
+                            : "To be updated"
+                        }
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                  {shippingAddr && (
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900">Shipping Address</p>
+                        <div className="text-sm text-slate-600 break-words">
+                          {shippingAddr.firstName && <p>{shippingAddr.firstName} {shippingAddr.lastName}</p>}
+                          {shippingAddr.street && <p>{shippingAddr.street}</p>}
+                          {shippingAddr.city && <p>{shippingAddr.city}, {shippingAddr.state} {shippingAddr.zipCode}</p>}
+                          {shippingAddr.phone && <p>{shippingAddr.phone}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="w-5 h-5 text-purple-600 shrink-0" />
+                    <div>
+                      <p className="font-medium text-slate-900">Payment Method</p>
+                      <p className="text-sm text-slate-600">{orderDetails.paymentMethod || "N/A"}</p>
+                      <p className="text-xs text-slate-500 mt-1">Status: {orderDetails.paymentStatus}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
 

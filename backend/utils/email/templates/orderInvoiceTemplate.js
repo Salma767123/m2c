@@ -31,6 +31,8 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     tax = 0,
     discount = 0,
     totalAmount = 0,
+    bagTypeName,
+    bagTypePrice = 0,
     paymentMethod,
     paymentStatus,
   } = order;
@@ -41,8 +43,8 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     gstNumber = '',
     address = '',
     state = '',
-    country = 'India',
-    currency = '₹',
+    country = 'United States',
+    currency = '$',
   } = adminSettings;
 
   // Fallback to website logo if no custom company logo is set
@@ -55,22 +57,22 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   const sym = currency === 'INR' ? '₹' : currency;
 
   const fmt = (n) =>
-    Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const fmtDate = (d) =>
-    new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    new Date(d).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 
   const addr = typeof shippingAddress === 'string'
     ? JSON.parse(shippingAddress)
     : shippingAddress;
 
   const shippingAddrStr = [
-    addr.name,
-    addr.addressLine1,
+    addr.firstName && addr.lastName ? `${addr.firstName} ${addr.lastName}` : addr.name,
+    addr.street || addr.addressLine1,
     addr.addressLine2,
     `${addr.city || ''}, ${addr.state || ''}`,
-    addr.pincode || addr.zipCode,
-    addr.country,
+    addr.zipCode || addr.pincode,
+    addr.country ? `${addr.country} 🇺🇸` : '',
   ].filter(Boolean).join('\n');
 
   const payStatusColor = paymentStatus === 'PAID' ? '#16a34a' : '#dc2626';
@@ -195,6 +197,11 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
         <tr>
           <td style="padding:6px 0; color:#16a34a;">Discount</td>
           <td style="padding:6px 0; text-align:right; font-weight:600; color:#16a34a;">− ${sym}${fmt(discount)}</td>
+        </tr>` : ''}
+        ${bagTypePrice > 0 ? `
+        <tr>
+          <td style="padding:6px 0; color:#6b7280;">Bag (${bagTypeName || 'Add-on'})</td>
+          <td style="padding:6px 0; text-align:right; font-weight:600;">${sym}${fmt(bagTypePrice)}</td>
         </tr>` : ''}
         <tr style="border-top:2px solid #111827;">
           <td style="padding:10px 0; font-size:16px; font-weight:800; color:#111827;">Grand Total</td>

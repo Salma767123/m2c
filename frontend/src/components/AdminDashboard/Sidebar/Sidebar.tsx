@@ -26,6 +26,7 @@ import {
   Ticket,
   ShoppingCart,
   FileBarChart,
+  ShoppingBag,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -93,6 +94,11 @@ const navigation: NavigationItem[] = [
     icon: Ticket,
     href: "/admin/dashboard/coupons",
     permission: "view_coupons",
+  },
+  {
+    title: "Bag Types",
+    icon: ShoppingBag,
+    href: "/admin/dashboard/bag-types",
   },
   {
     title: "Inventory",

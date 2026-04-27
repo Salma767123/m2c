@@ -10,17 +10,20 @@ import {
   Truck,
   Lock,
   Shield,
-  Loader2
+  Loader2,
+  ShoppingBag
 } from "lucide-react"
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
 import ReviewOrder from "./CheckoutProcess/ReviewOrder"
+import AddressSelector from "./CheckoutProcess/AddressSelector"
 import cartService, { CartItem } from "@/services/cartService"
 import orderService from "@/services/orderService"
 import paymentService from "@/services/paymentService"
 import { userProfileService } from "@/services/userProfileService"
 import { userAuthService } from "@/services/userAuthService"
 import { paymentSettingsService, PublicPaymentSettings } from "@/services/paymentSettingsService"
+import { addressService, MAX_SAVED_ADDRESSES, type SavedAddress, type AddressPayload } from "@/services/addressService"
 
 // Declare Razorpay type for TypeScript
 declare global {
@@ -36,6 +39,7 @@ export interface CheckoutFormData {
   email: string
   phone: string
   address: string
+  addressLine2: string
   city: string
   state: string
   zipCode: string
@@ -58,11 +62,19 @@ export interface CheckoutFormData {
 export default function Checkout() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
+  const [shippingValid, setShippingValid] = useState(false)
   const [loading, setLoading] = useState(true)
   const [placingOrder, setPlacingOrder] = useState(false)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [paymentSettings, setPaymentSettings] = useState<PublicPaymentSettings | null>(null)
+
+  // Saved addresses state
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
+  const [useNewAddress, setUseNewAddress] = useState(false)
+  const [saveNewAddressToBook, setSaveNewAddressToBook] = useState(false)
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<CheckoutFormData>({
     firstName: "",
@@ -70,6 +82,7 @@ export default function Checkout() {
     email: "",
     phone: "",
     address: "",
+    addressLine2: "",
     city: "",
     state: "",
     zipCode: "",
@@ -97,17 +110,23 @@ export default function Checkout() {
   const [freeShippingApplied, setFreeShippingApplied] = useState(false)
   const [freeShippingMessage, setFreeShippingMessage] = useState("")
 
+  const [selectedBagTypeId, setSelectedBagTypeId] = useState<string | null>(null)
+  const [bagTypeName, setBagTypeName] = useState("")
+  const [bagTypePrice, setBagTypePrice] = useState(0)
+
   const [orderSummary, setOrderSummary] = useState({
     subtotal: 0,
     shipping: 0,
     tax: 0,
     discount: 0,
+    bagCost: 0,
     total: 0
   })
 
   useEffect(() => {
     fetchCart()
     fetchUserProfile()
+    fetchSavedAddresses()
     fetchPaymentSettings()
     loadRazorpayScript()
 
@@ -124,11 +143,24 @@ export default function Checkout() {
         console.error("Failed to parse coupon", e)
       }
     }
+
+    // Load selected bag type
+    const savedBag = localStorage.getItem('selectedBagType')
+    if (savedBag) {
+      try {
+        const { id, name, price } = JSON.parse(savedBag)
+        setSelectedBagTypeId(id)
+        setBagTypeName(name)
+        setBagTypePrice(price)
+      } catch {
+        localStorage.removeItem('selectedBagType')
+      }
+    }
   }, [])
 
   useEffect(() => {
     calculateTotals()
-  }, [cartItems, formData.shippingMethod, discountAmount])
+  }, [cartItems, formData.shippingMethod, discountAmount, bagTypePrice])
 
   const fetchCart = async () => {
     try {
@@ -167,18 +199,14 @@ export default function Checkout() {
         const firstName = nameParts[0] || ''
         const lastName = nameParts.slice(1).join(' ') || ''
 
-        // Pre-fill form with user data
+        // Pre-fill personal info only. Shipping address is sourced from saved addresses
+        // (see fetchSavedAddresses) so it isn't overridden by legacy flat User.address fields.
         setFormData(prev => ({
           ...prev,
-          firstName,
-          lastName,
+          firstName: prev.firstName || firstName,
+          lastName: prev.lastName || lastName,
           email: userData.email,
-          phone: userData.phoneNumber || '',
-          address: userData.address || '',
-          city: userData.city || '',
-          state: userData.state || '',
-          zipCode: userData.zipCode || '',
-          country: userData.country || 'United States'
+          phone: prev.phone || userData.phoneNumber || '',
         }))
       }
     } catch (err: any) {
@@ -186,6 +214,150 @@ export default function Checkout() {
       // Don't show error to user, just log it
       // User can still manually enter address
     }
+  }
+
+  const fetchSavedAddresses = async () => {
+    try {
+      if (!userAuthService.isAuthenticated()) return
+      const list = await addressService.list()
+      setSavedAddresses(list)
+      // Auto-select default if user has addresses; otherwise go straight to new-address entry
+      const def = list.find((a) => a.isDefault) || list[0]
+      if (def) {
+        setSelectedAddressId(def.id)
+        setUseNewAddress(false)
+        applySavedAddressToForm(def)
+      } else {
+        setUseNewAddress(true)
+      }
+    } catch (err) {
+      console.error("Failed to load saved addresses:", err)
+      setUseNewAddress(true)
+    }
+  }
+
+  const applySavedAddressToForm = (addr: SavedAddress) => {
+    const nameParts = (addr.name || "").trim().split(/\s+/)
+    const firstName = nameParts[0] || ""
+    const lastName = nameParts.slice(1).join(" ") || ""
+    setFormData((prev) => ({
+      ...prev,
+      firstName,
+      lastName,
+      phone: addr.phone || prev.phone,
+      address: addr.address || "",
+      addressLine2: addr.addressLine2 || "",
+      city: addr.city || "",
+      state: addr.state || "",
+      zipCode: addr.zipCode || "",
+      country: addr.country || "United States",
+    }))
+  }
+
+  const handleSelectSavedAddress = (id: string) => {
+    const addr = savedAddresses.find((a) => a.id === id)
+    if (!addr) return
+    setSelectedAddressId(id)
+    setUseNewAddress(false)
+    setSaveNewAddressToBook(false)
+    applySavedAddressToForm(addr)
+  }
+
+  const handleEditAddress = (id: string) => {
+    const addr = savedAddresses.find((a) => a.id === id)
+    if (!addr) return
+    setEditingAddressId(id)
+    setSelectedAddressId(id)
+    setUseNewAddress(true)
+    setSaveNewAddressToBook(false)
+    applySavedAddressToForm(addr)
+  }
+
+  const handleChooseNewAddress = () => {
+    setUseNewAddress(true)
+    setSelectedAddressId(null)
+    setEditingAddressId(null)
+    // Clear shipping fields so the user enters fresh data; keep email so it's not lost
+    setFormData((prev) => ({
+      ...prev,
+      firstName: "",
+      lastName: "",
+      phone: "",
+      address: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "United States",
+    }))
+  }
+
+  // True when Step 1 can proceed: either a saved address is selected, or the new-address form is valid.
+  const canAdvanceShipping = useNewAddress ? shippingValid : !!selectedAddressId
+
+  // If the user opted to save a new address to the address book, persist it before advancing.
+  // A save failure is surfaced but does NOT block checkout — the user should still be able to complete the order.
+  const handleShippingStepAdvance = async () => {
+    const isAuthed = userAuthService.isAuthenticated()
+
+    // Editing an existing saved address — update it in the address book
+    if (useNewAddress && editingAddressId && isAuthed) {
+      try {
+        const existing = savedAddresses.find(a => a.id === editingAddressId)
+        const payload: AddressPayload = {
+          type: existing?.type || "home",
+          name: `${formData.firstName} ${formData.lastName}`.trim(),
+          phone: formData.phone,
+          address: formData.address,
+          addressLine2: formData.addressLine2 || undefined,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: "United States",
+          isDefault: existing?.isDefault || false,
+        }
+        const updated = await addressService.update(editingAddressId, payload)
+        setSavedAddresses((prev) => prev.map(a => a.id === editingAddressId ? updated : a))
+        setSelectedAddressId(editingAddressId)
+        setEditingAddressId(null)
+        setUseNewAddress(false)
+      } catch (err: any) {
+        console.error("Failed to update address:", err)
+        // Warn but do not block checkout — the form data is still valid for shipping
+        setError(err?.message || "Could not update address — your changes will still be used for this order")
+      }
+    }
+    // Saving a new address to the address book
+    else if (
+      useNewAddress &&
+      saveNewAddressToBook &&
+      isAuthed &&
+      savedAddresses.length < MAX_SAVED_ADDRESSES
+    ) {
+      try {
+        const payload: AddressPayload = {
+          type: "home",
+          name: `${formData.firstName} ${formData.lastName}`.trim(),
+          phone: formData.phone,
+          address: formData.address,
+          addressLine2: formData.addressLine2 || undefined,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: "United States",
+          isDefault: savedAddresses.length === 0,
+        }
+        const created = await addressService.create(payload)
+        setSavedAddresses((prev) => [created, ...prev])
+        setSelectedAddressId(created.id)
+        setSaveNewAddressToBook(false)
+      } catch (err: any) {
+        console.error("Failed to save address to book:", err)
+        // Warn but do not block checkout — the form data is still valid for shipping
+        setError(err?.message || "Could not save address to your address book — your details will still be used for this order")
+      }
+    }
+    setCurrentStep((s) => s + 1)
   }
 
   const fetchPaymentSettings = async () => {
@@ -234,14 +406,15 @@ export default function Checkout() {
       const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0
       return sum + (itemSubtotal * gstRate)
     }, 0)
-    // Calculate total with discount, ensure >= 0
-    const total = Math.max(0, subtotal + shipping + tax - discountAmount)
+    // Calculate total with discount + bag cost, ensure >= 0
+    const total = Math.max(0, subtotal + shipping + tax - discountAmount + bagTypePrice)
 
     setOrderSummary({
       subtotal,
       shipping,
       tax,
       discount: discountAmount,
+      bagCost: bagTypePrice,
       total
     })
   }
@@ -279,6 +452,7 @@ export default function Checkout() {
         email: formData.email,
         phone: formData.phone,
         street: formData.address,
+        addressLine2: formData.addressLine2 || "",
         city: formData.city,
         state: formData.state,
         zipCode: formData.zipCode,
@@ -391,14 +565,17 @@ export default function Checkout() {
         shippingCost: orderSummary.shipping,
         tax: orderSummary.tax,
         discount: orderSummary.discount,
-        freeShipping: freeShippingApplied
+        freeShipping: freeShippingApplied,
+        bagTypeId: selectedBagTypeId || undefined
       })
 
       if (response.success && response.data) {
         localStorage.removeItem('appliedCoupon')
+        localStorage.removeItem('selectedBagType')
         router.push(`/order-confirmation?id=${response.data.id}`)
       } else {
         localStorage.removeItem('appliedCoupon')
+        localStorage.removeItem('selectedBagType')
         router.push("/order-confirmation")
       }
     } catch (error: any) {
@@ -441,9 +618,83 @@ export default function Checkout() {
     </div>
   )
 
-  const renderShippingForm = () => (
-    <ShippingForm formData={formData} updateFormData={updateFormData} />
-  )
+  const renderShippingForm = () => {
+    const canSaveMore = savedAddresses.length < MAX_SAVED_ADDRESSES
+    const isAuthed = userAuthService.isAuthenticated()
+    return (
+      <div className="space-y-6">
+        {savedAddresses.length > 0 && (
+          <AddressSelector
+            addresses={savedAddresses}
+            selectedId={selectedAddressId}
+            useNewAddress={useNewAddress}
+            onSelect={handleSelectSavedAddress}
+            onChooseNew={handleChooseNewAddress}
+            onEdit={handleEditAddress}
+            disabled={placingOrder}
+          />
+        )}
+
+        {useNewAddress && (
+          <>
+            {savedAddresses.length > 0 && (
+              <div className="border-t border-slate-200 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    {editingAddressId ? "Edit shipping address" : "Enter new shipping address"}
+                  </h3>
+                  {editingAddressId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingAddressId(null)
+                        setUseNewAddress(false)
+                        if (selectedAddressId) {
+                          const addr = savedAddresses.find(a => a.id === selectedAddressId)
+                          if (addr) applySavedAddressToForm(addr)
+                        }
+                      }}
+                      className="px-4 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            <ShippingForm
+              formData={formData}
+              updateFormData={updateFormData}
+              disabled={placingOrder}
+              onValidityChange={setShippingValid}
+            />
+            {isAuthed && !editingAddressId && canSaveMore && (
+              <label className="flex items-center gap-3 cursor-pointer select-none pt-2">
+                <input
+                  type="checkbox"
+                  checked={saveNewAddressToBook}
+                  onChange={(e) => setSaveNewAddressToBook(e.target.checked)}
+                  disabled={placingOrder}
+                  className="w-4 h-4 accent-gray-800"
+                />
+                <span className="text-sm text-slate-700">
+                  Save this address to my address book
+                  <span className="text-slate-400 ml-1">
+                    ({savedAddresses.length}/{MAX_SAVED_ADDRESSES} used)
+                  </span>
+                </span>
+              </label>
+            )}
+            {isAuthed && !canSaveMore && (
+              <p className="text-xs text-slate-500 pt-2">
+                You&apos;ve reached the {MAX_SAVED_ADDRESSES}-address limit — this address won&apos;t be saved to your address book.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    )
+  }
 
   const renderPaymentForm = () => (
     <PaymentForm formData={formData} updateFormData={updateFormData} paymentSettings={paymentSettings} />
@@ -512,8 +763,15 @@ export default function Checkout() {
                   </button>
                   <button
                     onClick={() => {
+                      if (currentStep === 1 && !canAdvanceShipping) {
+                        return;
+                      }
                       if (currentStep < 3) {
-                        setCurrentStep(currentStep + 1)
+                        if (currentStep === 1) {
+                          void handleShippingStepAdvance()
+                        } else {
+                          setCurrentStep(currentStep + 1)
+                        }
                       } else {
                         handlePlaceOrder()
                       }
@@ -523,7 +781,8 @@ export default function Checkout() {
                       cartItems.some(item =>
                         item.product?.inStock === false ||
                         (item.product?.availableStock !== undefined && item.quantity > item.product?.availableStock)
-                      )
+                      ) ||
+                      (currentStep === 1 && !canAdvanceShipping)
                     }
                     className="px-8 py-3 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                   >
@@ -592,6 +851,17 @@ export default function Checkout() {
                       </div>
                     )
                   })}
+
+                  {/* Bag Add-on */}
+                  {bagTypeName && bagTypePrice > 0 && (
+                    <div className="flex items-center justify-between px-1 py-2 text-sm text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-amber-600" />
+                        <span>Bag: {bagTypeName}</span>
+                      </div>
+                      <span className="font-medium text-slate-900">${bagTypePrice.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4 mb-6 border-t border-slate-200 pt-4">
@@ -636,6 +906,12 @@ export default function Checkout() {
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
                       <span className="font-medium">-${orderSummary.discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {orderSummary.bagCost > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Bag ({bagTypeName})</span>
+                      <span className="font-medium">${orderSummary.bagCost.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="border-t border-slate-200 pt-4">

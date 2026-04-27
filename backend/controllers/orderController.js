@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const { generateInvoiceNo } = require('../utils/invoiceGenerator');
+const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 const { notifications } = require('../utils/notificationService');
 
 // Create new order
@@ -13,6 +14,7 @@ const createOrder = async (req, res) => {
             shippingCost = 0,
             tax = 0,
             discount = 0,
+            bagTypeId = null,
             couponCode = null,
         } = req.body;
 
@@ -149,7 +151,23 @@ const createOrder = async (req, res) => {
             }
         }
 
-        // 5. Create Order
+        // 5. Resolve bag type selection (if any)
+        let bagTypeName = null;
+        let bagTypePrice = 0;
+
+        if (bagTypeId) {
+            const bagType = await prisma.bagType.findUnique({ where: { id: bagTypeId } });
+            if (!bagType || !bagType.isActive) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Selected bag type is not available'
+                });
+            }
+            bagTypeName = bagType.name;
+            bagTypePrice = bagType.price;
+        }
+
+        // 6. Create Order
         // Generate unique Order ID
         const timestamp = Date.now().toString().slice(-6);
         const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
@@ -158,7 +176,7 @@ const createOrder = async (req, res) => {
         // Generate invoice number from InvoiceSettings
         const invoiceNo = await generateInvoiceNo(prisma);
 
-        const totalAmount = subtotal + shippingCost + tax - discount;
+        const totalAmount = subtotal + shippingCost + tax - discount + bagTypePrice;
 
         // Group vendor totals for Settlements (Now calculated in the main cart loop)
 
@@ -184,6 +202,9 @@ const createOrder = async (req, res) => {
                     tax,
                     discount,
                     totalAmount,
+                    bagTypeId: bagTypeId || undefined,
+                    bagTypeName,
+                    bagTypePrice,
                     couponCode: couponCode || null,
                     paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PAID',
                     paymentMethod,
@@ -197,6 +218,35 @@ const createOrder = async (req, res) => {
                     items: true
                 }
             });
+
+            // Re-validate stock inside transaction to prevent concurrent overselling.
+            // The outer check (pre-transaction) is a fast-path guard; this is the
+            // authoritative check under transactional isolation.
+            for (const update of stockUpdates) {
+                if (update.variantId) {
+                    const freshVariant = await tx.productVariant.findUnique({
+                        where: { id: update.variantId },
+                        select: { stock: true },
+                    });
+                    if (!freshVariant || freshVariant.stock < update.quantity) {
+                        throw Object.assign(
+                            new Error(`Insufficient stock for one of the products. Please refresh and try again.`),
+                            { statusCode: 409 }
+                        );
+                    }
+                } else {
+                    const freshProduct = await tx.product.findUnique({
+                        where: { id: update.id },
+                        select: { totalStock: true },
+                    });
+                    if (!freshProduct || freshProduct.totalStock < update.quantity) {
+                        throw Object.assign(
+                            new Error(`Insufficient stock for one of the products. Please refresh and try again.`),
+                            { statusCode: 409 }
+                        );
+                    }
+                }
+            }
 
             // Increment coupon usedCount if a coupon was applied
             if (couponCode) {
@@ -324,6 +374,39 @@ const createOrder = async (req, res) => {
                 });
             }
 
+            // Create VendorShipments — one per vendor in this order.
+            // Each shipment tracks its own status, shipping, hub, and review.
+            const vendorItemGroups = {};
+            for (const item of newOrder.items) {
+                if (!vendorItemGroups[item.vendorId]) {
+                    vendorItemGroups[item.vendorId] = {
+                        vendorName: item.vendorName,
+                        itemIds: [],
+                    };
+                }
+                vendorItemGroups[item.vendorId].itemIds.push(item.id);
+            }
+
+            let shipmentIdx = 0;
+            for (const [vid, group] of Object.entries(vendorItemGroups)) {
+                shipmentIdx++;
+                const shipmentDisplayId = `${orderDisplayId}-V${shipmentIdx}`;
+                const shipment = await tx.vendorShipment.create({
+                    data: {
+                        shipmentId: shipmentDisplayId,
+                        orderId: newOrder.id,
+                        vendorId: vid,
+                        vendorName: group.vendorName,
+                        status: 'ORDER_CREATED',
+                    },
+                });
+                // Link items to their shipment
+                await tx.orderItem.updateMany({
+                    where: { id: { in: group.itemIds } },
+                    data: { shipmentId: shipment.id },
+                });
+            }
+
             // Clear Cart
             await tx.cartItem.deleteMany({
                 where: { cartId: cart.id }
@@ -352,6 +435,9 @@ const createOrder = async (req, res) => {
         });
 
     } catch (error) {
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, error: error.message });
+        }
         console.error('Create order error:', error);
         res.status(500).json({
             success: false,
@@ -368,7 +454,7 @@ const getUserOrders = async (req, res) => {
         const orders = await prisma.order.findMany({
             where: { customerId: userId },
             include: {
-                items: true
+                items: ACTIVE_ITEMS_FILTER,
             },
             orderBy: {
                 createdAt: 'desc'
@@ -404,7 +490,7 @@ const getOrderById = async (req, res) => {
             order = await prisma.order.findUnique({
                 where: { id },
                 include: {
-                    items: true,
+                    items: ACTIVE_ITEMS_FILTER,
                     statusHistory: true
                 }
             });
@@ -415,7 +501,7 @@ const getOrderById = async (req, res) => {
             order = await prisma.order.findUnique({
                 where: { orderId: id },
                 include: {
-                    items: true,
+                    items: ACTIVE_ITEMS_FILTER,
                     statusHistory: true
                 }
             });

@@ -7,12 +7,21 @@ const adminReviewController = require('../controllers/adminReviewController');
 const { authenticateToken, requireAdminRole, requireVendorRole, requirePermission } = require('../middleware/auth');
 const { getOrderInvoiceHTML } = require('../utils/email/templates/orderInvoiceTemplate');
 const { prisma } = require('../config/database');
+const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 
 // Apply base auth middleware to all routes
 router.use(authenticateToken);
 
 // ============================================
-// ADMIN ROUTES (/api/orders/admin/*)
+// ADMIN SHIPMENT ROUTES (/api/orders/admin/shipments/*)
+// These must come BEFORE /admin/:id so "shipments" isn't treated as an ID.
+// ============================================
+router.get('/admin/shipments', requireAdminRole, adminOrderController.getAllShipmentsAdmin);
+router.get('/admin/shipments/:id', requireAdminRole, adminOrderController.getShipmentByIdAdmin);
+router.put('/admin/shipments/:id/status', requireAdminRole, adminOrderController.updateShipmentStatusAdmin);
+
+// ============================================
+// ADMIN ORDER ROUTES (/api/orders/admin/*)
 // ============================================
 router.get('/admin', requireAdminRole, requirePermission('view_orders'), adminOrderController.getAllOrdersAdmin);
 router.get('/admin/:id', requireAdminRole, requirePermission('view_orders'), adminOrderController.getAdminOrderById);
@@ -25,7 +34,7 @@ router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['view_bill
         const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
         const where = isObjectId ? { id } : { orderId: id };
 
-        const order = await prisma.order.findUnique({ where, include: { items: true } });
+        const order = await prisma.order.findUnique({ where, include: { items: ACTIVE_ITEMS_FILTER } });
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
 
         // Fetch company info for invoice header (logo, name, GST, etc.)
@@ -53,6 +62,10 @@ router.get('/admin/:id/invoice', requireAdminRole, requirePermission(['view_bill
 // ADMIN REVIEW ROUTES (/api/orders/admin-reviews/*)
 // ============================================
 router.get('/admin-reviews', requireAdminRole, requirePermission('view_orders'), adminReviewController.getAllAdminReviews);
+// Shipment-based review routes (primary path for new orders)
+router.get('/admin-reviews/shipment/:shipmentId', requireAdminRole, requirePermission('view_orders'), adminReviewController.getAdminReviewByShipment);
+router.post('/admin-reviews/shipment/:shipmentId', requireAdminRole, requirePermission('edit_orders'), adminReviewController.createOrUpdateShipmentReview);
+// Order-based review routes (backward compat for legacy orders)
 router.get('/admin-reviews/order/:orderId', requireAdminRole, requirePermission('view_orders'), adminReviewController.getAdminReviewByOrder);
 router.post('/admin-reviews/order/:orderId', requireAdminRole, requirePermission('edit_orders'), adminReviewController.createOrUpdateAdminReview);
 router.delete('/admin-reviews/:id', requireAdminRole, requirePermission('delete_orders'), adminReviewController.deleteAdminReview);
@@ -61,8 +74,12 @@ router.delete('/admin-reviews/:id', requireAdminRole, requirePermission('delete_
 // VENDOR ROUTES (/api/orders/vendor/*)
 // ============================================
 router.get('/vendor', requireVendorRole, vendorOrderController.getVendorOrders);
+// More-specific /vendor/reviews must be registered BEFORE /vendor/:id so Express
+// doesn't treat "reviews" as an order id.
+router.get('/vendor/reviews', requireVendorRole, vendorOrderController.getVendorReviews);
 router.get('/vendor/:id', requireVendorRole, vendorOrderController.getVendorOrderById);
 router.put('/vendor/:id/status', requireVendorRole, vendorOrderController.updateVendorOrderStatus);
+router.post('/vendor/:id/reship', requireVendorRole, vendorOrderController.reshipVendorOrder);
 
 // ============================================
 // CUSTOMER ROUTES (/api/orders/*)
@@ -79,7 +96,7 @@ router.get('/:id/invoice', async (req, res) => {
         const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
         const where = isObjectId ? { id } : { orderId: id };
 
-        const order = await prisma.order.findUnique({ where, include: { items: true } });
+        const order = await prisma.order.findUnique({ where, include: { items: ACTIVE_ITEMS_FILTER } });
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
         if (order.customerId !== userId) return res.status(403).json({ success: false, error: 'Unauthorized' });
 

@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
     ArrowLeft, Building2, ShieldCheck, Factory,
     CheckCircle, XCircle, AlertTriangle, Clock,
-    FileText, ClipboardList, Package, Settings, Camera
+    FileText, ClipboardList, Package, Settings, Download, Camera
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import vendorService from '@/services/vendorService'
+import { downloadReportPdf } from '@/lib/reportPdfDownload'
+import { getStoredAuth } from '@/lib/auth'
 
 interface Props {
     inspectionId: string
@@ -68,9 +70,15 @@ function YesNoRow({ label, value }: { label: string; value?: string }) {
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function FactoryInspectionDetail({ inspectionId }: Props) {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const autoDownload = searchParams.get('download') === 'true'
     const [inspection, setInspection] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [downloading, setDownloading] = useState(false)
+    const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null)
+    const reportRef = useRef<HTMLDivElement>(null)
+    const autoDownloadTriggered = useRef(false)
 
     useEffect(() => {
         const load = async () => {
@@ -90,6 +98,34 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
         load()
     }, [inspectionId])
 
+    useEffect(() => {
+        if (!autoDownload || autoDownloadTriggered.current || loading || !inspection || downloading) return
+        let cancelled = false
+        const tryDownload = () => {
+            if (cancelled) return
+            if (!reportRef.current) {
+                setTimeout(tryDownload, 300)
+                return
+            }
+            autoDownloadTriggered.current = true
+            const vendorName = inspection.vendor?.companyName || 'Report'
+            const adminUser = getStoredAuth()?.user
+            const downloadedBy = adminUser ? `${adminUser.name || 'Admin'} <${adminUser.email}>` : undefined
+            downloadReportPdf({
+                element: reportRef.current,
+                title: 'Factory Inspection Report',
+                submittedDate: inspection.completedAt
+                    ? new Date(inspection.completedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+                    : '—',
+                filename: `Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}_Internal.pdf`,
+                variant: 'internal',
+                downloadedBy,
+            }).catch(() => { /* silent */ })
+        }
+        const timer = setTimeout(tryDownload, 500)
+        return () => { cancelled = true; clearTimeout(timer) }
+    }, [autoDownload, loading, inspection, downloading, inspectionId])
+
     if (loading) return (
         <div className="flex items-center justify-center min-h-[60vh]">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
@@ -106,6 +142,30 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
 
     const status = inspection.status
     const isCompleted = status === 'COMPLETED'
+
+    const handleDownloadPdf = async () => {
+        if (!reportRef.current) return
+        setDownloading(true)
+        try {
+            const vendorName = inspection.vendor?.companyName || 'Report'
+            const adminUser = getStoredAuth()?.user
+            const downloadedBy = adminUser ? `${adminUser.name || 'Admin'} <${adminUser.email}>` : undefined
+            await downloadReportPdf({
+                element: reportRef.current,
+                title: 'Factory Inspection Report',
+                submittedDate: inspection.completedAt
+                    ? new Date(inspection.completedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+                    : '—',
+                filename: `Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}_Internal.pdf`,
+                variant: 'internal',
+                downloadedBy,
+            })
+        } catch {
+            alert('Failed to generate PDF. Please try again.')
+        } finally {
+            setDownloading(false)
+        }
+    }
 
     // itemsToInspect is the ORIGINAL ARRAY when assigned (admin side)
     // After checker completes, it becomes the FORM DATA OBJECT
@@ -140,6 +200,14 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         {inspection.vendor?.companyName} &bull; Ref: {inspectionId.slice(-8).toUpperCase()}
                     </p>
                 </div>
+                <button
+                    onClick={handleDownloadPdf}
+                    disabled={downloading}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#222222] rounded-lg hover:bg-[#333333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                >
+                    <Download className="w-4 h-4" />
+                    {downloading ? 'Generating...' : 'Download PDF'}
+                </button>
                 <div className="flex gap-2 flex-shrink-0">
                     <Badge className={statusColors[status] || 'bg-gray-100 text-gray-700'}>
                         {status}
@@ -152,28 +220,31 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 </div>
             </div>
 
+            {/* PDF capture area */}
+            <div ref={reportRef} className="space-y-6">
+
             {/* Assignment Banner */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 text-white">
+            <div className="bg-gradient-to-r from-[#222222] to-[#333333] rounded-2xl p-6 text-white">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     <div>
-                        <p className="text-blue-200 text-xs font-medium uppercase mb-1">Vendor</p>
+                        <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Vendor</p>
                         <p className="font-semibold text-sm">{inspection.vendor?.companyName || '—'}</p>
-                        <p className="text-blue-200 text-xs mt-0.5">{inspection.vendor?.email}</p>
+                        <p className="text-neutral-400 text-xs mt-0.5">{inspection.vendor?.email}</p>
                     </div>
                     <div>
-                        <p className="text-blue-200 text-xs font-medium uppercase mb-1">QC Checker</p>
+                        <p className="text-neutral-400 text-xs font-medium uppercase mb-1">QC Checker</p>
                         <p className="font-semibold text-sm">{inspection.checker?.name || '—'}</p>
-                        <p className="text-blue-200 text-xs mt-0.5">{inspection.checker?.email}</p>
+                        <p className="text-neutral-400 text-xs mt-0.5">{inspection.checker?.email}</p>
                     </div>
                     <div>
-                        <p className="text-blue-200 text-xs font-medium uppercase mb-1">Scheduled</p>
+                        <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Scheduled</p>
                         <p className="font-semibold text-sm">{inspection.scheduledDate || '—'}</p>
-                        <p className="text-blue-200 text-xs mt-0.5">{inspection.scheduledTime}</p>
+                        <p className="text-neutral-400 text-xs mt-0.5">{inspection.scheduledTime}</p>
                     </div>
                     <div>
-                        <p className="text-blue-200 text-xs font-medium uppercase mb-1">Client / Priority</p>
+                        <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Client / Priority</p>
                         <p className="font-semibold text-sm">{inspection.clientName || '—'}</p>
-                        <p className="text-blue-200 text-xs mt-0.5">Priority: {inspection.priority}</p>
+                        <p className="text-neutral-400 text-xs mt-0.5">Priority: {inspection.priority}</p>
                     </div>
                 </div>
             </div>
@@ -281,15 +352,22 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                             const src = p?.data || p?.url || null
                                             const isImage = src && typeof src === 'string' && (src.startsWith('data:image') || src.startsWith('http'))
                                             return isImage ? (
-                                                <div key={i} className="relative group">
+                                                <div
+                                                    key={i}
+                                                    className="relative group cursor-pointer"
+                                                    onClick={() => setSelectedImage({ src, alt: p.name || `Photo ${i + 1}` })}
+                                                >
                                                     <img
                                                         src={src}
                                                         alt={p.name || `Photo ${i + 1}`}
-                                                        className="w-full h-32 object-cover rounded-xl border border-slate-200 shadow-sm"
+                                                        onError={(e) => { e.currentTarget.style.display = "none" }}
+                                                        className="w-full h-32 object-cover rounded-xl border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
                                                     />
-                                                    <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        {p.name}
-                                                    </div>
+                                                    {p.name && (
+                                                        <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            {p.name}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div key={i} className="flex items-center justify-center h-32 bg-slate-100 rounded-xl border border-dashed border-slate-300">
@@ -410,6 +488,32 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     <InfoCard label="Estimated Duration" value={inspection.estimatedDuration} />
                 </div>
             </div>
+
+            </div>{/* end PDF capture area */}
+
+            {/* Fullscreen Image Modal */}
+            {selectedImage && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div className="relative max-w-5xl max-h-screen">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedImage(null) }}
+                            className="absolute -top-10 -right-4 p-2 text-white hover:text-gray-300"
+                        >
+                            <XCircle className="w-8 h-8" />
+                        </button>
+                        <img
+                            src={selectedImage.src}
+                            alt={selectedImage.alt}
+                            className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <p className="text-center text-white mt-4 text-sm font-medium">{selectedImage.alt}</p>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -2,7 +2,9 @@ import axios from '@/lib/axios';
 
 export interface AdminOrderReview {
     id: string;
-    orderId: string;
+    orderId?: string;
+    shipmentId?: string;
+    vendorId?: string;
     reviewComments?: string;
     qualityCheckNotes?: string;
     rating?: number;
@@ -13,6 +15,12 @@ export interface AdminOrderReview {
     returnToVendor: boolean;
     createdAt: string;
     updatedAt: string;
+    shipment?: {
+        id: string;
+        shipmentId: string;
+        vendorName: string;
+        status: string;
+    } | null;
     order?: {
         id: string;
         orderId: string;
@@ -54,6 +62,16 @@ export interface AdminOrderReviewsResponse {
         approved: number;
         rejected: number;
     };
+    ratingDistribution?: Record<number, number>;
+}
+
+interface ReviewPayload {
+    reviewComments?: string;
+    qualityCheckNotes?: string;
+    rating?: number;
+    approved: boolean;
+    rejectionReason?: string;
+    returnToVendor?: boolean;
 }
 
 class AdminReviewService {
@@ -63,39 +81,56 @@ class AdminReviewService {
         status?: string;
         page?: number;
         limit?: number;
+        vendorId?: string;
     }): Promise<AdminOrderReviewsResponse> {
         try {
             const response = await axios.get('/orders/admin-reviews', { params });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to fetch admin reviews');
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to fetch admin reviews');
         }
     }
 
-    // Get admin review for a specific order
+    // Get admin review for a specific shipment (primary path)
+    async getAdminReviewByShipment(shipmentId: string): Promise<{ success: boolean; data: AdminOrderReview }> {
+        try {
+            const response = await axios.get(`/orders/admin-reviews/shipment/${shipmentId}`);
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to fetch admin review');
+        }
+    }
+
+    // Create or update admin review for a shipment (primary path)
+    async createOrUpdateShipmentReview(
+        shipmentId: string,
+        reviewData: ReviewPayload
+    ): Promise<{ success: boolean; data: AdminOrderReview; message: string }> {
+        try {
+            const response = await axios.post(`/orders/admin-reviews/shipment/${shipmentId}`, reviewData);
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to save admin review');
+        }
+    }
+
+    // Get admin review for a specific order (backward compat)
     async getAdminReviewByOrder(orderId: string): Promise<{ success: boolean; data: AdminOrderReview }> {
         try {
             const response = await axios.get(`/orders/admin-reviews/order/${orderId}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to fetch admin review');
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to fetch admin review');
         }
     }
 
-    // Create or update admin review for an order
-    async createOrUpdateAdminReview(orderId: string, reviewData: {
-        reviewComments?: string;
-        qualityCheckNotes?: string;
-        rating?: number;
-        approved: boolean;
-        rejectionReason?: string;
-        returnToVendor?: boolean;
-    }): Promise<{ success: boolean; data: AdminOrderReview; message: string }> {
+    // Create or update admin review for an order (backward compat)
+    async createOrUpdateAdminReview(orderId: string, reviewData: ReviewPayload): Promise<{ success: boolean; data: AdminOrderReview; message: string }> {
         try {
             const response = await axios.post(`/orders/admin-reviews/order/${orderId}`, reviewData);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to save admin review');
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to save admin review');
         }
     }
 
@@ -105,7 +140,7 @@ class AdminReviewService {
             const response = await axios.delete(`/orders/admin-reviews/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to delete admin review');
+            throw new Error(error.response?.data?.message || error.response?.data?.error || 'Failed to delete admin review');
         }
     }
 }

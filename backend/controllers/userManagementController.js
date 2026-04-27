@@ -44,6 +44,23 @@ exports.getCustomers = async (req, res) => {
             }
         });
 
+        // Aggregate order counts and spending per customer
+        const customerIds = customers.map(c => c.id);
+        const orderAggregations = await prisma.order.groupBy({
+            by: ['customerId'],
+            where: { customerId: { in: customerIds } },
+            _count: { id: true },
+            _sum: { totalAmount: true }
+        });
+
+        const orderMap = {};
+        for (const agg of orderAggregations) {
+            orderMap[agg.customerId] = {
+                totalOrders: agg._count.id,
+                totalSpent: agg._sum.totalAmount || 0
+            };
+        }
+
         // Formatting for frontend expected Customer interface
         const formattedCustomers = customers.map(c => {
             let currentStatus = 'pending';
@@ -64,8 +81,8 @@ exports.getCustomers = async (req, res) => {
                 status: currentStatus,
                 joinDate: c.createdAt,
                 lastLogin: c.lastLogin || c.createdAt,
-                totalOrders: 0, // Mock for now, you can aggregation
-                totalSpent: 0,
+                totalOrders: orderMap[c.id]?.totalOrders || 0,
+                totalSpent: orderMap[c.id]?.totalSpent || 0,
                 loyaltyTier: 'Bronze', // Mock
                 avatar: c.image,
                 address: {
@@ -84,6 +101,95 @@ exports.getCustomers = async (req, res) => {
     } catch (error) {
         console.error('Error getting customers:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch customers' });
+    }
+};
+
+// Get single customer by ID with order history
+exports.getCustomerById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const customer = await prisma.user.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                phoneNumber: true,
+                isActive: true,
+                isVerified: true,
+                createdAt: true,
+                lastLogin: true,
+                image: true,
+                addresses: true
+            }
+        });
+
+        if (!customer) {
+            return res.status(404).json({ success: false, error: 'Customer not found' });
+        }
+
+        // Get order stats
+        const orderAgg = await prisma.order.aggregate({
+            where: { customerId: id },
+            _count: { id: true },
+            _sum: { totalAmount: true }
+        });
+
+        // Get recent orders
+        const recentOrders = await prisma.order.findMany({
+            where: { customerId: id },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            select: {
+                id: true,
+                orderId: true,
+                status: true,
+                totalAmount: true,
+                createdAt: true,
+                paymentStatus: true,
+                paymentMethod: true,
+                items: {
+                    select: {
+                        id: true,
+                        productName: true,
+                        productImage: true,
+                        quantity: true,
+                        unitPrice: true,
+                        totalPrice: true,
+                        size: true,
+                        color: true
+                    }
+                }
+            }
+        });
+
+        let currentStatus = 'pending';
+        if (customer.isActive && customer.isVerified) currentStatus = 'active';
+        else if (!customer.isActive) currentStatus = 'suspended';
+
+        res.json({
+            success: true,
+            data: {
+                id: customer.id,
+                name: customer.name,
+                email: customer.email,
+                phone: customer.phoneNumber || 'N/A',
+                status: currentStatus,
+                joinDate: customer.createdAt,
+                lastLogin: customer.lastLogin || customer.createdAt,
+                avatar: customer.image,
+                isEmailVerified: customer.isVerified,
+                isPhoneVerified: !!customer.phoneNumber,
+                addresses: customer.addresses || [],
+                totalOrders: orderAgg._count.id,
+                totalSpent: orderAgg._sum.totalAmount || 0,
+                recentOrders
+            }
+        });
+    } catch (error) {
+        console.error('Error getting customer:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch customer' });
     }
 };
 

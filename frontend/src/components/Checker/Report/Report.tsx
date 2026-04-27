@@ -19,6 +19,8 @@ type Tab = "factory" | "product"
 
 const PAGE_SIZE = 12
 const DEFAULT_SORT = "completedAt:desc"
+// Reserve vertical space for a full page so pagination/layout doesn't jump when result count shrinks.
+const TABLE_MIN_HEIGHT_PX = PAGE_SIZE * 65
 
 const RESULT_OPTIONS = [
   { value: "", label: "All results" },
@@ -275,7 +277,7 @@ export default function ReportsPage() {
           )}
 
           {/* Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden" style={{ minHeight: TABLE_MIN_HEIGHT_PX }}>
             {loading && inspections.length === 0 ? (
               <div className="animate-pulse">
                 <div className="grid grid-cols-5 gap-4 px-6 py-4 border-b border-slate-100">

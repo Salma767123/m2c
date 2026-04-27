@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, UserCheck, Building2, Mail, Phone, CheckCircle, Plus, Package, Eye, FileText } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Search, UserCheck, Building2, Mail, Phone, CheckCircle, Plus, Eye, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
@@ -30,67 +30,100 @@ interface QCChecker {
 import vendorService from '@/services/vendorService';
 import qcCheckerService from '@/services/qcCheckerService';
 
+const ITEMS_PER_PAGE = 10;
+
 export default function AssignQCChecker() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [qcCheckers, setQcCheckers] = useState<QCChecker[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [vendorListResponse, checkersResponse] = await Promise.all([
-          vendorService.getAllVendors({ limit: 100 }),
-          qcCheckerService.getAllQCCheckers(),
-        ]);
-
-        const AllVendors = vendorListResponse.vendors.map((v: any) => ({
-          id: v.id,
-          vendorCode: v.vendorCode || null,
-          companyName: v.companyName,
-          ownerName: v.ownerName,
-          email: v.email,
-          phone: v.businessPhone,
-          status: v.status,
-          assignedChecker: v.assignedQcId || null,
-          assignedCheckerName: v.assignedQc?.name || null,
-          inspectionStatus: v.latestInspection?.status || null,
-        }));
-        setVendors(AllVendors);
-
-        if (checkersResponse.success) {
-          setQcCheckers(checkersResponse.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
-
+  const [pagination, setPagination] = useState({ page: 1, limit: ITEMS_PER_PAGE, total: 0, pages: 0 });
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterVendorStatus, setFilterVendorStatus] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
+  const mapVendors = (rawVendors: any[]): Vendor[] =>
+    rawVendors.map((v: any) => ({
+      id: v.id,
+      vendorCode: v.vendorCode || null,
+      companyName: v.companyName,
+      ownerName: v.ownerName,
+      email: v.email,
+      phone: v.businessPhone,
+      status: v.status,
+      assignedChecker: v.assignedQcId || null,
+      assignedCheckerName: v.assignedQc?.name || null,
+      inspectionStatus: v.latestInspection?.status || null,
+    }));
+
+  const fetchVendors = useCallback(async (page: number) => {
+    try {
+      setLoading(true);
+      const vendorFilters: { page: number; limit: number; status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'; search?: string } = {
+        page,
+        limit: ITEMS_PER_PAGE,
+      };
+      if (filterVendorStatus !== "all") {
+        vendorFilters.status = filterVendorStatus as any;
+      }
+      if (searchTerm.trim()) {
+        vendorFilters.search = searchTerm.trim();
+      }
+
+      const vendorListResponse = await vendorService.getAllVendors(vendorFilters);
+      setVendors(mapVendors(vendorListResponse.vendors));
+      setPagination(vendorListResponse.pagination);
+    } catch (error) {
+      console.error('Failed to fetch vendors:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterVendorStatus, searchTerm]);
+
+  const fetchCheckers = useCallback(async () => {
+    try {
+      const checkersResponse = await qcCheckerService.getAllQCCheckers();
+      if (checkersResponse.success) {
+        setQcCheckers(checkersResponse.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch QC checkers:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCheckers();
+  }, [fetchCheckers]);
+
+  useEffect(() => {
+    fetchVendors(currentPage);
+  }, [currentPage, fetchVendors]);
+
+  // Reset to page 1 when filters change
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+  };
+
+  const handleSearchSubmit = () => {
+    setCurrentPage(1);
+  };
+
+  const handleFilterStatusChange = (value: string) => {
+    setFilterStatus(value);
+    setCurrentPage(1);
+  };
+
+  const handleVendorStatusChange = (value: string) => {
+    setFilterVendorStatus(value);
+    setCurrentPage(1);
+  };
+
+  // Client-side filter for assignment status (not in API)
   const filteredVendors = vendors.filter((vendor) => {
-    const q = searchTerm.toLowerCase();
-    const matchesSearch =
-      vendor.companyName.toLowerCase().includes(q) ||
-      vendor.ownerName.toLowerCase().includes(q) ||
-      vendor.email.toLowerCase().includes(q) ||
-      (vendor.vendorCode?.toLowerCase().includes(q) ?? false);
-
-    const matchesAssignmentFilter =
-      filterStatus === "all" ||
-      (filterStatus === "assigned" && vendor.assignedChecker) ||
-      (filterStatus === "unassigned" && !vendor.assignedChecker);
-
-    const matchesVendorStatusFilter =
-      filterVendorStatus === "all" || vendor.status === filterVendorStatus;
-
-    return matchesSearch && matchesAssignmentFilter && matchesVendorStatusFilter;
+    if (filterStatus === "all") return true;
+    if (filterStatus === "assigned") return !!vendor.assignedChecker;
+    if (filterStatus === "unassigned") return !vendor.assignedChecker;
+    return true;
   });
 
   const getStatusBadge = (status: string) => {
@@ -106,13 +139,29 @@ export default function AssignQCChecker() {
     );
   };
 
-  const totalAssigned = vendors.filter((v) => v.assignedChecker).length;
-  const totalUnassigned = vendors.filter((v) => !v.assignedChecker).length;
+  const totalAssigned = filteredVendors.filter((v) => v.assignedChecker).length;
+  const totalUnassigned = filteredVendors.filter((v) => !v.assignedChecker).length;
+
+  // Pagination helpers (matches QC Reports style)
+  const getPageRange = (current: number, total: number): Array<number | '…'> => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages: Array<number | '…'> = [1];
+    if (current > 4) pages.push('…');
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    for (let p = start; p <= end; p++) pages.push(p);
+    if (current < total - 3) pages.push('…');
+    pages.push(total);
+    return pages;
+  };
+
+  const rangeStart = pagination.total === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
+  const rangeEnd = Math.min(currentPage * ITEMS_PER_PAGE, pagination.total);
 
   return (
     <div className="p-6">
       <Breadcrumb />
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Assign QC Checker to Vendors</h1>
           <p className="text-gray-600 mt-1">Manage QC checker assignments for vendor quality control</p>
@@ -127,11 +176,11 @@ export default function AssignQCChecker() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-gray-600">Total Vendors</div>
-            <div className="text-2xl font-bold text-gray-900">{vendors.length}</div>
+            <div className="text-2xl font-bold text-gray-900">{pagination.total}</div>
           </CardContent>
         </Card>
         <Card>
@@ -164,7 +213,8 @@ export default function AssignQCChecker() {
                 type="text"
                 placeholder="Search by company name, owner, email, or vendor code..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
               />
             </div>
@@ -177,7 +227,7 @@ export default function AssignQCChecker() {
                     { value: "assigned", label: "Assigned" },
                     { value: "unassigned", label: "Unassigned" },
                   ]}
-                  onChange={(val) => setFilterStatus(val as string)}
+                  onChange={(val) => handleFilterStatusChange(val as string)}
                   placeholder="Filter by assignment"
                 />
               </div>
@@ -190,7 +240,7 @@ export default function AssignQCChecker() {
                     { value: "PENDING", label: "Pending" },
                     { value: "REJECTED", label: "Rejected" },
                   ]}
-                  onChange={(val) => setFilterVendorStatus(val as string)}
+                  onChange={(val) => handleVendorStatusChange(val as string)}
                   placeholder="Filter by status"
                 />
               </div>
@@ -198,6 +248,17 @@ export default function AssignQCChecker() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Results summary */}
+      <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600 mb-4">
+        <span>
+          {loading
+            ? 'Loading vendors...'
+            : pagination.total === 0
+              ? '0 vendors'
+              : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total} vendor${pagination.total === 1 ? '' : 's'}`}
+        </span>
+      </div>
 
       {/* Vendors Table */}
       <Card>
@@ -212,7 +273,15 @@ export default function AssignQCChecker() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredVendors.length > 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredVendors.length > 0 ? (
               filteredVendors.map((vendor) => (
                 <TableRow key={vendor.id}>
                   <TableCell>
@@ -295,7 +364,46 @@ export default function AssignQCChecker() {
             )}
           </TableBody>
         </Table>
+
       </Card>
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="flex items-center justify-end gap-3 text-sm mt-4">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            {getPageRange(currentPage, pagination.pages).map((p, i) =>
+              p === '…' ? (
+                <span key={`e-${i}`} className="px-2 text-slate-400">…</span>
+              ) : (
+                <button
+                  key={`p-${p}`}
+                  onClick={() => setCurrentPage(p as number)}
+                  aria-current={p === currentPage ? 'page' : undefined}
+                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(pagination.pages, p + 1))}
+              disabled={currentPage >= pagination.pages}
+              className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,13 +1,27 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Star, Search, Eye, AlertCircle, RefreshCw, Package } from "lucide-react";
+import { Star, Search, Eye, AlertCircle, RefreshCw, Package, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import adminReviewService, { AdminOrderReview } from "@/services/adminReviewService";
 import { hasPermission } from "@/lib/auth";
+
+const PAGE_SIZE = 10;
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
+}
 
 interface VendorProductReview {
   id: string;
@@ -35,6 +49,7 @@ export default function VendorProductReviews() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedReview, setSelectedReview] = useState<VendorProductReview | null>(null);
   const [stats, setStats] = useState({ total: 0, approved: 0, rejected: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -97,6 +112,17 @@ export default function VendorProductReviews() {
     const matchesFilter = filterStatus === "all" || review.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredReviews.length / PAGE_SIZE);
+  const paginatedReviews = filteredReviews.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const rangeStart = filteredReviews.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filteredReviews.length);
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -188,6 +214,17 @@ export default function VendorProductReviews() {
         </CardContent>
       </Card>
 
+      {/* Results summary */}
+      <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600 mb-4">
+        <span>
+          {loading
+            ? 'Loading reviews...'
+            : filteredReviews.length === 0
+              ? '0 reviews'
+              : `Showing ${rangeStart}–${rangeEnd} of ${filteredReviews.length} review${filteredReviews.length === 1 ? '' : 's'}`}
+        </span>
+      </div>
+
       {/* Reviews Table */}
       <Card>
         {loading ? (
@@ -209,8 +246,8 @@ export default function VendorProductReviews() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredReviews.length > 0 ? (
-                filteredReviews.map((review) => (
+              {paginatedReviews.length > 0 ? (
+                paginatedReviews.map((review) => (
                   <TableRow key={review.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -286,6 +323,44 @@ export default function VendorProductReviews() {
           </Table>
         )}
       </Card>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-3 text-sm">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            {getPageRange(currentPage, totalPages).map((p, i) =>
+              p === '…' ? (
+                <span key={`e-${i}`} className="px-2 text-slate-400">…</span>
+              ) : (
+                <button
+                  key={`p-${p}`}
+                  onClick={() => setCurrentPage(p as number)}
+                  aria-current={p === currentPage ? 'page' : undefined}
+                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Detail Modal */}
       {selectedReview && (

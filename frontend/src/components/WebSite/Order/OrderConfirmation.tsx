@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { CheckCircle, Package, Truck, Mail, Download, ArrowRight, Clock, AlertCircle, CreditCard, MapPin, Phone, Loader2 } from "lucide-react"
+import { CheckCircle, Package, Truck, Mail, Download, ArrowRight, Clock, AlertCircle, CreditCard, MapPin, Phone, Loader2, ShoppingBag } from "lucide-react"
 import { useState, useEffect } from "react"
 import orderService, { Order } from "@/services/orderService"
 import { useSearchParams } from "next/navigation"
@@ -187,18 +187,25 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                 </h2>
               </div>
               <div className="p-6">
-                <div className="space-y-2">
-                  <p className="font-semibold text-gray-900">
+                <div className="space-y-1">
+                  <p className="font-semibold text-gray-900 border-b border-gray-100 pb-1 mb-2">
                     {order.shippingAddress?.firstName} {order.shippingAddress?.lastName}
                   </p>
-                  <p className="text-gray-700">{order.shippingAddress?.street}</p>
-                  <p className="text-gray-700">
-                    {order.shippingAddress?.city}, {order.shippingAddress?.state} {order.shippingAddress?.zipCode}
-                  </p>
-                  <p className="text-gray-700">{order.shippingAddress?.country}</p>
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
-                    <Phone className="w-4 h-4 text-gray-600" />
-                    <span className="text-gray-700">{order.shippingAddress?.phone}</span>
+                  <div className="space-y-0.5 text-gray-700">
+                    <p>{order.shippingAddress?.street}</p>
+                    {order.shippingAddress?.addressLine2 && <p>{order.shippingAddress?.addressLine2}</p>}
+                    <p>
+                      {order.shippingAddress?.city}, {order.shippingAddress?.state} {order.shippingAddress?.zipCode}
+                    </p>
+                    <p className="flex items-center gap-1.5 mt-1 text-slate-500 font-medium italic text-sm">
+                      Shipping to: {order.shippingAddress?.country} 🇺🇸
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center gap-2 text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                      <Phone className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">{order.shippingAddress?.phone}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -240,6 +247,17 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                     </div>
                   )
                   )}
+
+                  {/* Bag Add-on */}
+                  {order.bagTypeName && order.bagTypePrice && order.bagTypePrice > 0 && (
+                    <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-amber-600" />
+                        <span>Bag: {order.bagTypeName}</span>
+                      </div>
+                      <span className="font-medium text-gray-900">${order.bagTypePrice.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t border-gray-200 pt-4 space-y-3">
@@ -259,6 +277,12 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
                       <span className="font-medium">-${order.discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {order.bagTypePrice && order.bagTypePrice > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Bag ({order.bagTypeName})</span>
+                      <span className="font-medium">${order.bagTypePrice.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold text-gray-900 pt-3 border-t border-gray-200">

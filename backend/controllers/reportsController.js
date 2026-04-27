@@ -661,20 +661,53 @@ const getFinancialReport = async (req, res) => {
 // ============================================
 const getQcFactoryReports = async (req, res) => {
     try {
-        const inspections = await prisma.inspection.findMany({
-            where: {
-                status: 'COMPLETED'
-            },
-            include: {
-                vendor: true,
-                checker: true
-            },
-            orderBy: { completedAt: 'desc' },
-        });
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 12, 1), 100);
+        const search = (req.query.search || '').trim();
+        const result = (req.query.result || '').trim().toUpperCase();
+        const sortBy = req.query.sortBy === 'createdAt' ? 'createdAt' : 'completedAt';
+        const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+        const skip = (page - 1) * limit;
+
+        const where = { status: 'COMPLETED' };
+        if (result === 'PASSED' || result === 'FAILED') where.result = result;
+        if (search) {
+            where.OR = [
+                { vendor: { is: { companyName: { contains: search, mode: 'insensitive' } } } },
+                { vendor: { is: { email: { contains: search, mode: 'insensitive' } } } },
+                { clientName: { contains: search, mode: 'insensitive' } },
+                { checker: { is: { name: { contains: search, mode: 'insensitive' } } } },
+            ];
+        }
+
+        const [inspections, total] = await Promise.all([
+            prisma.inspection.findMany({
+                where,
+                select: {
+                    id: true,
+                    status: true,
+                    result: true,
+                    createdAt: true,
+                    completedAt: true,
+                    vendor: { select: { id: true, companyName: true, email: true } },
+                    checker: { select: { id: true, name: true, email: true } },
+                },
+                orderBy: { [sortBy]: sortOrder },
+                skip,
+                take: limit,
+            }),
+            prisma.inspection.count({ where }),
+        ]);
 
         res.json({
             success: true,
             data: inspections,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.max(Math.ceil(total / limit), 1),
+            },
         });
     } catch (error) {
         console.error('Error fetching QC factory reports:', error);
@@ -687,21 +720,66 @@ const getQcFactoryReports = async (req, res) => {
 // ============================================
 const getQcProductReports = async (req, res) => {
     try {
-        const products = await prisma.product.findMany({
-            where: {
-                qcInspectionData: {
-                    not: null
-                }
-            },
-            include: {
-                vendor: true
-            },
-            orderBy: { updatedAt: 'desc' },
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 12, 1), 100);
+        const search = (req.query.search || '').trim();
+        const status = (req.query.status || '').trim().toUpperCase();
+        const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+        const skip = (page - 1) * limit;
+
+        const where = { qcInspectionData: { not: null } };
+        if (['APPROVED', 'REJECTED', 'REINSPECTION', 'QC_APPROVED', 'PENDING'].includes(status)) {
+            where.approvalStatus = status;
+        }
+        if (search) {
+            where.OR = [
+                { name: { contains: search, mode: 'insensitive' } },
+                { baseSku: { contains: search, mode: 'insensitive' } },
+                { category: { contains: search, mode: 'insensitive' } },
+                { vendor: { is: { companyName: { contains: search, mode: 'insensitive' } } } },
+            ];
+        }
+
+        const [products, total] = await Promise.all([
+            prisma.product.findMany({
+                where,
+                select: {
+                    id: true,
+                    name: true,
+                    baseSku: true,
+                    category: true,
+                    approvalStatus: true,
+                    rejectionReason: true,
+                    updatedAt: true,
+                    qcInspectionData: true, // needed to extract finalDecision; stripped before response
+                    vendor: { select: { id: true, companyName: true, email: true } },
+                },
+                orderBy: { updatedAt: sortOrder },
+                skip,
+                take: limit,
+            }),
+            prisma.product.count({ where }),
+        ]);
+
+        // Strip the heavy qcInspectionData JSON (can contain base64 photos) — surface only finalDecision.
+        const slim = products.map((p) => {
+            const finalDecision = p.qcInspectionData && typeof p.qcInspectionData === 'object'
+                ? p.qcInspectionData.finalDecision || null
+                : null;
+            // eslint-disable-next-line no-unused-vars
+            const { qcInspectionData, ...rest } = p;
+            return { ...rest, finalDecision };
         });
 
         res.json({
             success: true,
-            data: products,
+            data: slim,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.max(Math.ceil(total / limit), 1),
+            },
         });
     } catch (error) {
         console.error('Error fetching QC product reports:', error);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Package, Eye, Download, Star, Truck, CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, ShoppingBag } from 'lucide-react'
 import orderService, { Order as APIOrder } from '@/services/orderService'
 
 const ORDERS_PER_PAGE = 5
@@ -166,7 +166,7 @@ export default function OrderHistory() {
                     </span>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-slate-900">₹{order.totalAmount.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-slate-900">${order.totalAmount.toFixed(2)}</p>
                     <p className="text-xs text-slate-500">{order.paymentStatus}</p>
                   </div>
                 </div>
@@ -200,11 +200,22 @@ export default function OrderHistory() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-slate-900">₹{(item.totalPrice).toFixed(2)}</p>
-                        <p className="text-sm text-slate-600">₹{item.unitPrice.toFixed(2)} each</p>
+                        <p className="font-semibold text-slate-900">${(item.totalPrice).toFixed(2)}</p>
+                        <p className="text-sm text-slate-600">${item.unitPrice.toFixed(2)} each</p>
                       </div>
                     </div>
                   ))}
+
+                  {/* Bag Add-on */}
+                  {order.bagTypeName && order.bagTypePrice && order.bagTypePrice > 0 && (
+                    <div className="flex items-center justify-between px-3 py-2 text-sm text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-amber-600" />
+                        <span>Bag: {order.bagTypeName}</span>
+                      </div>
+                      <span className="font-medium text-slate-900">${order.bagTypePrice.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Order Actions */}

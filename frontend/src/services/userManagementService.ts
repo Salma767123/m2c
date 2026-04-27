@@ -61,6 +61,16 @@ export const userManagementService = {
         }
     },
 
+    getCustomerById: async (id: string): Promise<any> => {
+        try {
+            const { data } = await axios.get(`/admin/users/customers/${id}`);
+            return data.data;
+        } catch (error) {
+            console.error('Failed to fetch customer', error);
+            return null;
+        }
+    },
+
     updateCustomerStatus: async (id: string, status: 'active' | 'suspended'): Promise<void> => {
         await axios.put(`/admin/users/customers/${id}/status`, { status });
     },

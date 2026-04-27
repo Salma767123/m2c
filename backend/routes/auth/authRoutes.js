@@ -19,6 +19,7 @@ const {
   addAddress,
   updateAddress,
   deleteAddress,
+  setDefaultAddress,
   getUserStats
 } = require('../../controllers/auth/authController');
 
@@ -65,6 +66,7 @@ router.put('/profile', authenticateToken, updateProfile);
 router.get('/addresses', authenticateToken, getAddresses);
 router.post('/addresses', authenticateToken, addAddress);
 router.put('/addresses/:id', authenticateToken, updateAddress);
+router.patch('/addresses/:id/default', authenticateToken, setDefaultAddress);
 router.delete('/addresses/:id', authenticateToken, deleteAddress);
 
 // Admin specific routes (same controllers, different endpoints)
