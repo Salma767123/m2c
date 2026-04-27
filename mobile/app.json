@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "dk",
+    "name": "m2c",
     "slug": "m2c",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,14 +13,19 @@
     },
     "android": {
       "package": "com.m2c.mobile",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#000000",
-        "foregroundImage": "./assets/images/logo3.png",
-        "backgroundImage": "./assets/images/logo3.png",
-        "monochromeImage": "./assets/images/logo3.png"
+        "foregroundImage": "./assets/images/1024.png",
+        "backgroundImage": "./assets/images/1024.png",
+        "monochromeImage": "./assets/images/1024.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#111827"
     },
     "web": {
       "bundler": "metro",
@@ -30,7 +35,9 @@
     "plugins": [
       "expo-router",
       "expo-video",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -39,9 +46,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "eb361ce3-397f-4683-8cfb-94f3e32b9b68"
+        "projectId": "b8eb8431-f0db-4428-acf6-2960e0539eee"
       }
     },
-    "owner": "manoj_kumar_t"
+    "owner": "asarm2c",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b8eb8431-f0db-4428-acf6-2960e0539eee"
+    }
   }
 }

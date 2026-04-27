@@ -1,4 +1,12 @@
 const { prisma } = require('../config/database');
+const { notifications } = require('../utils/notificationService');
+
+// Maps vendor status → customer notification
+const VENDOR_STATUS_NOTIFY = {
+  'VENDOR_PROCESSING': 'orderProcessing',
+  'PACKED_BY_VENDOR': null,                   // no customer notification for packing
+  'IN_TRANSIT_TO_ADMIN_HUB': 'orderShipped',  // shipped from vendor
+};
 
 // Vendor: Get all orders containing items from this vendor
 const getVendorOrders = async (req, res) => {
@@ -143,6 +151,14 @@ const updateVendorOrderStatus = async (req, res) => {
                 hub: true
             }
         });
+
+        // Notify customer about status change (fire-and-forget)
+        if (order.customerId) {
+            const notifHelper = VENDOR_STATUS_NOTIFY[status];
+            if (notifHelper && notifications[notifHelper]) {
+                notifications[notifHelper](order.customerId, order.orderId).catch(() => {});
+            }
+        }
 
         res.json({
             success: true,

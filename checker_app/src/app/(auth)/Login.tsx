@@ -10,12 +10,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { User, Lock, LogIn, Shield, Eye, EyeOff } from 'lucide-react-native';
 import { qcCheckerService } from '../../services/qcCheckerService';
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const [checkerId, setCheckerId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -82,7 +83,7 @@ export default function LoginScreen() {
   }, [checkerId, password, validateCheckerId, validatePassword]);
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-900">
+    <View className="flex-1 bg-slate-900" style={{ paddingTop: insets.top }}>
       <KeyboardAwareScrollView
         contentContainerStyle={{ paddingBottom: 20, flexGrow: 1, justifyContent: 'center' }}
         keyboardShouldPersistTaps="handled"
@@ -244,6 +245,6 @@ export default function LoginScreen() {
           </View>
         </View>
       </KeyboardAwareScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

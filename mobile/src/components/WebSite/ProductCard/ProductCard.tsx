@@ -65,9 +65,11 @@ function getDisplayPrice(product: Product): number {
 }
 
 function getCurrentStock(product: Product): number {
-  // Mirror web's ProductCard exactly — clamp to 0 and ignore the stale
-  // `product.inStock` flag; it lies for variant products.
   if (isServiceProduct(product)) {
+    // For variant products, totalStock is sum of all variants — not usable
+    // as a per-variant limit. Return it only for non-variant products.
+    // Variant products use the stepper-disabled path (hasVariants = true),
+    // so this value only gates the "in stock" boolean check.
     return Math.max(product.totalStock ?? 0, 0);
   }
   return (product as any).stock ?? 1;
@@ -186,8 +188,13 @@ function ProductCardImpl({
   ]);
 
   const handleToggleWishlist = useCallback(async () => {
-    // Allow guest wishlisting — context falls back to AsyncStorage when
-    // unauthenticated. Guest items migrate to the server on login.
+    const auth = await userAuthService.isAuthenticated();
+    if (!auth) {
+      showErrorToast("Login Required", "Please login to manage your wishlist");
+      setTimeout(() => router.push("/(auth)/Login" as any), 1500);
+      return;
+    }
+
     setIsTogglingWishlist(true);
     try {
       if (onToggleWishlist) {
@@ -221,6 +228,7 @@ function ProductCardImpl({
     product.id,
     product.name,
     removeFromGlobalWishlist,
+    router,
   ]);
 
   const inc = useCallback(() => {
@@ -237,7 +245,7 @@ function ProductCardImpl({
       <Pressable
         onPress={openDetails}
         accessibilityRole="button"
-        accessibilityLabel={`${product.name}${product.category ? `, ${product.category}` : ""}, ₹${displayPrice.toFixed(
+        accessibilityLabel={`${product.name}${product.category ? `, ${product.category}` : ""}, $${displayPrice.toFixed(
           2,
         )}${!isActuallyInStock ? ", out of stock" : ""}`}
         android_ripple={{ color: "rgba(15,23,42,0.05)" }}
@@ -245,14 +253,14 @@ function ProductCardImpl({
       >
         {/* ── Image Area ──────────────────────────────────────────────────────── */}
         <View
-          className="relative bg-gray-100"
+          className="relative bg-white"
           style={{ aspectRatio: 1, width: "100%" }}
         >
           {imageUrl ? (
             <Image
               source={{ uri: imageUrl }}
               style={{ width: "100%", height: "100%" }}
-              contentFit="cover"
+              contentFit="contain"
               transition={300}
               accessibilityIgnoresInvertColors
             />
@@ -343,11 +351,11 @@ function ProductCardImpl({
           {/* Price row — matches web: price + strikethrough original + discount pill */}
           <View className="flex-row items-center flex-wrap gap-1.5 mb-2.5">
             <Text className="text-lg font-black text-[#111827]">
-              ₹{displayPrice.toFixed(2)}
+              ${displayPrice.toFixed(2)}
             </Text>
             {product.originalPrice ? (
               <Text className="text-xs text-red-500 line-through font-medium opacity-80">
-                ₹{product.originalPrice.toFixed(2)}
+                ${product.originalPrice.toFixed(2)}
               </Text>
             ) : null}
             {product.discount && product.discount > 0 ? (
@@ -360,38 +368,79 @@ function ProductCardImpl({
           </View>
 
           {/* Quantity stepper — ALWAYS rendered so every card in a row has
-            identical height. Dimmed + disabled for variant products (picked
-            on detail page) and for out-of-stock. */}
+            identical height. Dimmed for variant/out-of-stock products.
+            + disabled when quantity reaches available stock.
+            - disabled when quantity is at minimum (1). */}
           {(() => {
-            const disabled = hasVariants || !isActuallyInStock;
+            const stepperOff = hasVariants || !isActuallyInStock;
+            const decOff = stepperOff || quantity <= 1;
+            const incOff = stepperOff || quantity >= currentStock;
             return (
               <View
-                className={`flex-row items-center self-start bg-gray-50 rounded-lg border border-gray-100 mb-2 overflow-hidden ${
-                  disabled ? "opacity-40" : ""
-                }`}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  alignSelf: 'flex-start',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: '#e5e7eb',
+                  marginBottom: 8,
+                  opacity: stepperOff ? 0.4 : 1,
+                }}
               >
                 <Pressable
                   onPress={dec}
-                  disabled={disabled || quantity <= 1}
-                  className={`px-3 py-1.5 ${
-                    disabled || quantity <= 1
-                      ? "opacity-50"
-                      : "active:bg-gray-200"
-                  }`}
+                  disabled={decOff}
+                  accessibilityRole="button"
+                  accessibilityLabel="Decrease quantity"
+                  hitSlop={4}
                 >
-                  <Minus size={14} color="#111827" strokeWidth={2.5} />
+                  <View
+                    style={{
+                      width: 38,
+                      height: 36,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: decOff ? 0.35 : 1,
+                    }}
+                  >
+                    <Minus size={14} color="#111827" strokeWidth={2.5} />
+                  </View>
                 </Pressable>
-                <Text className="min-w-[28px] text-center text-sm font-black text-[#111827]">
+                <Text
+                  style={{
+                    minWidth: 28,
+                    textAlign: 'center',
+                    fontSize: 14,
+                    fontWeight: '800',
+                    color: '#111827',
+                  }}
+                >
                   {quantity}
                 </Text>
                 <Pressable
                   onPress={inc}
-                  disabled={disabled}
-                  className={`px-3 py-1.5 ${
-                    disabled ? "opacity-50" : "active:bg-gray-200"
-                  }`}
+                  disabled={incOff}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    incOff && !stepperOff
+                      ? `Maximum stock reached (${currentStock})`
+                      : 'Increase quantity'
+                  }
+                  hitSlop={4}
                 >
-                  <Plus size={14} color="#111827" strokeWidth={2.5} />
+                  <View
+                    style={{
+                      width: 38,
+                      height: 36,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: incOff ? 0.35 : 1,
+                    }}
+                  >
+                    <Plus size={14} color="#111827" strokeWidth={2.5} />
+                  </View>
                 </Pressable>
               </View>
             );
@@ -400,29 +449,52 @@ function ProductCardImpl({
           <Pressable
             onPress={handleAddToCart}
             disabled={!isActuallyInStock || isAddingToCart}
-            style={{
-              backgroundColor: !isActuallyInStock ? "#f3f4f6" : "#111827",
-            }}
-            className="w-full h-11 rounded-xl flex-row items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={
+              !isActuallyInStock
+                ? 'Out of stock'
+                : hasVariants
+                  ? 'Choose options — select size or color'
+                  : 'Add to cart'
+            }
           >
-            {isAddingToCart ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <>
-                <ShoppingCart
-                  size={16}
-                  color={isActuallyInStock ? "#ffffff" : "#94a3b8"}
-                  strokeWidth={2.5}
-                />
-                <Text
-                  className={`text-sm font-bold ml-2 ${
-                    isActuallyInStock ? "text-white" : "text-gray-400"
-                  }`}
-                >
-                  {!isActuallyInStock ? "Out of Stock" : "Add to Cart"}
-                </Text>
-              </>
-            )}
+            <View
+              style={{
+                width: '100%',
+                height: 44,
+                borderRadius: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: !isActuallyInStock ? '#f3f4f6' : '#111827',
+              }}
+            >
+              {isAddingToCart ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <ShoppingCart
+                    size={16}
+                    color={isActuallyInStock ? '#ffffff' : '#94a3b8'}
+                    strokeWidth={2.5}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      marginLeft: 6,
+                      color: isActuallyInStock ? '#ffffff' : '#94a3b8',
+                    }}
+                  >
+                    {!isActuallyInStock
+                      ? 'Out of Stock'
+                      : hasVariants
+                        ? 'Choose Options'
+                        : 'Add to Cart'}
+                  </Text>
+                </>
+              )}
+            </View>
           </Pressable>
         </View>
       </Pressable>

@@ -53,41 +53,39 @@ axiosInstance.interceptors.response.use(
             error.config?.url?.includes("/vendors/login");
 
           if (!isLoginAttempt) {
-            // Clear tokens from AsyncStorage
-            try {
-              await AsyncStorage.multiRemove([
-                "adminToken",
-                "vendorToken",
-                "vendorData",
-                "userToken",
-                "userData",
-              ]);
-            } catch (e) {
-              console.error("Error clearing auth data:", e);
+            // Only clear tokens if one was actually sent with the request.
+            // Avoids unnecessary AsyncStorage churn on unauthenticated startup.
+            const hadToken = !!error.config?.headers?.Authorization;
+            if (hadToken) {
+              try {
+                await AsyncStorage.multiRemove([
+                  "adminToken",
+                  "vendorToken",
+                  "vendorData",
+                  "userToken",
+                  "userData",
+                ]);
+              } catch (e) {
+                if (__DEV__) console.warn("Error clearing auth data:", e);
+              }
             }
           }
+          // 401 is expected for guests — use warn, not error, to avoid red-box in dev.
+          if (__DEV__) console.warn("Auth 401:", error.config?.url);
           break;
         }
         case 403:
-          console.error(
-            "Access forbidden:",
-            data?.error || "Insufficient permissions",
-          );
+          if (__DEV__) console.warn("Access forbidden:", data?.error || "Insufficient permissions");
           break;
         case 404:
-          console.error(
-            "Resource not found:",
-            data?.error || "The requested resource was not found",
-          );
+          // 404 is routine (e.g. empty cart lookup) — warn only in dev.
+          if (__DEV__) console.warn("Not found:", error.config?.url);
           break;
         case 500:
-          console.error(
-            "Server error:",
-            data?.error || "Internal server error",
-          );
+          console.error("Server error:", data?.error || "Internal server error");
           break;
         default:
-          console.error("API Error:", data?.error || `HTTP ${status}`);
+          if (__DEV__) console.warn("API Error:", data?.error || `HTTP ${status}`);
       }
 
       const errorMessage = data?.error || data?.message || `HTTP ${status}`;

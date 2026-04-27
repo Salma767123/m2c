@@ -4,11 +4,13 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
   Modal,
+  StatusBar,
 } from 'react-native';
 import {
   CreditCard,
@@ -32,6 +34,8 @@ import paymentService from '@/services/paymentService';
 import { paymentSettingsService, PublicPaymentSettings } from '@/services/paymentSettingsService';
 import { userProfileService } from '@/services/userProfileService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { CheckoutSkeleton } from '@/components/ui/Skeleton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface CheckoutFormData {
   firstName: string;
@@ -50,6 +54,7 @@ export interface CheckoutFormData {
 }
 
 export default function Checkout() {
+  const safeInsets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -100,15 +105,9 @@ export default function Checkout() {
   const fetchCart = async () => {
     try {
       setLoading(true);
-      console.log('Fetching cart...');
       const response = await cartService.getCart();
-      console.log('Cart response:', response);
-      
       if (response.success && response.data) {
-        console.log('Cart items:', response.data.items);
         setCartItems(response.data.items);
-      } else {
-        console.warn('No cart data received');
       }
     } catch (err: any) {
       console.error('Cart fetch error:', err);
@@ -264,10 +263,6 @@ export default function Checkout() {
       setPlacingOrder(true);
       setError(null);
 
-      console.log('=== Starting Order Placement ===');
-      console.log('Form data:', formData);
-      console.log('Cart items:', cartItems);
-      console.log('Order summary:', orderSummary);
 
       // Validate form (should already be validated, but double-check)
       if (!validateShippingForm()) {
@@ -320,8 +315,6 @@ export default function Checkout() {
         country: formData.country,
       };
 
-      console.log('Shipping address:', shippingAddress);
-      console.log('Payment method:', formData.paymentMethod);
 
       // Handle Razorpay payment
       if (formData.paymentMethod === 'razorpay') {
@@ -346,8 +339,6 @@ export default function Checkout() {
 
   const handleRazorpayPayment = async (shippingAddress: any) => {
     try {
-      console.log('Starting Razorpay payment...');
-      console.log('Order total:', orderSummary.total);
       
       // Store shipping address for later use
       setCurrentShippingAddress(shippingAddress);
@@ -358,7 +349,6 @@ export default function Checkout() {
         'INR'
       );
 
-      console.log('Razorpay order response:', orderResponse);
 
       if (!orderResponse.success) {
         throw new Error('Failed to initialize payment');
@@ -366,7 +356,6 @@ export default function Checkout() {
 
       const { orderId, amount, currency, keyId } = orderResponse.data;
 
-      console.log('Razorpay order created:', { orderId, amount, currency, keyId });
 
       // Create HTML for Razorpay checkout in WebView
       const checkoutHtml = `
@@ -488,7 +477,6 @@ export default function Checkout() {
   const handleWebViewMessage = async (event: any) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
-      console.log('WebView message:', message);
 
       setShowPaymentModal(false);
 
@@ -498,18 +486,15 @@ export default function Checkout() {
         
         try {
           // Verify payment with backend
-          console.log('Verifying payment...');
           const verifyResponse = await paymentService.verifyRazorpayPayment(
             razorpay_order_id,
             razorpay_payment_id,
             razorpay_signature
           );
 
-          console.log('Verification response:', verifyResponse);
 
           if (verifyResponse.success) {
             // Create order after successful payment verification
-            console.log('Creating order...');
             await createOrderAfterPayment(currentShippingAddress, razorpay_payment_id);
           } else {
             throw new Error('Payment verification failed');
@@ -549,9 +534,6 @@ export default function Checkout() {
 
   const createOrderAfterPayment = async (shippingAddress: any, paymentId: string) => {
     try {
-      console.log('=== Creating Order After Payment ===');
-      console.log('Shipping address:', shippingAddress);
-      console.log('Payment ID:', paymentId);
       
       const orderParams: CreateOrderParams = {
         shippingAddress,
@@ -562,22 +544,18 @@ export default function Checkout() {
         discount: orderSummary.discount,
       };
 
-      console.log('Order params:', orderParams);
 
       const response = await orderService.createOrder(orderParams);
 
-      console.log('Order creation response:', response);
 
       if (response.success && response.data) {
         await AsyncStorage.removeItem('appliedCoupon');
         showSuccessToast('Order Placed!', 'Your order has been placed successfully');
-        console.log('Navigating to order:', response.data.id);
-        router.push(`/(tabs)/orders/${response.data.id}`);
+        router.replace(`/(any)/order-confirmation?id=${response.data.id}` as any);
       } else {
         await AsyncStorage.removeItem('appliedCoupon');
         showSuccessToast('Order Placed!', 'Your order has been placed successfully');
-        console.log('Navigating to orders list');
-        router.push('/(tabs)/orders');
+        router.replace('/(tabs)/orders' as any);
       }
     } catch (error: any) {
       console.error('Order creation error:', error);
@@ -677,12 +655,8 @@ export default function Checkout() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-slate-50 items-center justify-center p-8">
-        <View className="w-20 h-20 rounded-full bg-white items-center justify-center mb-5 shadow-xl">
-          <ActivityIndicator size="large" color="#1a1a2e" />
-        </View>
-        <Text className="text-[18px] font-bold text-gray-900 mb-1.5">Loading Checkout</Text>
-        <Text className="text-sm text-gray-500 text-center">Preparing your order details...</Text>
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <CheckoutSkeleton />
       </View>
     );
   }
@@ -692,29 +666,36 @@ export default function Checkout() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-slate-50"
     >
-      {/* Header */}
+      {/* Header — white, matches app */}
       <View
-        className={`bg-[#1a1a2e] ${Platform.OS === 'ios' ? 'pt-[50px]' : 'pt-5'} pb-5 px-5 shadow-xl`}
+        style={{
+          backgroundColor: '#ffffff',
+          paddingHorizontal: 8,
+          paddingTop: safeInsets.top + 8,
+          paddingBottom: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: '#e5e7eb',
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}
       >
-        <TouchableOpacity
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+        <Pressable
           onPress={() => router.back()}
-          className="flex-row items-center mb-4"
-          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Back to cart"
+          hitSlop={8}
+          style={{ padding: 8 }}
         >
-          <View className="w-8 h-8 rounded-full bg-white/15 items-center justify-center mr-2.5">
-            <ArrowLeft size={18} color="#ffffff" />
+          <ArrowLeft size={22} color="#111827" />
+        </Pressable>
+        <View style={{ flex: 1, marginLeft: 4 }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Checkout</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+            <Lock size={10} color="#16a34a" />
+            <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '600' }}>Secure payment</Text>
           </View>
-          <Text className="text-gray-300 text-sm font-semibold">
-            Back to Cart
-          </Text>
-        </TouchableOpacity>
-
-        <Text className="text-[28px] font-extrabold text-white mb-1.5 tracking-tight">
-          Secure Checkout
-        </Text>
-        <Text className="text-sm text-gray-400 leading-5">
-          Complete your purchase securely with encrypted payment
-        </Text>
+        </View>
       </View>
 
       <ScrollView
@@ -729,20 +710,38 @@ export default function Checkout() {
           className="bg-white rounded-[24px] overflow-hidden mb-4 shadow-md"
         >
           {/* Card Header */}
-          <View className="bg-[#1a1a2e] px-6 py-4.5 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-xl bg-white/15 items-center justify-center">
-                {currentStep === 1 && <Truck size={20} color="#f59e0b" />}
-                {currentStep === 2 && <CreditCard size={20} color="#f59e0b" />}
-                {currentStep === 3 && <CheckCircle size={20} color="#f59e0b" />}
+          <View
+            style={{
+              backgroundColor: '#f9fafb',
+              paddingHorizontal: 20,
+              paddingVertical: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottomWidth: 1,
+              borderBottomColor: '#e5e7eb',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  backgroundColor: '#111827',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {currentStep === 1 ? <Truck size={18} color="#fff" /> : null}
+                {currentStep === 2 ? <CreditCard size={18} color="#fff" /> : null}
+                {currentStep === 3 ? <CheckCircle size={18} color="#fff" /> : null}
               </View>
               <View>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: '#ffffff' }}>
-                  {currentStep === 1 && 'Shipping Information'}
-                  {currentStep === 2 && 'Payment Method'}
-                  {currentStep === 3 && 'Review Your Order'}
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>
+                  {currentStep === 1 ? 'Shipping' : currentStep === 2 ? 'Payment' : 'Review'}
                 </Text>
-                <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
+                <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>
                   Step {currentStep} of {steps.length}
                 </Text>
               </View>
@@ -807,64 +806,55 @@ export default function Checkout() {
                 gap: 12,
               }}
             >
-              <TouchableOpacity
+              <Pressable
                 onPress={() => setCurrentStep(Math.max(1, currentStep - 1))}
                 disabled={currentStep === 1 || placingOrder}
-                style={{
-                  flex: 1,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  borderRadius: 16,
-                  borderWidth: 2,
-                  borderColor: currentStep === 1 || placingOrder ? '#e5e7eb' : '#1a1a2e',
-                  backgroundColor: '#ffffff',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: currentStep === 1 || placingOrder ? 0.4 : 1,
-                }}
-                activeOpacity={0.7}
+                accessibilityRole="button"
+                style={{ flex: 1 }}
               >
-                <Text
+                <View
                   style={{
-                    fontSize: 15,
-                    fontWeight: '700',
-                    color: currentStep === 1 || placingOrder ? '#9ca3af' : '#1a1a2e',
+                    height: 52,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: '#e5e7eb',
+                    backgroundColor: '#ffffff',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: currentStep === 1 || placingOrder ? 0.4 : 1,
                   }}
                 >
-                  Previous
-                </Text>
-              </TouchableOpacity>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Previous</Text>
+                </View>
+              </Pressable>
 
-              <TouchableOpacity
+              <Pressable
                 onPress={handleContinue}
                 disabled={placingOrder}
-                style={{
-                  flex: 1.5,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  borderRadius: 16,
-                  backgroundColor: placingOrder ? '#9ca3af' : '#1a1a2e',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  shadowColor: '#1a1a2e',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: placingOrder ? 0 : 0.3,
-                  shadowRadius: 12,
-                  elevation: placingOrder ? 0 : 6,
-                }}
-                activeOpacity={0.85}
+                accessibilityRole="button"
+                style={{ flex: 1.5 }}
               >
-                {placingOrder && <ActivityIndicator size="small" color="#ffffff" />}
-                <Text style={{ fontSize: 15, fontWeight: '800', color: '#ffffff', letterSpacing: 0.3 }}>
-                  {currentStep === 3
-                    ? placingOrder
-                      ? 'Processing...'
-                      : 'Place Order'
-                    : 'Continue'}
-                </Text>
-              </TouchableOpacity>
+                <View
+                  style={{
+                    height: 52,
+                    borderRadius: 14,
+                    backgroundColor: placingOrder ? '#9ca3af' : '#111827',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  {placingOrder ? <ActivityIndicator size="small" color="#ffffff" /> : null}
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#ffffff' }}>
+                    {currentStep === 3
+                      ? placingOrder
+                        ? 'Processing...'
+                        : 'Place Order'
+                      : 'Continue'}
+                  </Text>
+                </View>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -883,43 +873,31 @@ export default function Checkout() {
             marginBottom: 16,
           }}
         >
-          {/* Header with gradient effect */}
+          {/* Summary header */}
           <View
             style={{
-              backgroundColor: '#1a1a2e',
-              paddingHorizontal: 24,
-              paddingVertical: 18,
+              backgroundColor: '#f9fafb',
+              paddingHorizontal: 20,
+              paddingVertical: 14,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
+              borderBottomWidth: 1,
+              borderBottomColor: '#e5e7eb',
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  backgroundColor: 'rgba(245,158,11,0.2)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Package size={18} color="#f59e0b" />
-              </View>
-              <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '800' }}>
-                Order Summary
-              </Text>
-            </View>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>
+              Order Summary
+            </Text>
             <View
               style={{
-                backgroundColor: 'rgba(255,255,255,0.15)',
-                borderRadius: 16,
-                paddingHorizontal: 12,
-                paddingVertical: 5,
+                backgroundColor: '#e5e7eb',
+                borderRadius: 12,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
               }}
             >
-              <Text style={{ color: '#f3f4f6', fontSize: 12, fontWeight: '700' }}>
+              <Text style={{ color: '#374151', fontSize: 12, fontWeight: '700' }}>
                 {cartItems.length} item{cartItems.length !== 1 ? 's' : ''}
               </Text>
             </View>

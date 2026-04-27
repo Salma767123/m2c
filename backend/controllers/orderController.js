@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const { generateInvoiceNo } = require('../utils/invoiceGenerator');
+const { notifications } = require('../utils/notificationService');
 
 // Create new order
 const createOrder = async (req, res) => {
@@ -11,7 +12,8 @@ const createOrder = async (req, res) => {
             paymentId, // from payment gateway (e.g., Stripe, Razorpay)
             shippingCost = 0,
             tax = 0,
-            discount = 0
+            discount = 0,
+            couponCode = null,
         } = req.body;
 
         // 1. Validate Input
@@ -182,6 +184,7 @@ const createOrder = async (req, res) => {
                     tax,
                     discount,
                     totalAmount,
+                    couponCode: couponCode || null,
                     paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PAID',
                     paymentMethod,
                     paymentId,
@@ -194,6 +197,14 @@ const createOrder = async (req, res) => {
                     items: true
                 }
             });
+
+            // Increment coupon usedCount if a coupon was applied
+            if (couponCode) {
+                await tx.coupon.updateMany({
+                    where: { code: couponCode },
+                    data: { usedCount: { increment: 1 } },
+                });
+            }
 
             // Update Stock
             // Aggregate total quantity per product for totalStock/inventory updates
@@ -320,6 +331,19 @@ const createOrder = async (req, res) => {
 
             return newOrder;
         });
+
+        // Notify vendors about new order (fire-and-forget)
+        const vendorIds = [...new Set(result.items.map((i) => i.vendorId).filter(Boolean))];
+        for (const vid of vendorIds) {
+            const vendorItems = result.items.filter((i) => i.vendorId === vid);
+            const vendorTotal = vendorItems.reduce((s, i) => s + i.totalPrice, 0);
+            notifications.orderReceived(vid, result.orderId, vendorItems.length, vendorTotal).catch(() => {});
+        }
+
+        // Notify customer — order confirmed
+        if (result.customerId) {
+            notifications.orderConfirmed(result.customerId, result.orderId).catch(() => {});
+        }
 
         res.status(201).json({
             success: true,

@@ -8,6 +8,7 @@ import { publicProductService, PublicProduct } from '@/services/publicProductSer
 import { showErrorToast } from '@/lib/toast-utils';
 import ProductDetail from '@/components/WebSite/Home/ProductDetail';
 import { useCart } from '@/context/CartContext';
+import { ProductDetailSkeleton } from '@/components/ui/Skeleton';
 import { useWishlist } from '@/context/WishlistContext';
 
 // Truncate to N words, append "..." if excess
@@ -44,7 +45,7 @@ const TopBar = ({
   return (
     <View
       className="bg-[#111827] pb-3.5 px-4 flex-row items-center justify-between"
-      style={{ paddingTop: Math.max(insets.top, 16) }}
+      style={{ paddingTop: 12 }}
     >
       <Pressable
         onPress={async () => {
@@ -155,12 +156,9 @@ export default function ProductDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 bg-slate-50">
-        <StatusBar barStyle="light-content" backgroundColor="#111827" />
+        <StatusBar barStyle="light-content" backgroundColor="#111827" translucent={false} />
         <TopBar insets={insets} router={router} />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#111827" />
-          <Text className="text-gray-500 mt-3 text-sm">Loading product…</Text>
-        </View>
+        <ProductDetailSkeleton />
       </View>
     );
   }
@@ -169,7 +167,7 @@ export default function ProductDetailScreen() {
   if (!product) {
     return (
       <View className="flex-1 bg-slate-50">
-        <StatusBar barStyle="light-content" backgroundColor="#111827" />
+        <StatusBar barStyle="light-content" backgroundColor="#111827" translucent={false} />
         <TopBar insets={insets} router={router} />
         <View className="flex-1 items-center justify-center px-8">
           <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-5">
@@ -205,7 +203,7 @@ export default function ProductDetailScreen() {
   // ── Main ──────────────────────────────────────────────────────────────────
   return (
     <View className="flex-1 bg-slate-50">
-      <StatusBar barStyle="light-content" backgroundColor="#111827" />
+      <StatusBar barStyle="light-content" backgroundColor="#111827" translucent={false} />
       <TopBar title={product.name} insets={insets} router={router} />
       <ProductDetail product={product} productId={id as string} />
     </View>

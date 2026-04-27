@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import {
   View,
   Text,
   Pressable,
-  ScrollView,
+  FlatList,
   RefreshControl,
-  Dimensions,
+  StyleSheet,
+  useWindowDimensions,
+  StatusBar,
 } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -18,118 +20,39 @@ import {
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { categoryService, type Category } from '@/services/categoryService';
+import { useCart } from '@/context/CartContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const GRID_PADDING = 16;
-const GRID_GAP = 16;
-const CARD_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP) / 2;
+const GRID_PAD = 16;
+const GRID_GAP = 12;
 
-const pressableOpacity = ({ pressed }: { pressed: boolean }) => ({
-  opacity: pressed ? 0.7 : 1,
-});
-
-// ─── Header Component ─────────────────────────────────────────────────────────
-function Header() {
-  return (
-    <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-4 px-5`}>
-      <View className="flex-row items-center justify-between">
-        <View>
-          <Text className="text-white text-2xl font-extrabold tracking-tight">Categories</Text>
-          <Text className="text-gray-400 text-xs mt-0.5">Browse our collections</Text>
-        </View>
-        <View className="flex-row items-center gap-3">
-          <TouchableOpacity
-            onPress={() => router.push('/(any)/search' as any)}
-            className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center"
-            activeOpacity={0.7}
-          >
-            <Search size={18} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push('/(tabs)/cart' as any)}
-            className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center"
-            activeOpacity={0.7}
-          >
-            <ShoppingCart size={18} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// ─── Category Card ────────────────────────────────────────────────────────────
-function CategoryCard({ category, onPress }: { category: Category; onPress: () => void }) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="w-[48%] mb-4 bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100"
-      activeOpacity={0.75}
-    >
-      {/* Image area */}
-      <View className="w-full aspect-square bg-gray-100 relative">
-        {category.image ? (
-          <Image
-            source={{ uri: category.image }}
-            className="w-full h-full"
-            resizeMode="cover"
-          />
-        ) : (
-          <View className="w-full h-full items-center justify-center">
-            <Package size={40} color="#d1d5db" />
-          </View>
-        )}
-        {/* Dark overlay gradient at bottom */}
-        <View
-          className="absolute bottom-0 left-0 right-0 h-14"
-          style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
-        />
-      </View>
-
-      {/* Info area */}
-      <View className="px-3 py-3">
-        <Text className="text-sm font-bold text-gray-900 mb-0.5" numberOfLines={1}>
-          {category.name}
-        </Text>
-        <View className="flex-row items-center justify-between">
-          {category.subcategoryCount !== undefined && category.subcategoryCount > 0 ? (
-            <Text className="text-[11px] text-gray-500">
-              {category.subcategoryCount} subcategories
-            </Text>
-          ) : (
-            <Text className="text-[11px] text-gray-400">Explore</Text>
-          )}
-          <ChevronRight size={13} color="#9ca3af" />
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Categories() {
+  const { itemCount } = useCart();
+  const { width } = useWindowDimensions();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const cardWidth = (width - GRID_PAD * 2 - GRID_GAP) / 2;
+
   const fetchCategories = useCallback(async () => {
     try {
       setError(null);
-      const response = await categoryService.getAllCategories({
+      const res = await categoryService.getAllCategories({
         status: 'ACTIVE',
         showRootOnly: 'true',
+        includeSubcategories: 'true',
         sortBy: 'sortOrder',
         sortOrder: 'asc',
       });
-
-      if (response.success && response.data) {
-        setCategories(response.data);
+      if (res.success && res.data) {
+        setCategories(res.data);
       } else {
         setError('Failed to load categories');
       }
-    } catch (err) {
-      console.error('Failed to fetch categories:', err);
+    } catch {
       setError('Failed to load categories');
     } finally {
       setLoading(false);
@@ -146,254 +69,512 @@ export default function Categories() {
     fetchCategories();
   }, [fetchCategories]);
 
-  const handleCategoryPress = (category: Category) => {
-    router.push(`/(tabs)/categories/${category.slug}` as any);
-  };
+  const renderItem = useCallback(
+    ({ item }: { item: Category }) => (
+      <CategoryCard category={item} cardWidth={cardWidth} />
+    ),
+    [cardWidth],
+  );
 
-  const renderCard = (item: Category) => {
-    const count = item.subcategoryCount ?? 0;
-    return (
-      <View
-        key={item.id}
-        style={{
-          width: CARD_WIDTH,
-        }}
-      >
-      <Pressable
-        onPress={() => handleCategoryPress(item)}
-        accessibilityLabel={`View ${item.name} subcategories`}
-        accessibilityRole="button"
-        android_ripple={{ color: 'rgba(15,23,42,0.06)', borderless: false }}
-        style={({ pressed }) => ({
-          opacity: pressed ? 0.92 : 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
-        })}
-      >
-        <View
-          className="bg-white rounded-3xl overflow-hidden border border-slate-200/70"
-          style={{
-            shadowColor: '#0f172a',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.06,
-            shadowRadius: 10,
-            elevation: 3,
-          }}
-        >
-          <View
-            style={{ width: '100%', aspectRatio: 1, backgroundColor: '#f1f5f9' }}
-          >
-            {item.image ? (
-              <Image
-                source={{ uri: item.image }}
-                style={{ width: '100%', height: '100%' }}
-                contentFit="cover"
-                transition={250}
-                accessibilityLabel={`${item.name} category image`}
-              />
-            ) : (
-              <View className="w-full h-full items-center justify-center bg-slate-100">
-                <Package size={44} color="#94a3b8" strokeWidth={1.5} />
-              </View>
-            )}
-            {count > 0 ? (
-              <View
-                className="absolute top-2.5 right-2.5 flex-row items-center bg-white rounded-full px-2.5 py-1"
-                style={{
-                  shadowColor: '#0f172a',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 4,
-                  elevation: 2,
-                }}
-              >
-                <Text className="text-[11px] font-bold text-slate-900">
-                  {count}
-                </Text>
-              </View>
-            ) : null}
-          </View>
+  const keyExtractor = useCallback((item: Category) => item.id, []);
 
-          <View className="px-4 py-3">
-            <Text
-              className="text-base font-bold text-slate-900 mb-1"
-              numberOfLines={1}
-              style={{ lineHeight: 22 }}
-            >
-              {item.name}
-            </Text>
-            <View className="flex-row items-center justify-between">
-              <Text
-                className="text-xs text-slate-600 font-medium flex-1"
-                numberOfLines={1}
-              >
-                {count > 0
-                  ? `${count} ${count === 1 ? 'subcategory' : 'subcategories'}`
-                  : 'Explore now'}
-              </Text>
-              <ChevronRight size={16} color="#475569" strokeWidth={2.25} />
-            </View>
-          </View>
-        </View>
-      </Pressable>
+  const ListHeader = (
+    <View style={s.listHeader}>
+      <Text style={s.listTitle}>Browse Collections</Text>
+      <View style={s.listCountPill}>
+        <Text style={s.listCountText}>
+          {categories.length} {categories.length === 1 ? 'category' : 'categories'}
+        </Text>
       </View>
-    );
-  };
-
-  const renderSkeleton = () => (
-    <View
-      style={{
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        paddingHorizontal: GRID_PADDING,
-        columnGap: GRID_GAP,
-        rowGap: GRID_GAP,
-      }}
-    >
-      {Array.from({ length: 6 }).map((_, i) => {
-        return (
-          <View
-            key={i}
-            style={{
-              width: CARD_WIDTH,
-            }}
-          >
-            <View className="bg-white rounded-3xl overflow-hidden border border-slate-200/70">
-              <View
-                style={{
-                  width: '100%',
-                  aspectRatio: 1,
-                  backgroundColor: '#e2e8f0',
-                }}
-              />
-              <View className="px-4 py-3">
-                <View
-                  className="bg-slate-200 rounded-md mb-2"
-                  style={{ height: 14, width: '70%' }}
-                />
-                <View
-                  className="bg-slate-100 rounded-md"
-                  style={{ height: 10, width: '50%' }}
-                />
-              </View>
-            </View>
-          </View>
-        );
-      })}
     </View>
   );
 
   return (
-    <View className="flex-1 bg-slate-50">
-      <View className="bg-white px-4 pt-3 pb-4 border-b border-slate-200">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-1">
-            <Text
-              className="text-2xl font-extrabold text-slate-900"
-              style={{ lineHeight: 30 }}
-            >
-              All Categories
-            </Text>
-            <Text className="text-sm text-slate-600 mt-0.5">
-              Browse our complete collection
-            </Text>
-          </View>
-          <Pressable
-            onPress={() => router.push('/(tabs)/cart' as any)}
-            accessibilityLabel="View cart"
-            accessibilityRole="button"
-            hitSlop={8}
-            style={pressableOpacity}
-            className="w-11 h-11 items-center justify-center rounded-full bg-slate-100"
-          >
-            <ShoppingCart size={20} color="#0f172a" strokeWidth={2} />
-          </Pressable>
-        </View>
-      </View>
+    <View style={s.screen}>
+      <ScreenHeader itemCount={itemCount} />
 
       {loading ? (
-        <ScrollView
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {renderSkeleton()}
-        </ScrollView>
+        <View style={s.skeletonWrap}>
+          <View style={s.skeletonRow}>
+            <SkeletonCard width={cardWidth} />
+            <SkeletonCard width={cardWidth} />
+          </View>
+          <View style={s.skeletonRow}>
+            <SkeletonCard width={cardWidth} />
+            <SkeletonCard width={cardWidth} />
+          </View>
+          <View style={s.skeletonRow}>
+            <SkeletonCard width={cardWidth} />
+            <SkeletonCard width={cardWidth} />
+          </View>
+        </View>
       ) : error ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="w-20 h-20 rounded-full bg-red-50 items-center justify-center mb-5">
-            <AlertCircle size={36} color="#dc2626" strokeWidth={1.75} />
-          </View>
-          <Text
-            className="text-xl font-bold text-slate-900 mb-2 text-center"
-            style={{ lineHeight: 28 }}
-          >
-            Something went wrong
-          </Text>
-          <Text
-            className="text-base text-slate-600 text-center mb-6"
-            style={{ lineHeight: 24 }}
-          >
-            {error}
-          </Text>
-          <Pressable
-            onPress={fetchCategories}
-            accessibilityLabel="Retry loading categories"
-            accessibilityRole="button"
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.85 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-            })}
-            className="flex-row items-center bg-slate-900 rounded-2xl px-8 min-h-[48px] justify-center"
-          >
-            <RefreshCw size={18} color="#ffffff" strokeWidth={2.25} />
-            <Text className="text-white font-bold text-base ml-2">
-              Try Again
-            </Text>
-          </Pressable>
-        </View>
+        <CenteredState
+          icon={<AlertCircle size={32} color="#dc2626" strokeWidth={1.75} />}
+          iconBg="#fef2f2"
+          title="Something went wrong"
+          body={error}
+          action={
+            <ActionButton
+              label="Try Again"
+              icon={<RefreshCw size={15} color="#fff" />}
+              onPress={fetchCategories}
+            />
+          }
+        />
       ) : categories.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="w-20 h-20 rounded-full bg-slate-100 items-center justify-center mb-5">
-            <Search size={36} color="#64748b" strokeWidth={1.75} />
-          </View>
-          <Text
-            className="text-xl font-bold text-slate-900 mb-2 text-center"
-            style={{ lineHeight: 28 }}
-          >
-            No Categories Yet
-          </Text>
-          <Text
-            className="text-base text-slate-600 text-center"
-            style={{ lineHeight: 24 }}
-          >
-            Categories will appear here once they are added.
-          </Text>
-        </View>
+        <CenteredState
+          icon={<Package size={32} color="#6b7280" strokeWidth={1.75} />}
+          iconBg="#f3f4f6"
+          title="No Categories Yet"
+          body="Categories will appear here once they are added."
+        />
       ) : (
-        <ScrollView
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
+        <FlatList
+          data={categories}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          numColumns={2}
+          columnWrapperStyle={s.columnWrapper}
+          contentContainerStyle={s.flatListContent}
+          ListHeaderComponent={ListHeader}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#0f172a"
-              colors={['#0f172a']}
+              tintColor="#111827"
+              colors={['#111827']}
             />
           }
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              paddingHorizontal: GRID_PADDING,
-              columnGap: GRID_GAP,
-              rowGap: GRID_GAP,
-            }}
-          >
-            {categories.map(renderCard)}
-          </View>
-        </ScrollView>
+        />
       )}
     </View>
   );
 }
+
+// ─── Header ───────────────────────────────────────────────────────────────────
+function ScreenHeader({ itemCount }: { itemCount: number }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <View style={s.headerLeft}>
+        <Text style={s.headerTitle}>Categories</Text>
+      </View>
+      <View style={s.headerActions}>
+        <Pressable
+          onPress={() => router.push('/(any)/products' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Search products"
+          accessibilityHint="Opens product search"
+          hitSlop={6}
+          style={s.headerBtn}
+        >
+          <View style={s.headerBtnCircle}>
+            <Search size={18} color="#111827" strokeWidth={2} />
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push('/(tabs)/cart' as any)}
+          accessibilityRole="button"
+          accessibilityLabel={`Cart, ${itemCount} items`}
+          accessibilityHint="Opens your shopping cart"
+          hitSlop={6}
+          style={s.headerBtn}
+        >
+          <View style={s.headerBtnCircle}>
+            <ShoppingCart size={18} color="#111827" strokeWidth={2} />
+            {itemCount > 0 ? (
+              <View style={s.headerBadge}>
+                <Text style={s.headerBadgeText}>
+                  {itemCount > 99 ? '99+' : itemCount}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ─── Category Card (compact grid) ────────────────────────────────────────────
+const CategoryCard = memo(function CategoryCard({
+  category,
+  cardWidth,
+}: {
+  category: Category;
+  cardWidth: number;
+}) {
+  const count = category.subcategoryCount ?? 0;
+
+  const handlePress = useCallback(() => {
+    router.push(`/(tabs)/categories/${category.slug}` as any);
+  }, [category.slug]);
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`${category.name}, ${count} subcategories`}
+      accessibilityHint="Opens category details"
+      android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
+      style={{ width: cardWidth }}
+    >
+      <View style={c.card}>
+        {/* Image — square for compact grid */}
+        <View style={c.imageWrap}>
+          {category.image ? (
+            <Image
+              source={{ uri: category.image }}
+              style={c.image}
+              contentFit="cover"
+              transition={250}
+            />
+          ) : (
+            <View style={c.imagePlaceholder}>
+              <Package size={36} color="#d1d5db" strokeWidth={1.5} />
+            </View>
+          )}
+
+          {/* Subcategory count */}
+          {count > 0 ? (
+            <View style={c.badge}>
+              <Text style={c.badgeText}>{count}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Info */}
+        <View style={c.info}>
+          <Text style={c.name} numberOfLines={2}>{category.name}</Text>
+          {category.description ? (
+            <Text style={c.desc} numberOfLines={1}>{category.description}</Text>
+          ) : null}
+          <View style={c.exploreRow}>
+            <Text style={c.exploreText}>Explore</Text>
+            <ChevronRight size={12} color="#6b7280" strokeWidth={2.5} />
+          </View>
+        </View>
+      </View>
+    </Pressable>
+  );
+});
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+function SkeletonCard({ width: w }: { width: number }) {
+  return (
+    <View style={[sk.card, { width: w }]}>
+      <View style={sk.image} />
+      <View style={sk.info}>
+        <View style={sk.line1} />
+        <View style={sk.line2} />
+      </View>
+    </View>
+  );
+}
+
+// ─── Centered state (error / empty) ──────────────────────────────────────────
+function CenteredState({
+  icon,
+  iconBg,
+  title,
+  body,
+  action,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  title: string;
+  body: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <View style={s.centeredWrap}>
+      <View style={[s.centeredIcon, { backgroundColor: iconBg }]}>{icon}</View>
+      <Text style={s.centeredTitle}>{title}</Text>
+      <Text style={[s.centeredBody, action ? { marginBottom: 20 } : undefined]}>{body}</Text>
+      {action ?? null}
+    </View>
+  );
+}
+
+function ActionButton({
+  label,
+  icon,
+  onPress,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+      <View style={s.actionBtn}>
+        {icon}
+        <Text style={s.actionBtnText}>{label}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+
+  // Header
+  header: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerLeft: { flex: 1 },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: -0.3,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  headerBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBtnCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -5,
+    backgroundColor: '#111827',
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  headerBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+    lineHeight: 11,
+  },
+
+  // List
+  flatListContent: {
+    paddingHorizontal: GRID_PAD,
+    paddingBottom: 32,
+  },
+  columnWrapper: {
+    gap: GRID_GAP,
+    marginBottom: GRID_GAP,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  listTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  listCountPill: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  listCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+
+  // Centered states
+  centeredWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  centeredIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  centeredTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  centeredBody: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    paddingHorizontal: 24,
+    height: 48,
+    borderRadius: 14,
+    gap: 8,
+  },
+  actionBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+
+  // Skeleton
+  skeletonWrap: {
+    padding: GRID_PAD,
+    gap: GRID_GAP,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    gap: GRID_GAP,
+  },
+});
+
+// ─── Card styles ──────────────────────────────────────────────────────────────
+const c = StyleSheet.create({
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  imageWrap: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#f3f4f6',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#111827',
+    minWidth: 24,
+    height: 24,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  info: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  name: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    lineHeight: 18,
+  },
+  desc: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  exploreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 2,
+  },
+  exploreText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+});
+
+// ─── Skeleton styles ──────────────────────────────────────────────────────────
+const sk = StyleSheet.create({
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  image: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  info: {
+    padding: 12,
+  },
+  line1: {
+    height: 14,
+    width: '60%',
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 6,
+  },
+  line2: {
+    height: 10,
+    width: '40%',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 4,
+  },
+});

@@ -5,183 +5,121 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Share,
   RefreshControl,
+  StyleSheet,
   StatusBar,
-  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import {
   Heart,
   ShoppingCart,
-  Share2,
   Trash2,
   ArrowRight,
   Package,
-  Tag,
   AlertCircle,
-  AlertTriangle,
-  Sparkles,
-  CheckCircle2,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { wishlistService, WishlistItem } from '@/services/wishlistService';
+import { publicProductService } from '@/services/publicProductService';
 import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
-
-const fmt = (n: number) => `₹${n.toFixed(2)}`;
-
-// ─── Stock status helpers ─────────────────────────────────────────────────────
-type StockLevel = 'in_stock' | 'low_stock' | 'out_of_stock';
+import { WishlistSkeleton } from '@/components/ui/Skeleton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const LOW_STOCK_THRESHOLD = 5;
 
-/** Returns the stock level string for display. WishlistItem.product doesn't
- * expose a numeric availableStock count directly, so we infer from `inStock` and
- * use the `totalStock` if the backend ever surfaces it in the wishlist payload. */
-function resolveStockLevel(product: WishlistItem['product']): StockLevel {
-  if (!product) return 'out_of_stock';
-  // If the product explicitly exposes a numeric stock count, use it.
-  const numericStock = (product as any).availableStock ?? (product as any).totalStock ?? null;
-  if (numericStock !== null) {
-    if (numericStock <= 0) return 'out_of_stock';
-    if (numericStock <= LOW_STOCK_THRESHOLD) return 'low_stock';
-    return 'in_stock';
-  }
-  return product.inStock ? 'in_stock' : 'out_of_stock';
-}
+type StockInfo = {
+  stock: number;
+  status: 'in_stock' | 'low_stock' | 'out_of_stock';
+  livePrice?: number;
+  priceChanged?: boolean;
+  liveName?: string;
+  liveImage?: string;
+  liveOriginalPrice?: number;
+  liveDiscount?: number;
+};
 
-// ─── Sub-component: stock pill ────────────────────────────────────────────────
-function StockPill({ level, numericStock }: { level: StockLevel; numericStock?: number }) {
-  if (level === 'out_of_stock') {
-    return (
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-          backgroundColor: '#fef2f2',
-          borderRadius: 6,
-          paddingHorizontal: 7,
-          paddingVertical: 3,
-          alignSelf: 'flex-start',
-          marginTop: 6,
-        }}
-      >
-        <AlertCircle size={10} color="#dc2626" />
-        <Text style={{ fontSize: 10, fontWeight: '700', color: '#dc2626' }}>
-          Out of Stock
-        </Text>
-      </View>
-    );
-  }
+const fmt = (n: number) => `$${n.toFixed(2)}`;
 
-  if (level === 'low_stock') {
-    const label =
-      numericStock != null ? `Only ${numericStock} left` : 'Low Stock';
-    return (
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-          backgroundColor: '#fffbeb',
-          borderRadius: 6,
-          paddingHorizontal: 7,
-          paddingVertical: 3,
-          alignSelf: 'flex-start',
-          marginTop: 6,
-        }}
-      >
-        <AlertTriangle size={10} color="#d97706" />
-        <Text style={{ fontSize: 10, fontWeight: '700', color: '#d97706' }}>
-          {label}
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: '#f0fdf4',
-        borderRadius: 6,
-        paddingHorizontal: 7,
-        paddingVertical: 3,
-        alignSelf: 'flex-start',
-        marginTop: 6,
-      }}
-    >
-      <CheckCircle2 size={10} color="#16a34a" />
-      <Text style={{ fontSize: 10, fontWeight: '700', color: '#16a34a' }}>
-        In Stock
-      </Text>
-    </View>
-  );
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
-const Wishlist = () => {
+export default function Wishlist() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  /** Set of productIds that were OOS on previous load — so we can show "Back in stock!" */
-  const [previouslyOos, setPreviouslyOos] = useState<Set<string>>(new Set());
   const [addingToCart, setAddingToCart] = useState<string | null>(null);
 
-  const { refreshWishlist, lastSyncedAt } = useWishlist();
-  const { refreshCart } = useCart();
+  const { refreshWishlist } = useWishlist();
+  const { refreshCart, itemCount } = useCart();
+
+  // Live stock info keyed by productId
+  const [stockMap, setStockMap] = useState<Record<string, StockInfo>>({});
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    checkAuthAndLoad();
+    (async () => {
+      const auth = await userAuthService.isAuthenticated();
+      setIsAuthenticated(auth);
+      if (auth) await loadWishlist();
+      else setIsLoading(false);
+    })();
   }, []);
 
-  const checkAuthAndLoad = async () => {
-    const authStatus = await userAuthService.isAuthenticated();
-    setIsAuthenticated(authStatus);
-    if (!authStatus) { setIsLoading(false); return; }
-    loadWishlist();
+  // Sync stock on mount — tabs use router.replace() so component remounts on each tab switch
+  useEffect(() => {
+    if (wishlistItems.length > 0) syncWishlistStock(wishlistItems);
+  }, [wishlistItems.length]);
+
+  const syncWishlistStock = async (items: WishlistItem[]) => {
+    setIsSyncing(true);
+    const map: Record<string, StockInfo> = {};
+    await Promise.allSettled(
+      items.map(async (item) => {
+        try {
+          const res = await publicProductService.getProduct(item.productId);
+          if (!res.success || !res.data) return;
+          const p = res.data;
+
+          // For variant products, totalStock is sum of all variants — use baseStock instead
+          const stock = p.hasVariants
+            ? (p.inventory?.baseStock ?? 0)
+            : (p.inventory?.availableStock ?? p.totalStock ?? 0);
+          const livePrice = p.adminFixedPrice ?? p.basePrice;
+          const oldPrice = item.product?.adminFixedPrice ?? item.product?.basePrice ?? 0;
+          const priceChanged = Math.abs(oldPrice - livePrice) >= 0.01;
+          const primaryImg = p.images?.find((img: any) => img.isPrimary)?.url || p.images?.[0]?.url;
+
+          map[item.productId] = {
+            stock: Math.max(0, stock),
+            status: stock <= 0 ? 'out_of_stock' : stock <= LOW_STOCK_THRESHOLD ? 'low_stock' : 'in_stock',
+            livePrice,
+            priceChanged,
+            liveName: p.name,
+            liveImage: primaryImg,
+            liveOriginalPrice: p.originalPrice,
+            liveDiscount: p.discount,
+          };
+
+        } catch {
+          // skip failed items
+        }
+      }),
+    );
+    setStockMap(map);
+    setIsSyncing(false);
   };
 
   const loadWishlist = async () => {
     try {
       setIsLoading(true);
-      const response = await wishlistService.getWishlist();
-      if (response.success && response.data) {
-        const items = response.data.items;
-
-        // Track which items just became back-in-stock
-        setWishlistItems((prev) => {
-          const prevOosIds = new Set<string>(
-            prev
-              .filter((i) => i.product && !i.product.inStock)
-              .map((i) => i.productId),
-          );
-          const newlyBack = new Set<string>(
-            items
-              .filter(
-                (i) =>
-                  i.product?.inStock === true && prevOosIds.has(i.productId),
-              )
-              .map((i) => i.productId),
-          );
-          if (newlyBack.size > 0) setPreviouslyOos(newlyBack);
-          return items;
-        });
-
-        // Fallback: first load — just set items
-        setWishlistItems(items);
+      const res = await wishlistService.getWishlist();
+      if (res.success && res.data) {
+        setWishlistItems(res.data.items);
       }
-    } catch (error: any) {
-      console.error('Error loading wishlist:', error);
+    } catch {
       showErrorToast('Load Failed', 'Unable to load wishlist');
     } finally {
       setIsLoading(false);
@@ -191,449 +129,423 @@ const Wishlist = () => {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    if (isAuthenticated) {
-      loadWishlist();
-    } else {
-      setRefreshing(false);
-    }
+    if (isAuthenticated) loadWishlist();
+    else setRefreshing(false);
   }, [isAuthenticated]);
 
-  const removeFromWishlist = async (productId: string, productName?: string) => {
+  const removeItem = async (productId: string, name?: string) => {
     try {
-      if (typeof Haptics !== 'undefined')
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (typeof Haptics !== 'undefined') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await wishlistService.removeFromWishlist(productId);
-      setWishlistItems((items) => items.filter((item) => item.productId !== productId));
-      showSuccessToast('Removed', `${productName || 'Item'} removed from wishlist.`);
+      setWishlistItems((prev) => prev.filter((i) => i.productId !== productId));
+      showSuccessToast('Removed', `${name || 'Item'} removed from wishlist.`);
       refreshWishlist();
-    } catch (error: any) {
-      showErrorToast('Failed', 'Unable to remove item from wishlist.');
+    } catch {
+      showErrorToast('Failed', 'Unable to remove item.');
     }
   };
 
-  const addToCart = async (productId: string, productName: string) => {
+  const moveToCart = async (productId: string, name: string) => {
     if (addingToCart) return;
     try {
-      if (typeof Haptics !== 'undefined')
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (typeof Haptics !== 'undefined') await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setAddingToCart(productId);
       await cartService.addToCart(productId, 1);
-      showSuccessToast('Added to Cart!', `${productName} added to your cart.`);
+      showSuccessToast('Added to Cart!', `${name} added to your cart.`);
       refreshCart();
-    } catch (error: any) {
-      showErrorToast('Failed to Add', 'Unable to add item to cart.');
+    } catch (e: any) {
+      showErrorToast('Failed', e.message || 'Unable to add to cart.');
     } finally {
       setAddingToCart(null);
     }
   };
 
-  const shareProduct = async (productId: string, productName: string) => {
-    try {
-      const url = `https://m2cmarkdowns.com/products/${productId}`;
-      await Share.share({
-        message: `Check out this amazing product: ${productName} - ${url}`,
-        title: productName,
-      });
-    } catch {
-      showErrorToast('Share Failed', 'Unable to share product.');
-    }
-  };
 
-  // ── Loading state ─────────────────────────────────────────────────────────
+  // ── States ──────────────────────────────────────────────────────────────
   if (isLoading && !refreshing) {
     return (
-      <View className="flex-1 bg-gray-50 items-center justify-center">
-        <ActivityIndicator size="large" color="#111827" />
-        <Text className="text-gray-500 mt-4">Loading wishlist...</Text>
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <ScreenHeader count={0} itemCount={itemCount} />
+        <WishlistSkeleton />
       </View>
     );
   }
 
-  // ── Auth required ─────────────────────────────────────────────────────────
   if (!isAuthenticated) {
     return (
-      <View className="flex-1 bg-gray-50">
-        <StatusBar barStyle="light-content" backgroundColor="#111827" />
-        <View className={`bg-[#111827] ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-5 px-5`}>
-          <Text className="text-white text-2xl font-extrabold tracking-tight">My Wishlist</Text>
-          <Text className="text-gray-400 text-xs mt-0.5">Please login to view</Text>
-        </View>
-        <View className="flex-1 items-center justify-center p-8">
-          <View className="w-24 h-24 rounded-full bg-gray-200 items-center justify-center mb-6">
-            <Heart size={48} color="#9ca3af" />
-          </View>
-          <Text className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Login Required</Text>
-          <Text className="text-sm text-gray-500 mb-8 text-center leading-5">
-            Please log in to view and save items to your wishlist.
-          </Text>
-          <Pressable
-            onPress={() => router.push('/(auth)/Login' as any)}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.8 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-              shadowColor: '#111827',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 10,
-              elevation: 6,
-            })}
-            className="bg-[#111827] px-8 py-4 rounded-2xl flex-row items-center justify-center w-full"
-          >
-            <Text className="text-white text-base font-bold text-center">Login to Continue</Text>
-          </Pressable>
-        </View>
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <ScreenHeader count={0} itemCount={itemCount} />
+        <CenteredMessage
+          icon={<Heart size={40} color="#d1d5db" />}
+          title="Login Required"
+          body="Please log in to view and manage your wishlist."
+          action={
+            <ActionBtn label="Login to Continue" onPress={() => router.push('/(auth)/Login' as any)} />
+          }
+        />
       </View>
     );
   }
 
-  // ── Empty state ───────────────────────────────────────────────────────────
   if (wishlistItems.length === 0) {
     return (
-      <View className="flex-1 bg-gray-50">
-        <StatusBar barStyle="light-content" backgroundColor="#111827" />
-        <View className={`bg-[#111827] ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-5 px-5`}>
-          <Text className="text-white text-2xl font-extrabold tracking-tight">My Wishlist</Text>
-          <Text className="text-gray-400 text-xs mt-0.5">0 items</Text>
-        </View>
-        <View className="flex-1 items-center justify-center p-8">
-          <View className="w-24 h-24 rounded-full bg-gray-200 items-center justify-center mb-6">
-            <Heart size={48} color="#9ca3af" />
-          </View>
-          <Text className="text-2xl font-extrabold text-gray-900 mb-2 text-center">Your Wishlist is Empty</Text>
-          <Text className="text-sm text-gray-500 mb-8 text-center leading-5 px-4">
-            Save items you love to your wishlist and never lose track of them.
-          </Text>
-          <Pressable
-            onPress={() => router.push('/(tabs)')}
-            style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
-            className="bg-[#111827] px-8 py-4 rounded-2xl flex-row items-center gap-2"
-          >
-            <Text className="text-white font-bold text-base">Start Shopping</Text>
-            <ArrowRight size={18} color="#ffffff" />
-          </Pressable>
-        </View>
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <ScreenHeader count={0} itemCount={itemCount} />
+        <CenteredMessage
+          icon={<Heart size={40} color="#d1d5db" />}
+          title="Your Wishlist is Empty"
+          body="Save items you love to your wishlist and never lose track of them."
+          action={
+            <ActionBtn
+              label="Start Shopping"
+              icon={<ArrowRight size={16} color="#fff" />}
+              onPress={() => router.push('/(tabs)')}
+            />
+          }
+        />
       </View>
     );
   }
 
-  // ── Counts for header ─────────────────────────────────────────────────────
-  const oosCount = wishlistItems.filter(
-    (i) => i.product && !i.product.inStock,
-  ).length;
-
-  // ── Main layout ────────────────────────────────────────────────────────────
+  // ── Main ────────────────────────────────────────────────────────────────
   return (
-    <View className="flex-1 bg-gray-50">
-      <StatusBar barStyle="light-content" backgroundColor="#111827" />
-
-      {/* ── Page Header ─────────────────────────────────────── */}
-      <View className={`bg-[#111827] ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-5 px-5`}>
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-white text-2xl font-extrabold tracking-tight">My Wishlist</Text>
-            <Text className="text-gray-400 text-xs mt-0.5">
-              {wishlistItems.length} item{wishlistItems.length !== 1 ? 's' : ''}
-              {oosCount > 0 ? ` · ${oosCount} out of stock` : ''}
-            </Text>
-          </View>
-          <View className="bg-gray-200 rounded-full px-3.5 py-1.5">
-            <Text className="text-black font-extrabold text-xs">{wishlistItems.length}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* ── OOS notice banner (if some items are out of stock) ─────────────── */}
-      {oosCount > 0 && (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-            backgroundColor: '#fef2f2',
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-            borderBottomWidth: 1,
-            borderBottomColor: '#fecaca',
-          }}
-        >
-          <AlertCircle size={14} color="#dc2626" />
-          <Text style={{ fontSize: 12, color: '#991b1b', flex: 1, fontWeight: '600' }}>
-            {oosCount} item{oosCount !== 1 ? 's are' : ' is'} currently out of stock. We&apos;ll notify you when {oosCount !== 1 ? "they're" : "it's"} back.
-          </Text>
-        </View>
-      )}
+    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <ScreenHeader count={wishlistItems.length} itemCount={itemCount} />
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 10 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#111827"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111827" />
         }
       >
-        <View className="px-4 pt-4">
+        {/* Syncing indicator */}
+        {isSyncing ? (
+          <View style={ws.syncingRow}>
+            <ActivityIndicator size="small" color="#2563eb" />
+            <Text style={ws.syncingText}>Checking availability...</Text>
+          </View>
+        ) : null}
 
-          {wishlistItems.map((item, index) => {
-            if (!item.product) return null;
-            const isLast = index === wishlistItems.length - 1;
-            const stockLevel = resolveStockLevel(item.product);
-            const isOutOfStock = stockLevel === 'out_of_stock';
-            const isBackInStock = previouslyOos.has(item.productId);
-            const numericStock =
-              (item.product as any).availableStock ??
-              (item.product as any).totalStock ??
-              undefined;
-            const isAddingThisItem = addingToCart === item.productId;
+        {wishlistItems.map((item) => {
+          if (!item.product) return null;
+          const isAdding = addingToCart === item.productId;
 
-            // Border color by stock status
-            const borderColor = isOutOfStock
-              ? '#fecaca'
-              : stockLevel === 'low_stock'
-              ? '#fde68a'
-              : 'transparent';
+          // Use live product data if available, fallback to server snapshot
+          const live = stockMap[item.productId];
+          const inStock = live ? live.status !== 'out_of_stock' : item.product.inStock;
+          const isLowStock = live?.status === 'low_stock';
+          const isOOS = live ? live.status === 'out_of_stock' : !item.product.inStock;
+          const serverPrice = item.product.adminFixedPrice ?? item.product.basePrice;
+          const displayPrice = live?.livePrice ?? serverPrice;
+          const displayName = live?.liveName ?? item.product.name;
+          const displayImage = live?.liveImage ?? item.product.image;
+          const displayOriginalPrice = live?.liveOriginalPrice ?? item.product.originalPrice;
+          const displayDiscount = live?.liveDiscount ?? item.product.discount;
+          const priceChanged = live?.priceChanged ?? false;
+          const hasVariants = item.product.hasVariants ?? false;
 
-            return (
-              <View
-                key={item.id}
-                style={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: 20,
-                  overflow: 'hidden',
-                  marginBottom: isLast ? 0 : 12,
-                  borderWidth: 1.5,
-                  borderColor,
-                  shadowColor: '#000',
-                  shadowOpacity: 0.06,
-                  shadowRadius: 8,
-                  elevation: 2,
-                }}
-              >
-                {/* Back-in-stock banner */}
-                {isBackInStock && (
+          return (
+            <View
+              key={item.id}
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: isOOS ? '#fecaca' : isLowStock ? '#fed7aa' : '#e5e7eb',
+                shadowColor: '#0f172a',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 4,
+                elevation: 1,
+              }}
+            >
+              {/* Stock status banner */}
+              {isOOS ? (
+                <View style={[ws.bannerRow, ws.bannerOos]} accessibilityRole="alert">
+                  <AlertCircle size={11} color="#dc2626" />
+                  <Text style={ws.bannerTextOos}>Out of Stock</Text>
+                </View>
+              ) : isLowStock && live ? (
+                <View style={[ws.bannerRow, ws.bannerLow]} accessibilityRole="alert">
+                  <AlertCircle size={11} color="#ea580c" />
+                  <Text style={ws.bannerTextLow}>Low stock — only {live.stock} left</Text>
+                </View>
+              ) : null}
+
+              <View style={{ flexDirection: 'row', padding: 12, gap: 12 }}>
+                {/* Image — 64px compact */}
+                <Pressable
+                  onPress={() => router.push(`/(any)/products/${item.productId}` as any)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${displayName}`}
+                >
                   <View
                     style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingHorizontal: 14,
-                      paddingVertical: 7,
-                      backgroundColor: '#f0fdf4',
-                      borderBottomWidth: 1,
-                      borderBottomColor: '#bbf7d0',
+                      width: 64,
+                      height: 64,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      backgroundColor: '#f3f4f6',
+                      opacity: isOOS ? 0.4 : 1,
                     }}
                   >
-                    <Sparkles size={12} color="#16a34a" />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#16a34a' }}>
-                      Back in Stock! Add it to your cart now
-                    </Text>
-                  </View>
-                )}
-
-                {/* ── Product Info Row ───────────────────────── */}
-                <View className="p-4 flex-row gap-3">
-
-                  {/* Left 25% — Image */}
-                  <View className="w-[25%] relative">
-                    {item.product.image ? (
+                    {displayImage ? (
                       <Image
-                        source={{ uri: item.product.image }}
-                        style={{
-                          width: '100%',
-                          aspectRatio: 1,
-                          borderRadius: 16,
-                          opacity: isOutOfStock ? 0.5 : 1,
-                        }}
+                        source={{ uri: displayImage }}
+                        style={{ width: '100%', height: '100%' }}
                         contentFit="cover"
-                        transition={300}
+                        transition={200}
                       />
                     ) : (
-                      <View className="w-full aspect-square rounded-2xl bg-gray-100 items-center justify-center">
-                        <Package size={28} color="#d1d5db" />
+                      <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                        <Package size={20} color="#d1d5db" />
                       </View>
                     )}
-
-                    {/* OOS stamp */}
-                    {isOutOfStock && (
+                    {displayDiscount != null && displayDiscount > 0 ? (
                       <View
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          borderRadius: 16,
-                          backgroundColor: 'rgba(255,255,255,0.4)',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
+                        style={{ position: 'absolute', top: 4, left: 4, backgroundColor: '#111827', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 }}
                       >
-                        <View
-                          style={{
-                            backgroundColor: '#dc2626',
-                            borderRadius: 6,
-                            paddingHorizontal: 5,
-                            paddingVertical: 2,
-                          }}
-                        >
-                          <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>
-                            OOS
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-
-                    {/* Discount badge */}
-                    {item.product.discount && item.product.discount > 0 ? (
-                      <View className="absolute top-1 left-1 bg-gray-800 rounded-md px-1 py-0.5">
-                        <Text className="text-white text-[9px] font-extrabold">
-                          -{item.product.discount}%
+                        <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800' }}>
+                          {displayDiscount}%
                         </Text>
                       </View>
                     ) : null}
                   </View>
+                </Pressable>
 
-                  {/* Right 75% — Details */}
-                  <View className="flex-1">
-                    {/* Name & Trash */}
-                    <View className="flex-row items-start justify-between mb-1.5">
-                      <Text
-                        className="flex-1 text-[15px] font-bold text-gray-900 leading-5 mr-2"
-                        numberOfLines={2}
-                      >
-                        {item.product.name}
-                      </Text>
-                      <Pressable
-                        onPress={() => removeFromWishlist(item.productId, item.product?.name)}
-                        style={({ pressed }) => ({
-                          opacity: pressed ? 0.6 : 1,
-                          transform: [{ scale: pressed ? 0.95 : 1 }],
-                        })}
-                        className="p-1 -mt-0.5"
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Trash2 size={17} color="#374151" />
-                      </Pressable>
-                    </View>
+                {/* Info + actions */}
+                <View style={{ flex: 1 }}>
+                  {/* Name + trash */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
+                    <Text
+                      style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 17, marginRight: 8 }}
+                      numberOfLines={2}
+                    >
+                      {displayName}
+                    </Text>
+                    <Pressable onPress={() => removeItem(item.productId, displayName)} accessibilityRole="button" accessibilityLabel="Remove" hitSlop={8}>
+                      <View style={{ padding: 4 }}>
+                        <Trash2 size={14} color="#9ca3af" />
+                      </View>
+                    </Pressable>
+                  </View>
 
-                    {/* Tags */}
-                    <View className="flex-row flex-wrap gap-1.5">
-                      {item.product.category ? (
-                        <View className="bg-gray-100 px-2 py-0.5 rounded-md">
-                          <Text className="text-[11px] text-gray-700 font-semibold">
-                            {item.product.category}
+                  {/* Price row + stock label + Add to Cart */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>
+                          {fmt(displayPrice)}
+                        </Text>
+                        {displayOriginalPrice ? (
+                          <Text style={{ fontSize: 10, color: '#dc2626', textDecorationLine: 'line-through' }}>
+                            {fmt(displayOriginalPrice)}
                           </Text>
-                        </View>
+                        ) : null}
+                      </View>
+                      {priceChanged && live ? (
+                        <Text style={live.livePrice! > item.product.basePrice ? ws.priceUp : ws.priceDown}>
+                          Price {live.livePrice! > item.product.basePrice ? 'increased' : 'decreased'}
+                        </Text>
                       ) : null}
                     </View>
 
-                    {/* Price */}
-                    <View className="mt-2 flex-row items-center gap-2">
-                      <Text className="text-[17px] font-extrabold text-gray-900">
-                        {fmt(item.product.basePrice)}
-                      </Text>
-                      {item.product.originalPrice &&
-                        item.product.originalPrice > item.product.basePrice && (
-                          <Text className="text-xs text-gray-400 line-through">
-                            {fmt(item.product.originalPrice)}
-                          </Text>
+                    {/* Add to Cart / Choose Options / OOS */}
+                    <Pressable
+                      onPress={() => {
+                        if (hasVariants) {
+                          router.push(`/(any)/products/${item.productId}` as any);
+                        } else {
+                          moveToCart(item.productId, displayName);
+                        }
+                      }}
+                      disabled={isOOS || isAdding}
+                      accessibilityRole="button"
+                      accessibilityLabel={isOOS ? 'Out of stock' : hasVariants ? 'Choose variant options' : 'Add to cart'}
+                    >
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: isOOS ? '#f3f4f6' : '#111827',
+                          paddingHorizontal: 10,
+                          height: 30,
+                          borderRadius: 8,
+                          gap: 4,
+                        }}
+                      >
+                        {isAdding ? (
+                          <ActivityIndicator size={12} color="#fff" />
+                        ) : (
+                          <>
+                            <ShoppingCart size={11} color={isOOS ? '#9ca3af' : '#fff'} strokeWidth={2.5} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: isOOS ? '#9ca3af' : '#fff' }}>
+                              {isOOS ? 'OOS' : hasVariants ? 'Options' : 'Add'}
+                            </Text>
+                          </>
                         )}
-                    </View>
-
-                    {/* Stock pill */}
-                    <StockPill
-                      level={stockLevel}
-                      numericStock={
-                        stockLevel === 'low_stock' ? numericStock : undefined
-                      }
-                    />
+                      </View>
+                    </Pressable>
                   </View>
-                </View>
-
-                {/* ── Actions row ───────────────────────────────── */}
-                <View className="flex-row border-t border-gray-100 bg-gray-50/50">
-                  <Pressable
-                    onPress={() => addToCart(item.productId, item.product!.name)}
-                    disabled={isOutOfStock || isAddingThisItem}
-                    style={({ pressed }) => ({
-                      opacity: pressed ? 0.8 : 1,
-                      backgroundColor: isOutOfStock
-                        ? '#f3f4f6'
-                        : isBackInStock
-                        ? (pressed ? '#15803d' : '#16a34a')
-                        : pressed
-                        ? '#1f2937'
-                        : '#111827',
-                    })}
-                    className="flex-1 flex-row items-center justify-center py-3.5 border-r border-gray-100"
-                  >
-                    {isAddingThisItem ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                      <>
-                        <ShoppingCart
-                          size={16}
-                          color={!isOutOfStock ? '#ffffff' : '#9ca3af'}
-                        />
-                        <Text
-                          className={`ml-2 text-sm font-bold tracking-wide ${!isOutOfStock ? 'text-white' : 'text-gray-400'}`}
-                        >
-                          {isOutOfStock
-                            ? 'OUT OF STOCK'
-                            : isBackInStock
-                            ? 'ADD NOW ✦'
-                            : 'ADD TO CART'}
-                        </Text>
-                      </>
-                    )}
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => shareProduct(item.productId, item.product!.name)}
-                    style={({ pressed }) => ({
-                      opacity: pressed ? 0.6 : 1,
-                      transform: [{ scale: pressed ? 0.95 : 1 }],
-                    })}
-                    className="px-6 items-center justify-center bg-white"
-                  >
-                    <Share2 size={18} color="#374151" />
-                  </Pressable>
                 </View>
               </View>
-            );
-          })}
-
-          {/* ── Wishlist Tips ─────────────────────────────────────── */}
-          <View className="bg-white rounded-[20px] mt-4 shadow-sm p-4">
-            <View className="flex-row items-center justify-center gap-2 mb-4">
-              <View className="w-8 h-8 bg-gray-100 rounded-xl items-center justify-center">
-                <Tag size={15} color="#374151" />
-              </View>
-              <Text className="text-[15px] font-bold text-gray-900">Wishlist Tips</Text>
             </View>
-            <View className="gap-3.5 pl-1">
-              {[
-                { icon: Heart,        label: 'Save for Later',  desc: 'Tap the heart icon on any product to save it' },
-                { icon: Share2,       label: 'Share',           desc: 'Share your wishlist with family for gift ideas' },
-                { icon: ShoppingCart, label: 'Add to Cart',     desc: 'Easily move in-stock items right to your cart' },
-              ].map(({ icon: Icon, label, desc }, idx) => (
-                <View key={idx} className="flex-row items-center gap-3">
-                  <View className="w-9 h-9 bg-gray-100 rounded-xl items-center justify-center">
-                    <Icon size={16} color="#4b5563" />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="font-bold text-gray-900 text-sm">{label}</Text>
-                    <Text className="text-[11px] text-gray-500 mt-0.5">{desc}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-
-        </View>
+          );
+        })}
       </ScrollView>
     </View>
   );
-};
+}
 
-export default Wishlist;
+// ─── Header ───────────────────────────────────────────────────────────────────
+function ScreenHeader({ count, itemCount }: { count: number; itemCount: number }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={{
+        backgroundColor: '#ffffff',
+        paddingHorizontal: 16,
+        paddingTop: insets.top + 12,
+        paddingBottom: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 24, fontWeight: '800', color: '#111827' }}>
+          My Wishlist
+        </Text>
+        <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
+          {count > 0 ? `${count} saved ${count === 1 ? 'item' : 'items'}` : 'Your saved items'}
+        </Text>
+      </View>
+      <Pressable
+        onPress={() => router.push('/(tabs)/cart' as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`Cart, ${itemCount} items`}
+        hitSlop={6}
+      >
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: '#f3f4f6',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <ShoppingCart size={18} color="#111827" />
+          {itemCount > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -2,
+                right: -4,
+                backgroundColor: '#dc2626',
+                minWidth: 16,
+                height: 16,
+                borderRadius: 8,
+                paddingHorizontal: 4,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                {itemCount > 99 ? '99+' : itemCount}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Centered message (empty / auth) ──────────────────────────────────────────
+function CenteredMessage({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <View
+        style={{
+          width: 88,
+          height: 88,
+          borderRadius: 44,
+          backgroundColor: '#f3f4f6',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 20,
+        }}
+      >
+        {icon}
+      </View>
+      <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 6, textAlign: 'center' }}>
+        {title}
+      </Text>
+      <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20, marginBottom: action ? 24 : 0 }}>
+        {body}
+      </Text>
+      {action ?? null}
+    </View>
+  );
+}
+
+function ActionBtn({ label, icon, onPress }: { label: string; icon?: React.ReactNode; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button">
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: '#111827',
+          paddingHorizontal: 28,
+          height: 50,
+          borderRadius: 14,
+          gap: 8,
+        }}
+      >
+        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{label}</Text>
+        {icon ?? null}
+      </View>
+    </Pressable>
+  );
+}
+
+// ─── Hoisted styles for sync UI ──────────────────────────────────────────────
+const ws = StyleSheet.create({
+  // Syncing indicator
+  syncingRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 10, backgroundColor: '#eff6ff', borderRadius: 12, marginBottom: 4,
+  },
+  syncingText: { fontSize: 12, fontWeight: '600', color: '#2563eb' },
+
+  // Stock banners (per-item)
+  bannerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderTopLeftRadius: 14, borderTopRightRadius: 14,
+  },
+  bannerOos: { backgroundColor: '#fef2f2' },
+  bannerLow: { backgroundColor: '#fff7ed' },
+  bannerTextOos: { fontSize: 10, fontWeight: '700', color: '#dc2626' },
+  bannerTextLow: { fontSize: 10, fontWeight: '700', color: '#9a3412' },
+
+  // Price change labels
+  priceUp: { fontSize: 9, fontWeight: '600', color: '#dc2626', marginTop: 1 },
+  priceDown: { fontSize: 9, fontWeight: '600', color: '#16a34a', marginTop: 1 },
+});

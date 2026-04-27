@@ -1,62 +1,19 @@
-# Only the checker_app + its config matters for this build.
-# Ignore everything except checker_app/ and root-level files EAS needs.
-
-# Other apps / services in the monorepo
 backend/
 frontend/
-mobile/
+checker_app/
 docs/
-
-# Agent / skill configs
 .agents/
-.mcp.json
-.claude/
-
-# Editor / OS
 .vscode/
 .idea/
-.DS_Store
-Thumbs.db
-
-# Dependencies (EAS installs fresh inside checker_app)
+.claude/
 **/node_modules/
-
-# Native folders — EAS runs `expo prebuild` to regenerate fresh from app.json.
-# Never ship local android/ or ios/ (they drift from app.json and cause build failures).
 **/android/
 **/ios/
-
-# Dev caches
 **/.expo/
-**/.expo-shared/
-**/dist/
-**/web-build/
-**/.cache/
-**/.next/
-
-# Tests & stories
-**/__tests__/
-**/__mocks__/
-**/*.test.*
-**/*.spec.*
-**/*.stories.*
-
-# Env files — must come from EAS env, never the bundle
 **/.env
 **/.env.*
-!**/.env.example
-
-# Logs & large binaries
 *.log
-*.mp4
-*.mov
-*.zip
 *.apk
 *.aab
-*.ipa
-
-# Root-level work artifacts
-CHANGES_COMPLETED.md
 COMMIT_MESSAGE.txt
-MOBILE_UPDATES_TODO.md
 WORK_REPORT.md

@@ -15,6 +15,7 @@ interface WishlistContextType {
   refreshWishlist: () => Promise<void>;
   addToWishlist: (productId: string) => Promise<void>;
   removeFromWishlist: (productId: string) => Promise<void>;
+  clearWishlist: () => void;
   isLoading: boolean;
   isInWishlist: (productId: string) => boolean;
   lastSyncedAt: Date | null;
@@ -91,6 +92,10 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearWishlist = useCallback(() => {
+    setWishlistItems([]);
+  }, []);
+
   const isInWishlist = useCallback(
     (productId: string) =>
       wishlistItems.some((item) => item.productId === productId),
@@ -124,6 +129,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         refreshWishlist,
         addToWishlist,
         removeFromWishlist,
+        clearWishlist,
         isLoading,
         isInWishlist,
         lastSyncedAt,

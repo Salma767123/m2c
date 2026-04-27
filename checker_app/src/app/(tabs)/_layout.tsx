@@ -1,7 +1,7 @@
 import { Stack, usePathname } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Text, TouchableOpacity, View, Keyboard, Platform } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
   LayoutDashboard,
@@ -34,7 +34,7 @@ export default function TabLayout() {
 ];
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-gray-50" style={{ paddingTop: insets.top }}>
       {/* Header */}
       <Header />
       
@@ -101,6 +101,6 @@ export default function TabLayout() {
         </View>
       </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }

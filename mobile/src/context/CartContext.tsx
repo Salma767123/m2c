@@ -20,8 +20,10 @@ interface CartContextType {
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   isLoading: boolean;
+  clearCart: () => void;
   // ── Stock sync ──────────────────────────────────────────────────────────────
-  syncResult: StockSyncResult[];
+  syncResult: StockSyncResult[];       // only items with actionable changes (banners)
+  allSyncResults: StockSyncResult[];   // all items with live data (for UI refresh)
   isSyncing: boolean;
   lastSyncedAt: Date | null;
   syncStock: () => Promise<void>;
@@ -38,6 +40,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   // ── Stock sync state ────────────────────────────────────────────────────────
   const [syncResult, setSyncResult] = useState<StockSyncResult[]>([]);
+  const [allSyncResults, setAllSyncResults] = useState<StockSyncResult[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
@@ -87,11 +90,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       syncInProgress.current = true;
       setIsSyncing(true);
 
-      // Always refresh the cart first to get latest items from server.
       await refreshCart();
 
-      // Re-read from state after refresh — cartItems may not update synchronously,
-      // so we fetch fresh directly.
       const authenticated = await userAuthService.isAuthenticated();
       let freshItems: CartItem[] = [];
       if (authenticated) {
@@ -109,7 +109,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       const results = await syncCartStock(freshItems);
 
-      // ── Auto-clamp quantities that exceed available stock ──────────────────
+      // Auto-clamp quantities that exceed available stock
       const toClamp = results.filter(
         (r) => r.qtyAdjusted && r.availableStock > 0,
       );
@@ -127,10 +127,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }),
       );
 
-      // Refresh once more so the UI shows clamped quantities immediately.
       if (toClamp.length > 0) await refreshCart();
 
-      // Only surface results that have something actionable to show.
       const meaningful = results.filter(
         (r) =>
           r.stockStatus !== 'in_stock' ||
@@ -138,10 +136,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           r.qtyAdjusted ||
           r.wasOutOfStock,
       );
+      setAllSyncResults(results);
       setSyncResult(meaningful);
       setLastSyncedAt(new Date());
-    } catch (err) {
-      console.error('Stock sync failed:', err);
+    } catch {
+      // Sync failed — non-critical, swallow silently.
     } finally {
       setIsSyncing(false);
       syncInProgress.current = false;
@@ -149,6 +148,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [refreshCart]);
 
   const clearSyncResult = useCallback(() => setSyncResult([]), []);
+
+  const clearCart = useCallback(() => {
+    setCartItems([]);
+    setItemCount(0);
+    setTotalAmount(0);
+    setSyncResult([]);
+    setAllSyncResults([]);
+  }, []);
 
   // ── Cart mutation helpers ────────────────────────────────────────────────────
   const addToCart = async (productId: string, quantity: number, variantId?: string) => {
@@ -244,8 +251,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         addToCart,
         updateQuantity,
         removeFromCart,
+        clearCart,
         isLoading,
         syncResult,
+        allSyncResults,
         isSyncing,
         lastSyncedAt,
         syncStock,

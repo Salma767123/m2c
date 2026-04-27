@@ -34,6 +34,24 @@ export interface StockSyncResult {
   /** qty clamped to availableStock; equals oldQty if no clamp needed */
   clampedQty: number;
   qtyAdjusted: boolean;
+
+  /* ── Live product snapshot (for UI refresh) ── */
+  live: {
+    name: string;
+    images: string[];
+    price: number;
+    originalPrice?: number;
+    discount?: number;
+    inStock: boolean;
+    availableStock: number;
+    category: string;
+    variant?: {
+      size: string;
+      color: string;
+      colorHex?: string;
+      sku: string;
+    };
+  };
 }
 
 /** Threshold below which we call stock "low". */
@@ -62,9 +80,13 @@ export async function syncCartStock(
 
         const p = res.data;
 
-        // Resolve price and available stock — prefer variant if present.
+        // Resolve price, stock, images, and variant details — prefer variant if present.
         let livePrice: number;
         let availableStock: number;
+        let liveImages: string[] = [];
+        let liveOriginalPrice: number | undefined = p.originalPrice;
+        let liveDiscount: number | undefined = p.discount;
+        let liveVariant: { size: string; color: string; colorHex?: string; sku: string } | undefined;
 
         if (item.variantId && p.variants) {
           const variant = p.variants.find((v) => v.id === item.variantId);
@@ -74,6 +96,18 @@ export async function syncCartStock(
                 ? variant.adminFixedPrice
                 : variant.price;
             availableStock = variant.stock;
+            liveOriginalPrice = variant.originalPrice ?? p.originalPrice;
+            liveDiscount = variant.discount ?? p.discount;
+            liveVariant = {
+              size: variant.size,
+              color: variant.color,
+              colorHex: variant.colorHex,
+              sku: variant.sku,
+            };
+            // Use variant images if available, fall back to product images
+            if (variant.images && variant.images.length > 0) {
+              liveImages = [...variant.images];
+            }
           } else {
             // Variant no longer exists — treat as OOS.
             livePrice = item.price;
@@ -82,7 +116,19 @@ export async function syncCartStock(
         } else {
           livePrice =
             p.adminFixedPrice != null ? p.adminFixedPrice : p.basePrice;
-          availableStock = p.inventory?.availableStock ?? p.totalStock ?? 0;
+          // For products with variants but no variantId selected (base unit),
+          // use baseStock from inventory — NOT totalStock (which sums all variants).
+          availableStock = p.hasVariants
+            ? (p.inventory?.baseStock ?? 0)
+            : (p.inventory?.availableStock ?? p.totalStock ?? 0);
+        }
+
+        // Fall back to product images if variant had none
+        if (liveImages.length === 0 && p.images) {
+          for (const img of p.images) {
+            const url = typeof img === 'string' ? img : img?.url;
+            if (url) liveImages.push(url);
+          }
         }
 
         availableStock = Math.max(0, availableStock);
@@ -95,8 +141,6 @@ export async function syncCartStock(
         const priceChanged = Math.abs(oldPrice - livePrice) >= 0.01;
 
         const status = stockStatus(availableStock);
-        // "wasOutOfStock" — the item was originally OOS (inStock === false) but
-        // is now available again.
         const wasOutOfStock =
           item.product?.inStock === false && status !== 'out_of_stock';
 
@@ -113,6 +157,17 @@ export async function syncCartStock(
           oldQty,
           clampedQty,
           qtyAdjusted,
+          live: {
+            name: p.name,
+            images: liveImages,
+            price: livePrice,
+            originalPrice: liveOriginalPrice,
+            discount: liveDiscount,
+            inStock: availableStock > 0,
+            availableStock,
+            category: p.category || '',
+            variant: liveVariant,
+          },
         });
       } catch {
         // Network error for this item — skip silently.

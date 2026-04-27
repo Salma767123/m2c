@@ -23,9 +23,15 @@ const addToCart = async (req, res) => {
         adminFixedPrice: true,
         inStock: true,
         totalStock: true,
-        variants: {
-          where: variantId ? { id: variantId } : {}
-        }
+        variants: variantId ? {
+          where: { id: variantId },
+          select: {
+            id: true,
+            price: true,
+            adminFixedPrice: true,
+            stock: true,
+          }
+        } : false
       }
     });
 
@@ -76,7 +82,8 @@ const addToCart = async (req, res) => {
 
     let price = product.adminFixedPrice || product.basePrice;
     if (variantId && product.variants && product.variants.length > 0) {
-      price = product.variants[0].price;
+      const v = product.variants[0];
+      price = v.adminFixedPrice || v.price;
     }
 
     if (existingItem) {
@@ -183,6 +190,7 @@ const getCart = async (req, res) => {
             discount: true,
             inStock: true,
             totalStock: true,
+            hasVariants: true,
             gstPercentage: true,
             category: true,
             material: true,
@@ -192,6 +200,12 @@ const getCart = async (req, res) => {
             singleUnitColor: true,
             singleUnitColorHex: true,
             baseSku: true,
+            inventory: {
+              select: {
+                baseStock: true,
+                currentStock: true,
+              }
+            },
             images: {
               select: {
                 url: true,
@@ -203,7 +217,19 @@ const getCart = async (req, res) => {
             },
             variants: item.variantId ? {
               where: { id: item.variantId },
-              select: { id: true, size: true, color: true, colorHex: true, images: true, stock: true }
+              select: {
+                id: true,
+                size: true,
+                color: true,
+                colorHex: true,
+                sku: true,
+                price: true,
+                adminFixedPrice: true,
+                originalPrice: true,
+                discount: true,
+                stock: true,
+                images: true,
+              }
             } : false
           }
         });
@@ -221,11 +247,18 @@ const getCart = async (req, res) => {
             name: product.name,
             description: product.description,
             images: product.images.map(img => ({ url: img.url, isPrimary: img.isPrimary })),
-            basePrice: product.adminFixedPrice || product.basePrice,
+            basePrice: product.basePrice,
+            adminFixedPrice: product.adminFixedPrice,
             originalPrice: product.originalPrice,
             discount: product.discount,
             inStock: product.inStock,
-            availableStock: product.totalStock,
+            totalStock: product.totalStock,
+            hasVariants: product.hasVariants,
+            // For variant products without a specific variant selected (base unit),
+            // use inventory.baseStock instead of totalStock (which sums all variants)
+            availableStock: !item.variantId && product.hasVariants
+              ? (product.inventory?.baseStock ?? 0)
+              : product.totalStock,
             gstPercentage: product.gstPercentage,
             category: product.category,
             material: product.material,
@@ -288,16 +321,27 @@ const updateCartItem = async (req, res) => {
       });
     }
 
-    // Verify product stock
+    // Verify product stock — check variant stock if applicable
     const product = await prisma.product.findUnique({
       where: { id: cartItem.productId },
-      select: { totalStock: true, inStock: true }
+      select: {
+        totalStock: true,
+        inStock: true,
+        variants: cartItem.variantId ? {
+          where: { id: cartItem.variantId },
+          select: { stock: true }
+        } : false,
+      }
     });
 
-    if (!product || !product.inStock || product.totalStock < quantity) {
+    const availableStock = cartItem.variantId && product?.variants?.length > 0
+      ? product.variants[0].stock
+      : product?.totalStock;
+
+    if (!product || !product.inStock || availableStock < quantity) {
       return res.status(400).json({
         success: false,
-        error: 'Insufficient stock available'
+        error: `Insufficient stock available${availableStock != null ? ` (${availableStock} left)` : ''}`
       });
     }
 

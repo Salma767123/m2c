@@ -2118,9 +2118,8 @@ const getPublicProducts = async (req, res) => {
       where.subCategory = { equals: subCategory, mode: 'insensitive' };
     }
 
-    // Price filtering should use adminFixedPrice if available, otherwise basePrice
+    // Price filtering — uses AND so it doesn't conflict with search OR
     if (minPrice || maxPrice) {
-      where.OR = where.OR || [];
       const priceConditions = [];
 
       if (minPrice && maxPrice) {
@@ -2151,7 +2150,9 @@ const getPublicProducts = async (req, res) => {
         });
       }
 
-      where.OR = [...(where.OR || []), ...priceConditions];
+      // Wrap price conditions in AND so they don't mix with search OR
+      where.AND = where.AND || [];
+      where.AND.push({ OR: priceConditions });
     }
 
     if (inStock === 'true') {
@@ -2159,15 +2160,17 @@ const getPublicProducts = async (req, res) => {
       where.totalStock = { gt: 0 };
     }
 
-    // Color filter - match against tags, singleUnitColor, or variant colors
+    // Color filter — uses AND so it doesn't conflict with search OR
     if (colors) {
       const colorList = colors.split(',').map(c => c.trim().toLowerCase());
-      where.OR = [
-        ...(where.OR || []),
-        { tags: { hasSome: colorList } },
-        { singleUnitColor: { in: colorList, mode: 'insensitive' } },
-        { variants: { some: { color: { in: colorList, mode: 'insensitive' } } } }
-      ];
+      where.AND = where.AND || [];
+      where.AND.push({
+        OR: [
+          { tags: { hasSome: colorList } },
+          { singleUnitColor: { in: colorList, mode: 'insensitive' } },
+          { variants: { some: { color: { in: colorList, mode: 'insensitive' } } } }
+        ]
+      });
     }
 
     // Rating filter
@@ -2210,6 +2213,7 @@ const getPublicProducts = async (req, res) => {
             size: true,
             color: true,
             colorHex: true,
+            sku: true,
             price: true,
             originalPrice: true,
             discount: true,

@@ -12,9 +12,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Search,
@@ -249,7 +250,7 @@ export default function ProductsScreen() {
         onClear: () => setFilters((f) => ({ ...f, minRating: 0 })),
       });
     if (filters.minPrice != null || filters.maxPrice != null) {
-      const range = `₹${filters.minPrice ?? 0} – ₹${filters.maxPrice ?? '∞'}`;
+      const range = `$${filters.minPrice ?? 0} – $${filters.maxPrice ?? '∞'}`;
       chips.push({
         key: 'price',
         label: range,
@@ -282,7 +283,7 @@ export default function ProductsScreen() {
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+    <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
       <Header itemCount={itemCount} />
       <SearchBar
         value={searchInput}
@@ -307,11 +308,24 @@ export default function ProductsScreen() {
       />
 
       <FlatList
+        // key forces FlatList remount when switching between 1-col and 2-col
+        // (required by React Native when numColumns changes).
+        key={products.length <= 1 ? 'single' : 'grid'}
         data={products}
         keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        numColumns={2}
-        columnWrapperStyle={{ gap: 12 }}
+        renderItem={({ item }) => (
+          <View
+            style={
+              products.length <= 1
+                ? { width: '100%', maxWidth: 300, alignSelf: 'center' }
+                : { flex: 1 }
+            }
+          >
+            <ProductCard product={item} />
+          </View>
+        )}
+        numColumns={products.length <= 1 ? 1 : 2}
+        columnWrapperStyle={products.length > 1 ? { gap: 12 } : undefined}
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 8,
@@ -380,32 +394,30 @@ export default function ProductsScreen() {
         }}
         onClose={() => setShowFilter(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const keyExtractor = (p: PublicProduct) => p.id;
-const renderItem = ({ item }: { item: PublicProduct }) => (
-  <View style={{ flex: 1 }}>
-    <ProductCard product={item} />
-  </View>
-);
 
 // ─── Sub-components ───────────────────────────────────────────────────────
 
 function Header({ itemCount }: { itemCount: number }) {
+  const headerInsets = useSafeAreaInsets();
   return (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 8,
-        paddingVertical: 8,
+        paddingTop: headerInsets.top + 8,
+        paddingBottom: 8,
         backgroundColor: '#ffffff',
         borderBottomWidth: 1,
         borderBottomColor: '#e5e7eb',
       }}
     >
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <Pressable
         onPress={() => (router.canGoBack() ? router.back() : router.push('/(tabs)'))}
         accessibilityRole="button"
@@ -1168,9 +1180,8 @@ function FilterModal({
                   onPress={() => setDraft((d) => ({ ...d, inStockOnly: !d.inStockOnly }))}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: draft.inStockOnly }}
-                  style={({ pressed }) => ({ backgroundColor: pressed ? '#f9fafb' : '#ffffff' })}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#ffffff' }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 15, color: '#111827', fontWeight: '500' }}>In stock only</Text>
                       <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>Show only available items</Text>
@@ -1194,7 +1205,7 @@ function FilterModal({
 
                 {/* ── Section: Price Range ─────────────────────────────── */}
                 <View style={{ backgroundColor: '#f3f4f6', paddingHorizontal: 20, paddingVertical: 8, marginTop: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Price Range (₹)</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#6b7280', letterSpacing: 0.8, textTransform: 'uppercase' }}>Price Range ($)</Text>
                 </View>
                 <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 }}>
                   <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -1213,7 +1224,7 @@ function FilterModal({
                           height: 46,
                         }}
                       >
-                        <Text style={{ fontSize: 15, color: '#6b7280', marginRight: 4 }}>₹</Text>
+                        <Text style={{ fontSize: 15, color: '#6b7280', marginRight: 4 }}>$</Text>
                         <TextInput
                           value={minPriceInput}
                           onChangeText={setMinPriceInput}
@@ -1239,7 +1250,7 @@ function FilterModal({
                           height: 46,
                         }}
                       >
-                        <Text style={{ fontSize: 15, color: '#6b7280', marginRight: 4 }}>₹</Text>
+                        <Text style={{ fontSize: 15, color: '#6b7280', marginRight: 4 }}>$</Text>
                         <TextInput
                           value={maxPriceInput}
                           onChangeText={setMaxPriceInput}
@@ -1301,9 +1312,6 @@ function FilterModal({
                         onPress={() => setDraft((d) => ({ ...d, minRating: opt.value }))}
                         accessibilityRole="radio"
                         accessibilityState={{ selected }}
-                        style={({ pressed }) => ({
-                          backgroundColor: pressed ? '#f9fafb' : selected ? '#fafafa' : '#ffffff',
-                        })}
                       >
                         <View
                           style={{
@@ -1313,9 +1321,10 @@ function FilterModal({
                             paddingVertical: 13,
                             borderBottomWidth: idx < RATING_OPTIONS.length - 1 ? 1 : 0,
                             borderBottomColor: '#f3f4f6',
+                            backgroundColor: selected ? '#f9fafb' : '#ffffff',
                           }}
                         >
-                          {/* Radio */}
+                          {/* Radio dot */}
                           <View
                             style={{
                               width: 20,
@@ -1333,9 +1342,9 @@ function FilterModal({
                             ) : null}
                           </View>
 
-                          {/* Stars — full 5-star row with filled/empty */}
+                          {/* Stars row (5 stars, filled up to opt.value) */}
                           {opt.value > 0 ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 6 }}>
                               {Array.from({ length: 5 }).map((_, i) => (
                                 <Star
                                   key={i}
@@ -1352,11 +1361,11 @@ function FilterModal({
                             style={{
                               fontSize: 14,
                               color: '#111827',
-                              fontWeight: selected ? '700' : '400',
+                              fontWeight: selected ? '600' : '400',
                               flex: 1,
                             }}
                           >
-                            {opt.value > 0 ? `${opt.value} ${opt.label}` : opt.label}
+                            {opt.label}
                           </Text>
 
                           {selected ? <Check size={16} color="#111827" strokeWidth={2.5} /> : null}
@@ -1383,38 +1392,36 @@ function FilterModal({
                   flexShrink: 0,
                 }}
               >
-                <Pressable
-                  onPress={onClose}
-                  accessibilityRole="button"
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    height: 52,
-                    borderRadius: 12,
-                    borderWidth: 1.5,
-                    borderColor: '#e5e7eb',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: pressed ? '#f3f4f6' : '#ffffff',
-                  })}
-                >
-                  <Text style={{ color: '#374151', fontSize: 15, fontWeight: '600' }}>Cancel</Text>
+                <Pressable onPress={onClose} accessibilityRole="button">
+                  <View
+                    style={{
+                      height: 52,
+                      borderRadius: 12,
+                      borderWidth: 1.5,
+                      borderColor: '#e5e7eb',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#ffffff',
+                      paddingHorizontal: 24,
+                    }}
+                  >
+                    <Text style={{ color: '#374151', fontSize: 15, fontWeight: '600' }}>Cancel</Text>
+                  </View>
                 </Pressable>
-                <Pressable
-                  onPress={apply}
-                  accessibilityRole="button"
-                  accessibilityLabel="Apply filters"
-                  style={({ pressed }) => ({
-                    flex: 2,
-                    height: 52,
-                    borderRadius: 12,
-                    backgroundColor: pressed ? '#1f2937' : '#111827',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  })}
-                >
-                  <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>
-                    {draftCount > 0 ? `Apply ${draftCount} Filter${draftCount > 1 ? 's' : ''}` : 'Show Results'}
-                  </Text>
+                <Pressable onPress={apply} accessibilityRole="button" accessibilityLabel="Apply filters" style={{ flex: 1 }}>
+                  <View
+                    style={{
+                      height: 52,
+                      borderRadius: 12,
+                      backgroundColor: '#111827',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>
+                      {draftCount > 0 ? `Apply ${draftCount} Filter${draftCount > 1 ? 's' : ''}` : 'Show Results'}
+                    </Text>
+                  </View>
                 </Pressable>
               </View>
             </View>

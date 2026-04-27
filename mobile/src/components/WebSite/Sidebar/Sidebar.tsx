@@ -2,16 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
+  Pressable,
   Animated,
   Dimensions,
   ScrollView,
-  Image,
   ActivityIndicator,
-  StatusBar,
-  Platform,
   Modal,
+  Platform,
+  StatusBar,
 } from 'react-native';
+import { Image } from 'expo-image';
 import {
   X,
   Star,
@@ -20,14 +20,16 @@ import {
   ChevronRight,
   Package,
   User as UserIcon,
-  Mail,
+  ShoppingCart,
+  Heart,
+  LogIn,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { categoryService, type Category } from '@/services/categoryService';
 import { userAuthService } from '@/services/userAuthService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SIDEBAR_WIDTH = SCREEN_WIDTH * 0.7;
+const SIDEBAR_WIDTH = Math.min(SCREEN_WIDTH * 0.78, 340);
 
 interface SidebarProps {
   visible: boolean;
@@ -39,349 +41,284 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [modalVisible, setModalVisible] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [userName, setUserName] = useState<string>('Guest User');
-  const [userEmail, setUserEmail] = useState<string>('');
+  const [loadingCats, setLoadingCats] = useState(true);
+  const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [isAuth, setIsAuth] = useState(false);
   const router = useRouter();
 
-  // Fetch user data on each open
   useEffect(() => {
-    const loadUserData = async () => {
+    if (!visible) return;
+    (async () => {
       try {
-        const userData = await userAuthService.getUserData();
-        if (userData) {
-          setUserName(userData.name || 'Guest User');
-          setUserEmail(userData.email || '');
+        const auth = await userAuthService.isAuthenticated();
+        setIsAuth(auth);
+        if (auth) {
+          const data = await userAuthService.getUserData();
+          if (data) {
+            setUserName(data.name || '');
+            setUserEmail(data.email || '');
+          }
         }
-      } catch (error) {
-        console.error('Failed to load user data:', error);
-      }
-    };
-    loadUserData();
+      } catch { /* ignore */ }
+    })();
   }, [visible]);
 
-  // Fetch categories once
   useEffect(() => {
-    const fetchCategories = async () => {
+    if (categories.length > 0) return;
+    (async () => {
       try {
-        setLoadingCategories(true);
-        const response = await categoryService.getAllCategories({
+        setLoadingCats(true);
+        const res = await categoryService.getAllCategories({
           status: 'ACTIVE',
           showRootOnly: 'true',
           sortBy: 'sortOrder',
           sortOrder: 'asc',
         });
-        if (response.success && response.data) {
-          setCategories(response.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch categories:', error);
-      } finally {
-        setLoadingCategories(false);
-      }
-    };
-    fetchCategories();
+        if (res.success && res.data) setCategories(res.data);
+      } catch { /* ignore */ }
+      finally { setLoadingCats(false); }
+    })();
   }, []);
 
-  // Drive Modal visibility and animation together
   useEffect(() => {
     if (visible) {
-      // Mount the Modal first, then animate in
       setModalVisible(true);
       translateX.setValue(-SIDEBAR_WIDTH);
       overlayOpacity.setValue(0);
       Animated.parallel([
-        Animated.timing(translateX, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(overlayOpacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
+        Animated.timing(translateX, { toValue: 0, duration: 280, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
       ]).start();
     } else {
-      // Animate out, then unmount the Modal
       Animated.parallel([
-        Animated.timing(translateX, {
-          toValue: -SIDEBAR_WIDTH,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(overlayOpacity, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setModalVisible(false);
-      });
+        Animated.timing(translateX, { toValue: -SIDEBAR_WIDTH, duration: 220, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start(() => setModalVisible(false));
     }
   }, [visible]);
 
-  const handleNavigation = (route: string) => {
+  const go = (route: string) => {
     onClose();
-    setTimeout(() => router.push(route as any), 300);
+    setTimeout(() => router.push(route as any), 280);
   };
 
-  const handleCategoryPress = (category: Category) => {
-    onClose();
-    setTimeout(() => router.push(`/(tabs)/categories/${category.slug}` as any), 300);
-  };
-
-  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 50;
-  const closeBtnTop = Platform.OS === 'android' ? statusBarHeight + 12 : 56;
+  const statusBarH = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 50;
+  const initials = userName
+    ? userName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+    : '';
 
   return (
-    // Using Modal ensures the sidebar renders in its own native layer,
-    // completely outside any parent ScrollView — this is the definitive fix
-    // for scroll events bleeding through to the home screen.
-    <Modal
-      visible={modalVisible}
-      transparent={true}
-      animationType="none"
-      statusBarTranslucent={true}
-      onRequestClose={onClose}
-    >
-      {/* ── Overlay ──────────────────────────────────────── */}
-      <Animated.View
-        className="absolute inset-0 bg-black/50"
-        style={{ opacity: overlayOpacity }}
-      >
-        <TouchableOpacity className="flex-1" activeOpacity={1} onPress={onClose} />
+    <Modal visible={modalVisible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+      {/* Overlay */}
+      <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', opacity: overlayOpacity }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close menu" />
       </Animated.View>
 
-      {/* ── Sidebar Panel ────────────────────────────────── */}
+      {/* Panel */}
       <Animated.View
-        className="absolute top-0 left-0 bottom-0 bg-black"
         style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          bottom: 0,
           width: SIDEBAR_WIDTH,
-          paddingTop: statusBarHeight,
+          backgroundColor: '#ffffff',
+          paddingTop: statusBarH,
           transform: [{ translateX }],
           shadowColor: '#000',
           shadowOffset: { width: 4, height: 0 },
-          shadowOpacity: 0.5,
-          shadowRadius: 10,
+          shadowOpacity: 0.15,
+          shadowRadius: 12,
           elevation: 10,
         }}
       >
-        {/* Close Button */}
-        {/* <TouchableOpacity
+        {/* Close button */}
+        <Pressable
           onPress={onClose}
-          className="absolute right-3 z-10 p-1.5 rounded-full bg-white/10"
-          style={{ top: closeBtnTop }}
-          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Close menu"
+          hitSlop={8}
+          style={{ position: 'absolute', top: statusBarH + 12, right: 12, zIndex: 10, padding: 6 }}
         >
-          <X size={20} color="#9ca3af" />
-        </TouchableOpacity> */}
+          <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={16} color="#111827" />
+          </View>
+        </Pressable>
 
-        {/* ── Sidebar ScrollView: isolated inside Modal, never touches outer app ── */}
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-        >
-          {/* ══════════════════════════════════════════════
-              Company Logo & Branding
-          ══════════════════════════════════════════════ */}
-          <View className="items-center py-6 px-4">
-            <View
-              className="rounded-md bg-white/5 items-center justify-center mb-3 border-[1.5px] border-white/10"
-              style={{ width: 140, height: 105, borderRadius: 10, padding: 10 }}
-            >
-              <View
-                className="bg-white items-center justify-center"
-                style={{ width: 132, height: 96, borderRadius: 10 }}
-              >
-                <Image
-                  source={require('../../../../assets/images/logo4.png')}
-                  className="rounded-md"
-                  style={{ width: 132, height: 96, borderRadius: 10 }}
-                  resizeMode="contain"
-                />
-              </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+
+          {/* Brand */}
+          <View style={{ alignItems: 'center', paddingVertical: 20, paddingHorizontal: 16 }}>
+            <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 6, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 8 }}>
+              <Image
+                source={require('../../../../assets/images/logo4.png')}
+                style={{ width: 110, height: 40 }}
+                contentFit="contain"
+              />
             </View>
-
-            <Text className="text-lg font-bold text-white tracking-wide">
-              M2C MarkDowns
-            </Text>
-            <Text className="text-xs text-gray-500 mt-0.5">
-              Private Limited
-            </Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>M2C MarkDowns</Text>
+            <Text style={{ fontSize: 11, color: '#9ca3af' }}>Private Limited</Text>
           </View>
 
-          {/* ══════════════════════════════════════════════
-              User Info Card
-          ══════════════════════════════════════════════ */}
-          <View className="px-4 pb-4">
-            <TouchableOpacity
-              onPress={() => handleNavigation('/(tabs)/profile')}
-              className="flex-row items-center bg-white/5 rounded-xl p-3.5 border border-white/5"
-              activeOpacity={0.7}
+          {/* User card */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+            <Pressable
+              onPress={() => go(isAuth ? '/(tabs)/profile' : '/(auth)/Login')}
+              accessibilityRole="button"
+              android_ripple={{ color: 'rgba(0,0,0,0.04)' }}
             >
-              <View className="w-11 h-11 rounded-full bg-white/10 items-center justify-center mr-3">
-                <UserIcon size={22} color="#ffffff" />
-              </View>
-
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-white" numberOfLines={1}>
-                  {userName}
-                </Text>
-                {userEmail ? (
-                  <View className="flex-row items-center mt-0.5">
-                    <Mail size={12} color="#9ca3af" />
-                    <Text className="text-xs text-gray-400 ml-1" numberOfLines={1}>
-                      {userEmail}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text className="text-xs text-white font-bold mt-0.5 tracking-wide">
-                    Tap to sign in
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: '#e5e7eb',
+                }}
+              >
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    backgroundColor: isAuth ? '#111827' : '#e5e7eb',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                  }}
+                >
+                  {isAuth && initials ? (
+                    <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>{initials}</Text>
+                  ) : (
+                    <UserIcon size={20} color={isAuth ? '#fff' : '#9ca3af'} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }} numberOfLines={1}>
+                    {isAuth ? userName || 'My Account' : 'Sign In'}
                   </Text>
+                  {isAuth && userEmail ? (
+                    <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }} numberOfLines={1}>{userEmail}</Text>
+                  ) : !isAuth ? (
+                    <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>Login to your account</Text>
+                  ) : null}
+                </View>
+                {isAuth ? (
+                  <ChevronRight size={16} color="#9ca3af" />
+                ) : (
+                  <LogIn size={16} color="#111827" />
                 )}
               </View>
-
-              <ChevronRight size={18} color="#6b7280" />
-            </TouchableOpacity>
+            </Pressable>
           </View>
 
-          {/* ══════ Divider ══════ */}
-          <View className="h-px bg-white/10 mx-4" />
+          <Divider />
 
-          {/* ══════════════════════════════════════════════
-              Product Navigation Links
-          ══════════════════════════════════════════════ */}
-          <View className="py-3">
-            <Text className="text-xs font-bold text-gray-500 uppercase tracking-widest px-4 mb-2">
-              Browse Products
-            </Text>
+          {/* Browse Products */}
+          <SectionLabel label="Shop" />
+          <NavItem icon={<Star size={16} color="#111827" />} label="Featured Products" onPress={() => go('/(any)/products')} />
+          <NavItem icon={<TrendingUp size={16} color="#111827" />} label="Best Sellers" onPress={() => go('/(any)/products')} />
+          <NavItem icon={<Award size={16} color="#111827" />} label="Top Selling" onPress={() => go('/(any)/products')} />
 
-            <TouchableOpacity
-              onPress={() => handleNavigation('/(any)/browse-products?type=featured')}
-              className="flex-row items-center py-3 px-4"
-              activeOpacity={0.6}
-            >
-              <View
-                className="w-9 h-9 rounded-xl items-center justify-center mr-3 bg-white/10"
-              >
-                <Star size={18} color="#ffffff" />
-              </View>
-              <Text className="flex-1 text-sm font-medium text-gray-300">
-                Featured Products
-              </Text>
-              <ChevronRight size={16} color="#4b5563" />
-            </TouchableOpacity>
+          {isAuth ? (
+            <>
+              <Divider />
+              <SectionLabel label="My Account" />
+              <NavItem icon={<Package size={16} color="#111827" />} label="My Orders" onPress={() => go('/(tabs)/orders')} />
+              <NavItem icon={<Heart size={16} color="#111827" />} label="My Wishlist" onPress={() => go('/(tabs)/wishlist')} />
+              <NavItem icon={<ShoppingCart size={16} color="#111827" />} label="My Cart" onPress={() => go('/(tabs)/cart')} />
+            </>
+          ) : null}
 
-            <TouchableOpacity
-              onPress={() => handleNavigation('/(any)/browse-products?type=bestseller')}
-              className="flex-row items-center py-3 px-4"
-              activeOpacity={0.6}
-            >
-              <View
-                className="w-9 h-9 rounded-xl items-center justify-center mr-3 bg-white/10"
-              >
-                <TrendingUp size={18} color="#ffffff" />
-              </View>
-              <Text className="flex-1 text-sm font-medium text-gray-300">
-                Bestselling Products
-              </Text>
-              <ChevronRight size={16} color="#4b5563" />
-            </TouchableOpacity>
+          <Divider />
 
-            <TouchableOpacity
-              onPress={() => handleNavigation('/(any)/browse-products?type=topselling')}
-              className="flex-row items-center py-3 px-4"
-              activeOpacity={0.6}
-            >
-              <View
-                className="w-9 h-9 rounded-xl items-center justify-center mr-3 bg-white/10"
-              >
-                <Award size={18} color="#ffffff" />
-              </View>
-              <Text className="flex-1 text-sm font-medium text-gray-300">
-                Top Selling Products
-              </Text>
-              <ChevronRight size={16} color="#4b5563" />
-            </TouchableOpacity>
-          </View>
-
-          {/* ══════ Divider ══════ */}
-          <View className="h-px bg-white/10 mx-4" />
-
-          {/* ══════════════════════════════════════════════
-              Categories List
-          ══════════════════════════════════════════════ */}
-          <View className="py-3">
-            <Text className="text-xs font-bold text-gray-500 uppercase tracking-widest px-4 mb-2">
-              Category
-            </Text>
-
-            {loadingCategories ? (
-              <View className="items-center py-5">
-                <ActivityIndicator size="small" color="#ffffff" />
-                <Text className="text-xs text-gray-500 mt-2">
-                  Loading categories...
-                </Text>
-              </View>
-            ) : categories.length === 0 ? (
-              <View className="items-center py-5 px-4">
-                <Package size={28} color="#4b5563" />
-                <Text className="text-xs text-gray-500 mt-2">
-                  No categories available
-                </Text>
-              </View>
-            ) : (
-              categories.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  onPress={() => handleCategoryPress(category)}
-                  className="flex-row items-center py-2.5 px-4"
-                  activeOpacity={0.6}
+          {/* Categories */}
+          <SectionLabel label="Categories" />
+          {loadingCats ? (
+            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+              <ActivityIndicator size="small" color="#111827" />
+            </View>
+          ) : categories.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+              <Text style={{ fontSize: 12, color: '#9ca3af' }}>No categories</Text>
+            </View>
+          ) : (
+            <>
+              {categories.map((cat) => (
+                <Pressable
+                  key={cat.id}
+                  onPress={() => { onClose(); setTimeout(() => router.push(`/(tabs)/categories/${cat.slug}` as any), 280); }}
+                  accessibilityRole="button"
+                  android_ripple={{ color: 'rgba(0,0,0,0.04)' }}
                 >
-                  <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center mr-3 overflow-hidden">
-                    {category.image ? (
-                      <Image
-                        source={{ uri: category.image }}
-                        className="w-full h-full"
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <Package size={18} color="#9ca3af" />
-                    )}
-                  </View>
-
-                  <View className="flex-1">
-                    <Text className="text-sm font-medium text-gray-300" numberOfLines={1}>
-                      {category.name}
-                    </Text>
-                    {category.subcategoryCount !== undefined &&
-                      category.subcategoryCount > 0 && (
-                        <Text className="text-xs text-gray-500 mt-0.5">
-                          {category.subcategoryCount} subcategories
-                        </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 11 }}>
+                    <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#f3f4f6', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      {cat.image ? (
+                        <Image source={{ uri: cat.image }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                      ) : (
+                        <Package size={14} color="#9ca3af" />
                       )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827' }} numberOfLines={1}>{cat.name}</Text>
+                      {cat.subcategoryCount && cat.subcategoryCount > 0 ? (
+                        <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>{cat.subcategoryCount} subcategories</Text>
+                      ) : null}
+                    </View>
+                    <ChevronRight size={14} color="#d1d5db" />
                   </View>
+                </Pressable>
+              ))}
 
-                  <ChevronRight size={16} color="#4b5563" />
-                </TouchableOpacity>
-              ))
-            )}
-
-            {categories.length > 0 && (
-              <TouchableOpacity
-                onPress={() => handleNavigation('/(tabs)/categories')}
-                className="mx-4 mt-3 py-3 rounded-xl border border-white/20 items-center bg-white/5"
-                activeOpacity={0.7}
-              >
-                <Text className="text-sm font-bold text-white tracking-wide">
-                  View All Categories
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+              <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+                <Pressable onPress={() => go('/(tabs)/categories')} accessibilityRole="button">
+                  <View
+                    style={{
+                      height: 40,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: '#e5e7eb',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>View All Categories</Text>
+                  </View>
+                </Pressable>
+              </View>
+            </>
+          )}
         </ScrollView>
       </Animated.View>
     </Modal>
+  );
+}
+
+function Divider() {
+  return <View style={{ height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 16, marginVertical: 8 }} />;
+}
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <Text style={{ fontSize: 11, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 16, marginTop: 4, marginBottom: 4 }}>
+      {label}
+    </Text>
+  );
+}
+
+function NavItem({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} android_ripple={{ color: 'rgba(0,0,0,0.04)' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}>
+        <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+          {icon}
+        </View>
+        <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: '#111827' }}>{label}</Text>
+        <ChevronRight size={14} color="#d1d5db" />
+      </View>
+    </Pressable>
   );
 }

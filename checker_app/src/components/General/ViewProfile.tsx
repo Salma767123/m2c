@@ -14,7 +14,7 @@ import {
   Award,
   CheckCircle2,
 } from 'lucide-react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import qcCheckerService from '../../services/qcCheckerService';
@@ -175,6 +175,7 @@ function FormField({
 }
 
 export function ViewProfile({ onClose }: ViewProfileProps) {
+  const insets = useSafeAreaInsets();
   const [checkerInfo, setCheckerInfo] = useState<CheckerInfo>(EMPTY_INFO);
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -291,7 +292,7 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
   ].filter(Boolean);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }} edges={['top', 'bottom']}>
+    <View style={{ flex: 1, backgroundColor: '#0f172a', paddingTop: insets.top, paddingBottom: insets.bottom }}>
       <View className="flex-1 bg-slate-50">
         {/* Header */}
         <View className="bg-slate-900 px-4 pt-2 pb-4">
@@ -512,7 +513,7 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
           presentationStyle="pageSheet"
           onRequestClose={() => setShowEditModal(false)}
         >
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }} edges={['top', 'bottom']}>
+          <View style={{ flex: 1, backgroundColor: '#0f172a', paddingTop: insets.top, paddingBottom: insets.bottom }}>
             <View className="flex-1 bg-slate-50">
               <View className="bg-slate-900 px-4 py-3">
                 <View className="flex-row items-center justify-between">
@@ -660,9 +661,9 @@ export function ViewProfile({ onClose }: ViewProfileProps) {
                 </View>
               </KeyboardAwareScrollView>
             </View>
-          </SafeAreaView>
+          </View>
         </Modal>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
