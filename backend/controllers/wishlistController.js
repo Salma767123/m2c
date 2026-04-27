@@ -133,9 +133,13 @@ const getWishlist = async (req, res) => {
             discount: true,
             inStock: true,
             totalStock: true,
+            hasVariants: true,
             rating: true,
             reviews: true,
             category: true,
+            singleUnitSize: true,
+            singleUnitColor: true,
+            singleUnitColorHex: true,
             images: {
               where: { isPrimary: true },
               take: 1,
@@ -150,13 +154,19 @@ const getWishlist = async (req, res) => {
             id: product.id,
             name: product.name,
             image: product.images[0]?.url || '',
-            basePrice: product.adminFixedPrice || product.basePrice,
+            basePrice: product.basePrice,
+            adminFixedPrice: product.adminFixedPrice,
             originalPrice: product.originalPrice,
             discount: product.discount,
-            inStock: product.inStock,
+            inStock: product.inStock && product.totalStock > 0,
+            totalStock: product.totalStock,
+            hasVariants: product.hasVariants,
             rating: product.rating,
             reviews: product.reviews,
-            category: product.category
+            category: product.category,
+            singleUnitSize: product.singleUnitSize,
+            singleUnitColor: product.singleUnitColor,
+            singleUnitColorHex: product.singleUnitColorHex,
           } : null
         };
       })

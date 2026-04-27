@@ -1,0 +1,47 @@
+# Other apps / services
+backend/
+frontend/
+mobile/
+docs/
+.agents/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Dependencies — EAS installs fresh
+**/node_modules/
+
+# Native folders — EAS runs expo prebuild
+**/android/
+**/ios/
+
+# Dev caches
+**/.expo/
+**/.expo-shared/
+**/dist/
+**/web-build/
+**/.cache/
+**/.next/
+
+# Env files — use EAS environment variables
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs & binaries
+*.log
+*.mp4
+*.mov
+*.zip
+*.apk
+*.aab
+*.ipa
+
+# Work artifacts
+COMMIT_MESSAGE.txt
+WORK_REPORT.md
+CHANGES_COMPLETED.md
+MOBILE_UPDATES_TODO.md

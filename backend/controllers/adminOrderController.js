@@ -69,9 +69,22 @@ const getAdminOrderById = async (req, res) => {
 };
 
 // Admin: Update order status
+const { notifications } = require('../utils/notificationService');
+
+// Maps order status to notification helper
+const STATUS_NOTIFICATION_MAP = {
+  'ORDER_CONFIRMED': 'orderConfirmed',
+  'PROCESSING': 'orderProcessing',
+  'SHIPPED': 'orderShipped',
+  'OUT_FOR_DELIVERY': 'orderOutForDelivery',
+  'DELIVERED': 'orderDelivered',
+  'CANCELLED': 'orderCancelled',
+  'REFUNDED': 'orderRefunded',
+};
+
 const updateAdminOrderStatus = async (req, res) => {
     try {
-        const adminId = req.userId || req.adminId; // Depends on how admin auth middleware sets it
+        const adminId = req.userId || req.adminId;
         const { id } = req.params;
         const { status, assignedHubId } = req.body;
 
@@ -114,6 +127,14 @@ const updateAdminOrderStatus = async (req, res) => {
                 hub: true
             }
         });
+
+        // Send push notification to customer (fire-and-forget)
+        if (status && order.customerId) {
+            const notifHelper = STATUS_NOTIFICATION_MAP[status];
+            if (notifHelper && notifications[notifHelper]) {
+                notifications[notifHelper](order.customerId, order.orderId).catch(() => {});
+            }
+        }
 
         res.json({
             success: true,

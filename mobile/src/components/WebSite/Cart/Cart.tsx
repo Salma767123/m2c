@@ -1,32 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
-  Image,
+  Pressable,
   Alert,
   TextInput,
   ActivityIndicator,
+  RefreshControl,
+  StyleSheet,
   StatusBar,
-  Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
 import {
-  ShoppingBag,
+  ShoppingCart,
   Plus,
   Minus,
   Trash2,
   CreditCard,
-  Truck,
-  Shield,
-  Star,
-  Package,
-  CheckCircle,
   ArrowRight,
+  Package,
   Tag,
-  RotateCcw,
   AlertCircle,
-  ChevronLeft,
+  AlertTriangle,
+  X,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  Info,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,9 +37,13 @@ import { couponService } from '@/services/couponService';
 import { publicProductService } from '@/services/publicProductService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCart } from '@/context/CartContext';
+import type { StockSyncResult } from '@/lib/stockSync';
+import { CartSkeleton } from '@/components/ui/Skeleton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface OrderItem {
+interface CartItem {
   id: string;
   productId: string;
   name: string;
@@ -45,691 +51,895 @@ interface OrderItem {
   originalPrice?: number;
   images: string[];
   category: string;
-  rating?: number;
-  reviews?: number;
   inStock: boolean;
-  quantity: number;
-  description?: string;
   availableStock?: number;
-  material?: string;
+  quantity: number;
   discount?: number;
   gstPercentage?: number;
-  variantDetails?: {
-    size: string;
-    color: string;
-    colorHex?: string;
-    sku?: string;
-  };
+  variantDetails?: { size: string; color: string; colorHex?: string; sku?: string };
 }
 
-interface OrderSummary {
-  subtotal: number;
-  shipping: number;
-  tax: number;
-  discount: number;
-  total: number;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const fmt = (n: number) => `₹${n.toFixed(2)}`;
+const fmt = (n: number) => `$${n.toFixed(2)}`;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Cart() {
-  const [cartItems, setCartItems] = useState<OrderItem[]>([]);
+  const { refreshCart, itemCount, syncStock, syncResult, allSyncResults, isSyncing, clearSyncResult } = useCart();
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Promo
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [couponMeta, setCouponMeta] = useState<{ discountType: string; discountValue: number; maxDiscountAmount?: number } | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
 
   useEffect(() => {
     fetchCart();
     loadSavedCoupon();
+    syncStock();
   }, []);
 
-  // ── Data ────────────────────────────────────────────────────────────────────
+  // When sync completes, merge live product data into local cartItems (uses ALL results, not just meaningful)
+  useEffect(() => {
+    if (allSyncResults.length === 0) return;
+
+    setCartItems((prev) => {
+      return prev.map((item) => {
+        let sr = allSyncResults.find((r) => r.itemId === item.id);
+        if (!sr) {
+          const byProduct = allSyncResults.filter((r) => r.productId === item.productId);
+          if (byProduct.length === 1) sr = byProduct[0];
+        }
+        if (!sr?.live) return item;
+        return {
+          ...item,
+          name: sr.live.name,
+          price: sr.live.price,
+          originalPrice: sr.live.originalPrice,
+          discount: sr.live.discount,
+          images: sr.live.images.length > 0 ? sr.live.images : item.images,
+          category: sr.live.category || item.category,
+          inStock: sr.live.inStock,
+          availableStock: sr.live.availableStock,
+          quantity: sr.qtyAdjusted ? sr.clampedQty : item.quantity,
+          variantDetails: sr.live.variant
+            ? { size: sr.live.variant.size, color: sr.live.variant.color, colorHex: sr.live.variant.colorHex, sku: sr.live.variant.sku }
+            : item.variantDetails,
+        };
+      });
+    });
+  }, [allSyncResults]);
+
   const loadSavedCoupon = async () => {
     try {
       const saved = await AsyncStorage.getItem('appliedCoupon');
       if (saved) {
-        const { code, discountAmount: da } = JSON.parse(saved);
-        setAppliedPromo(code);
-        setDiscountAmount(da);
+        const parsed = JSON.parse(saved);
+        setAppliedPromo(parsed.code);
+        setDiscountAmount(parsed.discountAmount);
+        if (parsed.discountType && parsed.discountValue != null) {
+          setCouponMeta({
+            discountType: parsed.discountType,
+            discountValue: parsed.discountValue,
+            maxDiscountAmount: parsed.maxDiscountAmount,
+          });
+        }
       }
-    } catch {
-      await AsyncStorage.removeItem('appliedCoupon');
-    }
+    } catch { /* ignore */ }
   };
 
   const fetchCart = async () => {
     try {
       setLoading(true);
-      const authenticated = await userAuthService.isAuthenticated();
-      setIsAuthenticated(authenticated);
+      const auth = await userAuthService.isAuthenticated();
+      setIsAuthenticated(auth);
 
-      if (!authenticated) {
-        const localCart = await cartService.getLocalCart();
-        const promises = localCart.map(async (item: any) => {
-          try {
-            const res = await publicProductService.getProduct(item.productId);
-            if (res.success && res.data) {
-              const p = res.data;
-              // Resolve variant if present
-              let variantDetails: OrderItem['variantDetails'] = undefined;
-              let finalPrice = p.adminFixedPrice || p.basePrice;
-              let finalImages = p.images.map((img: any) => img.url);
-              let finalStock = p.totalStock;
-              if (item.variantId && p.variants) {
-                const v = p.variants.find((vv: any) => vv.id === item.variantId);
-                if (v) {
-                  variantDetails = { size: v.size, color: v.color, colorHex: v.colorHex, sku: v.sku };
-                  finalPrice = v.price;
-                  finalStock = v.stock;
-                  if (v.images?.length > 0) finalImages = v.images;
+      if (auth) {
+        const res = await cartService.getCart();
+        if (res.success && res.data) {
+          setCartItems(
+            res.data.items.map((item: any) => {
+              const hasVariant = !!item.variant;
+
+              // Images: prefer variant images, fall back to product images
+              const imgArray: string[] = [];
+              const imgSource = (hasVariant && item.variant.images?.length > 0)
+                ? item.variant.images
+                : item.product?.images;
+              if (Array.isArray(imgSource)) {
+                for (const img of imgSource) {
+                  const url = typeof img === 'string' ? img : img?.url;
+                  if (url) imgArray.push(url);
                 }
               }
+
+              // Price: use live product/variant price, not stale cart price
+              const livePrice = hasVariant
+                ? (item.variant.adminFixedPrice ?? item.variant.price ?? item.price)
+                : (item.product?.adminFixedPrice ?? item.product?.basePrice ?? item.price);
+
+              // Stock: variant stock takes priority
+              const liveStock = hasVariant
+                ? item.variant.stock
+                : (item.product?.availableStock ?? item.product?.totalStock);
+
+              // Original price & discount: variant overrides product
+              const liveOriginalPrice = hasVariant
+                ? (item.variant.originalPrice ?? item.product?.originalPrice)
+                : item.product?.originalPrice;
+              const liveDiscount = hasVariant
+                ? (item.variant.discount ?? item.product?.discount)
+                : item.product?.discount;
+
+              // Build variant display info — use variant data if present,
+              // otherwise show product's singleUnit attributes (base variant)
+              let variantDetails: CartItem['variantDetails'];
+              if (hasVariant) {
+                variantDetails = {
+                  size: item.variant.size,
+                  color: item.variant.color,
+                  colorHex: item.variant.colorHex,
+                  sku: item.variant.sku,
+                };
+              } else if (item.product?.singleUnitSize || item.product?.singleUnitColor) {
+                variantDetails = {
+                  size: item.product.singleUnitSize || '',
+                  color: item.product.singleUnitColor || '',
+                  colorHex: item.product.singleUnitColorHex,
+                };
+              }
+
               return {
                 id: item.id,
                 productId: item.productId,
-                name: p.name,
-                price: finalPrice,
-                originalPrice: p.originalPrice,
-                images: finalImages,
-                category: p.category,
-                rating: p.rating,
-                reviews: p.reviews,
-                inStock: p.inStock,
-                availableStock: finalStock,
-                quantity: item.quantity,
-                description: p.description,
-                material: p.material,
-                discount: p.discount,
-                gstPercentage: p.gstPercentage,
-                variantDetails,
-              };
-            }
-          } catch { /* skip broken product */ }
-          return null;
-        });
-        const resolved = await Promise.all(promises);
-        setCartItems(resolved.filter(Boolean) as OrderItem[]);
-      } else {
-        const response = await cartService.getCart();
-        if (response.success && response.data) {
-          setCartItems(
-            response.data.items.map((item: any) => {
-              const hasVariantImg = item.variant?.images && item.variant.images.length > 0;
-              const hasProductImg = item.product?.images && item.product.images.length > 0;
-              const imgArray = hasVariantImg
-                ? item.variant.images
-                : hasProductImg
-                ? item.product.images.map((img: any) => img.url)
-                : [];
-              return {
-                id: item.id,
-                productId: item.productId,
-                name: item.product?.name || 'Unknown Product',
-                price: item.price,
-                originalPrice: item.product?.originalPrice,
+                name: item.product?.name || 'Product',
+                price: livePrice,
+                originalPrice: liveOriginalPrice,
                 images: imgArray,
                 category: item.product?.category || '',
-                rating: item.product?.rating,
-                reviews: item.product?.reviews,
-                inStock: item.product?.inStock ?? true,
-                availableStock: item.variant?.stock ?? item.product?.availableStock,
+                inStock: liveStock > 0 && (item.product?.inStock ?? true),
+                availableStock: liveStock,
                 quantity: item.quantity,
-                description: item.product?.description,
-                material: item.product?.material,
-                discount: item.product?.discount,
+                discount: liveDiscount,
                 gstPercentage: item.product?.gstPercentage,
-                variantDetails: item.variant
-                  ? {
-                      size: item.variant.size,
-                      color: item.variant.color,
-                      colorHex: item.variant.colorHex,
-                      sku: item.variant.sku,
-                    }
-                  : undefined,
+                variantDetails,
               };
-            })
+            }),
           );
         }
+      } else {
+        const local = await cartService.getLocalCart();
+        const items: CartItem[] = [];
+        for (const ci of local) {
+          try {
+            const res = await publicProductService.getProduct(ci.productId);
+            if (res.success && res.data) {
+              const p = res.data;
+              const url = p.images?.[0]?.url;
+              items.push({
+                id: ci.id,
+                productId: ci.productId,
+                name: p.name,
+                price: p.adminFixedPrice ?? p.basePrice,
+                originalPrice: p.originalPrice,
+                images: url ? [url] : [],
+                category: p.category || '',
+                inStock: p.inStock,
+                availableStock: p.totalStock,
+                quantity: ci.quantity,
+                discount: p.discount,
+                gstPercentage: p.gstPercentage,
+              });
+            }
+          } catch { /* skip broken items */ }
+        }
+        setCartItems(items);
       }
     } catch {
-      showErrorToast('Error', 'Failed to load cart items');
+      showErrorToast('Error', 'Failed to load cart');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // ── Cart actions ─────────────────────────────────────────────────────────────
-  const updateQuantity = async (id: string, productId: string, newQty: number) => {
-    if (newQty < 1) { removeItem(id); return; }
-    try {
-      if (!isAuthenticated) {
-        await cartService.updateLocalCartItem(id, newQty);
-        setCartItems(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty } : i));
-        showSuccessToast('Updated', 'Cart item quantity updated');
-      } else {
-        await cartService.updateCartItem(id, newQty);
-        setCartItems(prev => prev.map(i => i.id === id ? { ...i, quantity: newQty } : i));
-        showSuccessToast('Updated', 'Cart item quantity updated');
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchCart();
+  }, []);
+
+  // ── Actions (optimistic updates) ────────────────────────────────────────
+  const pendingUpdates = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const updateQty = useCallback((id: string, qty: number) => {
+    if (qty < 1) { removeItem(id); return; }
+
+    // 1. Optimistic: update local state instantly
+    setCartItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity: qty } : i)));
+
+    // 2. Debounce API call — if user taps rapidly, only the last value is sent
+    if (pendingUpdates.current[id]) clearTimeout(pendingUpdates.current[id]);
+    pendingUpdates.current[id] = setTimeout(async () => {
+      delete pendingUpdates.current[id];
+      try {
+        if (isAuthenticated) await cartService.updateCartItem(id, qty);
+        else await cartService.updateLocalCartItem(id, qty);
+        refreshCart(); // sync badge count
+      } catch {
+        // Rollback on failure — re-fetch real state
+        showErrorToast('Error', 'Failed to update quantity');
+        fetchCart();
       }
-    } catch {
-      showErrorToast('Error', 'Failed to update quantity');
-    }
-  };
+    }, 400);
+  }, [isAuthenticated, refreshCart]);
 
-  const removeItem = (id: string) => {
+  const removeItem = useCallback((id: string) => {
     Alert.alert('Remove Item', 'Remove this item from your cart?', [
       { text: 'Keep', style: 'cancel' },
       {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
+          // Optimistic remove
+          const prev = [...cartItems];
+          setCartItems((items) => items.filter((i) => i.id !== id));
           try {
-            if (!isAuthenticated) {
-              await cartService.removeFromLocalCart(id);
-              setCartItems(prev => prev.filter(i => i.id !== id));
-            } else {
-              await cartService.removeFromCart(id);
-              setCartItems(prev => prev.filter(i => i.id !== id));
-            }
+            if (isAuthenticated) await cartService.removeFromCart(id);
+            else await cartService.removeFromLocalCart(id);
+            refreshCart();
             showSuccessToast('Removed', 'Item removed from cart');
           } catch {
+            // Rollback
+            setCartItems(prev);
             showErrorToast('Error', 'Failed to remove item');
           }
         },
       },
     ]);
-  };
+  }, [isAuthenticated, cartItems, refreshCart]);
 
-  const applyPromoCode = async () => {
-    if (!promoCode.trim()) { showErrorToast('Error', 'Please enter a promo code'); return; }
+  const applyCoupon = async () => {
+    if (!promoCode.trim()) return;
     try {
       setApplyingCoupon(true);
       const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
-      const response = await couponService.applyCoupon(promoCode, subtotal);
-      if (response.success && response.data) {
-        setAppliedPromo(response.data.code);
-        setDiscountAmount(response.data.discountAmount);
+      const res = await couponService.applyCoupon(promoCode, subtotal);
+      if (res.success && res.data) {
+        setAppliedPromo(res.data.code);
+        setDiscountAmount(res.data.discountAmount);
+        setCouponMeta({
+          discountType: res.data.discountType,
+          discountValue: res.data.discountValue,
+          maxDiscountAmount: res.data.minPurchaseAmount, // backend returns maxDiscountAmount here
+        });
         setPromoCode('');
         await AsyncStorage.setItem('appliedCoupon', JSON.stringify({
-          code: response.data.code,
-          discountAmount: response.data.discountAmount,
+          code: res.data.code,
+          discountAmount: res.data.discountAmount,
+          discountType: res.data.discountType,
+          discountValue: res.data.discountValue,
         }));
-        showSuccessToast('Applied!', `Coupon "${response.data.code}" saved you ${fmt(response.data.discountAmount)}`);
+        showSuccessToast('Applied!', `Saved ${fmt(res.data.discountAmount)}`);
       } else {
-        throw new Error(response.message || 'Invalid coupon');
+        throw new Error(res.message || 'Invalid coupon');
       }
     } catch (e: any) {
-      setAppliedPromo(''); setDiscountAmount(0);
-      await AsyncStorage.removeItem('appliedCoupon');
-      showErrorToast('Invalid Coupon', e.message || 'Failed to apply coupon');
+      showErrorToast('Invalid', e.message || 'Coupon not valid');
     } finally {
       setApplyingCoupon(false);
     }
   };
 
   const removeCoupon = async () => {
-    setAppliedPromo(''); setDiscountAmount(0);
+    setAppliedPromo('');
+    setDiscountAmount(0);
+    setCouponMeta(null);
     await AsyncStorage.removeItem('appliedCoupon');
-    showSuccessToast('Removed', 'Coupon removed');
   };
 
-  // ── Summary ──────────────────────────────────────────────────────────────────
-  const calculateSummary = (): OrderSummary => {
-    const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
-    const tax = cartItems.reduce((s, i) => {
-      return s + i.price * i.quantity * (i.gstPercentage ? i.gstPercentage / 100 : 0);
-    }, 0);
-    const total = Math.max(0, subtotal + tax - discountAmount);
-    return { subtotal, shipping: 0, tax, discount: discountAmount, total };
-  };
+  const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const tax = cartItems.reduce((s, i) => s + i.price * i.quantity * ((i.gstPercentage ?? 0) / 100), 0);
 
-  const hasStockIssue = cartItems.some(
-    i => i.inStock === false || (i.availableStock !== undefined && i.quantity > i.availableStock)
-  );
+  // Recalculate discount from coupon metadata when subtotal changes
+  const effectiveDiscount = (() => {
+    if (!couponMeta || !appliedPromo) return discountAmount;
+    let calc = 0;
+    if (couponMeta.discountType === 'PERCENTAGE') {
+      calc = (subtotal * couponMeta.discountValue) / 100;
+      if (couponMeta.maxDiscountAmount && calc > couponMeta.maxDiscountAmount) {
+        calc = couponMeta.maxDiscountAmount;
+      }
+    } else {
+      calc = couponMeta.discountValue;
+    }
+    return Math.min(calc, subtotal);
+  })();
+
+  const total = Math.max(0, subtotal + tax - effectiveDiscount);
+  const hasStockIssue = cartItems.some((i) => !i.inStock || (i.availableStock != null && i.quantity > i.availableStock));
 
   const handleCheckout = () => {
     if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please login to proceed with checkout', [
+      Alert.alert('Login Required', 'Please login to checkout', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Login', onPress: () => router.push('/(auth)/Login') },
       ]);
       return;
     }
     if (hasStockIssue) {
-      showErrorToast('Stock Issue', 'Remove out-of-stock items before checkout');
+      showErrorToast('Stock Issue', 'Fix stock issues before checkout');
       return;
     }
-    router.push('/(any)/checkout');
+    router.push('/(any)/checkout' as any);
   };
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  // ── Loading ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-50 items-center justify-center">
-        <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
-        <ActivityIndicator size="large" color="#000000" />
-        <Text className="text-gray-500 mt-3 text-sm">Loading your cart…</Text>
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <ScreenHeader count={0} />
+        <CartSkeleton />
       </View>
     );
   }
 
-  const summary = calculateSummary();
-
-  // ── Empty state ──────────────────────────────────────────────────────────────
+  // ── Empty ───────────────────────────────────────────────────────────────
   if (cartItems.length === 0) {
     return (
-      <View className="flex-1 bg-gray-50">
-        <StatusBar barStyle="light-content" backgroundColor="#000000" />
-
-        {/* Header */}
-        <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-5 px-5`}>
-          <Text className="text-white text-2xl font-extrabold tracking-tight">My Cart</Text>
-          <Text className="text-gray-400 text-xs mt-0.5">0 items</Text>
-        </View>
-
-        <View className="flex-1 items-center justify-center p-8">
-          {/* Empty bag illustration */}
-          <View className="w-24 h-24 rounded-full bg-gray-100 items-center justify-center mb-6">
-            <ShoppingBag size={48} color="#d1d5db" />
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <ScreenHeader count={0} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <View
+            style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
+          >
+            <ShoppingCart size={40} color="#d1d5db" />
           </View>
-          <Text className="text-2xl font-extrabold text-gray-900 mb-2 text-center">
+          <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 6 }}>
             Your cart is empty
           </Text>
-          <Text className="text-sm text-gray-500 text-center leading-5 mb-8">
-            Looks like you haven't added anything yet.{'\n'}Start shopping to fill it up!
+          <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
+            {"Looks like you haven't added anything yet."}
           </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(tabs)')}
-            activeOpacity={0.85}
-            className="bg-black px-8 py-4 rounded-2xl flex-row items-center gap-2"
-          >
-            <Text className="text-white text-base font-bold">Start Shopping</Text>
-            <ArrowRight size={18} color="#ffffff" />
-          </TouchableOpacity>
+          <Pressable onPress={() => router.push('/(tabs)')} accessibilityRole="button">
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#111827',
+                paddingHorizontal: 28,
+                height: 50,
+                borderRadius: 14,
+                gap: 8,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Start Shopping</Text>
+              <ArrowRight size={16} color="#fff" />
+            </View>
+          </Pressable>
         </View>
       </View>
     );
   }
 
-  // ── Main cart ─────────────────────────────────────────────────────────────────
+  // ── Main ────────────────────────────────────────────────────────────────
   return (
-    <View className="flex-1 bg-gray-50">
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
-
-      {/* ── Page Header ─────────────────────────────────────────────────────── */}
-      <View className={`bg-black ${Platform.OS === 'ios' ? 'pt-0' : 'pt-4'} pb-5 px-5`}>
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-white text-2xl font-extrabold tracking-tight">My Cart</Text>
-            <Text className="text-gray-400 text-xs mt-0.5">
-              {cartItems.length} item{cartItems.length !== 1 ? 's' : ''}
-            </Text>
-          </View>
-          {/* Item count chip */}
-          <View className="bg-gray-200 rounded-full px-3.5 py-1.5">
-            <Text className="text-black font-extrabold text-xs">{cartItems.length}</Text>
-          </View>
-        </View>
-
-        {/* Subtotal preview strip */}
-        <View className="bg-white/10 rounded-xl px-4 py-2.5 mt-3.5 flex-row justify-between items-center">
-          <Text className="text-gray-300 text-xs">Subtotal</Text>
-          <Text className="text-white text-lg font-extrabold">{fmt(summary.subtotal)}</Text>
-        </View>
-      </View>
+    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <ScreenHeader count={cartItems.length} />
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 16, gap: 10 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111827" />}
       >
-        {/* ── Cart Items ────────────────────────────────────────────────────── */}
-        <View className="px-4 pt-4">
+        {/* Sync notification banner */}
+        {syncResult.length > 0 ? (
+          <SyncBanner results={syncResult} onDismiss={clearSyncResult} isSyncing={isSyncing} />
+        ) : null}
 
-          {cartItems.map((item, index) => {
-            const isLast = index === cartItems.length - 1;
-            const isOutOfStock = !item.inStock;
-            const isOverStock = item.availableStock !== undefined && item.quantity > item.availableStock;
-            const hasIssue = isOutOfStock || isOverStock;
+        {/* Syncing indicator */}
+        {isSyncing && syncResult.length === 0 ? (
+          <View style={cs.syncingRow}>
+            <RefreshCw size={14} color="#2563eb" />
+            <Text style={cs.syncingText}>Checking stock & prices...</Text>
+          </View>
+        ) : null}
 
-            return (
-              <View
-                key={item.id}
-                className={`bg-white rounded-[20px] overflow-hidden shadow-sm ${isLast ? '' : 'mb-3'} border-[1.5px] ${hasIssue ? 'border-gray-400' : 'border-transparent'}`}
-              >
-                {/* Stock issue banner */}
-                {hasIssue && (
-                  <View className="flex-row items-center gap-1.5 px-3.5 py-1.5 bg-gray-100">
-                    <AlertCircle size={13} color="#374151" />
-                    <Text className="text-xs font-semibold text-gray-700">
-                      {isOutOfStock ? 'Out of Stock' : `Only ${item.availableStock} available — reduce quantity`}
-                    </Text>
-                  </View>
-                )}
+        {/* Items — compact single-row cards */}
+        {cartItems.map((item) => {
+          const oos = !item.inStock;
+          const overStock = !oos && item.availableStock != null && item.quantity > item.availableStock;
+          const lowStock = !oos && !overStock && item.availableStock != null && item.availableStock > 0 && item.availableStock <= 5;
+          const incOff = oos || (item.availableStock != null && item.quantity >= item.availableStock);
 
-                {/* ── SECTION 1: 25% image | 75% info ───────────────────── */}
-                <View className="p-4 flex-row gap-3">
+          // Check if this item has a sync result with changes (match by itemId to avoid variant mix-up)
+          const sr = syncResult.find((r) => r.itemId === item.id)
+            ?? (syncResult.filter((r) => r.productId === item.productId).length === 1
+              ? syncResult.find((r) => r.productId === item.productId)
+              : undefined);
 
-                  {/* Left 25% — Product image */}
-                  <View className="w-[25%] relative">
-                    {item.images?.length > 0 ? (
-                      <Image
-                        source={{ uri: item.images[0] }}
-                        className="w-full aspect-square rounded-2xl bg-gray-100"
-                        resizeMode="cover"
-                      />
+          return (
+            <View
+              key={item.id}
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: oos ? '#fecaca' : overStock ? '#fde68a' : lowStock ? '#fed7aa' : '#e5e7eb',
+                shadowColor: '#0f172a',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 4,
+                elevation: 1,
+              }}
+            >
+              {/* Stock warning — slim inline */}
+              {oos ? (
+                <View style={[cs.bannerRow, cs.bannerOos]} accessibilityRole="alert">
+                  <AlertCircle size={11} color="#dc2626" />
+                  <Text style={cs.bannerTextOos}>Out of Stock — remove to checkout</Text>
+                </View>
+              ) : overStock ? (
+                <View style={[cs.bannerRow, cs.bannerOver]} accessibilityRole="alert">
+                  <AlertTriangle size={11} color="#d97706" />
+                  <Text style={cs.bannerTextOver}>Only {item.availableStock} left — quantity adjusted</Text>
+                </View>
+              ) : lowStock ? (
+                <View style={[cs.bannerRow, cs.bannerLow]} accessibilityRole="alert">
+                  <Info size={11} color="#ea580c" />
+                  <Text style={cs.bannerTextLow}>Low stock — only {item.availableStock} left</Text>
+                </View>
+              ) : null}
+
+              {/* Price change notification — per item */}
+              {sr?.priceChanged ? (
+                <View
+                  style={[cs.priceBannerRow, sr.newPrice > sr.oldPrice ? cs.priceBannerUp : cs.priceBannerDown]}
+                  accessibilityRole="alert"
+                >
+                  {sr.newPrice > sr.oldPrice ? (
+                    <TrendingUp size={11} color="#dc2626" />
+                  ) : (
+                    <TrendingDown size={11} color="#16a34a" />
+                  )}
+                  <Text style={sr.newPrice > sr.oldPrice ? cs.priceTextUp : cs.priceTextDown}>
+                    Price {sr.newPrice > sr.oldPrice ? 'increased' : 'decreased'}: {fmt(sr.oldPrice)} → {fmt(sr.newPrice)}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={{ flexDirection: 'row', padding: 12, gap: 12 }}>
+                {/* Image — 64px compact */}
+                <Pressable
+                  onPress={() => router.push(`/(any)/products/${item.productId}` as any)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${item.name}`}
+                >
+                  <View
+                    style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', backgroundColor: '#f3f4f6', opacity: oos ? 0.4 : 1 }}
+                  >
+                    {item.images.length > 0 ? (
+                      <Image source={{ uri: item.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={200} />
                     ) : (
-                      <View className="w-full aspect-square rounded-2xl bg-gray-100 items-center justify-center">
-                        <Package size={28} color="#d1d5db" />
-                      </View>
-                    )}
-                    {/* Discount badge */}
-                    {item.discount && item.discount > 0 && (
-                      <View className="absolute top-1 left-1 bg-gray-800 rounded-md px-1 py-0.5">
-                        <Text className="text-white text-[9px] font-extrabold">-{item.discount}%</Text>
+                      <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                        <Package size={20} color="#d1d5db" />
                       </View>
                     )}
                   </View>
+                </Pressable>
 
-                  {/* Right 75% — Name row + delete + Tags */}
-                  <View className="flex-1">
-                    {/* Name row + delete button */}
-                    <View className="flex-row items-start justify-between mb-1.5">
-                      <Text
-                        className="flex-1 text-[15px] font-bold text-gray-900 leading-5 mr-2"
-                        numberOfLines={2}
-                      >
-                        {item.name}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => removeItem(item.id)}
-                        className="p-1 -mt-0.5"
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Trash2 size={17} color="#374151" />
-                      </TouchableOpacity>
-                    </View>
+                {/* Info + controls — all in one column */}
+                <View style={{ flex: 1 }}>
+                  {/* Name row + trash */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
+                    <Text
+                      style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 17, marginRight: 8 }}
+                      numberOfLines={2}
+                    >
+                      {item.name}
+                    </Text>
+                    <Pressable onPress={() => removeItem(item.id)} accessibilityRole="button" accessibilityLabel="Remove" hitSlop={8}>
+                      <View style={{ padding: 4 }}>
+                        <Trash2 size={14} color="#9ca3af" />
+                      </View>
+                    </Pressable>
+                  </View>
 
-                    {/* Tags row: category · material · rating */}
-                    <View className="flex-row flex-wrap gap-1.5">
-                      {item.category ? (
-                        <View className="bg-gray-100 px-2 py-0.5 rounded-md">
-                          <Text className="text-[11px] text-gray-700 font-semibold">{item.category}</Text>
-                        </View>
+                  {/* Variant / Product attributes + stock */}
+                  <View style={cs.metaRow}>
+                    {item.variantDetails ? (
+                      <View style={cs.variantChip}>
+                        {item.variantDetails.colorHex ? (
+                          <View style={[cs.colorDot, { backgroundColor: item.variantDetails.colorHex }]} />
+                        ) : null}
+                        <Text style={cs.variantText}>
+                          {[item.variantDetails.size, item.variantDetails.color].filter(Boolean).join(' · ')}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {item.availableStock != null ? (
+                      <View style={[
+                        cs.stockChip,
+                        oos ? cs.stockChipOos : lowStock ? cs.stockChipLow : cs.stockChipOk,
+                      ]}>
+                        <Text style={[
+                          cs.stockText,
+                          oos ? cs.stockTextOos : lowStock ? cs.stockTextLow : cs.stockTextOk,
+                        ]}>
+                          {oos ? 'Out of stock' : `${item.availableStock} in stock`}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {/* Price + stepper + line total */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    {/* Price */}
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{fmt(item.price)}</Text>
+                      {item.originalPrice ? (
+                        <Text style={{ fontSize: 10, color: '#dc2626', textDecorationLine: 'line-through' }}>{fmt(item.originalPrice)}</Text>
                       ) : null}
-                      {item.material ? (
-                        <View className="bg-gray-100 px-2 py-0.5 rounded-md">
-                          <Text className="text-[11px] text-gray-700 font-semibold">{item.material}</Text>
+                    </View>
+
+                    {/* Compact stepper */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#f3f4f6',
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: '#e5e7eb',
+                      }}
+                    >
+                      <Pressable onPress={() => updateQty(item.id, item.quantity - 1)} disabled={oos} accessibilityRole="button" hitSlop={4}>
+                        <View style={{ width: 30, height: 28, alignItems: 'center', justifyContent: 'center', opacity: oos ? 0.3 : 1 }}>
+                          <Minus size={12} color="#111827" strokeWidth={2.5} />
                         </View>
-                      ) : null}
-                      {item.rating !== undefined && (
-                        <View className="flex-row items-center gap-0.5 bg-gray-100 px-1.5 py-0.5 rounded-md">
-                          <Star size={10} color="#6b7280" fill="#6b7280" />
-                          <Text className="text-[11px] text-gray-700 font-semibold">
-                            {item.rating} ({item.reviews ?? 0})
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-
-                {/* ── SECTION 2: Full-width Variant details ──────────────── */}
-                {item.variantDetails && (
-                  <View className="flex-row items-center gap-4 px-4 py-2.5 bg-gray-50 border-t border-gray-100">
-                    {/* Color */}
-                    <View className="flex-row items-center gap-1.5">
-                      <Text className="text-[11px] text-gray-500 font-medium">Color:</Text>
-                      <View className="flex-row items-center gap-1">
-                        {item.variantDetails.colorHex && (
-                          <View
-                            className="w-3.5 h-3.5 rounded-full border border-gray-300"
-                            style={{ backgroundColor: item.variantDetails.colorHex }}
-                          />
-                        )}
-                        <Text className="text-[12px] font-semibold text-gray-800">
-                          {item.variantDetails.color}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Divider */}
-                    <View className="w-px h-3.5 bg-gray-300" />
-
-                    {/* Size */}
-                    <View className="flex-row items-center gap-1.5">
-                      <Text className="text-[11px] text-gray-500 font-medium">Size:</Text>
-                      <View className="bg-white border border-gray-200 rounded-lg px-2 py-0.5">
-                        <Text className="text-[12px] font-bold text-gray-800">
-                          {item.variantDetails.size}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* SKU if available */}
-                    {item.variantDetails.sku && (
-                      <>
-                        <View className="w-px h-3.5 bg-gray-300" />
-                        <Text className="text-[10px] text-gray-400 font-medium">
-                          SKU: {item.variantDetails.sku}
-                        </Text>
-                      </>
-                    )}
-                  </View>
-                )}
-
-                {/* ── Price + Qty stepper + Line total ───────────────────── */}
-                <View className="px-4 pt-3 pb-4">
-                  <View className="flex-row items-center justify-between">
-                    {/* Price stack */}
-                    <View>
-                      <Text className="text-[17px] font-extrabold text-gray-900">
-                        {fmt(item.price)}
+                      </Pressable>
+                      <Text style={{ minWidth: 22, textAlign: 'center', fontSize: 13, fontWeight: '800', color: '#111827' }}>
+                        {item.quantity}
                       </Text>
-                      {item.originalPrice && item.originalPrice > item.price && (
-                        <Text className="text-xs text-gray-400 line-through">
-                          {fmt(item.originalPrice)}
-                        </Text>
-                      )}
+                      <Pressable onPress={() => updateQty(item.id, item.quantity + 1)} disabled={incOff} accessibilityRole="button" hitSlop={4}>
+                        <View style={{ width: 30, height: 28, alignItems: 'center', justifyContent: 'center', opacity: incOff ? 0.3 : 1 }}>
+                          <Plus size={12} color="#111827" strokeWidth={2.5} />
+                        </View>
+                      </Pressable>
                     </View>
 
-                    {/* Qty stepper */}
-                    <View className="flex-row items-center bg-gray-100 rounded-xl overflow-hidden">
-                      <TouchableOpacity
-                        onPress={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
-                        disabled={!item.inStock}
-                        className="px-3 py-2"
-                        activeOpacity={0.7}
-                      >
-                        <Minus size={15} color={item.inStock ? '#374151' : '#d1d5db'} />
-                      </TouchableOpacity>
-                      <View className="px-2.5">
-                        <Text className="text-[15px] font-bold text-gray-900 min-w-[18px] text-center">
-                          {item.quantity}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
-                        disabled={!item.inStock}
-                        className="px-3 py-2"
-                        activeOpacity={0.7}
-                      >
-                        <Plus size={15} color={item.inStock ? '#374151' : '#d1d5db'} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Line total */}
-                  <Text className="text-xs text-gray-500 mt-1.5 text-right">
-                    Item total:{' '}
-                    <Text className="font-bold text-gray-700">{fmt(item.price * item.quantity)}</Text>
-                  </Text>
-                </View>
-
-              </View>
-            );
-          })}
-
-          {/* ── Promo Code ────────────────────────────────────────────────── */}
-          <View className="bg-white rounded-[20px] mt-4 p-4.5 shadow-sm p-4">
-            {/* Section title */}
-            <View className="flex-row items-center gap-2 mb-3.5">
-              <View className="w-8 h-8 bg-gray-100 rounded-xl items-center justify-center">
-                <Tag size={15} color="#374151" />
-              </View>
-              <Text className="text-[15px] font-bold text-gray-900">Promo Code</Text>
-            </View>
-
-            {appliedPromo ? (
-              <View className="bg-gray-100 rounded-2xl p-3.5 border-[1.5px] border-gray-300 flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2.5 flex-1">
-                  <CheckCircle size={20} color="#374151" />
-                  <View>
-                    <Text className="text-sm font-bold text-gray-800">"{appliedPromo}" applied!</Text>
-                    <Text className="text-xs text-gray-600 mt-0.5">
-                      You saved {fmt(discountAmount)} 🎉
+                    {/* Line total */}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>
+                      {fmt(item.price * item.quantity)}
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={removeCoupon} activeOpacity={0.7} className="p-1">
-                  <Trash2 size={16} color="#374151" />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View className="flex-row gap-2.5">
-                <View className="flex-1 flex-row items-center bg-gray-50 border-[1.5px] border-gray-200 rounded-2xl px-3.5">
-                  <TextInput
-                    placeholder="Enter promo code"
-                    value={promoCode}
-                    onChangeText={setPromoCode}
-                    autoCapitalize="characters"
-                    className="flex-1 py-3 text-sm text-gray-900 tracking-wider"
-                    placeholderTextColor="#9ca3af"
-                    returnKeyType="done"
-                    onSubmitEditing={applyPromoCode}
-                  />
-                </View>
-                <TouchableOpacity
-                  onPress={applyPromoCode}
-                  disabled={applyingCoupon}
-                  activeOpacity={0.85}
-                  className={`rounded-2xl px-5 items-center justify-center min-w-[72px] ${applyingCoupon ? 'bg-gray-400' : 'bg-black'}`}
-                >
-                  {applyingCoupon
-                    ? <ActivityIndicator size="small" color="#ffffff" />
-                    : <Text className="text-white text-sm font-bold">Apply</Text>
-                  }
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
-          {/* ── Order Summary ─────────────────────────────────────────────── */}
-          <View className="bg-white rounded-[20px] mt-3.5 overflow-hidden shadow-sm">
-            {/* Summary header */}
-            <View className="bg-black px-4.5 py-3.5 p-4">
-              <Text className="text-white text-base font-extrabold">Order Summary</Text>
-            </View>
-
-            <View className="p-4">
-              {/* Line items */}
-              {[
-                { label: 'Subtotal',  value: fmt(summary.subtotal),  special: false },
-                { label: 'Shipping',  value: summary.shipping === 0 ? 'FREE' : fmt(summary.shipping), special: summary.shipping === 0 },
-                { label: 'Tax (GST)', value: fmt(summary.tax),        special: false },
-              ].map(({ label, value, special }) => (
-                <View key={label} className="flex-row justify-between mb-3">
-                  <Text className="text-sm text-gray-500">{label}</Text>
-                  <Text className={`text-sm font-semibold ${special ? 'text-gray-900 font-extrabold' : 'text-gray-700'}`}>{value}</Text>
-                </View>
-              ))}
-
-              {/* GST breakdown per product */}
-              {cartItems.some(i => i.gstPercentage) && (
-                <View className="bg-gray-50 rounded-xl p-2.5 mb-3">
-                  {cartItems.map(i => {
-                    if (!i.gstPercentage) return null;
-                    const tax = i.price * i.quantity * (i.gstPercentage / 100);
-                    return (
-                      <View key={i.id} className="flex-row justify-between mb-1">
-                        <Text className="text-[11px] text-gray-400 flex-1 mr-2" numberOfLines={1}>
-                          {i.name} ({i.gstPercentage}%)
-                        </Text>
-                        <Text className="text-[11px] text-gray-400">{fmt(tax)}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-
-              {/* Discount */}
-              {summary.discount > 0 && (
-                <View className="flex-row justify-between mb-3 bg-gray-100 p-2.5 rounded-xl border border-gray-200">
-                  <View className="flex-row items-center gap-1.5">
-                    <Tag size={13} color="#374151" />
-                    <Text className="text-sm text-gray-700 font-semibold">Coupon Discount</Text>
-                  </View>
-                  <Text className="text-sm text-gray-900 font-bold">-{fmt(summary.discount)}</Text>
-                </View>
-              )}
-
-              {/* Divider */}
-              <View className="h-px bg-gray-100 mb-3.5" />
-
-              {/* Grand total */}
-              <View className="flex-row justify-between items-center mb-5">
-                <Text className="text-base font-extrabold text-gray-900">Total</Text>
-                <Text className="text-[22px] font-black text-black">{fmt(summary.total)}</Text>
-              </View>
-
-              {/* ── Checkout button ── */}
-              {hasStockIssue ? (
-                <View className="bg-gray-100 rounded-2xl py-4 flex-row items-center justify-center gap-2 mb-4">
-                  <AlertCircle size={18} color="#9ca3af" />
-                  <Text className="text-gray-400 font-bold text-sm">
-                    Remove out-of-stock items to proceed
-                  </Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  onPress={handleCheckout}
-                  activeOpacity={0.88}
-                  className="bg-black rounded-2xl py-4 flex-row items-center justify-center gap-2.5 mb-4"
-                  style={{ shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 }}
-                >
-                  <CreditCard size={20} color="#ffffff" />
-                  <Text className="text-white text-base font-extrabold tracking-wide">
-                    Proceed to Checkout
-                  </Text>
-                  <ArrowRight size={18} color="#ffffff" />
-                </TouchableOpacity>
-              )}
-
-              {/* Trust badges */}
-              <View className="gap-2.5">
-                {[
-                  { icon: Shield,    color: '#374151', label: 'SSL encrypted & secure checkout' },
-                  { icon: Truck,     color: '#374151', label: 'Free shipping on orders over ₹999' },
-                  { icon: RotateCcw, color: '#374151', label: '30-day hassle-free return policy' },
-                ].map(({ icon: Icon, color, label }) => (
-                  <View key={label} className="flex-row items-center gap-2.5">
-                    <View className="w-7 h-7 rounded-lg items-center justify-center bg-gray-100">
-                      <Icon size={14} color={color} />
-                    </View>
-                    <Text className="text-xs text-gray-500 flex-1">{label}</Text>
-                  </View>
-                ))}
               </View>
             </View>
-          </View>
+          );
+        })}
+
+        {/* Promo code */}
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e5e7eb' }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 10 }}>
+            <Tag size={13} color="#374151" /> Promo Code
+          </Text>
+          {appliedPromo ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f0fdf4', borderRadius: 10, padding: 12 }}>
+              <View>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#16a34a' }}>{`"${appliedPromo}" applied!`}</Text>
+                <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>You saved {fmt(discountAmount)}</Text>
+              </View>
+              <Pressable onPress={removeCoupon} accessibilityRole="button" hitSlop={8}>
+                <X size={16} color="#6b7280" />
+              </Pressable>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TextInput
+                value={promoCode}
+                onChangeText={setPromoCode}
+                placeholder="Enter code"
+                placeholderTextColor="#9ca3af"
+                autoCapitalize="characters"
+                returnKeyType="done"
+                onSubmitEditing={applyCoupon}
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: '#e5e7eb',
+                  borderRadius: 10,
+                  paddingHorizontal: 14,
+                  height: 44,
+                  fontSize: 14,
+                  color: '#111827',
+                  backgroundColor: '#f9fafb',
+                }}
+              />
+              <Pressable onPress={applyCoupon} disabled={applyingCoupon} accessibilityRole="button">
+                <View
+                  style={{
+                    backgroundColor: applyingCoupon ? '#6b7280' : '#111827',
+                    height: 44,
+                    paddingHorizontal: 20,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {applyingCoupon ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Apply</Text>
+                  )}
+                </View>
+              </Pressable>
+            </View>
+          )}
         </View>
+
       </ScrollView>
+
+      {/* Sticky bottom — summary + checkout, always visible */}
+      <StickyCheckout
+        subtotal={subtotal}
+        tax={tax}
+        discount={effectiveDiscount}
+        total={total}
+        hasStockIssue={hasStockIssue}
+        onCheckout={handleCheckout}
+      />
     </View>
   );
 }
+
+// ─── Header ───────────────────────────────────────────────────────────────────
+function ScreenHeader({ count }: { count: number }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={{
+        backgroundColor: '#fff',
+        paddingHorizontal: 16,
+        paddingTop: insets.top + 12,
+        paddingBottom: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+      }}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <Text style={{ fontSize: 24, fontWeight: '800', color: '#111827' }}>My Cart</Text>
+      <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
+        {count > 0 ? `${count} ${count === 1 ? 'item' : 'items'}` : 'Your shopping cart'}
+      </Text>
+    </View>
+  );
+}
+
+function SummaryRow({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      <Text style={{ fontSize: 13, color: '#6b7280' }}>{label}</Text>
+      <Text style={{ fontSize: 13, fontWeight: '600', color: color || '#111827' }}>{value}</Text>
+    </View>
+  );
+}
+
+// ─── Sticky Checkout with expandable summary ──────────────────────────────────
+function StickyCheckout({
+  subtotal,
+  tax,
+  discount,
+  total,
+  hasStockIssue,
+  onCheckout,
+}: {
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  hasStockIssue: boolean;
+  onCheckout: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const bottomInsets = useSafeAreaInsets();
+
+  return (
+    <View
+      style={{
+        backgroundColor: '#fff',
+        borderTopWidth: 1,
+        borderTopColor: '#e5e7eb',
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        paddingBottom: Math.max(bottomInsets.bottom, 16) + 60,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 10,
+      }}
+    >
+      {/* Expandable summary breakdown */}
+      {expanded ? (
+        <View style={{ marginBottom: 10, gap: 6 }}>
+          <SummaryRow label="Subtotal" value={fmt(subtotal)} />
+          {tax > 0 ? <SummaryRow label="Tax (GST)" value={fmt(tax)} /> : null}
+          {discount > 0 ? <SummaryRow label="Discount" value={`-${fmt(discount)}`} color="#16a34a" /> : null}
+          <SummaryRow label="Shipping" value="Free" color="#16a34a" />
+          <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 2 }} />
+        </View>
+      ) : null}
+
+      {/* Total row + expand toggle */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <Pressable
+          onPress={() => setExpanded((e) => !e)}
+          accessibilityRole="button"
+          accessibilityLabel={expanded ? 'Hide summary' : 'Show summary'}
+          hitSlop={8}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: 13, color: '#6b7280' }}>Total</Text>
+            <Text style={{ fontSize: 11, color: '#2563eb', fontWeight: '600' }}>
+              {expanded ? '▾ Hide' : '▸ Details'}
+            </Text>
+          </View>
+        </Pressable>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827' }}>{fmt(total)}</Text>
+      </View>
+
+      {/* Checkout button */}
+      <Pressable
+        onPress={onCheckout}
+        disabled={hasStockIssue}
+        accessibilityRole="button"
+        accessibilityLabel={hasStockIssue ? 'Fix stock issues to checkout' : 'Proceed to checkout'}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: hasStockIssue ? '#d1d5db' : '#111827',
+            height: 52,
+            borderRadius: 14,
+            gap: 8,
+          }}
+        >
+          <CreditCard size={18} color={hasStockIssue ? '#9ca3af' : '#fff'} />
+          <Text style={{ color: hasStockIssue ? '#9ca3af' : '#fff', fontSize: 16, fontWeight: '700' }}>
+            {hasStockIssue ? 'Fix Stock Issues' : 'Proceed to Checkout'}
+          </Text>
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Sync notification banner ────────────────────────────────────────────────
+function SyncBanner({
+  results,
+  onDismiss,
+  isSyncing,
+}: {
+  results: StockSyncResult[];
+  onDismiss: () => void;
+  isSyncing: boolean;
+}) {
+  const oosCount = results.filter((r) => r.stockStatus === 'out_of_stock').length;
+  const lowCount = results.filter((r) => r.stockStatus === 'low_stock').length;
+  const priceCount = results.filter((r) => r.priceChanged).length;
+  const qtyCount = results.filter((r) => r.qtyAdjusted).length;
+  const backCount = results.filter((r) => r.wasOutOfStock).length;
+
+  const lines: string[] = [];
+  if (oosCount > 0) lines.push(`${oosCount} ${oosCount === 1 ? 'item is' : 'items are'} now out of stock`);
+  if (lowCount > 0) lines.push(`${lowCount} ${lowCount === 1 ? 'item has' : 'items have'} low stock`);
+  if (qtyCount > 0) lines.push(`${qtyCount} ${qtyCount === 1 ? 'quantity was' : 'quantities were'} auto-adjusted`);
+  if (priceCount > 0) lines.push(`${priceCount} ${priceCount === 1 ? 'price has' : 'prices have'} changed`);
+  if (backCount > 0) lines.push(`${backCount} ${backCount === 1 ? 'item is' : 'items are'} back in stock`);
+
+  if (lines.length === 0) return null;
+
+  const hasIssues = oosCount > 0 || qtyCount > 0;
+  const bgColor = hasIssues ? '#fef2f2' : priceCount > 0 ? '#fffbeb' : '#f0fdf4';
+  const borderColor = hasIssues ? '#fecaca' : priceCount > 0 ? '#fde68a' : '#bbf7d0';
+  const iconColor = hasIssues ? '#dc2626' : priceCount > 0 ? '#d97706' : '#16a34a';
+
+  return (
+    <View
+      style={[cs.syncBanner, { backgroundColor: bgColor, borderColor }]}
+      accessibilityRole="alert"
+    >
+      <View style={cs.syncBannerInner}>
+        <AlertCircle size={16} color={iconColor} style={cs.syncBannerIcon} />
+        <View style={cs.syncBannerContent}>
+          <Text style={cs.syncBannerTitle}>
+            {isSyncing ? 'Updating cart...' : 'Cart updated'}
+          </Text>
+          {lines.map((line) => (
+            <Text key={line} style={cs.syncBannerLine}>{'• '}{line}</Text>
+          ))}
+        </View>
+        <Pressable
+          onPress={onDismiss}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss notification"
+          accessibilityHint="Hides the stock update banner"
+          style={cs.syncBannerDismiss}
+        >
+          <X size={16} color="#9ca3af" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ─── Hoisted styles for sync UI ──────────────────────────────────────────────
+const cs = StyleSheet.create({
+  // Syncing indicator
+  syncingRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 10, backgroundColor: '#eff6ff', borderRadius: 12,
+  },
+  syncingText: { fontSize: 12, fontWeight: '600', color: '#2563eb' },
+
+  // Stock warning banners (per-item)
+  bannerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderTopLeftRadius: 14, borderTopRightRadius: 14,
+  },
+  bannerOos: { backgroundColor: '#fef2f2' },
+  bannerOver: { backgroundColor: '#fffbeb' },
+  bannerLow: { backgroundColor: '#fff7ed' },
+  bannerTextOos: { fontSize: 10, fontWeight: '700', color: '#dc2626' },
+  bannerTextOver: { fontSize: 10, fontWeight: '700', color: '#92400e' },
+  bannerTextLow: { fontSize: 10, fontWeight: '700', color: '#9a3412' },
+
+  // Price change banner (per-item)
+  priceBannerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 5,
+  },
+  priceBannerUp: { backgroundColor: '#fef2f2' },
+  priceBannerDown: { backgroundColor: '#f0fdf4' },
+  priceTextUp: { fontSize: 10, fontWeight: '700', color: '#dc2626' },
+  priceTextDown: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+
+  // SyncBanner component
+  syncBanner: { borderRadius: 12, borderWidth: 1, padding: 12 },
+  syncBannerInner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  syncBannerIcon: { marginTop: 1 },
+  syncBannerContent: { flex: 1 },
+  syncBannerTitle: { fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 4 },
+  syncBannerLine: { fontSize: 11, color: '#374151', lineHeight: 17 },
+  syncBannerDismiss: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+
+  // Meta row (variant + stock)
+  metaRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap',
+  },
+  variantChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#f3f4f6', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  colorDot: {
+    width: 8, height: 8, borderRadius: 4, borderWidth: 1, borderColor: '#e5e7eb',
+  },
+  variantText: { fontSize: 10, fontWeight: '600', color: '#374151' },
+
+  // Stock chips
+  stockChip: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  stockChipOk: { backgroundColor: '#f0fdf4' },
+  stockChipLow: { backgroundColor: '#fff7ed' },
+  stockChipOos: { backgroundColor: '#fef2f2' },
+  stockText: { fontSize: 9, fontWeight: '700' },
+  stockTextOk: { color: '#16a34a' },
+  stockTextLow: { color: '#ea580c' },
+  stockTextOos: { color: '#dc2626' },
+});

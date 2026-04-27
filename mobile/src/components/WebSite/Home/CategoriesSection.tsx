@@ -1,186 +1,308 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
-import { Package, ChevronRight } from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  Dimensions,
+  ScrollView,
+} from 'react-native';
+import { Package, RefreshCw, ChevronRight } from 'lucide-react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { categoryService, Category } from '@/services/categoryService';
 
-const CARD_SIZE = 92;
-const CARD_GAP = 14;
+const HOMEPAGE_LIMIT = 6;
+const H_PADDING = 16;
+const GAP = 14;
 
-const pressableOpacity = ({ pressed }: { pressed: boolean }) => ({
-  opacity: pressed ? 0.7 : 1,
-});
+// Carousel sizing: ~2.4 cards visible so next one peeks, hinting at scroll.
+const screenWidth = Dimensions.get('window').width;
+const CARD_WIDTH = Math.max(148, Math.round((screenWidth - H_PADDING * 2) / 2.4));
+const SNAP_INTERVAL = CARD_WIDTH + GAP;
+
+type LoadState = 'loading' | 'ready' | 'empty' | 'error';
 
 export default function CategoriesSection() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<LoadState>('loading');
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchCategories = async () => {
-      try {
-        const response = await categoryService.getAllCategories({
-          status: 'ACTIVE',
-          showRootOnly: 'true',
-          sortBy: 'sortOrder',
-          sortOrder: 'asc',
-        });
-
-        if (isMounted && response.success && response.data) {
-          setCategories(response.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch categories:', error);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchCategories();
-
-    return () => {
-      isMounted = false;
-    };
+  const fetchCategories = useCallback(async (signal?: AbortSignal) => {
+    setState('loading');
+    try {
+      const res = await categoryService.getAllCategories({
+        status: 'ACTIVE',
+        showRootOnly: 'true',
+        sortBy: 'sortOrder',
+        sortOrder: 'asc',
+      });
+      if (signal?.aborted) return;
+      const list = (res.success && res.data ? res.data : []).slice(0, HOMEPAGE_LIMIT);
+      setCategories(list);
+      setState(list.length === 0 ? 'empty' : 'ready');
+    } catch (err) {
+      if (signal?.aborted) return;
+      console.error('Failed to fetch categories:', err);
+      setState('error');
+    }
   }, []);
 
-  const renderSkeleton = () => (
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCategories(controller.signal);
+    return () => controller.abort();
+  }, [fetchCategories]);
+
+  if (state === 'empty') return null;
+
+  return (
+    <View style={{ backgroundColor: '#ffffff', paddingTop: 32, paddingBottom: 40 }}>
+      <SectionHeader />
+
+      {state === 'loading' ? (
+        <Carousel>
+          {Array.from({ length: HOMEPAGE_LIMIT }).map((_, i) => (
+            <CategoryCardSkeleton key={i} />
+          ))}
+        </Carousel>
+      ) : state === 'error' ? (
+        <View style={{ paddingHorizontal: H_PADDING }}>
+          <ErrorState onRetry={() => fetchCategories()} />
+        </View>
+      ) : (
+        <Carousel>
+          {categories.map((c) => (
+            <CategoryCard key={c.id} category={c} />
+          ))}
+        </Carousel>
+      )}
+    </View>
+  );
+}
+
+function SectionHeader() {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        marginBottom: 20,
+      }}
+    >
+      <View style={{ flex: 1, paddingRight: 12 }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: '#1a1a1a',
+            fontSize: 22,
+            fontWeight: '700',
+            lineHeight: 28,
+          }}
+        >
+          Shop by Category
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: '#6b7280',
+            fontSize: 13,
+            lineHeight: 18,
+            marginTop: 2,
+          }}
+        >
+          Explore our carefully curated collection
+        </Text>
+      </View>
+      <Pressable
+        onPress={() => router.push('/(tabs)/categories' as any)}
+        accessibilityRole="button"
+        accessibilityLabel="View all categories"
+        hitSlop={6}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#111827',
+            paddingHorizontal: 14,
+            height: 36,
+            minWidth: 96,
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600', marginRight: 4 }}>
+            View All
+          </Text>
+          <ChevronRight size={14} color="#ffffff" strokeWidth={2.5} />
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+function Carousel({ children }: { children: React.ReactNode }) {
+  return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 16 }}
+      decelerationRate="fast"
+      snapToInterval={SNAP_INTERVAL}
+      snapToAlignment="start"
+      contentContainerStyle={{
+        paddingHorizontal: H_PADDING,
+        gap: GAP,
+      }}
     >
-      {Array.from({ length: 6 }).map((_, i) => (
-        <View
-          key={i}
-          style={{
-            width: CARD_SIZE,
-            marginRight: CARD_GAP,
-            alignItems: 'center',
-          }}
-        >
-          <View
-            className="bg-slate-200 rounded-3xl mb-2"
-            style={{ width: CARD_SIZE, height: CARD_SIZE }}
-          />
-          <View
-            className="bg-slate-200 rounded-md"
-            style={{ height: 10, width: '70%' }}
-          />
-        </View>
-      ))}
+      {children}
     </ScrollView>
   );
+}
 
-  if (!loading && categories.length === 0) {
-    return null;
-  }
-
+function CategoryCard({ category }: { category: Category }) {
   return (
-    <View className="bg-white pt-6 pb-7">
-      <View className="px-4 flex-row items-center justify-between mb-4">
-        <View className="flex-1 pr-3">
-          <Text
-            className="text-xl font-extrabold text-slate-900"
-            style={{ lineHeight: 26 }}
+    <Pressable
+      onPress={() => router.push(`/(tabs)/categories/${category.slug}` as any)}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${category.name} category`}
+      android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
+      style={({ pressed }) => ({
+        width: CARD_WIDTH,
+        opacity: pressed ? 0.9 : 1,
+        transform: [{ scale: pressed ? 0.98 : 1 }],
+      })}
+    >
+      <View
+        style={{
+          width: CARD_WIDTH,
+          height: CARD_WIDTH,
+          borderRadius: 14,
+          overflow: 'hidden',
+          backgroundColor: '#f3f4f6',
+          marginBottom: 10,
+          shadowColor: '#0f172a',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          elevation: 2,
+        }}
+      >
+        {category.image ? (
+          <Image
+            source={{ uri: category.image }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            transition={250}
+            accessibilityIgnoresInvertColors
+          />
+        ) : (
+          <LinearGradient
+            colors={['#f3f4f6', '#e5e7eb']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              width: '100%',
+              height: '100%',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            Shop by Category
-          </Text>
-          <Text
-            className="text-sm text-slate-600 mt-0.5"
-            style={{ lineHeight: 20 }}
-          >
-            Explore our curated collection
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => router.push('/(tabs)/categories' as any)}
-          accessibilityLabel="View all categories"
-          accessibilityRole="button"
-          hitSlop={8}
-          style={pressableOpacity}
-          className="flex-row items-center bg-slate-100 rounded-full pl-3.5 pr-2.5 py-2 min-h-[36px]"
-        >
-          <Text className="text-xs font-bold text-slate-900 mr-0.5">
-            View All
-          </Text>
-          <ChevronRight size={14} color="#0f172a" strokeWidth={2.5} />
-        </Pressable>
+            <Package size={40} color="#9ca3af" strokeWidth={1.5} />
+          </LinearGradient>
+        )}
       </View>
 
-      {loading ? (
-        renderSkeleton()
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16 }}
-          decelerationRate="fast"
-        >
-          {categories.map((category, idx) => (
-            <View
-              key={category.id}
-              style={{
-                width: CARD_SIZE,
-                marginRight: idx === categories.length - 1 ? 0 : CARD_GAP,
-              }}
-            >
-            <Pressable
-              onPress={() =>
-                router.push(`/(tabs)/categories/${category.slug}` as any)
-              }
-              accessibilityLabel={`View ${category.name} category`}
-              accessibilityRole="button"
-              android_ripple={{
-                color: 'rgba(15,23,42,0.08)',
-                borderless: true,
-              }}
-              style={({ pressed }) => ({
-                width: CARD_SIZE,
-                alignItems: 'center',
-                opacity: pressed ? 0.85 : 1,
-                transform: [{ scale: pressed ? 0.96 : 1 }],
-              })}
-            >
-              <View
-                className="mb-2 overflow-hidden rounded-3xl bg-slate-100 border border-slate-200/70"
-                style={{
-                  width: CARD_SIZE,
-                  height: CARD_SIZE,
-                  shadowColor: '#0f172a',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.08,
-                  shadowRadius: 8,
-                  elevation: 3,
-                }}
-              >
-                {category.image ? (
-                  <Image
-                    source={{ uri: category.image }}
-                    style={{ width: '100%', height: '100%' }}
-                    contentFit="cover"
-                    transition={200}
-                    accessibilityLabel={`${category.name} image`}
-                  />
-                ) : (
-                  <View className="w-full h-full items-center justify-center">
-                    <Package size={32} color="#94a3b8" strokeWidth={1.5} />
-                  </View>
-                )}
-              </View>
-              <Text
-                className="text-xs font-bold text-slate-900 text-center"
-                style={{ lineHeight: 16 }}
-                numberOfLines={2}
-              >
-                {category.name}
-              </Text>
-            </Pressable>
-            </View>
-          ))}
-        </ScrollView>
-      )}
+      <Text
+        style={{
+          color: '#374151',
+          fontSize: 15,
+          fontWeight: '600',
+          textAlign: 'center',
+          lineHeight: 20,
+        }}
+        numberOfLines={2}
+      >
+        {category.name}
+      </Text>
+    </Pressable>
+  );
+}
+
+function CategoryCardSkeleton() {
+  return (
+    <View style={{ width: CARD_WIDTH }}>
+      <View
+        className="bg-slate-200"
+        style={{
+          width: CARD_WIDTH,
+          height: CARD_WIDTH,
+          borderRadius: 14,
+          marginBottom: 10,
+        }}
+      />
+      <View
+        className="bg-slate-200 self-center"
+        style={{ height: 12, width: '60%', borderRadius: 4 }}
+      />
+    </View>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+      <View
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: '#fef2f2',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 12,
+        }}
+      >
+        <Package size={24} color="#dc2626" strokeWidth={1.75} />
+      </View>
+      <Text
+        style={{
+          fontSize: 15,
+          fontWeight: '600',
+          color: '#111827',
+          marginBottom: 4,
+        }}
+      >
+        {"Couldn't load categories"}
+      </Text>
+      <Text
+        style={{
+          fontSize: 13,
+          color: '#6b7280',
+          marginBottom: 16,
+          textAlign: 'center',
+        }}
+      >
+        Check your connection and try again.
+      </Text>
+      <Pressable
+        onPress={onRetry}
+        accessibilityRole="button"
+        accessibilityLabel="Retry loading categories"
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: pressed ? '#1f2937' : '#374151',
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          borderRadius: 10,
+          minHeight: 40,
+        })}
+      >
+        <RefreshCw size={14} color="#ffffff" strokeWidth={2.25} />
+        <Text className="text-white font-semibold text-sm ml-2">Try Again</Text>
+      </Pressable>
     </View>
   );
 }

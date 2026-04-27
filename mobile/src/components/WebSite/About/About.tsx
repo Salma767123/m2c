@@ -1,9 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { CheckCircle } from 'lucide-react-native';
-import { Video, ResizeMode } from 'expo-av';
-import { useRouter } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 interface AboutSection {
   title: string;
@@ -43,8 +42,6 @@ const aboutContent: AboutSection[] = [
     image: require('../../../../assets/images/about/a5.jpg'),
   },
 ];
-
-  const router = useRouter();
 
 const missionStatement = {
   title: 'Our Mission',
@@ -97,23 +94,20 @@ const styles = StyleSheet.create({
 });
 
 export default function About() {
-  const videoRef = useRef<Video>(null);
   const { width } = useWindowDimensions();
   const videoWidth = width - 48;
   const videoHeight = videoWidth * 0.5625;
 
-  useEffect(() => {
-    const playVideo = async () => {
-      if (videoRef.current) {
-        try {
-          await videoRef.current.playAsync();
-        } catch (error) {
-          console.log('Auto-play error:', error);
-        }
-      }
-    };
-    playVideo();
-  }, []);
+  // expo-video player: auto-play, looping, muted — matches the previous
+  // expo-av behavior with a simpler hook-based API.
+  const videoPlayer = useVideoPlayer(
+    require('../../../../assets/videos/About1.mp4'),
+    (player) => {
+      player.loop = true;
+      player.muted = true;
+      player.play();
+    },
+  );
 
   return (
     <View className="bg-white">
@@ -161,15 +155,13 @@ export default function About() {
               backgroundColor: '#000',
             }}
           >
-            <Video
-              ref={videoRef}
-              source={require('../../../../assets/videos/About1.mp4')}
+            <VideoView
+              player={videoPlayer}
               style={{ width: videoWidth, height: videoHeight }}
-              resizeMode={ResizeMode.COVER}
-              isLooping
-              isMuted
-              shouldPlay
-              useNativeControls={false}
+              contentFit="cover"
+              nativeControls={false}
+              allowsFullscreen={false}
+              allowsPictureInPicture={false}
             />
           </View>
         </View>

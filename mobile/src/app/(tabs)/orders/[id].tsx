@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   ActivityIndicator,
-  Image,
-  Animated,
+  Modal,
   StatusBar,
-  Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { WebView } from 'react-native-webview';
 import {
   ArrowLeft,
   Package,
@@ -22,445 +22,481 @@ import {
   Mail,
   XCircle,
   ShieldCheck,
-  Receipt,
-  CalendarDays,
-  RotateCcw,
   AlertCircle,
-  Hash,
-  Wallet,
+  FileText,
+  X,
 } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from '@/lib/axios';
 import { orderService, Order } from '@/services/orderService';
-import { showErrorToast } from '@/lib/toast-utils';
+import { showErrorToast, showSuccessToast } from '@/lib/toast-utils';
 
-// ── Status Config ──────────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<string, { iconBg: string; textColor: string; bgColor: string; borderColor: string; icon: any; label: string }> = {
-  delivered:     { iconBg: '#10b981', textColor: '#065f46', bgColor: '#ecfdf5', borderColor: '#a7f3d0', label: 'Delivered',   icon: CheckCircle },
-  shipped:       { iconBg: '#3b82f6', textColor: '#1e40af', bgColor: '#eff6ff', borderColor: '#bfdbfe', label: 'Shipped',     icon: Truck },
-  processing:    { iconBg: '#f59e0b', textColor: '#78350f', bgColor: '#fffbeb', borderColor: '#fde68a', label: 'Processing',  icon: Clock },
-  confirmed:     { iconBg: '#f59e0b', textColor: '#78350f', bgColor: '#fffbeb', borderColor: '#fde68a', label: 'Confirmed',   icon: Clock },
-  order_created: { iconBg: '#8b5cf6', textColor: '#5b21b6', bgColor: '#faf5ff', borderColor: '#ddd6fe', label: 'Order Placed',icon: Package },
-  cancelled:     { iconBg: '#ef4444', textColor: '#991b1b', bgColor: '#fef2f2', borderColor: '#fecaca', label: 'Cancelled',   icon: XCircle },
+// ─── Status helpers ───────────────────────────────────────────────────────────
+type StatusInfo = { icon: any; label: string; bg: string; fg: string; iconBg: string };
+
+const STATUS: Record<string, StatusInfo> = {
+  delivered:        { icon: CheckCircle, label: 'Delivered',    bg: '#f0fdf4', fg: '#16a34a', iconBg: '#16a34a' },
+  shipped:          { icon: Truck,       label: 'Shipped',      bg: '#eff6ff', fg: '#2563eb', iconBg: '#2563eb' },
+  processing:       { icon: Clock,       label: 'Processing',   bg: '#fffbeb', fg: '#d97706', iconBg: '#f59e0b' },
+  confirmed:        { icon: Clock,       label: 'Confirmed',    bg: '#fffbeb', fg: '#d97706', iconBg: '#f59e0b' },
+  order_created:    { icon: Package,     label: 'Order Placed', bg: '#f3f4f6', fg: '#374151', iconBg: '#6b7280' },
+  packed_by_vendor: { icon: Package,     label: 'Packed',       bg: '#eff6ff', fg: '#2563eb', iconBg: '#2563eb' },
+  cancelled:        { icon: XCircle,     label: 'Cancelled',    bg: '#fef2f2', fg: '#dc2626', iconBg: '#dc2626' },
 };
 
-const getConfig = (status: string) =>
-  STATUS_CONFIG[status.toLowerCase()] || {
-    iconBg: '#94a3b8', textColor: '#475569', bgColor: '#f8fafc', borderColor: '#e2e8f0',
-    label: status, icon: AlertCircle,
-  };
+const getStatus = (s: string): StatusInfo =>
+  STATUS[s.toLowerCase()] ?? { icon: AlertCircle, label: s, bg: '#f3f4f6', fg: '#374151', iconBg: '#6b7280' };
 
-// ── Timeline ───────────────────────────────────────────────────────────────────
-const ORDER_STEPS = [
-  { key: 'ORDER_CREATED', label: 'Order Placed', sub: 'Order received',   icon: Package },
-  { key: 'CONFIRMED',     label: 'Confirmed',    sub: 'Order confirmed',  icon: ShieldCheck },
-  { key: 'PROCESSING',    label: 'Processing',   sub: 'Being prepared',   icon: Clock },
-  { key: 'SHIPPED',       label: 'Shipped',      sub: 'On the way',       icon: Truck },
-  { key: 'DELIVERED',     label: 'Delivered',    sub: 'Order delivered',  icon: CheckCircle },
+const STEPS = [
+  { key: 'ORDER_CREATED', label: 'Placed',     icon: Package },
+  { key: 'CONFIRMED',     label: 'Confirmed',  icon: ShieldCheck },
+  { key: 'PROCESSING',    label: 'Processing', icon: Clock },
+  { key: 'SHIPPED',       label: 'Shipped',    icon: Truck },
+  { key: 'DELIVERED',     label: 'Delivered',  icon: CheckCircle },
 ];
 
-const getActiveStep = (status: string) =>
-  ORDER_STEPS.findIndex(s => s.key === status.toUpperCase());
+const getStepIndex = (s: string) => STEPS.findIndex((st) => st.key === s.toUpperCase());
 
-// ── Section Card ───────────────────────────────────────────────────────────────
-function SectionCard({
-  title, icon: Icon, iconColor, iconBg, children, delay = 0,
-}: {
-  title: string; icon: any; iconColor: string; iconBg: string;
-  children: React.ReactNode; delay?: number;
-}) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(18)).current;
+const fmt = (n: number) => `$${n.toFixed(2)}`;
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 400, delay, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View
-      style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
-      className="bg-white rounded-[22px] mx-4 mb-3.5 overflow-hidden shadow-sm"
-    >
-      <View className="flex-row items-center gap-3 px-4 py-3.5 border-b border-slate-100 bg-slate-50">
-        <View className="w-9 h-9 rounded-xl items-center justify-center" style={{ backgroundColor: iconBg }}>
-          <Icon size={17} color={iconColor} />
-        </View>
-        <Text className="text-[15px] font-extrabold text-slate-900">{title}</Text>
-      </View>
-      <View className="p-4">{children}</View>
-    </Animated.View>
-  );
-}
-
-// ── Main Screen ────────────────────────────────────────────────────────────────
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-  const heroAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => { if (id) fetchOrderDetails(); }, [id]);
+  const [invoiceHtml, setInvoiceHtml] = useState<string | null>(null);
+  const [loadingInvoice, setLoadingInvoice] = useState(false);
 
   useEffect(() => {
-    if (order) Animated.timing(heroAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-  }, [order]);
+    if (id) fetchOrder();
+  }, [id]);
 
-  const fetchOrderDetails = async () => {
+  const fetchOrder = async () => {
     try {
       setLoading(true);
       const res = await orderService.getOrderById(id);
       if (res.success && res.data) setOrder(res.data);
-    } catch { showErrorToast('Error', 'Failed to load order details'); }
-    finally { setLoading(false); }
+    } catch {
+      showErrorToast('Error', 'Failed to load order');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ── Top Bar ─────────────────────────────────────────────────────────────────
-  const TopBar = ({ title = 'Order Details', subtitle = '' }: { title?: string; subtitle?: string }) => (
-    <View className={`bg-[#1a1a2e] ${Platform.OS === 'ios' ? 'pt-14' : 'pt-5'} pb-5 px-5 shadow-xl`}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
-      <View className="flex-row items-center gap-3.5">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-10 h-10 rounded-2xl bg-white/12 border border-white/10 items-center justify-center"
-          activeOpacity={0.75}
-        >
-          <ArrowLeft size={20} color="#ffffff" />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="text-[18px] font-extrabold text-white tracking-tight">{title}</Text>
-          {!!subtitle && <Text className="text-[12px] text-slate-500 mt-0.5">{subtitle}</Text>}
-        </View>
-      </View>
-    </View>
-  );
+  const handleDownloadInvoice = async () => {
+    if (!order?.id) return;
+    setLoadingInvoice(true);
+    try {
+      const res = await axios.get(`/orders/${order.id}/invoice`, {
+        responseType: 'text',
+      });
+      // The backend returns raw HTML
+      const html = typeof res.data === 'string' ? res.data : String(res.data);
+      setInvoiceHtml(html);
+    } catch (err: any) {
+      showErrorToast('Failed', 'Could not generate invoice. Please try again.');
+    } finally {
+      setLoadingInvoice(false);
+    }
+  };
 
-  // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View className="flex-1 bg-slate-50">
-        <TopBar />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#1a1a2e" />
-          <Text className="text-slate-500 mt-3.5 text-sm font-semibold">Loading order details…</Text>
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <Header title="Order Details" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color="#111827" />
+          <Text style={{ color: '#6b7280', marginTop: 12, fontSize: 13 }}>Loading order…</Text>
         </View>
       </View>
     );
   }
 
-  // ── Not Found ───────────────────────────────────────────────────────────────
   if (!order) {
     return (
-      <View className="flex-1 bg-slate-50">
-        <TopBar />
-        <View className="flex-1 items-center justify-center px-9">
-          <View className="w-24 h-24 rounded-full bg-slate-100 items-center justify-center mb-6">
-            <Package size={46} color="#cbd5e1" />
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <Header title="Order Details" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Package size={32} color="#d1d5db" />
           </View>
-          <Text className="text-[22px] font-black text-slate-900 mb-2.5 text-center">Order Not Found</Text>
-          <Text className="text-sm text-slate-500 text-center leading-5 mb-8">
-            The order you're looking for doesn't exist or may have been removed.
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 4 }}>
+            Order Not Found
           </Text>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="bg-[#1a1a2e] rounded-[18px] px-9 py-4"
-            activeOpacity={0.85}
-          >
-            <Text className="text-white font-extrabold text-[15px]">Go Back</Text>
-          </TouchableOpacity>
+          <Text style={{ fontSize: 13, color: '#6b7280', textAlign: 'center', marginBottom: 20 }}>
+            {"The order you're looking for doesn't exist."}
+          </Text>
+          <Pressable onPress={() => router.back()} accessibilityRole="button">
+            <View style={{ backgroundColor: '#111827', paddingHorizontal: 24, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Go Back</Text>
+            </View>
+          </Pressable>
         </View>
       </View>
     );
   }
 
-  const cfg = getConfig(order.status);
-  const Icon = cfg.icon;
+  const s = getStatus(order.status);
+  const SIcon = s.icon;
   const isCancelled = order.status.toUpperCase() === 'CANCELLED';
-  const activeStep = getActiveStep(order.status);
+  const activeStep = getStepIndex(order.status);
 
   return (
-    <View className="flex-1 bg-slate-50">
-      <TopBar title="Order Details" subtitle={`#${order.orderId}`} />
+    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <Header title="Order Details" subtitle={`#${order.orderId}`} />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 14 }} showsVerticalScrollIndicator={false}>
 
-        {/* ── Hero Status Banner ───────────────────────────────────────────── */}
-        <Animated.View
-          style={{ opacity: heroAnim }}
-          className="mx-4 mt-4 mb-1.5 rounded-[22px] overflow-hidden shadow-lg"
-        >
-          <View className="bg-[#1a1a2e] p-5 flex-row items-center gap-4">
-            {/* Status icon */}
-            <View
-              className="w-16 h-16 rounded-[20px] items-center justify-center"
-              style={{ backgroundColor: cfg.iconBg, shadowColor: cfg.iconBg, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 6 }}
-            >
-              <Icon size={30} color="#ffffff" />
+        {/* Status card */}
+        <View style={{ backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e5e7eb' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14 }}>
+            <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: s.iconBg, alignItems: 'center', justifyContent: 'center' }}>
+              <SIcon size={24} color="#fff" />
             </View>
-
-            <View className="flex-1">
-              <Text className="text-[20px] font-black text-white mb-1 tracking-tight">{cfg.label}</Text>
-              <Text className="text-[13px] text-slate-400 leading-[18px]">
-                {isCancelled
-                  ? 'This order has been cancelled'
-                  : order.status === 'DELIVERED'
-                  ? 'Your order has been delivered!'
-                  : 'Your order is being processed'}
-              </Text>
-            </View>
-
-            {/* Payment pill */}
-            <View
-              className="rounded-xl px-2.5 py-1.5"
-              style={{
-                backgroundColor:
-                  order.paymentStatus === 'PAID'   ? '#10b981'
-                  : order.paymentStatus === 'FAILED' ? '#ef4444' : '#f59e0b',
-              }}
-            >
-              <Text className="text-[10px] text-white font-extrabold tracking-wider">
-                {order.paymentStatus}
-              </Text>
-            </View>
-          </View>
-
-          {/* Footer strip */}
-          <View
-            className="flex-row px-5 py-3 justify-between items-center"
-            style={{ backgroundColor: cfg.bgColor }}
-          >
-            <View className="flex-row items-center gap-1.5">
-              <Hash size={13} color={cfg.textColor} />
-              <Text className="text-[13px] font-extrabold" style={{ color: cfg.textColor }}>{order.orderId}</Text>
-            </View>
-            <View className="flex-row items-center gap-1.5">
-              <CalendarDays size={13} color={cfg.textColor} />
-              <Text className="text-[12px] font-semibold" style={{ color: cfg.textColor }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>{s.label}</Text>
+              <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                 {orderService.formatDate(order.createdAt)}
               </Text>
             </View>
-          </View>
-        </Animated.View>
-
-        {/* ── Timeline ──────────────────────────────────────────────────────── */}
-        {!isCancelled && (
-          <SectionCard title="Order Progress" icon={Truck} iconColor="#3b82f6" iconBg="#eff6ff" delay={80}>
-            <View className="px-1">
-              {ORDER_STEPS.map((step, i) => {
-                const done   = i <= activeStep;
-                const active = i === activeStep;
-                const isLast = i === ORDER_STEPS.length - 1;
-                const SI = step.icon;
-                return (
-                  <View key={step.key} className="flex-row items-start">
-                    <View className="items-center w-11">
-                      <View
-                        className="items-center justify-center rounded-xl"
-                        style={{
-                          width: active ? 38 : 32, height: active ? 38 : 32, borderRadius: active ? 13 : 11,
-                          backgroundColor: done ? cfg.iconBg : '#e2e8f0',
-                          shadowColor: active ? cfg.iconBg : 'transparent',
-                          shadowOffset: { width: 0, height: 3 }, shadowOpacity: active ? 0.45 : 0, shadowRadius: 8, elevation: active ? 5 : 0,
-                        }}
-                      >
-                        <SI size={active ? 18 : 15} color={done ? '#ffffff' : '#94a3b8'} />
-                      </View>
-                      {!isLast && (
-                        <View
-                          className="w-0.5 my-1 rounded-sm"
-                          style={{ height: 28, backgroundColor: done && i < activeStep ? cfg.iconBg : '#e2e8f0' }}
-                        />
-                      )}
-                    </View>
-                    <View className={`flex-1 pl-3 ${active ? 'pt-2' : 'pt-1.5'} ${isLast ? '' : 'pb-1'}`}>
-                      <Text className={`${active ? 'text-[15px] font-extrabold' : 'text-[13px] font-semibold'} ${done ? 'text-slate-900' : 'text-slate-400'}`}>
-                        {step.label}
-                      </Text>
-                      {active && (
-                        <Text className="text-[11px] font-semibold mt-0.5" style={{ color: cfg.textColor }}>
-                          {step.sub}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
+            <View style={{ backgroundColor: s.bg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: s.fg }}>{order.paymentStatus}</Text>
             </View>
-          </SectionCard>
-        )}
+          </View>
+        </View>
 
-        {/* ── Order Items ────────────────────────────────────────────────────── */}
-        <SectionCard title={`Items (${order.items.length})`} icon={Package} iconColor="#8b5cf6" iconBg="#faf5ff" delay={160}>
-          {order.items.map((item, i) => (
-            <View
-              key={item.id}
-              className={`flex-row gap-3.5 py-3.5 ${i < order.items.length - 1 ? 'border-b border-slate-100' : ''}`}
-            >
-              <View className="w-[76px] h-[76px] rounded-2xl bg-slate-50 border border-slate-200 overflow-hidden items-center justify-center">
-                {item.productImage ? (
-                  <Image source={{ uri: item.productImage }} className="w-full h-full" resizeMode="cover" />
-                ) : (
-                  <Package size={28} color="#cbd5e1" />
-                )}
-              </View>
-
-              <View className="flex-1">
-                <Text className="text-sm font-extrabold text-slate-900 mb-1 leading-[19px]" numberOfLines={2}>
-                  {item.productName}
-                </Text>
-                <Text className="text-[11px] text-slate-400 font-semibold mb-2">
-                  SKU: {item.sku}  ·  {item.vendorName}
-                </Text>
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row gap-1.5">
-                    <View className="bg-slate-100 px-2.5 py-1 rounded-lg">
-                      <Text className="text-[12px] text-slate-600 font-bold">Qty: {item.quantity}</Text>
+        {/* Timeline */}
+        {!isCancelled ? (
+          <Section title="Order Progress">
+            {STEPS.map((step, i) => {
+              const done = i <= activeStep;
+              const current = i === activeStep;
+              const last = i === STEPS.length - 1;
+              const SI = step.icon;
+              return (
+                <View key={step.key} style={{ flexDirection: 'row' }}>
+                  <View style={{ alignItems: 'center', width: 36 }}>
+                    <View
+                      style={{
+                        width: current ? 32 : 28,
+                        height: current ? 32 : 28,
+                        borderRadius: current ? 10 : 8,
+                        backgroundColor: done ? s.iconBg : '#e5e7eb',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <SI size={current ? 16 : 13} color={done ? '#fff' : '#9ca3af'} />
                     </View>
-                    <View className="bg-slate-100 px-2.5 py-1 rounded-lg">
-                      <Text className="text-[12px] text-slate-600 font-bold">₹{item.unitPrice.toFixed(2)} ea.</Text>
-                    </View>
+                    {!last ? (
+                      <View style={{ width: 2, height: 20, borderRadius: 1, marginVertical: 2, backgroundColor: done && i < activeStep ? s.iconBg : '#e5e7eb' }} />
+                    ) : null}
                   </View>
-                  <Text className="text-[15px] font-black text-slate-900">₹{item.totalPrice.toFixed(2)}</Text>
+                  <View style={{ flex: 1, paddingLeft: 10, paddingTop: current ? 4 : 2, paddingBottom: last ? 0 : 2 }}>
+                    <Text style={{ fontSize: current ? 14 : 12, fontWeight: done ? '700' : '500', color: done ? '#111827' : '#9ca3af' }}>
+                      {step.label}
+                    </Text>
+                  </View>
                 </View>
+              );
+            })}
+          </Section>
+        ) : null}
+
+        {/* Items — includes variant/SKU/vendor matching web */}
+        <Section title={`Items (${order.items.length})`}>
+          {order.items.map((item: any, i: number) => (
+            <View key={item.id} style={{ paddingVertical: 12, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: '#f3f4f6' }}>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', backgroundColor: '#f3f4f6' }}>
+                  {item.productImage ? (
+                    <Image source={{ uri: item.productImage }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                  ) : (
+                    <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                      <Package size={20} color="#d1d5db" />
+                    </View>
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 17 }} numberOfLines={2}>
+                    {item.productName}
+                  </Text>
+                  {/* Variant details — color/size (matches web) */}
+                  {(item.color || item.size) ? (
+                    <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                      {[item.color, item.size ? `Size: ${item.size}` : null].filter(Boolean).join(' · ')}
+                    </Text>
+                  ) : null}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <Text style={{ fontSize: 11, color: '#9ca3af' }}>Qty: {item.quantity}</Text>
+                    <Text style={{ fontSize: 11, color: '#9ca3af' }}>·</Text>
+                    <Text style={{ fontSize: 11, color: '#9ca3af' }}>{fmt(item.unitPrice)} each</Text>
+                  </View>
+                  {/* SKU + Vendor — available in API, matches web */}
+                  {(item.sku || item.vendorName) ? (
+                    <Text style={{ fontSize: 10, color: '#d1d5db', marginTop: 2 }}>
+                      {[item.sku ? `SKU: ${item.sku}` : null, item.vendorName].filter(Boolean).join(' · ')}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827', alignSelf: 'center' }}>
+                  {fmt(item.totalPrice)}
+                </Text>
               </View>
             </View>
           ))}
-        </SectionCard>
+        </Section>
 
-        {/* ── Shipping Address ──────────────────────────────────────────────── */}
-        <SectionCard title="Shipping Address" icon={MapPin} iconColor="#3b82f6" iconBg="#eff6ff" delay={240}>
-          <View className="flex-row gap-3.5 mb-4">
-            <View className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 items-center justify-center">
-              <MapPin size={20} color="#3b82f6" />
+        {/* Delivery info — estimated/actual date (matches web) */}
+        <Section title="Delivery Info">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
+              <Truck size={14} color="#2563eb" />
             </View>
-            <View className="flex-1">
-              <Text className="text-base font-extrabold text-slate-900 mb-1">{order.shippingAddress.fullName}</Text>
-              <Text className="text-sm text-slate-500 leading-5">
-                {order.shippingAddress.addressLine1}
-                {order.shippingAddress.addressLine2 && `, ${order.shippingAddress.addressLine2}`}
+            <View>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#111827' }}>
+                {order.status === 'DELIVERED' ? 'Delivered' : 'Estimated Delivery'}
               </Text>
-              <Text className="text-sm text-slate-500 mt-0.5">
-                {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}
+              <Text style={{ fontSize: 12, color: '#6b7280' }}>
+                {order.status === 'DELIVERED'
+                  ? `Delivered on ${orderService.formatDate(order.updatedAt)}`
+                  : (order as any).estimatedDelivery
+                    ? orderService.formatDate((order as any).estimatedDelivery)
+                    : 'To be updated'}
               </Text>
-              <Text className="text-sm text-slate-500">{order.shippingAddress.country}</Text>
             </View>
           </View>
+          <View style={{ height: 1, backgroundColor: '#f3f4f6', marginBottom: 12 }} />
 
-          <View className="bg-slate-50 rounded-2xl p-3.5 gap-3 border border-slate-100">
-            <View className="flex-row items-center gap-2.5">
-              <View className="w-8 h-8 rounded-xl bg-blue-50 items-center justify-center">
-                <Phone size={14} color="#3b82f6" />
-              </View>
-              <Text className="text-sm text-slate-700 font-semibold">{order.shippingAddress.phone}</Text>
+          {/* Address */}
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 4 }}>{order.shippingAddress.fullName}</Text>
+          <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 18 }}>
+            {order.shippingAddress.addressLine1}
+            {order.shippingAddress.addressLine2 ? `, ${order.shippingAddress.addressLine2}` : ''}
+          </Text>
+          <Text style={{ fontSize: 13, color: '#6b7280' }}>
+            {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}
+          </Text>
+          {order.shippingAddress.country ? (
+            <Text style={{ fontSize: 13, color: '#6b7280' }}>{order.shippingAddress.country}</Text>
+          ) : null}
+
+          {/* Contact — stacked vertically so email doesn't get cut */}
+          <View style={{ marginTop: 12, gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Phone size={13} color="#6b7280" />
+              <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>{order.shippingAddress.phone}</Text>
             </View>
-            <View className="h-px bg-slate-100" />
-            <View className="flex-row items-center gap-2.5">
-              <View className="w-8 h-8 rounded-xl bg-blue-50 items-center justify-center">
-                <Mail size={14} color="#3b82f6" />
+            {order.customerEmail ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Mail size={13} color="#6b7280" />
+                <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500', flexShrink: 1 }}>{order.customerEmail}</Text>
               </View>
-              <Text className="text-sm text-slate-700 font-semibold">{order.customerEmail}</Text>
-            </View>
+            ) : null}
           </View>
-        </SectionCard>
+        </Section>
 
-        {/* ── Payment Info ───────────────────────────────────────────────────── */}
-        <SectionCard title="Payment Details" icon={CreditCard} iconColor="#10b981" iconBg="#ecfdf5" delay={320}>
-          <View className="gap-3">
-            <View className="flex-row justify-between items-center py-2.5 border-b border-slate-50">
-              <Text className="text-[13px] text-slate-500 font-semibold">Method</Text>
-              <Text className="text-[13px] font-bold text-slate-800">{order.paymentMethod}</Text>
-            </View>
+        {/* Payment */}
+        <Section title="Payment">
+          <Row label="Method" value={order.paymentMethod} />
+          <Row label="Status" value={order.paymentStatus} valueColor={order.paymentStatus === 'PAID' ? '#16a34a' : order.paymentStatus === 'FAILED' ? '#dc2626' : '#d97706'} />
+          {order.paymentId ? <Row label="Transaction" value={order.paymentId} small /> : null}
+        </Section>
 
-            <View className="flex-row justify-between items-center py-2.5 border-b border-slate-50">
-              <Text className="text-[13px] text-slate-500 font-semibold">Payment Status</Text>
+        {/* Summary */}
+        <Section title="Order Summary">
+          <Row label="Subtotal" value={fmt(order.subtotal)} />
+          {order.tax > 0 ? <Row label="Tax" value={fmt(order.tax)} /> : null}
+          <Row label="Shipping" value={order.shippingCost === 0 ? 'Free' : fmt(order.shippingCost)} valueColor={order.shippingCost === 0 ? '#16a34a' : undefined} />
+          {order.discount > 0 ? <Row label="Discount" value={`-${fmt(order.discount)}`} valueColor="#16a34a" /> : null}
+          <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 8 }} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>Total</Text>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>{fmt(order.totalAmount)}</Text>
+          </View>
+        </Section>
+
+        {/* Actions — matches web: Invoice for all, Review for delivered */}
+        <Section title="Actions">
+          <View style={{ gap: 10 }}>
+            {/* Download Invoice — fetches HTML from API, shows in WebView modal */}
+            <Pressable
+              onPress={handleDownloadInvoice}
+              disabled={loadingInvoice}
+              accessibilityRole="button"
+              accessibilityLabel="Download invoice"
+            >
               <View
-                className="px-3 py-1.5 rounded-xl border"
                 style={{
-                  backgroundColor: order.paymentStatus === 'PAID' ? '#ecfdf5' : order.paymentStatus === 'FAILED' ? '#fef2f2' : '#fffbeb',
-                  borderColor:     order.paymentStatus === 'PAID' ? '#a7f3d0' : order.paymentStatus === 'FAILED' ? '#fecaca'  : '#fde68a',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 44,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: '#e5e7eb',
+                  backgroundColor: '#fff',
+                  gap: 6,
+                  opacity: loadingInvoice ? 0.6 : 1,
                 }}
               >
-                <Text
-                  className="text-[12px] font-extrabold"
-                  style={{ color: order.paymentStatus === 'PAID' ? '#059669' : order.paymentStatus === 'FAILED' ? '#dc2626' : '#d97706' }}
+                {loadingInvoice ? (
+                  <ActivityIndicator size={14} color="#111827" />
+                ) : (
+                  <FileText size={15} color="#111827" />
+                )}
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>
+                  {loadingInvoice ? 'Generating...' : 'View Invoice'}
+                </Text>
+              </View>
+            </Pressable>
+
+            {/* Write Review — only for delivered orders (matches web) */}
+            {order.status === 'DELIVERED' ? (
+              <Pressable
+                onPress={() => {
+                  // TODO: implement review modal
+                  showErrorToast('Coming Soon', 'Reviews will be available soon.');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Write a review"
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: 44,
+                    borderRadius: 10,
+                    backgroundColor: '#f3f4f6',
+                    gap: 6,
+                  }}
                 >
-                  {order.paymentStatus}
-                </Text>
-              </View>
-            </View>
+                  <CheckCircle size={15} color="#374151" />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>Write a Review</Text>
+                </View>
+              </Pressable>
+            ) : null}
 
-            {order.paymentId && (
-              <View className="pt-1">
-                <Text className="text-[11px] text-slate-400 font-semibold mb-1">Transaction ID</Text>
-                <Text className="text-xs text-slate-600 font-bold" numberOfLines={1}>{order.paymentId}</Text>
-              </View>
-            )}
-          </View>
-        </SectionCard>
-
-        {/* ── Order Summary ─────────────────────────────────────────────────── */}
-        <SectionCard title="Order Summary" icon={Receipt} iconColor="#f59e0b" iconBg="#fffbeb" delay={400}>
-          <View className="gap-3">
-            <View className="flex-row justify-between">
-              <Text className="text-sm text-slate-500 font-semibold">Subtotal</Text>
-              <Text className="text-sm font-bold text-slate-800">₹{order.subtotal.toFixed(2)}</Text>
-            </View>
-            <View className="flex-row justify-between">
-              <Text className="text-sm text-slate-500 font-semibold">Shipping</Text>
-              <Text className={`text-sm font-bold ${order.shippingCost === 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
-                {order.shippingCost === 0 ? 'FREE' : `₹${order.shippingCost.toFixed(2)}`}
-              </Text>
-            </View>
-            <View className="flex-row justify-between">
-              <Text className="text-sm text-slate-500 font-semibold">Tax</Text>
-              <Text className="text-sm font-bold text-slate-800">₹{order.tax.toFixed(2)}</Text>
-            </View>
-            {order.discount > 0 && (
-              <View className="flex-row justify-between">
-                <Text className="text-sm text-emerald-600 font-bold">Discount</Text>
-                <Text className="text-sm font-extrabold text-emerald-600">-₹{order.discount.toFixed(2)}</Text>
-              </View>
-            )}
-
-            {/* Grand total panel */}
-            <View className="flex-row justify-between items-center border-t-2 border-slate-100 pt-4 mt-1.5 bg-slate-50 rounded-2xl p-4 -mx-0.5">
-              <View>
-                <Text className="text-[12px] text-slate-400 font-semibold mb-1">GRAND TOTAL</Text>
-                <Text className="text-[28px] font-black text-slate-900 tracking-tight">
-                  ₹{order.totalAmount.toFixed(2)}
-                </Text>
-              </View>
-              <View className="bg-[#1a1a2e] rounded-2xl px-3.5 py-2.5">
-                <Text className="text-[11px] text-slate-400 font-semibold text-center">incl.</Text>
-                <Text className="text-[11px] text-amber-400 font-extrabold text-center">all taxes</Text>
-              </View>
+            {/* Navigation */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable onPress={() => router.push('/(tabs)' as any)} accessibilityRole="button" style={{ flex: 1 }}>
+                <View style={{ height: 48, borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>Shop Again</Text>
+                </View>
+              </Pressable>
+              <Pressable onPress={() => router.push('/(tabs)/orders' as any)} accessibilityRole="button" style={{ flex: 1 }}>
+                <View style={{ height: 48, borderRadius: 12, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>All Orders</Text>
+                </View>
+              </Pressable>
             </View>
           </View>
-        </SectionCard>
-
-        {/* ── Action Buttons ─────────────────────────────────────────────────── */}
-        <View className="flex-row gap-3 mx-4 mb-4">
-          <TouchableOpacity
-            onPress={() => router.push('/(tabs)' as any)}
-            className="flex-1 flex-row items-center justify-center gap-2 py-4 rounded-[18px] bg-white border-2 border-slate-200"
-            activeOpacity={0.8}
-          >
-            <RotateCcw size={16} color="#1a1a2e" />
-            <Text className="text-sm font-extrabold text-[#1a1a2e]">Shop Again</Text>
-          </TouchableOpacity>
-
-          {['SHIPPED', 'PROCESSING', 'CONFIRMED'].includes(order.status.toUpperCase()) && (
-            <TouchableOpacity
-              className="flex-1 flex-row items-center justify-center gap-2 py-4 rounded-[18px] bg-[#1a1a2e] shadow-lg"
-              activeOpacity={0.85}
-            >
-              <Truck size={16} color="#f59e0b" />
-              <Text className="text-sm font-extrabold text-white">Track Order</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        </Section>
       </ScrollView>
+
+      {/* Invoice modal — shows HTML from backend in a WebView */}
+      <Modal
+        visible={invoiceHtml !== null}
+        animationType="slide"
+        onRequestClose={() => setInvoiceHtml(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          {/* Modal header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingTop: 12,
+              paddingBottom: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: '#e5e7eb',
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Invoice</Text>
+            <Pressable onPress={() => setInvoiceHtml(null)} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
+              <View style={{ padding: 4 }}>
+                <X size={22} color="#111827" />
+              </View>
+            </Pressable>
+          </View>
+          {invoiceHtml ? (
+            <WebView
+              source={{ html: invoiceHtml }}
+              style={{ flex: 1 }}
+              scalesPageToFit
+            />
+          ) : null}
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+// ─── Header ───────────────────────────────────────────────────────────────────
+function Header({ title, subtitle }: { title: string; subtitle?: string }) {
+  const headerInsets = useSafeAreaInsets();
+  return (
+    <View
+      style={{
+        backgroundColor: '#fff',
+        paddingHorizontal: 8,
+        paddingTop: headerInsets.top + 8,
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <Pressable
+        onPress={() => (router.canGoBack() ? router.back() : router.push('/(tabs)/orders' as any))}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        hitSlop={8}
+        style={{ padding: 8 }}
+      >
+        <ArrowLeft size={22} color="#111827" />
+      </Pressable>
+      <View style={{ flex: 1, marginLeft: 4 }}>
+        <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>{title}</Text>
+        {subtitle ? <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>{subtitle}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+// ─── Section card ─────────────────────────────────────────────────────────────
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View
+      style={{
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        overflow: 'hidden',
+      }}
+    >
+      <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>{title}</Text>
+      </View>
+      <View style={{ padding: 16 }}>{children}</View>
+    </View>
+  );
+}
+
+// ─── Summary row ──────────────────────────────────────────────────────────────
+function Row({ label, value, valueColor, small }: { label: string; value: string; valueColor?: string; small?: boolean }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+      <Text style={{ fontSize: 13, color: '#6b7280' }}>{label}</Text>
+      <Text style={{ fontSize: small ? 11 : 13, fontWeight: '600', color: valueColor || '#111827' }} numberOfLines={1}>{value}</Text>
     </View>
   );
 }

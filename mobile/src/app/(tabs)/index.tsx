@@ -26,7 +26,7 @@ export default function HomeScreen() {
       <Header />
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 0 }}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
         refreshControl={

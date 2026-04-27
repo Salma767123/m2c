@@ -92,6 +92,7 @@ export interface CreateOrderParams {
   shippingCost?: number;
   tax?: number;
   discount?: number;
+  couponCode?: string;
 }
 
 class OrderService {

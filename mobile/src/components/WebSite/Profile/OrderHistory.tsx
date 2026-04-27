@@ -26,6 +26,7 @@ import {
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import orderService, { Order as APIOrder } from '@/services/orderService';
+import { OrdersSkeleton } from '@/components/ui/Skeleton';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -181,7 +182,7 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
                 </View>
               )}
               <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>
-                ₹{order.total.toFixed(2)}
+                ${order.total.toFixed(2)}
               </Text>
             </View>
           </View>
@@ -222,7 +223,7 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
                   </View>
                 </View>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e293b' }}>
-                  ₹{(item.price * item.quantity).toFixed(2)}
+                  ${(item.price * item.quantity).toFixed(2)}
                 </Text>
               </View>
             ))}
@@ -389,9 +390,8 @@ export default function OrderHistory() {
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa' }}>
-        <ActivityIndicator size="large" color="#1a1a2e" />
-        <Text style={{ color: '#6b7280', marginTop: 12, fontSize: 14 }}>Loading your orders…</Text>
+      <View style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+        <OrdersSkeleton />
       </View>
     );
   }

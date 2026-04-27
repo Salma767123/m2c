@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "241389466458",
+    "project_id": "m2c-markdowns-2a6ed",
+    "storage_bucket": "m2c-markdowns-2a6ed.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:241389466458:android:a82fe4083f7e83fb6eb963",
+        "android_client_info": {
+          "package_name": "com.anonymous.m2c_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-5wDb08SrUCnWYHinrXjRQcc4__zfHJk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:241389466458:android:2a417c0e1368940f6eb963",
+        "android_client_info": {
+          "package_name": "com.m2c.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-5wDb08SrUCnWYHinrXjRQcc4__zfHJk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

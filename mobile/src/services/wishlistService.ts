@@ -9,12 +9,18 @@ export interface WishlistItem {
     name: string;
     image: string;
     basePrice: number;
+    adminFixedPrice?: number;
     originalPrice?: number;
     discount?: number;
     inStock: boolean;
+    totalStock?: number;
+    hasVariants?: boolean;
     rating?: number;
     reviews?: number;
     category: string;
+    singleUnitSize?: string;
+    singleUnitColor?: string;
+    singleUnitColorHex?: string;
   };
   createdAt: string;
 }
@@ -29,13 +35,24 @@ export interface WishlistResponse {
   error?: string;
 }
 
+// Surface the backend's error payload instead of the generic axios message so
+// users see "Already in wishlist" / "Product not found" instead of a fallback.
+function extractError(error: any, fallback: string): Error {
+  return new Error(
+    error?.response?.data?.error ||
+      error?.response?.data?.message ||
+      error?.message ||
+      fallback,
+  );
+}
+
 class WishlistService {
   async addToWishlist(productId: string): Promise<WishlistResponse> {
     try {
       const response = await axios.post('/wishlist/add', { productId });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to add item to wishlist');
+      throw extractError(error, 'Failed to add item to wishlist');
     }
   }
 
@@ -44,7 +61,7 @@ class WishlistService {
       const response = await axios.get('/wishlist');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to fetch wishlist');
+      throw extractError(error, 'Failed to fetch wishlist');
     }
   }
 
@@ -53,7 +70,7 @@ class WishlistService {
       const response = await axios.delete(`/wishlist/${productId}`);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to remove item from wishlist');
+      throw extractError(error, 'Failed to remove item from wishlist');
     }
   }
 
@@ -61,12 +78,13 @@ class WishlistService {
     try {
       const response = await axios.get(`/wishlist/check/${productId}`);
       return response.data.inWishlist || false;
-    } catch (error: any) {
+    } catch {
       return false;
     }
   }
 
-  // AsyncStorage methods for guest users
+  // ── AsyncStorage methods for guest users ────────────────────────────────
+
   async getLocalWishlist(): Promise<string[]> {
     try {
       const wishlist = await AsyncStorage.getItem('guestWishlist');
@@ -94,7 +112,7 @@ class WishlistService {
 
   async removeFromLocalWishlist(productId: string): Promise<void> {
     const wishlist = await this.getLocalWishlist();
-    const updatedWishlist = wishlist.filter(id => id !== productId);
+    const updatedWishlist = wishlist.filter((id) => id !== productId);
     await this.saveLocalWishlist(updatedWishlist);
   }
 
@@ -109,6 +127,37 @@ class WishlistService {
     } catch (error) {
       console.error('Failed to clear wishlist from AsyncStorage:', error);
     }
+  }
+
+  // ── Guest → authenticated migration ─────────────────────────────────────
+  // Call after login. Pushes each guest wishlist ID to the server; ignores
+  // "already exists" errors from the backend so a repeated migrate is safe.
+  async migrateGuestWishlistToAuth(): Promise<{
+    migrated: number;
+    failed: number;
+  }> {
+    const localIds = await this.getLocalWishlist();
+    if (localIds.length === 0) return { migrated: 0, failed: 0 };
+
+    let migrated = 0;
+    let failed = 0;
+    for (const productId of localIds) {
+      try {
+        await this.addToWishlist(productId);
+        migrated += 1;
+      } catch (err: any) {
+        // The backend returns 400 with "already in wishlist" — treat as success.
+        const msg = (err?.message || '').toLowerCase();
+        if (msg.includes('already')) {
+          migrated += 1;
+        } else {
+          console.warn(`Failed to migrate wishlist item ${productId}:`, err);
+          failed += 1;
+        }
+      }
+    }
+    await this.clearLocalWishlist();
+    return { migrated, failed };
   }
 }
 

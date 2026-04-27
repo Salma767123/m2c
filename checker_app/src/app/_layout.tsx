@@ -16,15 +16,6 @@ import {
   checkInitialNotification,
 } from '@/services/notificationService';
 
-// Suppress library-side warnings we can't fix
-const IGNORED_WARNINGS = ['SafeAreaView has been deprecated'];
-LogBox.ignoreLogs(IGNORED_WARNINGS);
-const originalWarn = console.warn;
-console.warn = (...args: any[]) => {
-  const msg = typeof args[0] === 'string' ? args[0] : '';
-  if (IGNORED_WARNINGS.some((p) => msg.includes(p))) return;
-  originalWarn(...args);
-};
 
 // Must be called at top-level, outside components
 setupBackgroundHandler();

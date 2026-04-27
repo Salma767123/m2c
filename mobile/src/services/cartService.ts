@@ -44,13 +44,29 @@ export interface CartResponse {
   error?: string;
 }
 
+// Prefer the backend's error payload (`response.data.error`/`message`) over
+// axios's generic `.message` so users see real API errors ("Out of stock",
+// "Quantity exceeds available stock", etc.) instead of generic fallbacks.
+function extractError(error: any, fallback: string): Error {
+  return new Error(
+    error?.response?.data?.error ||
+      error?.response?.data?.message ||
+      error?.message ||
+      fallback,
+  );
+}
+
 class CartService {
-  async addToCart(productId: string, quantity: number = 1, variantId?: string): Promise<CartResponse> {
+  async addToCart(
+    productId: string,
+    quantity: number = 1,
+    variantId?: string,
+  ): Promise<CartResponse> {
     try {
       const response = await axios.post('/cart/add', { productId, quantity, variantId });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to add item to cart');
+      throw extractError(error, 'Failed to add item to cart');
     }
   }
 
@@ -59,7 +75,7 @@ class CartService {
       const response = await axios.get('/cart');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to fetch cart');
+      throw extractError(error, 'Failed to fetch cart');
     }
   }
 
@@ -68,7 +84,7 @@ class CartService {
       const response = await axios.put(`/cart/${itemId}`, { quantity });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to update cart item');
+      throw extractError(error, 'Failed to update cart item');
     }
   }
 
@@ -77,20 +93,22 @@ class CartService {
       const response = await axios.delete(`/cart/${itemId}`);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to remove item from cart');
+      throw extractError(error, 'Failed to remove item from cart');
     }
   }
 
   async clearCart(): Promise<{ success: boolean; message?: string }> {
     try {
-      const response = await axios.delete('/cart/clear');
+      // Backend route is /cart/clear/all — previously called /cart/clear which 404'd.
+      const response = await axios.delete('/cart/clear/all');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to clear cart');
+      throw extractError(error, 'Failed to clear cart');
     }
   }
 
-  // AsyncStorage methods for guest users
+  // ── AsyncStorage methods for guest users ────────────────────────────────
+
   async getLocalCart(): Promise<CartItem[]> {
     try {
       const cart = await AsyncStorage.getItem('guestCart');
@@ -108,9 +126,15 @@ class CartService {
     }
   }
 
-  async addToLocalCart(productId: string, quantity: number = 1, variantId?: string): Promise<void> {
+  async addToLocalCart(
+    productId: string,
+    quantity: number = 1,
+    variantId?: string,
+  ): Promise<void> {
     const cart = await this.getLocalCart();
-    const existingItem = cart.find(item => item.productId === productId && item.variantId === variantId);
+    const existingItem = cart.find(
+      (item) => item.productId === productId && item.variantId === variantId,
+    );
 
     if (existingItem) {
       existingItem.quantity += quantity;
@@ -120,7 +144,7 @@ class CartService {
         productId,
         variantId,
         quantity,
-        price: 0
+        price: 0,
       });
     }
 
@@ -129,14 +153,13 @@ class CartService {
 
   async removeFromLocalCart(id: string): Promise<void> {
     const cart = await this.getLocalCart();
-    // Remove by the unique cart item 'id' to support multiple variants
-    const updatedCart = cart.filter(item => item.id !== id);
+    const updatedCart = cart.filter((item) => item.id !== id);
     await this.saveLocalCart(updatedCart);
   }
 
   async updateLocalCartItem(id: string, quantity: number): Promise<void> {
     const cart = await this.getLocalCart();
-    const existingItem = cart.find(item => item.id === id);
+    const existingItem = cart.find((item) => item.id === id);
 
     if (existingItem) {
       existingItem.quantity = quantity;
@@ -150,6 +173,33 @@ class CartService {
     } catch (error) {
       console.error('Failed to clear cart from AsyncStorage:', error);
     }
+  }
+
+  // ── Guest → authenticated migration ─────────────────────────────────────
+  // Call this right after a successful login. Walks the guest cart, pushes
+  // each item to the server, then wipes the local copy. Swallows per-item
+  // errors (stock changes, deleted products) so one bad item doesn't block
+  // the rest from syncing.
+  async migrateGuestCartToAuth(): Promise<{
+    migrated: number;
+    failed: number;
+  }> {
+    const localCart = await this.getLocalCart();
+    if (localCart.length === 0) return { migrated: 0, failed: 0 };
+
+    let migrated = 0;
+    let failed = 0;
+    for (const item of localCart) {
+      try {
+        await this.addToCart(item.productId, item.quantity, item.variantId);
+        migrated += 1;
+      } catch (err) {
+        console.warn(`Failed to migrate cart item ${item.productId}:`, err);
+        failed += 1;
+      }
+    }
+    await this.clearLocalCart();
+    return { migrated, failed };
   }
 }
 

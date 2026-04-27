@@ -1,7 +1,8 @@
 {
   "cli": {
     "version": ">= 18.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "remote",
+    "requireCommit": false
   },
   "build": {
     "development": {
@@ -17,7 +18,8 @@
       },
       "cache": {
         "key": "development-cache"
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",

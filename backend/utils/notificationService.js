@@ -146,6 +146,65 @@ const notifications = {
       body: `Inspection for "${vendorName}" completed — Result: ${result}`,
       data: { type: 'INSPECTION_COMPLETED' },
     }),
+
+  // ── Order status notifications (customer-facing) ──────────────────────────
+
+  orderConfirmed: (customerId, orderId) =>
+    sendToUser(customerId, 'USER', {
+      title: 'Order Confirmed',
+      body: `Your order #${orderId} has been confirmed and is being processed.`,
+      data: { type: 'ORDER_CONFIRMED', orderId, screen: 'orders' },
+    }),
+
+  orderProcessing: (customerId, orderId) =>
+    sendToUser(customerId, 'USER', {
+      title: 'Order Processing',
+      body: `Your order #${orderId} is being prepared for shipment.`,
+      data: { type: 'ORDER_PROCESSING', orderId, screen: 'orders' },
+    }),
+
+  orderShipped: (customerId, orderId) =>
+    sendToUser(customerId, 'USER', {
+      title: 'Order Shipped',
+      body: `Your order #${orderId} has been shipped! Track your delivery in the app.`,
+      data: { type: 'ORDER_SHIPPED', orderId, screen: 'orders' },
+    }),
+
+  orderOutForDelivery: (customerId, orderId) =>
+    sendToUser(customerId, 'USER', {
+      title: 'Out for Delivery',
+      body: `Your order #${orderId} is out for delivery. It will arrive soon!`,
+      data: { type: 'ORDER_OUT_FOR_DELIVERY', orderId, screen: 'orders' },
+    }),
+
+  orderDelivered: (customerId, orderId) =>
+    sendToUser(customerId, 'USER', {
+      title: 'Order Delivered',
+      body: `Your order #${orderId} has been delivered. Enjoy your purchase!`,
+      data: { type: 'ORDER_DELIVERED', orderId, screen: 'orders' },
+    }),
+
+  orderCancelled: (customerId, orderId) =>
+    sendToUser(customerId, 'USER', {
+      title: 'Order Cancelled',
+      body: `Your order #${orderId} has been cancelled. Refund will be processed if applicable.`,
+      data: { type: 'ORDER_CANCELLED', orderId, screen: 'orders' },
+    }),
+
+  orderRefunded: (customerId, orderId) =>
+    sendToUser(customerId, 'USER', {
+      title: 'Refund Processed',
+      body: `Refund for order #${orderId} has been processed. Please allow 5-7 business days.`,
+      data: { type: 'ORDER_REFUNDED', orderId, screen: 'orders' },
+    }),
+
+  // Vendor: new order received
+  orderReceived: (vendorId, orderId, itemCount, total) =>
+    sendToUser(vendorId, 'VENDOR', {
+      title: 'New Order Received',
+      body: `Order #${orderId} — ${itemCount} items, ₹${total}`,
+      data: { type: 'ORDER_RECEIVED', orderId },
+    }),
 };
 
 module.exports = {

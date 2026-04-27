@@ -753,6 +753,7 @@ model Order {
   tax                   Float     @default(0)
   discount              Float     @default(0)
   totalAmount           Float
+  couponCode            String?
 
   // Payment Information
   paymentStatus         PaymentStatus @default(PENDING)

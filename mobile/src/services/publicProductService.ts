@@ -31,6 +31,9 @@ export interface PublicProduct {
     colorHex?: string;
     sku: string;
     price: number;
+    adminFixedPrice?: number;
+    originalPrice?: number;
+    discount?: number;
     stock: number;
     images: string[];
   }>;
@@ -43,6 +46,7 @@ export interface PublicProduct {
   singleUnitColorHex?: string;
   fabricSpecifications?: Record<string, any>;
   inventory?: {
+    baseStock?: number;
     currentStock: number;
     reservedStock: number;
     availableStock: number;

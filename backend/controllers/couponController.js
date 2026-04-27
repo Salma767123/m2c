@@ -262,6 +262,22 @@ const applyCoupon = async (req, res) => {
             });
         }
 
+        // Check per-user limit
+        if (userId && coupon.perUserLimit > 0) {
+            const userUsageCount = await prisma.order.count({
+                where: {
+                    customerId: userId,
+                    couponCode: coupon.code,
+                },
+            });
+            if (userUsageCount >= coupon.perUserLimit) {
+                return res.status(400).json({
+                    success: false,
+                    message: `You've already used this coupon ${coupon.perUserLimit === 1 ? '' : `${coupon.perUserLimit} times`}`,
+                });
+            }
+        }
+
         // Check free shipping Nth order condition
         if (coupon.freeShipping && coupon.freeShippingOrderNumbers && coupon.freeShippingOrderNumbers.length > 0 && userId) {
             const userOrderCount = await prisma.order.count({ where: { customerId: userId } });
