@@ -114,7 +114,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
   const handleConfirmShipping = async () => {
     if (!selectedCarrier) {
-      showErrorToast("Please select a carrier");
+      showErrorToast("Please select a courier");
       return;
     }
     const trimmedTracking = trackingId.trim();
@@ -353,7 +353,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm text-gray-600">Carrier</p>
+              <p className="text-sm text-gray-600">Courier</p>
               <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorCarrier}</p>
             </div>
             <div>
@@ -486,11 +486,11 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
             <div className="p-6 space-y-6">
               <div>
                 <Dropdown
-                  label="Select Carrier"
+                  label="Select Courier"
                   value={selectedCarrier}
                   options={carriers}
                   onChange={(value) => setSelectedCarrier(value as string)}
-                  placeholder="Choose a carrier"
+                  placeholder="Choose a courier"
                 />
               </div>
               <div>

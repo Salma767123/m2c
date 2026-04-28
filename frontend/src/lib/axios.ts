@@ -12,6 +12,33 @@ const axiosInstance: AxiosInstance = axios.create({
 });
 
 
+// Determine which token to use based on the current page path and API endpoint.
+// This prevents cross-role token conflicts when multiple roles are logged in.
+const getTokenForRequest = (url?: string): string | null => {
+  if (typeof window === 'undefined') return null;
+
+  const path = window.location.pathname;
+  const apiUrl = url || '';
+
+  // Admin pages or admin API calls
+  if (path.startsWith('/admin') || apiUrl.includes('/admin/')) {
+    return localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+  }
+
+  // Vendor pages or vendor API calls
+  if (path.startsWith('/vendor') || apiUrl.includes('/vendors/') || apiUrl.includes('/inventory')) {
+    return localStorage.getItem('vendorToken') || sessionStorage.getItem('vendorToken');
+  }
+
+  // Checker pages or checker API calls
+  if (path.startsWith('/checker') || apiUrl.includes('/qc-checkers/')) {
+    return localStorage.getItem('checkerToken');
+  }
+
+  // Customer/website pages — use user token
+  return localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
+};
+
 // Request interceptor to add auth token
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -21,14 +48,7 @@ axiosInstance.interceptors.request.use(
       return config;
     }
 
-    // Get token from localStorage or sessionStorage
-    // Check for admin token first, then vendor token, then checker token, then user token
-    const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-    const vendorToken = localStorage.getItem('vendorToken');
-    const checkerToken = localStorage.getItem('checkerToken');
-    const userToken = localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
-
-    const token = adminToken || vendorToken || checkerToken || userToken;
+    const token = getTokenForRequest(config.url);
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -61,31 +81,34 @@ axiosInstance.interceptors.response.use(
             error.config?.url?.includes('/vendors/login') ||
             error.config?.url?.includes('/qc-checkers/login');
 
-          if (!isLoginAttempt) {
-            // Unauthorized - clear tokens and redirect to login (only for authenticated requests)
-            localStorage.removeItem('adminToken');
-            sessionStorage.removeItem('adminToken');
-            localStorage.removeItem('vendorToken');
-            localStorage.removeItem('vendorData');
-            localStorage.removeItem('checkerToken');
-            localStorage.removeItem('checkerData');
-            localStorage.removeItem('checkerID');
-            localStorage.removeItem('userToken');
-            sessionStorage.removeItem('userToken');
-            localStorage.removeItem('userData');
-            sessionStorage.removeItem('userData');
-            if (typeof window !== 'undefined') {
-              // Redirect based on current path
-              const currentPath = window.location.pathname;
-              if (currentPath.includes('/admin')) {
-                window.location.href = '/admin/login';
-              } else if (currentPath.includes('/vendor')) {
-                window.location.href = '/vendor';
-              } else if (currentPath.includes('/checker')) {
-                window.location.href = '/checker';
-              } else {
-                window.location.href = '/login';
-              }
+          if (!isLoginAttempt && typeof window !== 'undefined') {
+            // Unauthorized - only clear the current role's tokens, not all roles
+            const currentPath = window.location.pathname;
+
+            if (currentPath.startsWith('/admin')) {
+              localStorage.removeItem('adminToken');
+              localStorage.removeItem('adminUser');
+              sessionStorage.removeItem('adminToken');
+              sessionStorage.removeItem('adminUser');
+              window.location.href = '/admin/login';
+            } else if (currentPath.startsWith('/vendor')) {
+              localStorage.removeItem('vendorToken');
+              localStorage.removeItem('vendorData');
+              localStorage.removeItem('vendorUser');
+              sessionStorage.removeItem('vendorToken');
+              sessionStorage.removeItem('vendorData');
+              window.location.href = '/vendor';
+            } else if (currentPath.startsWith('/checker')) {
+              localStorage.removeItem('checkerToken');
+              localStorage.removeItem('checkerData');
+              localStorage.removeItem('checkerID');
+              window.location.href = '/checker';
+            } else {
+              localStorage.removeItem('userToken');
+              localStorage.removeItem('userData');
+              sessionStorage.removeItem('userToken');
+              sessionStorage.removeItem('userData');
+              window.location.href = '/login';
             }
           }
           break;

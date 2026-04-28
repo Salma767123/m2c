@@ -400,7 +400,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           {shipment.vendorCarrier && shipment.vendorTrackingId ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <p className="text-sm text-gray-600">Carrier</p>
+                <p className="text-sm text-gray-600">Courier</p>
                 <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorCarrier}</p>
               </div>
               <div>

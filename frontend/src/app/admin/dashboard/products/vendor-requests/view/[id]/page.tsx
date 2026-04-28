@@ -5,10 +5,12 @@ import VendorProductRequestView from '@/components/AdminDashboard/Products/Vendo
 import PermissionGuard from '@/components/AdminDashboard/PermissionGuard'
 
 export default function VendorProductRequestViewPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+  const { id: slug } = use(params)
+  // Extract MongoDB ID from slug format: "product-name--mongoId"
+  const requestId = slug.includes('--') ? slug.split('--').pop()! : slug
   return (
     <PermissionGuard permission="view_products">
-      <VendorProductRequestView requestId={id} />
+      <VendorProductRequestView requestId={requestId} />
     </PermissionGuard>
   )
 }

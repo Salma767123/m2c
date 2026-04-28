@@ -299,7 +299,11 @@ export default function VendorProductRequests() {
   }
 
   const handleViewDetails = (request: VendorProductRequest) => {
-    router.push(`/admin/dashboard/products/vendor-requests/view/${request.id}`)
+    const slug = request.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+    router.push(`/admin/dashboard/products/vendor-requests/view/${slug}--${request.id}`)
   }
 
   const getStatusColor = (status: string) => {
