@@ -25,6 +25,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import orderService, { Order as APIOrder } from "@/services/orderService"
 import ReviewModal from "./ReviewModal"
+import reviewService from "@/services/reviewService"
 
 interface OrderDetailProps {
   orderId: string
@@ -82,6 +83,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
+  const [hasReviewed, setHasReviewed] = useState(false)
 
   useEffect(() => {
     fetchOrder()
@@ -94,6 +96,12 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
       const response = await orderService.getOrderById(orderId)
       if (response.success) {
         setOrderDetails(response.data)
+        // Check if user already reviewed
+        const order = response.data
+        if (getNormalizedStatus(order.status) === 'received' && order.items?.length > 0) {
+          const check = await reviewService.checkReviewStatus(order.items[0].productId, order.id)
+          if (check.hasReviewed) setHasReviewed(true)
+        }
       } else {
         setError('Order not found')
       }
@@ -350,13 +358,20 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                       Download Invoice
                     </button>
                     {normalizedStatus === "received" && (
-                      <button
-                        onClick={() => setReviewModalState({ isOpen: true, orderId: orderDetails.id, items: orderDetails.items })}
-                        className="flex items-center gap-2 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors"
-                      >
-                        <Star className="w-4 h-4" />
-                        Write Review
-                      </button>
+                      hasReviewed ? (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-green-50 text-green-600 rounded-xl">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="font-medium text-sm">Review Submitted</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setReviewModalState({ isOpen: true, orderId: orderDetails.id, items: orderDetails.items })}
+                          className="flex items-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors"
+                        >
+                          <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                          <span className="font-medium text-sm">Write a Review</span>
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
@@ -461,7 +476,15 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
       </div>
       <ReviewModal
         isOpen={reviewModalState.isOpen}
-        onClose={() => setReviewModalState({ ...reviewModalState, isOpen: false })}
+        onClose={() => {
+          setReviewModalState({ ...reviewModalState, isOpen: false })
+          // Re-check review status after modal closes
+          if (orderDetails?.items?.length) {
+            reviewService.checkReviewStatus(orderDetails.items[0].productId, orderDetails.id)
+              .then((res) => { if (res.hasReviewed) setHasReviewed(true) })
+              .catch(() => {})
+          }
+        }}
         orderId={reviewModalState.orderId}
         items={reviewModalState.items}
       />

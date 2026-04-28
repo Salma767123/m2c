@@ -19,6 +19,7 @@ import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
+import ProductReviews from '@/components/WebSite/Review/ProductReviews';
 
 
 
@@ -624,6 +625,13 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
           ))}
         </View>
       ) : null}
+
+      {/* ── Customer Reviews ──────────────────────────────────────────────── */}
+      <ProductReviews
+        productId={product.id}
+        rating={product.rating || 0}
+        reviewCount={product.reviews || 0}
+      />
 
       {/* ── Why choose this product ─────────────────────────────────────────── */}
       <View className="bg-white mt-2 px-5 py-5">

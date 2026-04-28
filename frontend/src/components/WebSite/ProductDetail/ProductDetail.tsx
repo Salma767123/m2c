@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { wishlistService } from '@/services/wishlistService';
 import { trackProductView } from '@/services/analyticsService';
+import reviewService from '@/services/reviewService';
 import Image from 'next/image';
 
 interface ProductDetailProps {
@@ -28,6 +29,22 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [imageRef, setImageRef] = useState<HTMLImageElement | null>(null);
   const [quantity, setQuantity] = useState(1);
+
+  // Reviews
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [showReviews, setShowReviews] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+
+  const fetchReviews = async () => {
+    if (reviews.length > 0) { setShowReviews(true); return; }
+    setLoadingReviews(true);
+    try {
+      const res = await reviewService.getProductReviews(productId);
+      if (res.success && res.data) setReviews(res.data);
+    } catch { /* ignore */ }
+    setLoadingReviews(false);
+    setShowReviews(true);
+  };
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -401,9 +418,12 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                           {product.rating || 0} ({product.reviews || 0} reviews)
                         </span>
                         {product.reviews && product.reviews > 0 && (
-                          <span className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
-                            See all reviews
-                          </span>
+                          <button
+                            onClick={fetchReviews}
+                            className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
+                          >
+                            {showReviews ? 'Hide reviews' : 'See all reviews'}
+                          </button>
                         )}
                       </div>
 
@@ -799,6 +819,62 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
               </div>
             )
           }
+
+          {/* Customer Reviews */}
+          {showReviews && (
+            <div className="mt-8 bg-white rounded-2xl shadow-lg p-8">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Customer Reviews</h3>
+              {loadingReviews ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                  <span className="ml-3 text-gray-500">Loading reviews...</span>
+                </div>
+              ) : reviews.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No reviews yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {reviews.map((review: any) => (
+                    <div key={review.id} className="bg-gray-50 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center">
+                            <span className="text-sm font-bold text-gray-600">
+                              {(review.user?.name || 'C')[0].toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm">{review.user?.name || 'Customer'}</p>
+                            <p className="text-xs text-gray-400">
+                              {new Date(review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-0.5">
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <Star
+                              key={i}
+                              className={`w-4 h-4 ${i <= review.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200'}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {review.comment && (
+                        <p className="text-gray-600 text-sm leading-relaxed">{review.comment}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {showReviews && reviews.length > 0 && (
+                <button
+                  onClick={() => setShowReviews(false)}
+                  className="mt-4 text-sm text-gray-500 hover:text-gray-700 font-medium"
+                >
+                  Hide reviews
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Features */}
           <div className="mt-8 bg-white rounded-2xl shadow-lg p-8">

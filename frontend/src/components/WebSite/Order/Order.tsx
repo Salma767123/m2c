@@ -58,6 +58,7 @@ export default function OrderList() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
   const [reviewModalState, setReviewModalState] = useState<{ isOpen: boolean, orderId: string, items: any[] }>({ isOpen: false, orderId: '', items: [] })
+  const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
   const [pastPage, setPastPage] = useState(1)
 
@@ -590,13 +591,20 @@ export default function OrderList() {
                             </button>
                           </Link>
                           {order.status === 'received' && (
-                            <button
-                              onClick={() => setReviewModalState({ isOpen: true, orderId: order.id, items: order.items })}
-                              className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-                            >
-                              <Star className="w-4 h-4" />
-                              Write Review
-                            </button>
+                            reviewedOrders.has(order.id) ? (
+                              <div className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-lg">
+                                <CheckCircle className="w-4 h-4" />
+                                <span className="text-sm font-medium">Reviewed</span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setReviewModalState({ isOpen: true, orderId: order.id, items: order.items })}
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                              >
+                                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                                <span className="text-sm font-medium">Write Review</span>
+                              </button>
+                            )
                           )}
                           {order.trackingNumber && (
                             <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
@@ -751,7 +759,14 @@ export default function OrderList() {
       </div>
       <ReviewModal
         isOpen={reviewModalState.isOpen}
-        onClose={() => setReviewModalState({ ...reviewModalState, isOpen: false })}
+        onClose={() => {
+          const closedOrderId = reviewModalState.orderId
+          setReviewModalState({ ...reviewModalState, isOpen: false })
+          // Mark as reviewed if submission happened
+          if (closedOrderId) {
+            setReviewedOrders((prev) => new Set(prev).add(closedOrderId))
+          }
+        }}
         orderId={reviewModalState.orderId}
         items={reviewModalState.items}
       />

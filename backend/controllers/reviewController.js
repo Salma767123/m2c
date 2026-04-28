@@ -54,42 +54,31 @@ exports.createReview = async (req, res) => {
                 rating: Number(rating),
                 comment,
                 images: images || [],
-                isApproved: true
+                isApproved: false,
+                status: 'PENDING',
             }
         });
 
-        // Update product average rating
-        const allReviews = await prisma.review.findMany({
-            where: { productId, isApproved: true }
-        });
+        // Don't update product rating here — only on admin approval
+        // (updateReviewStatus and deleteReview handle recalculation)
 
-        const totalRating = allReviews.reduce((sum, rev) => sum + rev.rating, 0);
-        const avgRating = totalRating / allReviews.length;
-
-        await prisma.product.update({
-            where: { id: productId },
-            data: {
-                rating: avgRating,
-                reviews: allReviews.length
-            }
-        });
-
-        res.status(201).json({ success: true, data: review, message: 'Review submitted successfully' });
+        res.status(201).json({ success: true, data: review, message: 'Review submitted and pending approval' });
     } catch (error) {
         console.error('Error creating review:', error);
         res.status(500).json({ success: false, message: 'Error creating review', error: error.message });
     }
 };
 
-// Get reviews for a product
+// Get reviews for a product (only approved + optionally the current user's pending review)
 exports.getProductReviews = async (req, res) => {
     try {
         const { productId } = req.params;
+        const userId = req.user?.id || null; // may be unauthenticated
 
         const reviews = await prisma.review.findMany({
             where: {
                 productId,
-                isApproved: true
+                status: 'APPROVED',
             },
             include: {
                 user: {
@@ -152,10 +141,12 @@ exports.getAllReviews = async (req, res) => {
         const where = {};
 
         if (status && status !== 'all') {
-            if (status === 'approved') {
-                where.isApproved = true;
+            if (status === 'pending') {
+                where.status = 'PENDING';
+            } else if (status === 'approved') {
+                where.status = 'APPROVED';
             } else if (status === 'rejected') {
-                where.isApproved = false;
+                where.status = 'REJECTED';
             }
         }
 
@@ -209,8 +200,9 @@ exports.getAllReviews = async (req, res) => {
 
         // Get counts
         const totalCount = await prisma.review.count();
-        const approvedCount = await prisma.review.count({ where: { isApproved: true } });
-        const rejectedCount = await prisma.review.count({ where: { isApproved: false } });
+        const pendingCount = await prisma.review.count({ where: { status: 'PENDING' } });
+        const approvedCount = await prisma.review.count({ where: { status: 'APPROVED' } });
+        const rejectedCount = await prisma.review.count({ where: { status: 'REJECTED' } });
 
         // Calculate average rating
         const allReviews = await prisma.review.findMany({
@@ -231,6 +223,7 @@ exports.getAllReviews = async (req, res) => {
             },
             stats: {
                 total: totalCount,
+                pending: pendingCount,
                 approved: approvedCount,
                 rejected: rejectedCount,
                 averageRating: Math.round(avgRating * 10) / 10
@@ -262,7 +255,10 @@ exports.updateReviewStatus = async (req, res) => {
 
         const updatedReview = await prisma.review.update({
             where: { id },
-            data: { isApproved },
+            data: {
+                isApproved,
+                status: isApproved ? 'APPROVED' : 'REJECTED',
+            },
             include: {
                 user: {
                     select: { name: true, email: true }
@@ -275,7 +271,7 @@ exports.updateReviewStatus = async (req, res) => {
 
         // Recalculate product average rating (only approved reviews count)
         const approvedReviews = await prisma.review.findMany({
-            where: { productId: review.productId, isApproved: true }
+            where: { productId: review.productId, status: 'APPROVED' }
         });
 
         const avgRating = approvedReviews.length > 0
@@ -320,7 +316,7 @@ exports.deleteReview = async (req, res) => {
 
         // Recalculate product average rating after deletion
         const remainingReviews = await prisma.review.findMany({
-            where: { productId: review.productId, isApproved: true }
+            where: { productId: review.productId, status: 'APPROVED' }
         });
 
         const avgRating = remainingReviews.length > 0

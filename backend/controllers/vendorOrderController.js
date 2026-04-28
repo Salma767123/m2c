@@ -5,8 +5,8 @@ const { notifications } = require('../utils/notificationService');
 // Maps vendor status → customer notification
 const VENDOR_STATUS_NOTIFY = {
   'VENDOR_PROCESSING': 'orderProcessing',
-  'PACKED_BY_VENDOR': null,                   // no customer notification for packing
-  'IN_TRANSIT_TO_ADMIN_HUB': 'orderShipped',  // shipped from vendor
+  'PACKED_BY_VENDOR': null,
+  'IN_TRANSIT_TO_ADMIN_HUB': null,  // shipped to admin hub, not to customer yet
 };
 
 // Shared include for shipment queries — keeps response shape consistent.

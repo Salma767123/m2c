@@ -25,6 +25,7 @@ import {
   AlertCircle,
   FileText,
   X,
+  Star,
 } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +33,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from '@/lib/axios';
 import { orderService, Order } from '@/services/orderService';
 import { showErrorToast, showSuccessToast } from '@/lib/toast-utils';
+import ReviewModal from '@/components/WebSite/Review/ReviewModal';
+import { reviewService } from '@/services/reviewService';
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 type StatusInfo = { icon: any; label: string; bg: string; fg: string; iconBg: string };
@@ -68,6 +71,8 @@ export default function OrderDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [invoiceHtml, setInvoiceHtml] = useState<string | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
 
   useEffect(() => {
     if (id) fetchOrder();
@@ -77,7 +82,17 @@ export default function OrderDetailsScreen() {
     try {
       setLoading(true);
       const res = await orderService.getOrderById(id);
-      if (res.success && res.data) setOrder(res.data);
+      if (res.success && res.data) {
+        setOrder(res.data);
+        // Check if user already reviewed any product in this order
+        if (res.data.status === 'DELIVERED' && res.data.items?.length > 0) {
+          const check = await reviewService.checkReviewStatus(
+            res.data.items[0].productId,
+            res.data.id,
+          );
+          if (check.hasReviewed) setHasReviewed(true);
+        }
+      }
     } catch {
       showErrorToast('Error', 'Failed to load order');
     } finally {
@@ -353,15 +368,13 @@ export default function OrderDetailsScreen() {
               </View>
             </Pressable>
 
-            {/* Write Review — only for delivered orders (matches web) */}
+            {/* Write Review — only for delivered orders */}
             {order.status === 'DELIVERED' ? (
               <Pressable
-                onPress={() => {
-                  // TODO: implement review modal
-                  showErrorToast('Coming Soon', 'Reviews will be available soon.');
-                }}
+                onPress={() => { if (!hasReviewed) setShowReviewModal(true); }}
+                disabled={hasReviewed}
                 accessibilityRole="button"
-                accessibilityLabel="Write a review"
+                accessibilityLabel={hasReviewed ? 'Review submitted' : 'Write a review'}
               >
                 <View
                   style={{
@@ -370,12 +383,21 @@ export default function OrderDetailsScreen() {
                     justifyContent: 'center',
                     height: 44,
                     borderRadius: 10,
-                    backgroundColor: '#f3f4f6',
+                    backgroundColor: hasReviewed ? '#f0fdf4' : '#111827',
                     gap: 6,
                   }}
                 >
-                  <CheckCircle size={15} color="#374151" />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>Write a Review</Text>
+                  {hasReviewed ? (
+                    <>
+                      <CheckCircle size={15} color="#16a34a" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#16a34a' }}>Review Submitted</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Star size={15} color="#f59e0b" fill="#f59e0b" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#ffffff' }}>Write a Review</Text>
+                    </>
+                  )}
                 </View>
               </Pressable>
             ) : null}
@@ -433,6 +455,22 @@ export default function OrderDetailsScreen() {
           ) : null}
         </View>
       </Modal>
+
+      {/* Review Modal */}
+      {order ? (
+        <ReviewModal
+          visible={showReviewModal}
+          orderId={order.id}
+          orderDisplayId={order.orderId}
+          items={order.items.map((item: any) => ({
+            productId: item.productId,
+            productName: item.productName,
+            productImage: item.productImage,
+          }))}
+          onClose={() => setShowReviewModal(false)}
+          onReviewSubmitted={() => { setHasReviewed(true); }}
+        />
+      ) : null}
     </View>
   );
 }

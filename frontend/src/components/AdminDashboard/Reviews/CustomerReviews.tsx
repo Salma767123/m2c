@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Star, Search, Eye, Trash2, CheckCircle, XCircle, RefreshCw, MessageSquare } from "lucide-react";
+import { Star, Search, Eye, Trash2, CheckCircle, XCircle, RefreshCw, MessageSquare, Clock } from "lucide-react";
+import Image from "next/image";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
@@ -18,6 +19,7 @@ export default function CustomerReviews() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [stats, setStats] = useState({
     total: 0,
+    pending: 0,
     approved: 0,
     rejected: 0,
     averageRating: 0,
@@ -48,18 +50,20 @@ export default function CustomerReviews() {
   const handleApprove = async (id: string) => {
     try {
       setActionLoading(id);
+      const currentReview = reviews.find(r => r.id === id);
+      const wasPending = currentReview?.status === 'PENDING';
       await reviewService.updateReviewStatus(id, true);
-      // Update local state
       setReviews(reviews.map(review =>
-        review.id === id ? { ...review, isApproved: true } : review
+        review.id === id ? { ...review, isApproved: true, status: 'APPROVED' as const } : review
       ));
       setStats(prev => ({
         ...prev,
         approved: prev.approved + 1,
-        rejected: Math.max(0, prev.rejected - 1),
+        pending: wasPending ? Math.max(0, prev.pending - 1) : prev.pending,
+        rejected: !wasPending ? Math.max(0, prev.rejected - 1) : prev.rejected,
       }));
       if (selectedReview?.id === id) {
-        setSelectedReview({ ...selectedReview, isApproved: true });
+        setSelectedReview({ ...selectedReview, isApproved: true, status: 'APPROVED' as const });
       }
     } catch (error) {
       console.error("Error approving review:", error);
@@ -71,18 +75,20 @@ export default function CustomerReviews() {
   const handleReject = async (id: string) => {
     try {
       setActionLoading(id);
+      const currentReview = reviews.find(r => r.id === id);
+      const wasPending = currentReview?.status === 'PENDING';
       await reviewService.updateReviewStatus(id, false);
-      // Update local state
       setReviews(reviews.map(review =>
-        review.id === id ? { ...review, isApproved: false } : review
+        review.id === id ? { ...review, isApproved: false, status: 'REJECTED' as const } : review
       ));
       setStats(prev => ({
         ...prev,
         rejected: prev.rejected + 1,
-        approved: Math.max(0, prev.approved - 1),
+        pending: wasPending ? Math.max(0, prev.pending - 1) : prev.pending,
+        approved: !wasPending ? Math.max(0, prev.approved - 1) : prev.approved,
       }));
       if (selectedReview?.id === id) {
-        setSelectedReview({ ...selectedReview, isApproved: false });
+        setSelectedReview({ ...selectedReview, isApproved: false, status: 'REJECTED' as const });
       }
     } catch (error) {
       console.error("Error rejecting review:", error);
@@ -127,16 +133,17 @@ export default function CustomerReviews() {
     );
   };
 
-  const getStatusBadge = (isApproved: boolean) => {
-    return isApproved ? (
-      <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        Approved
-      </span>
-    ) : (
-      <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-        Rejected
-      </span>
-    );
+  const getStatusBadge = (review: AdminReview) => {
+    const s = review.status || (review.isApproved ? 'APPROVED' : 'REJECTED');
+    switch (s) {
+      case 'APPROVED':
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>;
+      case 'REJECTED':
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>;
+      case 'PENDING':
+      default:
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pending</span>;
+    }
   };
 
   return (
@@ -157,6 +164,17 @@ export default function CustomerReviews() {
                 <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
               </div>
               <MessageSquare className="h-8 w-8 text-blue-500 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-600">Pending</div>
+                <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
+              </div>
+              <Clock className="h-8 w-8 text-amber-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
@@ -217,6 +235,7 @@ export default function CustomerReviews() {
                 value={filterStatus}
                 options={[
                   { value: "all", label: "All Status" },
+                  { value: "pending", label: "Pending" },
                   { value: "approved", label: "Approved" },
                   { value: "rejected", label: "Rejected" },
                 ]}
@@ -268,9 +287,11 @@ export default function CustomerReviews() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {review.product?.images?.[0]?.url && (
-                          <img
+                          <Image
                             src={review.product.images[0].url}
                             alt={review.product.name}
+                            width={32}
+                            height={32}
                             className="w-8 h-8 rounded object-cover"
                           />
                         )}
@@ -291,7 +312,7 @@ export default function CustomerReviews() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {getStatusBadge(review.isApproved)}
+                      {getStatusBadge(review)}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm text-gray-900">
@@ -389,9 +410,11 @@ export default function CustomerReviews() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
                     {selectedReview.user?.image ? (
-                      <img
+                      <Image
                         src={selectedReview.user.image}
                         alt={selectedReview.user.name}
+                        width={40}
+                        height={40}
                         className="w-10 h-10 rounded-full object-cover"
                       />
                     ) : (
@@ -425,9 +448,11 @@ export default function CustomerReviews() {
                 <label className="text-sm font-semibold text-gray-700 block mb-2">Product</label>
                 <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
                   {selectedReview.product?.images?.[0]?.url && (
-                    <img
+                    <Image
                       src={selectedReview.product.images[0].url}
                       alt={selectedReview.product.name}
+                      width={48}
+                      height={48}
                       className="w-12 h-12 rounded object-cover"
                     />
                   )}
@@ -454,10 +479,12 @@ export default function CustomerReviews() {
                   <label className="text-sm font-semibold text-gray-700 block mb-2">Review Images</label>
                   <div className="flex gap-2 flex-wrap">
                     {selectedReview.images.map((img, idx) => (
-                      <img
+                      <Image
                         key={idx}
                         src={img}
                         alt={`Review image ${idx + 1}`}
+                        width={80}
+                        height={80}
                         className="w-20 h-20 rounded-lg object-cover border border-gray-200"
                       />
                     ))}
@@ -468,7 +495,7 @@ export default function CustomerReviews() {
               {/* Status */}
               <div>
                 <label className="text-sm font-semibold text-gray-700 block mb-2">Status</label>
-                <div>{getStatusBadge(selectedReview.isApproved)}</div>
+                <div>{getStatusBadge(selectedReview)}</div>
               </div>
 
               {/* Actions */}

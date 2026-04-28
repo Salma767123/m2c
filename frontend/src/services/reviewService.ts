@@ -17,6 +17,7 @@ export interface AdminReview {
     comment: string | null;
     images: string[];
     isApproved: boolean;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
     createdAt: string;
     updatedAt: string;
     user: {

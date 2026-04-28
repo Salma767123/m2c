@@ -364,15 +364,18 @@ const getAdminOrderById = async (req, res) => {
 // Admin: Update order status (hub-to-customer phase)
 const { notifications } = require('../utils/notificationService');
 
-// Maps order status to notification helper
+// Maps order status to notification helper — must match OrderStatus enum exactly
 const STATUS_NOTIFICATION_MAP = {
-  'ORDER_CONFIRMED': 'orderConfirmed',
-  'PROCESSING': 'orderProcessing',
-  'SHIPPED': 'orderShipped',
-  'OUT_FOR_DELIVERY': 'orderOutForDelivery',
+  'ORDER_CREATED': 'orderConfirmed',
+  'VENDOR_PROCESSING': 'orderProcessing',
+  'PACKED_BY_VENDOR': null,
+  'IN_TRANSIT_TO_ADMIN_HUB': null,
+  'RECEIVED_AT_ADMIN_HUB': null,
+  'APPROVED_BY_ADMIN_HUB': null,
+  'SHIPPED_TO_CUSTOMER': 'orderShipped',
   'DELIVERED': 'orderDelivered',
   'CANCELLED': 'orderCancelled',
-  'REFUNDED': 'orderRefunded',
+  'RETURNED': 'orderRefunded',
 };
 
 

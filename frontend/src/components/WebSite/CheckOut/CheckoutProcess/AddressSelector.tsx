@@ -30,7 +30,7 @@ export default function AddressSelector({
   disabled,
 }: AddressSelectorProps) {
   // Tab stops: each address card + the "Use a new address" tile. Arrow keys move focus between them.
-  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const itemRefs = useRef<Array<HTMLElement | null>>([]);
 
   if (addresses.length === 0) return null;
 
@@ -90,17 +90,15 @@ export default function AddressSelector({
           // Only the currently selected card is in the tab order; arrow keys move between cards.
           const tabIndex = selected || (!selectedId && idx === 0) ? 0 : -1;
           return (
-            <button
+            <div
               key={addr.id}
               ref={(el) => { itemRefs.current[idx] = el; }}
               role="radio"
               aria-checked={selected}
               tabIndex={disabled ? -1 : tabIndex}
-              type="button"
-              onClick={() => onSelect(addr.id)}
-              onKeyDown={(e) => handleKeyDown(e, idx, () => onSelect(addr.id))}
-              disabled={disabled}
-              className={`relative text-left border-2 rounded-xl p-4 transition-all focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-60 disabled:cursor-not-allowed ${
+              onClick={() => { if (!disabled) onSelect(addr.id); }}
+              onKeyDown={(e) => { if (!disabled) handleKeyDown(e, idx, () => onSelect(addr.id)); }}
+              className={`relative text-left border-2 rounded-xl p-4 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-500 ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${
                 selected
                   ? "border-gray-800 bg-gradient-to-br from-gray-50 to-white shadow-sm"
                   : "border-slate-200 bg-white hover:border-slate-400"
@@ -141,7 +139,7 @@ export default function AddressSelector({
                 {addr.address}
                 {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}, {addr.city}, {addr.state} {addr.zipCode}
               </p>
-            </button>
+            </div>
           );
         })}
 

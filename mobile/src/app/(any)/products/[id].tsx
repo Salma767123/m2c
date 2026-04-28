@@ -45,7 +45,7 @@ const TopBar = ({
   return (
     <View
       className="bg-[#111827] pb-3.5 px-4 flex-row items-center justify-between"
-      style={{ paddingTop: 12 }}
+      style={{ paddingTop: insets.top + 12 }}
     >
       <Pressable
         onPress={async () => {
@@ -156,7 +156,7 @@ export default function ProductDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 bg-slate-50">
-        <StatusBar barStyle="light-content" backgroundColor="#111827" translucent={false} />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <TopBar insets={insets} router={router} />
         <ProductDetailSkeleton />
       </View>
@@ -167,7 +167,7 @@ export default function ProductDetailScreen() {
   if (!product) {
     return (
       <View className="flex-1 bg-slate-50">
-        <StatusBar barStyle="light-content" backgroundColor="#111827" translucent={false} />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         <TopBar insets={insets} router={router} />
         <View className="flex-1 items-center justify-center px-8">
           <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-5">
@@ -203,7 +203,7 @@ export default function ProductDetailScreen() {
   // ── Main ──────────────────────────────────────────────────────────────────
   return (
     <View className="flex-1 bg-slate-50">
-      <StatusBar barStyle="light-content" backgroundColor="#111827" translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <TopBar title={product.name} insets={insets} router={router} />
       <ProductDetail product={product} productId={id as string} />
     </View>
