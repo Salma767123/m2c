@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Outfit } from "next/font/google";
+import { Outfit, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/UI/Toaster";
 import PageTracker from "@/components/Analytics/PageTracker";
@@ -7,6 +7,12 @@ import PageTracker from "@/components/Analytics/PageTracker";
 const outfit = Outfit({
   variable: "--font-outfit",
   subsets: ["latin"],
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -40,7 +46,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body
-        className={`${outfit.variable} font-outfit antialiased h-full`}
+        className={`${outfit.variable} ${playfair.variable} font-outfit antialiased h-full`}
       >
         <PageTracker />
         {children}

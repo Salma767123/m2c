@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Package, ArrowRight, Grid3X3 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { categoryService } from '@/services/categoryService';
+import PromotionalPopup from '@/components/WebSite/PromotionalPopup/PromotionalPopup';
 
 interface Subcategory {
   id: string;
@@ -113,6 +114,7 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
 
   return (
     <div className="min-h-screen bg-white">
+      <PromotionalPopup category={category.name} />
       {/* Banner Header Section */}
       <div className="relative h-52 md:h-60 lg:h-64 overflow-hidden">
         {category.image ? (

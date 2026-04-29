@@ -237,43 +237,23 @@ const Header = () => {
     fetchPopularSearches();
   }, [])
 
-  // Load Promotional Offers
+  // Load Promotional Offers (data ready for future UI)
   useEffect(() => {
     const loadPromotionalOffers = async () => {
       try {
-        // Try to get active promotional coupons
         const response = await couponService.getPromotionalCoupons();
-        
         if (response.success && response.data.length > 0) {
-          // Filter out empty or invalid promotional messages
-          const validOffers = response.data.filter(offer => 
-            offer && typeof offer === 'string' && offer.trim().length > 0
-          );
-          
-          if (validOffers.length > 0) {
-            setPromotionalOffers(validOffers);
-            return;
-          }
+          const validOffers = response.data.filter((offer: string) => offer?.trim().length > 0);
+          if (validOffers.length > 0) { setPromotionalOffers(validOffers); return; }
         }
-      } catch (error) {
-        console.warn('Error loading promotional offers:', error);
-      }
-      
-      // Always set fallback offers if API fails or returns no valid data
+      } catch { /* silent */ }
       setPromotionalOffers([
-        'Free shipping on orders above ₹999',
-        'New arrivals - Kitchen Aprons starting at ₹299',
+        'Free shipping on orders above $99',
         'Premium Cotton Towels - Buy 2 Get 1 Free',
         'Special discount on Table Linen - Up to 40% off',
-        'Cotton Bags starting from ₹199 only',
-        'Jute products with eco-friendly packaging',
-        'Bath Towel Collection on 50% off'
       ]);
     };
-
     loadPromotionalOffers();
-
-    // Refresh promotional offers every 30 seconds
     const interval = setInterval(loadPromotionalOffers, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -345,46 +325,6 @@ const Header = () => {
 
   return (
     <div className="sticky top-0 z-50 font-sans">
-      {/* Top Section - Infinite Scrolling Promotional Banner */}
-      <div className="h-8 sm:h-10 md:h-12 bg-[#222222] flex items-center overflow-hidden relative">
-        {promotionalOffers.length > 0 && (
-          <div className="flex animate-scroll whitespace-nowrap">
-            {/* Duplicate the offers multiple times for seamless infinite scroll */}
-            {[...promotionalOffers, ...promotionalOffers, ...promotionalOffers, ...promotionalOffers].map((offer, index) => (
-              <div 
-                key={index}
-                className="flex items-center px-6 sm:px-8 md:px-12"
-              >
-                <p className="text-white text-xs sm:text-sm md:text-base font-medium whitespace-nowrap">
-                  {offer}
-                </p>
-                <span className="text-white/30 mx-6 sm:mx-8 md:mx-10">|</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <style jsx>{`
-        @keyframes scroll {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-25%);
-          }
-        }
-        
-        .animate-scroll {
-          animation: scroll 20s linear infinite;
-          will-change: transform;
-        }
-        
-        .animate-scroll:hover {
-          animation-play-state: running;
-        }
-      `}</style>
-
       {/* Main Header */}
       <header className="bg-white shadow-lg border-b border-gray-100 transition-all duration-300">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
@@ -409,7 +349,7 @@ const Header = () => {
             <div className="hidden md:flex w-[40%] justify-center px-1 sm:px-2 lg:px-4">
               <Link href="/" className="flex items-center">
                 <div className="text-center">
-                  <h1 className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-3xl font-bold bg-linear-to-r from-[#212121] to-[#222222] bg-clip-text text-transparent leading-tight line-clamp-2">
+                  <h1 className="font-playfair text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl 2xl:text-3xl font-medium text-[#1a1a1a] whitespace-nowrap tracking-tight">
                     M 2 C MarkDowns Private Limited
                   </h1>
                 </div>

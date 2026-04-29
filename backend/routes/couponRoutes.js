@@ -8,6 +8,7 @@ const {
     applyCoupon, // Public/User endpoint
     applyFreeShippingOffer, // Public/User endpoint for free shipping
     getPromotionalCoupons, // Public endpoint for promotional display
+    getPopupCoupons, // Public endpoint for category/product popup modals
     // Free shipping offer functions
     createFreeShippingOffer,
     getFreeShippingOffers,
@@ -25,6 +26,7 @@ router.post('/apply', applyCoupon);
 router.post('/apply-free-shipping', applyFreeShippingOffer);
 router.post('/check-free-shipping', checkFreeShipping);
 router.get('/promotional', getPromotionalCoupons); // Public endpoint for promotional display
+router.get('/popup', getPopupCoupons); // Public endpoint for category/product popup modals
 
 // Free shipping offer routes (Admin only) - MUST come before /:id route
 router.post('/free-shipping', authenticateToken, requireAdminRole, requirePermission('create_coupons'), createFreeShippingOffer);

@@ -16,7 +16,12 @@ const createCoupon = async (req, res) => {
             perUserLimit,
             isActive,
             freeShipping,
-            freeShippingOrderNumbers
+            freeShippingOrderNumbers,
+            showAsPopup,
+            popupImage,
+            popupTitle,
+            popupMessage,
+            applicableCategories,
         } = req.body;
 
         // Check if coupon code already exists
@@ -45,7 +50,12 @@ const createCoupon = async (req, res) => {
                 perUserLimit,
                 isActive: isActive !== undefined ? isActive : true,
                 freeShipping: freeShipping || false,
-                freeShippingOrderNumbers: freeShippingOrderNumbers || []
+                freeShippingOrderNumbers: freeShippingOrderNumbers || [],
+                showAsPopup: showAsPopup || false,
+                popupImage: popupImage || undefined,
+                popupTitle: popupTitle || undefined,
+                popupMessage: popupMessage || undefined,
+                applicableCategories: applicableCategories || [],
             }
         });
        
@@ -689,6 +699,58 @@ const checkFreeShipping = async (req, res) => {
     }
 };
 
+// Get popup coupons for a specific category (Public endpoint)
+const getPopupCoupons = async (req, res) => {
+    try {
+        const { category } = req.query;
+        if (!category || !String(category).trim()) {
+            return res.json({ success: true, data: null });
+        }
+
+        const categoryName = String(category).trim();
+        const now = new Date();
+
+        const coupon = await prisma.coupon.findFirst({
+            where: {
+                isActive: true,
+                showAsPopup: true,
+                expiryDate: { gt: now },
+                startDate: { lte: now },
+                applicableCategories: { has: categoryName },
+            },
+            select: {
+                id: true,
+                code: true,
+                popupImage: true,
+                popupTitle: true,
+                popupMessage: true,
+                discountType: true,
+                discountValue: true,
+                description: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (!coupon) {
+            return res.json({ success: true, data: null });
+        }
+
+        // Fallback: if no custom popup image, use the category's image
+        if (!coupon.popupImage) {
+            const cat = await prisma.category.findFirst({
+                where: { name: categoryName },
+                select: { image: true },
+            });
+            if (cat?.image) coupon.popupImage = cat.image;
+        }
+
+        res.json({ success: true, data: coupon });
+    } catch (error) {
+        console.error('Get popup coupons error:', error);
+        res.json({ success: true, data: null });
+    }
+};
+
 module.exports = {
     createCoupon,
     getCoupons,
@@ -698,6 +760,7 @@ module.exports = {
     applyCoupon,
     applyFreeShippingOffer,
     getPromotionalCoupons,
+    getPopupCoupons,
     // Free shipping offer functions
     createFreeShippingOffer,
     getFreeShippingOffers,
