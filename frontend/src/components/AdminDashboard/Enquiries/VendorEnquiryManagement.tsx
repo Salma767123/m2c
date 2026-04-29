@@ -5,9 +5,23 @@ import { enquiryService, VendorEnquiry } from '@/services/enquiryService';
 import { Card, CardContent } from '@/components/UI/Card';
 import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
-import { Mail, Phone, Building2, FileText, Eye, Trash2, CheckCircle, XCircle, Search, Globe } from 'lucide-react';
+import { Mail, Phone, Building2, FileText, Eye, Trash2, CheckCircle, XCircle, Search, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
+
+const PAGE_SIZE = 10;
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
+}
 
 export default function VendorEnquiryManagement() {
   const [enquiries, setEnquiries] = useState<VendorEnquiry[]>([]);
@@ -16,6 +30,7 @@ export default function VendorEnquiryManagement() {
   const [showModal, setShowModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchEnquiries();
@@ -95,6 +110,9 @@ export default function VendorEnquiryManagement() {
     rejected: enquiries.filter(e => e.status === 'rejected').length
   };
 
+  const totalPages = Math.ceil(enquiries.length / PAGE_SIZE);
+  const paginatedItems = enquiries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -131,14 +149,14 @@ export default function VendorEnquiryManagement() {
                   type="text"
                   placeholder="Search by name, company, email..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
                 />
               </div>
             </div>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
             >
               <option value="all">All Status</option>
@@ -151,6 +169,11 @@ export default function VendorEnquiryManagement() {
       </Card>
 
       {/* Enquiries Table */}
+      {enquiries.length > 0 && (
+        <p className="text-sm text-slate-600">
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, enquiries.length)} of {enquiries.length}
+        </p>
+      )}
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -172,7 +195,7 @@ export default function VendorEnquiryManagement() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {enquiries.map((enquiry) => (
+                  {paginatedItems.map((enquiry) => (
                     <tr key={enquiry.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{enquiry.name}</div>
@@ -252,6 +275,16 @@ export default function VendorEnquiryManagement() {
           )}
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-3 text-sm">
+          <div className="flex items-center gap-1">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
 
       {/* View Modal */}
       {showModal && selectedEnquiry && (
