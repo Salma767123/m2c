@@ -17,9 +17,6 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Wait a bit longer to ensure storage is ready, especially for new tabs
-        await new Promise(resolve => setTimeout(resolve, 200))
-
         const auth = getStoredAuth()
         
         if (!auth) {

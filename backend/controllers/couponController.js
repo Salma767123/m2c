@@ -1,13 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-
-// Use a module-level singleton with connection retry settings
-const prisma = new PrismaClient({
-    datasources: {
-        db: {
-            url: process.env.DATABASE_URL,
-        },
-    },
-});
+const { prisma } = require('../config/database');
 
 // Create a new coupon (Admin only)
 const createCoupon = async (req, res) => {

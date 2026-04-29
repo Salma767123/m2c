@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../config/database');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
-const prisma = new PrismaClient();
 
 // Get all banners (admin - includes inactive)
 const getAllBanners = async (req, res) => {

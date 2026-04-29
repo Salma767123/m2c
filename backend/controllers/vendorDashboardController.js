@@ -1,32 +1,56 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma } = require('../config/database');
 
 const getVendorDashboardStats = async (req, res) => {
     try {
         const vendorId = req.userId; // Provided by authenticateToken middleware
 
-        // 1. Total products
-        const totalProducts = await prisma.product.count({
-            where: { vendorId }
-        });
-
-        // 2. Total orders and Revenue
-        // To get distinct orders, we can find distinct orderIds from orderItems for this vendor
-        const orderItems = await prisma.orderItem.findMany({
-            where: { vendorId },
-            include: {
-                order: {
-                    select: { createdAt: true }
+        // Run all independent queries in parallel
+        const [totalProducts, orderItems, recentProductsList, recentOrdersGrouped] = await Promise.all([
+            // 1. Total products
+            prisma.product.count({
+                where: { vendorId }
+            }),
+            // 2. Total orders and Revenue
+            prisma.orderItem.findMany({
+                where: { vendorId },
+                include: {
+                    order: {
+                        select: { createdAt: true }
+                    }
                 }
-            }
-        });
+            }),
+            // 3. Recent products
+            prisma.product.findMany({
+                where: { vendorId },
+                take: 5,
+                orderBy: { createdAt: 'desc' }
+            }),
+            // 4. Recent orders
+            prisma.orderItem.findMany({
+                where: { vendorId },
+                take: 10,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    order: {
+                        select: {
+                            id: true,
+                            orderId: true,
+                            customerName: true,
+                            totalAmount: true,
+                            status: true,
+                            createdAt: true
+                        }
+                    }
+                }
+            })
+        ]);
 
         const orderIds = new Set(orderItems.map(item => item.orderId));
         const totalOrdersCount = orderIds.size;
 
         const totalRevenue = orderItems.reduce((sum, item) => sum + (item.totalPrice ? Number(item.totalPrice) : 0), 0);
 
-        // 3. Earnings chart (monthly data for the current year)
+        // Earnings chart (monthly data for the current year)
         const currentYear = new Date().getFullYear();
         const monthlyEarnings = Array(12).fill(0);
         orderItems.forEach(item => {
@@ -46,32 +70,6 @@ const getVendorDashboardStats = async (req, res) => {
             name: month,
             total: monthlyEarnings[index]
         }));
-
-        // 4. Recent products
-        const recentProductsList = await prisma.product.findMany({
-            where: { vendorId },
-            take: 5,
-            orderBy: { createdAt: 'desc' }
-        });
-
-        // 5. Recent orders
-        const recentOrdersGrouped = await prisma.orderItem.findMany({
-            where: { vendorId },
-            take: 10,
-            orderBy: { createdAt: 'desc' },
-            include: {
-                order: {
-                    select: {
-                        id: true,
-                        orderId: true,
-                        customerName: true,
-                        totalAmount: true,
-                        status: true,
-                        createdAt: true
-                    }
-                }
-            }
-        });
 
         // Dedup recent orders by orderId since multiple items could belong to the same order
         const recentOrderMap = new Map();

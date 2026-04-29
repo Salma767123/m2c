@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../config/database');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
-const prisma = new PrismaClient();
 
 // Get all SEO settings (for page management)
 const getAllSEOSettings = async (req, res) => {
