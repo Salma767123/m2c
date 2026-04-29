@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Eye, RefreshCw } from "lucide-react";
+import { Search, Eye, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -17,6 +17,7 @@ import { showErrorToast } from "@/lib/toast-utils";
 
 // Polls every 30s while the tab is visible so vendor sees admin status updates without F5.
 const REFRESH_INTERVAL_MS = 30000;
+const PAGE_SIZE = 10;
 
 export default function VendorOrderManagement() {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function VendorOrderManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const statusOptions = ["All", "ORDER_CREATED", "VENDOR_PROCESSING", "PACKED_BY_VENDOR", "IN_TRANSIT_TO_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "REJECTED_BY_ADMIN_HUB", "CANCELLED"];
 
@@ -98,6 +100,12 @@ export default function VendorOrderManagement() {
     return matchesSearch && matchesStatus;
   });
 
+  const totalPages = Math.ceil(filteredShipments.length / PAGE_SIZE);
+  const paginatedShipments = filteredShipments.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "ORDER_CREATED":
@@ -166,7 +174,7 @@ export default function VendorOrderManagement() {
               type="text"
               placeholder="Search by Order ID, Product, or SKU..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
             />
           </div>
@@ -174,7 +182,7 @@ export default function VendorOrderManagement() {
             <Dropdown
               value={statusFilter}
               options={statusOptions}
-              onChange={(value) => setStatusFilter(value as string)}
+              onChange={(value) => { setStatusFilter(value as string); setCurrentPage(1); }}
               placeholder="Filter by Status"
             />
           </div>
@@ -211,14 +219,14 @@ export default function VendorOrderManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredShipments.length === 0 ? (
+            {paginatedShipments.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                   No orders found
                 </TableCell>
               </TableRow>
             ) : (
-              filteredShipments.map((s) => {
+              paginatedShipments.map((s) => {
                 const mainItem = s.items?.[0] || ({} as any);
                 const productName = mainItem.productName || "Unknown";
                 const sku = mainItem.sku || "N/A";
@@ -256,6 +264,33 @@ export default function VendorOrderManagement() {
             )}
           </TableBody>
         </Table>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
+            <p className="text-xs text-gray-500">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+                className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+                className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Next page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -85,6 +85,7 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
       '/vendor/dashboard/orders': { title: 'Orders', icon: Truck },
       '/vendor/dashboard/earnings': { title: 'Overview', icon: BarChart3 },
       '/vendor/dashboard/earnings/payouts': { title: 'Payouts', icon: BarChart3 },
+      '/vendor/dashboard/reviews': { title: 'Reviews', icon: FileText },
       '/vendor/dashboard/reports': { title: 'Reports', icon: FileText },
       '/vendor/dashboard/support': { title: 'Support', icon: HelpCircle },
       '/vendor/dashboard/support/create': { title: 'Support', icon: HelpCircle },

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
-import { Plus, Edit, Eye, Trash2 } from 'lucide-react'
+import { Plus, Edit, Eye, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { productService, type Product } from '@/services/productService'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 
@@ -244,30 +244,29 @@ export default function Products() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-gray-600">
-                Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to {Math.min(pagination.currentPage * pagination.limit, pagination.totalItems)} of {pagination.totalItems} products
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => loadProducts(pagination.currentPage - 1)}
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
+              <p className="text-xs text-gray-500">
+                Page {pagination.currentPage} of {pagination.totalPages}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
                   disabled={!pagination.hasPrevPage}
+                  onClick={() => loadProducts(pagination.currentPage - 1)}
+                  className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                  aria-label="Previous page"
                 >
-                  Previous
-                </Button>
-                <span className="text-sm text-gray-600">
-                  Page {pagination.currentPage} of {pagination.totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => loadProducts(pagination.currentPage + 1)}
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
                   disabled={!pagination.hasNextPage}
+                  onClick={() => loadProducts(pagination.currentPage + 1)}
+                  className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                  aria-label="Next page"
                 >
-                  Next
-                </Button>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
           )}
