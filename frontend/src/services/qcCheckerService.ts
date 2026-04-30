@@ -207,7 +207,7 @@ class QCCheckerService {
     // Fast path: get the active (or latest) inspection for a vendor — used by InspectionForm
     async getActiveInspectionForVendor(
         vendorId: string
-    ): Promise<{ success: boolean; inspection: any | null }> {
+    ): Promise<{ success: boolean; inspection: any | null; previousRejectionReason?: string | null }> {
         try {
             const token = this.getCheckerToken();
             if (!token) {

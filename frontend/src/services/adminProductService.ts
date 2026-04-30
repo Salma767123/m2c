@@ -35,7 +35,19 @@ export interface AdminProduct {
   dimensions?: string;
   weight?: string;
   inStock: boolean;
-  logisticsConfig?: Record<string, unknown> | null;
+  logisticsConfig?: {
+    unitWeight: number;
+    weightUom: string;
+    maxWeight: number;
+    dimensions: { length: number; width: number; height: number; unit: string } | null;
+    transportTypes: string[];
+    weightRanges: Array<{ minWeight: number; maxWeight: number; recommendedTransport: string }>;
+    airDeliveryDays: number;
+    shipDeliveryDays: number;
+    airCostPerKg: number;
+    shipCostPerKg: number;
+    notes: string;
+  } | null;
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
   approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION';
   approvedAt?: string;

@@ -510,7 +510,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
               weight: product.weight,
               inStock: product.inStock,
               status: product.status || 'ACTIVE',
-              logisticsConfig: product.logisticsConfig || {
+              logisticsConfig: (product.logisticsConfig as ProductFormData['logisticsConfig']) || {
                 unitWeight: 0,
                 weightUom: 'KG',
                 maxWeight: 0,

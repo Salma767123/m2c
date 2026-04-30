@@ -140,7 +140,7 @@ export default function FactoryInspectionReviewPage() {
   }
 
   const canReview = ['SUBMITTED', 'UNDER_ADMIN_REVIEW', 'REJECTED'].includes(inspection.status);
-  const formData = inspection.itemsToInspect as Record<string, unknown> || {};
+  const formData = (inspection.itemsToInspect || {}) as Record<string, any>;
 
   return (
     <div className="space-y-6">
