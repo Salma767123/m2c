@@ -16,9 +16,26 @@ import {
   Users,
   Lock,
   Crown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { hasPermission } from '@/lib/auth'
+
+const PAGE_SIZE = 10
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
+}
+
 export default function RolesPermissions() {
   const canCreate = hasPermission('create_roles') || hasPermission('manage_settings')
   const canEdit = hasPermission('edit_roles') || hasPermission('manage_settings')
@@ -31,6 +48,7 @@ export default function RolesPermissions() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,9 +69,19 @@ export default function RolesPermissions() {
     fetchData()
   }, [])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, activeTab])
+
   const filteredRoles = roles.filter(role =>
     role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     role.description.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / PAGE_SIZE))
+  const paginatedRoles = filteredRoles.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
   )
 
   const groupedPermissions = permissions.reduce((acc, permission) => {
@@ -210,8 +238,14 @@ export default function RolesPermissions() {
         {/* Content */}
         <div className="p-6">
           {activeTab === 'roles' && (
+            <>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm text-slate-500">
+                Showing {filteredRoles.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRoles.length)} of {filteredRoles.length}
+              </span>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredRoles.map((role) => (
+              {paginatedRoles.map((role) => (
                 <Card key={role.id} className="border-gray-200 bg-white">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -285,6 +319,16 @@ export default function RolesPermissions() {
                 </Card>
               ))}
             </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end gap-3 text-sm mt-4">
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+                  {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+                </div>
+              </div>
+            )}
+            </>
           )}
 
           {activeTab === 'permissions' && (

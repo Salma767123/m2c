@@ -1009,6 +1009,13 @@ model Coupon {
   freeShipping      Boolean       @default(false)  // Whether this coupon grants free shipping
   freeShippingOrderNumbers Int[]  // Which order numbers get free shipping (e.g., [3, 5, 10] = 3rd, 5th, 10th orders)
 
+  // Promotional Popup Fields
+  showAsPopup             Boolean       @default(false)
+  popupImage              String?       // Cloudinary URL
+  popupTitle              String?
+  popupMessage            String?
+  applicableCategories    String[]      // Category names to target (e.g., ["Towel", "Apron"])
+
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 

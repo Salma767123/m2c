@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar, RefreshCw, Send } from "lucide-react";
+import { Search, Eye, Edit, Trash2, UserPlus, Mail, Phone, Calendar, RefreshCw, Send, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
@@ -11,6 +11,20 @@ import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { hasPermission } from "@/lib/auth";
 
+const PAGE_SIZE = 10;
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
+}
+
 export default function QCCheckerList() {
   const [checkers, setCheckers] = useState<QCCheckerData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +32,7 @@ export default function QCCheckerList() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch QC Checkers
   const fetchCheckers = async () => {
@@ -40,11 +55,13 @@ export default function QCCheckerList() {
   };
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchCheckers();
   }, [filterStatus]);
 
   // Debounced search
   useEffect(() => {
+    setCurrentPage(1);
     const timer = setTimeout(() => {
       fetchCheckers();
     }, 500);
@@ -99,6 +116,9 @@ export default function QCCheckerList() {
       </span>
     );
   };
+
+  const totalPages = Math.max(1, Math.ceil(checkers.length / PAGE_SIZE));
+  const paginatedCheckers = checkers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const totalActive = checkers.filter((c) => c.status === "ACTIVE").length;
   const totalInactive = checkers.filter((c) => c.status === "INACTIVE").length;
@@ -192,6 +212,11 @@ export default function QCCheckerList() {
       </Card>
 
       {/* Checkers Table */}
+      {!loading && checkers.length > 0 && (
+        <div className="text-sm text-slate-600 mb-2">
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, checkers.length)} of {checkers.length}
+        </div>
+      )}
       <Card>
         {loading ? (
           <div className="p-12 text-center">
@@ -213,8 +238,8 @@ export default function QCCheckerList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {checkers.length > 0 ? (
-                checkers.map((checker) => (
+              {paginatedCheckers.length > 0 ? (
+                paginatedCheckers.map((checker) => (
                   <TableRow key={checker.id}>
                     <TableCell>
                       <div>
@@ -302,6 +327,16 @@ export default function QCCheckerList() {
           </Table>
         )}
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-3 text-sm">
+          <div className="flex items-center gap-1">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

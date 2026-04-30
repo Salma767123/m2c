@@ -14,6 +14,7 @@ import { trackProductView } from '@/services/analyticsService';
 import reviewService from '@/services/reviewService';
 import Image from 'next/image';
 import { formatPrice } from '@/lib/currency';
+import PromotionalPopup from '@/components/WebSite/PromotionalPopup/PromotionalPopup';
 
 interface ProductDetailProps {
   productId: string;
@@ -301,6 +302,7 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
 
   return (
     <>
+      <PromotionalPopup category={product.category} />
       {/* Breadcrumb */}
       <div className="bg-white">
         <div className="max-w-7xl xl:max-w-420 mx-auto px-4 sm:px-6 lg:px-8 xl:px-0 py-4">

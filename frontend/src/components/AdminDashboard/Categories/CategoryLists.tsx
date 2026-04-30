@@ -6,10 +6,24 @@ import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { Plus, Edit, Trash2, Eye, Search, Filter } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { categoryService, Category, CategoryStats } from '@/services/categoryService'
 import { hasPermission } from '@/lib/auth'
+
+const PAGE_SIZE = 10
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
+}
 
 export default function CategoryLists() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -18,10 +32,12 @@ export default function CategoryLists() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE'>('all')
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     loadCategories()
     loadStats()
+    setCurrentPage(1)
   }, [searchTerm, statusFilter])
 
   const loadCategories = async () => {
@@ -72,6 +88,12 @@ export default function CategoryLists() {
     const matchesStatus = statusFilter === 'all' || category.status === statusFilter
     return matchesSearch && matchesStatus
   })
+
+  const totalPages = Math.max(1, Math.ceil(filteredCategories.length / PAGE_SIZE))
+  const paginatedCategories = filteredCategories.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  )
 
   const toggleExpanded = (categoryId: string) => {
     const newExpanded = new Set(expandedCategories)
@@ -245,7 +267,12 @@ export default function CategoryLists() {
       {/* Categories Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Categories List</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Categories List</CardTitle>
+            <span className="text-sm text-slate-500">
+              Showing {filteredCategories.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredCategories.length)} of {filteredCategories.length}
+            </span>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -276,7 +303,7 @@ export default function CategoryLists() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCategories.map((category) => (
+                  paginatedCategories.map((category) => (
                     <React.Fragment key={category.id}>
                       {renderCategoryRow(category)}
                       {expandedCategories.has(category.id) &&
@@ -290,6 +317,15 @@ export default function CategoryLists() {
             </Table>
           )}
         </CardContent>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-end gap-3 text-sm p-4 border-t border-gray-200">
+            <div className="flex items-center gap-1">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+              {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Summary Stats */}

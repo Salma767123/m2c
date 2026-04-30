@@ -153,7 +153,7 @@ const updateVendorOrderStatus = async (req, res) => {
         const { id } = req.params;
         const { status, carrier, trackingId } = req.body;
 
-        const validStatuses = ['VENDOR_PROCESSING', 'PACKED_BY_VENDOR', 'IN_TRANSIT_TO_ADMIN_HUB', 'CANCELLED'];
+        const validStatuses = ['VENDOR_PROCESSING', 'PACKED_BY_VENDOR', 'IN_TRANSIT_TO_ADMIN_HUB'];
 
         if (!validStatuses.includes(status)) {
             return res.status(400).json({
@@ -213,14 +213,6 @@ const updateVendorOrderStatus = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 error: 'Order not found',
-            });
-        }
-
-        // Vendor can only cancel a rejected shipment
-        if (status === 'CANCELLED' && shipment.status !== 'REJECTED_BY_ADMIN_HUB') {
-            return res.status(400).json({
-                success: false,
-                error: 'Vendors can only cancel shipments that were rejected by admin hub.',
             });
         }
 

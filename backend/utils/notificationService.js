@@ -1,6 +1,5 @@
 const admin = require('../config/firebase');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma } = require('../config/database');
 
 /**
  * Reusable notification service for sending FCM push notifications.

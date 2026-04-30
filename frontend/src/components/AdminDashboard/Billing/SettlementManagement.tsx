@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Eye, CheckCircle, Clock, X, RefreshCw } from "lucide-react";
+import { Search, Eye, CheckCircle, Clock, X, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -16,6 +16,20 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { settlementService, Settlement } from "@/services/settlementService";
 import { hasPermission } from "@/lib/auth";
 
+const PAGE_SIZE = 10;
+
+function getPageRange(current: number, total: number): Array<number | '...'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '...'> = [1];
+  if (current > 4) pages.push('...');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('...');
+  pages.push(total);
+  return pages;
+}
+
 export default function SettlementManagement() {
   const router = useRouter();
   const [settlements, setSettlements] = useState<Settlement[]>([]);
@@ -26,6 +40,7 @@ export default function SettlementManagement() {
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
   const [transactionId, setTransactionId] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const statusOptions = ["All", "Pending", "Processing", "Paid", "Failed"];
 
@@ -55,6 +70,12 @@ export default function SettlementManagement() {
     const matchesStatus = statusFilter === "All" || settlement.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const totalPages = Math.ceil(filteredSettlements.length / PAGE_SIZE);
+  const paginatedSettlements = filteredSettlements.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -142,7 +163,7 @@ export default function SettlementManagement() {
               type="text"
               placeholder="Search by Settlement Number, Vendor, or Billing Number..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
             />
           </div>
@@ -150,7 +171,7 @@ export default function SettlementManagement() {
             <Dropdown
               value={statusFilter}
               options={statusOptions}
-              onChange={(value) => setStatusFilter(value as string)}
+              onChange={(value) => { setStatusFilter(value as string); setCurrentPage(1); }}
               placeholder="Filter by Status"
             />
           </div>
@@ -187,14 +208,14 @@ export default function SettlementManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSettlements.length === 0 ? (
+              {paginatedSettlements.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                     No settlements found
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredSettlements.map((settlement) => (
+                paginatedSettlements.map((settlement) => (
                   <TableRow key={settlement.id}>
                     <TableCell className="font-medium text-indigo-600">{settlement.settlementNumber}</TableCell>
                     <TableCell className="font-medium">{settlement.vendorName}</TableCell>
@@ -229,6 +250,23 @@ export default function SettlementManagement() {
               )}
             </TableBody>
           </Table>
+        )}
+
+        {!loading && filteredSettlements.length > 0 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+            <p className="text-sm text-gray-600">
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredSettlements.length)} of {filteredSettlements.length}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end gap-3 text-sm">
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+                  {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

@@ -16,6 +16,22 @@ export interface Coupon {
     perUserLimit?: number;
     freeShipping?: boolean;
     freeShippingOrderNumbers?: number[];
+    showAsPopup?: boolean;
+    popupImage?: string;
+    popupTitle?: string;
+    popupMessage?: string;
+    applicableCategories?: string[];
+}
+
+export interface PopupCoupon {
+    id: string;
+    code: string;
+    popupImage: string | null;
+    popupTitle: string | null;
+    popupMessage: string | null;
+    discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+    discountValue: number;
+    description?: string;
 }
 
 export interface FreeShippingOffer {
@@ -87,6 +103,15 @@ class CouponService {
                 success: false,
                 data: []
             };
+        }
+    }
+
+    async getPopupCoupon(category: string): Promise<PopupCoupon | null> {
+        try {
+            const response = await axios.get('/coupons/popup', { params: { category }, timeout: 5000 });
+            return response.data?.success ? response.data.data : null;
+        } catch {
+            return null;
         }
     }
 

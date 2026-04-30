@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Package, MapPin, Truck, X, RefreshCw, XCircle, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Package, MapPin, Truck, X, RefreshCw, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import Dropdown from "@/components/UI/Dropdown";
@@ -33,7 +33,6 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
   const [trackingId, setTrackingId] = useState("");
   const [showReshipModal, setShowReshipModal] = useState(false);
   const [reshipLoading, setReshipLoading] = useState(false);
-  const [cancelLoading, setCancelLoading] = useState(false);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -89,22 +88,6 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       showErrorToast(error.message || "Failed to create reship");
     } finally {
       setReshipLoading(false);
-    }
-  };
-
-  const handleCancelRejected = async () => {
-    if (!shipment || cancelLoading) return;
-    try {
-      setCancelLoading(true);
-      const res = await orderService.updateVendorOrderStatus(shipment.id, "CANCELLED");
-      if (res.success) {
-        showSuccessToast("Shipment cancelled");
-        setShipment(res.data);
-      }
-    } catch (error: any) {
-      showErrorToast(error.message || "Failed to cancel shipment");
-    } finally {
-      setCancelLoading(false);
     }
   };
 
@@ -201,29 +184,13 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
             </div>
           )}
           {status === "REJECTED_BY_ADMIN_HUB" && (
-            <>
-              <button
-                onClick={() => setShowReshipModal(true)}
-                disabled={cancelLoading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Reship
-              </button>
-              <button
-                onClick={handleCancelRejected}
-                disabled={cancelLoading || reshipLoading}
-                className="px-6 py-2 bg-white text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <XCircle className="h-4 w-4" />
-                {cancelLoading ? "Cancelling..." : "Accept & Cancel"}
-              </button>
-            </>
-          )}
-          {status === "CANCELLED" && (
-            <div className="px-6 py-2 bg-red-100 text-red-800 rounded-lg font-medium border border-red-300">
-              Cancelled
-            </div>
+            <button
+              onClick={() => setShowReshipModal(true)}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Reship
+            </button>
           )}
         </div>
       </div>
