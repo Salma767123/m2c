@@ -35,6 +35,10 @@ const getStatusBadge = (status: string) => {
       return <Badge className="bg-gray-100 text-gray-800">Suspended</Badge>
     case 'REJECTED':
       return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
+    case 'REINSPECTION':
+      return <Badge className="bg-amber-100 text-amber-800">Re-Inspection</Badge>
+    case 'SUBMITTED':
+      return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>
     default:
       return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>
   }
@@ -280,6 +284,7 @@ export default function VendorsTable() {
                   { value: 'UNDER_REVIEW', label: 'Under Review' },
                   { value: 'APPROVED', label: 'Approved' },
                   { value: 'REJECTED', label: 'Rejected' },
+                  { value: 'REINSPECTION', label: 'Re-Inspection' },
                   { value: 'SUSPENDED', label: 'Suspended' }
                 ]}
                 placeholder="All Status"

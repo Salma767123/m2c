@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { cartService } from "@/services/cartService"
 import { couponService } from "@/services/couponService"
 import { publicProductService, PublicProduct } from "@/services/publicProductService"
@@ -68,7 +69,9 @@ export default function Order() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [availableBagTypes, setAvailableBagTypes] = useState<BagType[]>([])
   const [selectedBagTypeId, setSelectedBagTypeId] = useState<string | null>(null)
+
   const selectedBagRef = useRef<HTMLButtonElement>(null)
+  const pendingUpdates = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   useEffect(() => {
     const fetchCart = async () => {
@@ -150,31 +153,50 @@ export default function Order() {
           const response = await cartService.getCart()
           if (response.success && response.data) {
             const items = response.data.items.map((item: any) => {
-              const hasVariantImg = item.variant?.images && item.variant.images.length > 0;
-              const hasProductImg = item.product?.images && item.product.images.length > 0;
+              const hasVariant = !!item.variant;
+              const hasVariantImg = hasVariant && item.variant.images?.length > 0;
+              const hasProductImg = item.product?.images?.length > 0;
 
               const imgArray = hasVariantImg
                 ? item.variant.images
                 : (hasProductImg ? item.product.images.map((img: any) => img.url) : []);
 
+              // Use live variant pricing, not stale cart price
+              const livePrice = hasVariant
+                ? (item.variant.adminFixedPrice ?? item.variant.price ?? item.price)
+                : (item.product?.adminFixedPrice ?? item.product?.basePrice ?? item.price);
+
+              // Variant stock takes priority
+              const liveStock = hasVariant
+                ? item.variant.stock
+                : (item.product?.availableStock ?? item.product?.totalStock);
+
+              // Variant-specific discount/originalPrice
+              const liveOriginalPrice = hasVariant
+                ? (item.variant.originalPrice ?? item.product?.originalPrice)
+                : item.product?.originalPrice;
+              const liveDiscount = hasVariant
+                ? (item.variant.discount ?? item.product?.discount)
+                : item.product?.discount;
+
               return {
                 id: item.id,
                 productId: item.productId,
                 name: item.product?.name || 'Unknown Product',
-                price: item.price,
-                originalPrice: item.product?.originalPrice,
+                price: livePrice,
+                originalPrice: liveOriginalPrice,
                 images: imgArray,
                 category: item.product?.category || '',
                 rating: item.product?.rating,
                 reviews: item.product?.reviews,
-                inStock: item.product?.inStock ?? true,
-                availableStock: item.variant?.stock ?? item.product?.availableStock,
+                inStock: liveStock > 0 && (item.product?.inStock ?? true),
+                availableStock: liveStock,
                 quantity: item.quantity,
                 description: item.product?.description,
                 material: item.product?.material,
-                discount: item.product?.discount,
+                discount: liveDiscount,
                 gstPercentage: item.product?.gstPercentage,
-                variantDetails: item.variant ? {
+                variantDetails: hasVariant ? {
                   size: item.variant.size,
                   color: item.variant.color,
                   colorHex: item.variant.colorHex,
@@ -201,6 +223,7 @@ export default function Order() {
 
     fetchCart()
   }, [])
+
 
   // Fetch bag types and restore selection (restore AFTER fetch to validate against active list)
   useEffect(() => {
@@ -320,36 +343,49 @@ export default function Order() {
     )
   }
 
-  const updateQuantity = async (id: string, productId: string, newQuantity: number) => {
+  const updateQuantity = (id: string, productId: string, newQuantity: number) => {
     if (newQuantity < 1) {
       removeItem(id)
       return
     }
 
-    try {
-      if (!isAuthenticated) {
-        cartService.updateLocalCartItem(id, newQuantity)
-        setCartItems(items =>
-          items.map(item =>
-            item.id === id ? { ...item, quantity: newQuantity } : item
-          )
-        )
-        showSuccessToast('Updated', 'Cart item quantity updated')
-        return
-      }
+    // Clamp to available stock
+    const item = cartItems.find(i => i.id === id)
+    if (item?.availableStock != null && newQuantity > item.availableStock) {
+      newQuantity = item.availableStock
+    }
+    if (item && newQuantity === item.quantity) return
 
-      // Update via API
-      await cartService.updateCartItem(id, newQuantity)
-      setCartItems(items =>
-        items.map(item =>
-          item.id === id ? { ...item, quantity: newQuantity } : item
-        )
-      )
-      showSuccessToast('Updated', 'Cart item quantity updated')
-      } catch (error: unknown) {
-        console.error('Failed to update quantity:', error)
+    // Optimistic update — instant UI feedback
+    setCartItems(items =>
+      items.map(i => i.id === id ? { ...i, quantity: newQuantity } : i)
+    )
+
+    // Debounce API call — rapid clicks coalesce into one request
+    if (pendingUpdates.current[id]) clearTimeout(pendingUpdates.current[id])
+    pendingUpdates.current[id] = setTimeout(async () => {
+      delete pendingUpdates.current[id]
+      try {
+        if (isAuthenticated) {
+          await cartService.updateCartItem(id, newQuantity)
+        } else {
+          cartService.updateLocalCartItem(id, newQuantity)
+        }
+      } catch {
+        // Rollback on failure — re-fetch cart
         showErrorToast('Error', 'Failed to update quantity')
+        const response = await cartService.getCart()
+        if (response.success && response.data) {
+          // Re-run the mapping (simplified — just update quantity)
+          setCartItems(items =>
+            items.map(i => {
+              const serverItem = response.data!.items.find((s: { id: string; quantity: number }) => s.id === i.id)
+              return serverItem ? { ...i, quantity: serverItem.quantity } : i
+            })
+          )
+        }
       }
+    }, 400)
   }
 
   const removeItem = async (id: string) => {
@@ -472,9 +508,11 @@ export default function Order() {
                       {/* Product Image */}
                       <div className="shrink-0">
                         {item.images && item.images.length > 0 ? (
-                          <img
+                          <Image
                             src={item.images[0]}
                             alt={item.name}
+                            width={96}
+                            height={96}
                             className="w-24 h-24 object-cover rounded-xl border border-slate-200"
                           />
                         ) : (
@@ -486,6 +524,19 @@ export default function Order() {
 
                       {/* Product Details */}
                       <div className="flex-1 min-w-0">
+                        {/* Stock/price warnings */}
+                        {!item.inStock ? (
+                          <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-red-50 rounded-lg w-fit">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            <span className="text-xs font-semibold text-red-600">Out of Stock — remove to checkout</span>
+                          </div>
+                        ) : item.availableStock != null && item.availableStock > 0 && item.availableStock <= 5 ? (
+                          <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-amber-50 rounded-lg w-fit">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            <span className="text-xs font-semibold text-amber-700">Low stock — only {item.availableStock} left</span>
+                          </div>
+                        ) : null}
+
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <h3 className="text-lg font-semibold text-slate-900 mb-1">{item.name}</h3>
@@ -508,11 +559,11 @@ export default function Order() {
                                   {item.material}
                                 </span>
                               )}
-                              {item.discount && (
+                              {item.discount != null && item.discount > 0 ? (
                                 <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full font-semibold">
                                   Save {item.discount}%
                                 </span>
-                              )}
+                              ) : null}
                             </div>
                             {item.variantDetails && (item.variantDetails.color || item.variantDetails.size) && (
                               <div className="flex gap-4 mt-2 mb-2 text-sm text-slate-700 font-medium border-t border-slate-100 pt-2">
@@ -567,16 +618,16 @@ export default function Order() {
                             <div className="flex items-center border border-slate-300 rounded-lg">
                               <button
                                 onClick={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
-                                className="p-2 hover:bg-slate-100 transition-colors"
-                                disabled={!item.inStock}
+                                className="p-2 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                disabled={!item.inStock || item.quantity <= 1}
                               >
                                 <Minus className="w-4 h-4" />
                               </button>
                               <span className="px-4 py-2 font-medium">{item.quantity}</span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
-                                className="p-2 hover:bg-slate-100 transition-colors"
-                                disabled={!item.inStock}
+                                className="p-2 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                disabled={!item.inStock || (item.availableStock != null && item.quantity >= item.availableStock)}
                               >
                                 <Plus className="w-4 h-4" />
                               </button>
@@ -699,7 +750,7 @@ export default function Order() {
                           {selectedBagTypeId === bag.id && <div className="w-2 h-2 rounded-full bg-[#222222]" />}
                         </div>
                         {bag.image ? (
-                          <img src={bag.image} alt={bag.name} className="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0" />
+                          <Image src={bag.image} alt={bag.name} width={40} height={40} className="w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0" />
                         ) : (
                           <div className="w-10 h-10 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center shrink-0">
                             <ShoppingBag className="w-5 h-5 text-slate-400" />

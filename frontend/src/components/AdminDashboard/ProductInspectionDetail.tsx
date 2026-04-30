@@ -11,6 +11,8 @@ import { Badge } from '@/components/UI/Badge'
 import productService from '@/services/productService'
 import { downloadReportPdf } from '@/lib/reportPdfDownload'
 import { getStoredAuth } from '@/lib/auth'
+import reinspectionService, { AuditLogEntry } from '@/services/reinspectionService'
+import InspectionAuditTimeline from './ReInspection/InspectionAuditTimeline'
 
 interface Props {
     productId: string
@@ -110,6 +112,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
     const [error, setError] = useState<string | null>(null)
     const [downloading, setDownloading] = useState(false)
     const [selectedImage, setSelectedImage] = useState<{src: string, alt: string} | null>(null)
+    const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([])
     const reportRef = useRef<HTMLDivElement>(null)
     const autoDownloadTriggered = useRef(false)
 
@@ -119,6 +122,10 @@ export default function ProductInspectionDetail({ productId }: Props) {
                 const res = await productService.getProduct(productId)
                 if (res.success && res.data) {
                     setProduct(res.data)
+                    // Fetch audit trail (non-critical)
+                    reinspectionService.getAuditTrail('PRODUCT_INSPECTION', productId)
+                        .then(r => setAuditLogs(r.logs || []))
+                        .catch(() => {})
                 } else {
                     setError('Product report not found')
                 }
@@ -570,20 +577,33 @@ export default function ProductInspectionDetail({ productId }: Props) {
             </div>
 
             {/* Fullscreen Image Modal */}
+            {/* Audit Trail */}
+            {auditLogs.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50 text-slate-700">
+                        <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+                        <h3 className="font-bold text-sm tracking-wide">Inspection Audit Trail</h3>
+                    </div>
+                    <div className="p-6">
+                        <InspectionAuditTimeline logs={auditLogs} />
+                    </div>
+                </div>
+            )}
+
             {selectedImage && (
-                <div 
+                <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
                     onClick={() => setSelectedImage(null)}
                 >
                     <div className="relative max-w-5xl max-h-screen">
-                        <button 
+                        <button
                             onClick={(e) => {e.stopPropagation(); setSelectedImage(null)}}
                             className="absolute -top-10 -right-4 p-2 text-white hover:text-gray-300"
                         >
                             <XCircle className="w-8 h-8" />
                         </button>
-                        <img 
-                            src={selectedImage.src} 
+                        <img
+                            src={selectedImage.src}
                             alt={selectedImage.alt}
                             className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
                             onClick={(e) => e.stopPropagation()}

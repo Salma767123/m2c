@@ -214,13 +214,17 @@ export default function QCReports() {
                 return <Badge className="bg-emerald-100 text-emerald-800">QC Approved</Badge>
             case 'REINSPECTION':
             case 'RE_INSPECTION':
-                return <Badge className="bg-yellow-100 text-yellow-800">Review Required</Badge>
+                return <Badge className="bg-amber-100 text-amber-800">Re-Inspection</Badge>
             case 'FAILED':
             case 'REJECTED':
                 return <Badge className="bg-red-100 text-red-800">Failed / Rejected</Badge>
             case 'PENDING':
             case 'IN_PROGRESS':
                 return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
+            case 'SUBMITTED':
+                return <Badge className="bg-blue-100 text-blue-800">Submitted for Review</Badge>
+            case 'UNDER_ADMIN_REVIEW':
+                return <Badge className="bg-yellow-100 text-yellow-800">Under Admin Review</Badge>
             case 'COMPLETED':
                 return <Badge className="bg-green-100 text-green-800">Completed</Badge>
             default:

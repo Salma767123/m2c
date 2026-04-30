@@ -14,7 +14,9 @@ const createInspection = async (req, res) => {
             scheduledTime,
             priority,
             estimatedDuration,
-            itemsToInspect
+            itemsToInspect,
+            parentInspectionId, // For re-inspections
+            cycleNumber,        // For re-inspections
         } = req.body;
 
         // Validate required fields
@@ -38,6 +40,7 @@ const createInspection = async (req, res) => {
         // Prevents admin double-click / rescheduling from creating duplicate
         // SCHEDULED rows, which let checkers unintentionally submit the same
         // report twice and produce duplicate COMPLETED history entries.
+        // Note: SUBMITTED inspections are excluded — they're pending admin review, not active for the checker.
         const active = await prisma.inspection.findFirst({
             where: { vendorId, status: { in: ['SCHEDULED', 'IN_PROGRESS'] } },
             select: { id: true, status: true, scheduledDate: true },
@@ -62,7 +65,9 @@ const createInspection = async (req, res) => {
                 priority,
                 estimatedDuration: estimatedDuration || '1 Hour',
                 itemsToInspect: await resolveBase64InValue(itemsToInspect, { folder: 'inspections' }),
-                status: 'SCHEDULED'
+                status: 'SCHEDULED',
+                parentInspectionId: parentInspectionId || null,
+                cycleNumber: cycleNumber || 1,
             }
         });
 
@@ -98,7 +103,7 @@ const getInspectionsByChecker = async (req, res) => {
         const ALLOWED_SORT_FIELDS = ['scheduledDate', 'completedAt', 'createdAt'];
         const sortBy = ALLOWED_SORT_FIELDS.includes(req.query.sortBy) ? req.query.sortBy : 'completedAt';
         const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
-        const ALLOWED_STATUSES = ['COMPLETED', 'SCHEDULED', 'IN_PROGRESS', 'CANCELLED'];
+        const ALLOWED_STATUSES = ['COMPLETED', 'SCHEDULED', 'IN_PROGRESS', 'SUBMITTED', 'UNDER_ADMIN_REVIEW', 'REJECTED', 'REINSPECTION', 'CANCELLED'];
         const status = ALLOWED_STATUSES.includes(req.query.status) ? req.query.status : '';
 
         const where = { checkerId };
@@ -267,10 +272,12 @@ const updateInspection = async (req, res) => {
 };
 
 // Complete an Inspection and save results
+// Now sets status to SUBMITTED (pending admin review) instead of COMPLETED
 const completeInspection = async (req, res) => {
     try {
         const { id } = req.params;
         const checkerId = req.user?.checkerId || req.user?.id || req.userId;
+        const checkerName = req.user?.name || req.user?.email || 'QC Checker';
         const formData = req.body;
 
         const inspection = await prisma.inspection.findUnique({ where: { id } });
@@ -283,8 +290,8 @@ const completeInspection = async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized to complete this inspection' });
         }
 
-        if (inspection.status === 'COMPLETED') {
-            return res.status(400).json({ error: 'Inspection is already completed' });
+        if (inspection.status === 'COMPLETED' || inspection.status === 'SUBMITTED') {
+            return res.status(400).json({ error: `Inspection is already ${inspection.status.toLowerCase()}` });
         }
 
         if (inspection.status === 'CANCELLED') {
@@ -318,15 +325,26 @@ const completeInspection = async (req, res) => {
         // in Mongo and the admin viewer has to re-decode on every render.
         const persistedFormData = await resolveBase64InValue(formData, { folder: 'inspections' });
 
+        const fromStatus = inspection.status;
+
+        // Build rejection details from form data when inspection is failed
+        const rejectionFields = resultStatus === 'FAILED' ? {
+            rejectionReason: formData.inspectorRemarks || 'Inspection failed',
+            rejectionRemarks: formData.remarks || null,
+            rejectionNotes: formData.notes || null,
+            locationDetails: formData.factoryAddress || formData.locationDetails || null,
+        } : {};
+
         const updatedInspection = await prisma.inspection.update({
             where: { id },
             data: {
-                status: 'COMPLETED',
+                status: 'SUBMITTED',
                 startedAt: inspection.startedAt || new Date(),
-                completedAt: new Date(),
+                submittedAt: new Date(),
                 result: resultStatus,
                 notes: formData.inspectorRemarks || '',
-                itemsToInspect: persistedFormData
+                itemsToInspect: persistedFormData,
+                ...rejectionFields,
             },
             include: {
                 vendor: true
@@ -345,31 +363,44 @@ const completeInspection = async (req, res) => {
             },
             data: {
                 status: 'CANCELLED',
-                notes: `Auto-cancelled: superseded by completed inspection ${id}`,
+                notes: `Auto-cancelled: superseded by submitted inspection ${id}`,
             },
         });
 
-        // Also update vendor status - Keep as UNDER_REVIEW for admin approval even if QC passes
+        // Vendor stays UNDER_REVIEW regardless of pass/fail — admin will finalize
         await prisma.vendor.update({
             where: { id: inspection.vendorId },
-            data: {
-                status: resultStatus === 'FAILED' ? 'REJECTED' : 'UNDER_REVIEW',
-            }
+            data: { status: 'UNDER_REVIEW' },
         });
 
-        // If this was a product inspection, update product status
-        if (inspection.productId) {
-            await prisma.product.update({
-                where: { id: inspection.productId },
-                data: {
-                    approvalStatus: resultStatus === 'FAILED' ? 'REJECTED' : 'QC_APPROVED',
-                    status: 'INACTIVE', // Keep as INACTIVE until Admin finalizes with a price
-                    rejectionReason: resultStatus === 'FAILED' ? 'QC inspection failed' : null
-                }
-            });
-        }
+        // Write audit log
+        await prisma.inspectionAuditLog.create({
+            data: {
+                entityType: 'FACTORY_INSPECTION',
+                entityId: id,
+                action: 'SUBMITTED',
+                fromStatus,
+                toStatus: 'SUBMITTED',
+                performedById: checkerId,
+                performedByType: 'QC_CHECKER',
+                performedByName: checkerName,
+                rejectionReason: resultStatus === 'FAILED' ? (formData.inspectorRemarks || 'Inspection failed') : null,
+                remarks: formData.remarks || null,
+                notes: formData.notes || null,
+                locationDetails: formData.factoryAddress || formData.locationDetails || null,
+                inspectionData: persistedFormData,
+                cycleNumber: inspection.cycleNumber || 1,
+            },
+        });
 
-        res.json({ success: true, message: 'Inspection completed successfully', inspection: updatedInspection });
+        // Notify admins that inspection has been submitted for review
+        const { notifications } = require('../utils/notificationService');
+        notifications.inspectionSubmitted(
+            updatedInspection.vendor?.companyName || 'Vendor',
+            resultStatus
+        ).catch(console.error);
+
+        res.json({ success: true, message: 'Inspection submitted for admin review', inspection: updatedInspection });
     } catch (error) {
         console.error('Error completing inspection:', error);
         res.status(500).json({ error: 'Internal server error' });

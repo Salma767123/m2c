@@ -204,6 +204,40 @@ const notifications = {
       body: `Order #${orderId} — ${itemCount} items, ₹${total}`,
       data: { type: 'ORDER_RECEIVED', orderId },
     }),
+
+  // ── Re-Inspection workflow notifications ────────────────────────────────
+
+  // Admin: inspection submitted for review (factory or product)
+  inspectionSubmitted: (entityName, result) =>
+    sendToRole('ADMIN', {
+      title: 'Inspection Submitted for Review',
+      body: `Inspection for "${entityName}" submitted — Result: ${result}. Admin review required.`,
+      data: { type: 'INSPECTION_SUBMITTED', screen: 'reinspection-review' },
+    }),
+
+  // QC Checker: re-inspection raised
+  reinspectionRaised: (checkerId, entityName, entityType) =>
+    sendToUser(checkerId, 'QC_CHECKER', {
+      title: 'Re-Inspection Assigned',
+      body: `Re-inspection raised for ${entityType === 'factory' ? 'factory' : 'product'} "${entityName}". Please schedule your visit.`,
+      data: { type: 'REINSPECTION_RAISED', screen: entityType === 'factory' ? 'vendors' : 'products' },
+    }),
+
+  // Admin: re-inspection completed
+  reinspectionCompleted: (entityName, cycleNumber, result) =>
+    sendToRole('ADMIN', {
+      title: `Re-Inspection #${cycleNumber} Completed`,
+      body: `Re-inspection for "${entityName}" completed — Result: ${result}`,
+      data: { type: 'REINSPECTION_COMPLETED' },
+    }),
+
+  // Vendor: final rejection after admin review
+  inspectionFinalRejected: (vendorId, reason) =>
+    sendToUser(vendorId, 'VENDOR', {
+      title: 'Application Rejected',
+      body: `Your application has been finally rejected: ${reason}`,
+      data: { type: 'INSPECTION_FINAL_REJECTED' },
+    }),
 };
 
 module.exports = {

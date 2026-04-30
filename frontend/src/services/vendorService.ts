@@ -180,7 +180,7 @@ export interface VendorsListResponse {
 }
 
 export interface VendorFilters {
-  status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  status?: 'PENDING' | 'UNDER_REVIEW' | 'REINSPECTION' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   search?: string;
   page?: number;
   limit?: number;

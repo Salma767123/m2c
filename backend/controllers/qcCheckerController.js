@@ -673,7 +673,7 @@ const updateCheckerProfile = async (req, res) => {
 // ============================
 // QC Checker: Get assigned vendors
 // ============================
-const ALLOWED_VENDOR_STATUSES = ['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'SUSPENDED'];
+const ALLOWED_VENDOR_STATUSES = ['PENDING', 'UNDER_REVIEW', 'REINSPECTION', 'APPROVED', 'REJECTED', 'SUSPENDED'];
 const ALLOWED_VENDOR_SORT_FIELDS = ['submittedAt', 'status'];
 
 const getAssignedVendors = async (req, res) => {
@@ -792,6 +792,8 @@ const getVendorDetails = async (req, res) => {
             });
         }
 
+        // Include SUBMITTED and COMPLETED in history (inspections that have been done)
+        const historyWhere = { vendorId, status: { in: ['COMPLETED', 'SUBMITTED', 'UNDER_ADMIN_REVIEW', 'REJECTED'] } };
         const completedWhere = { vendorId, status: 'COMPLETED' };
 
         const [
@@ -807,8 +809,8 @@ const getVendorDetails = async (req, res) => {
             }),
             prisma.inspection.count({ where: { ...completedWhere, result: 'PASSED' } }),
             prisma.inspection.findMany({
-                where: completedWhere,
-                orderBy: { completedAt: 'desc' },
+                where: historyWhere,
+                orderBy: { createdAt: 'desc' },
                 take: historyLimit,
                 select: {
                     id: true,
@@ -816,7 +818,11 @@ const getVendorDetails = async (req, res) => {
                     clientName: true,
                     scheduledDate: true,
                     completedAt: true,
+                    submittedAt: true,
                     result: true,
+                    status: true,
+                    score: true,
+                    cycleNumber: true,
                     itemsToInspect: true,
                 },
             }),
@@ -830,6 +836,7 @@ const getVendorDetails = async (req, res) => {
                     scheduledDate: true,
                     status: true,
                     priority: true,
+                    cycleNumber: true,
                 },
             }),
         ]);
@@ -841,13 +848,15 @@ const getVendorDetails = async (req, res) => {
         const scheduledCount = countByStatus.SCHEDULED ?? 0;
         const inProgressCount = countByStatus.IN_PROGRESS ?? 0;
         const completedCount = countByStatus.COMPLETED ?? 0;
+        const submittedCount = countByStatus.SUBMITTED ?? 0;
         const cancelledCount = countByStatus.CANCELLED ?? 0;
-        const totalInspections = scheduledCount + inProgressCount + completedCount + cancelledCount;
-        const passRate = completedCount > 0 ? Math.round((passedCount / completedCount) * 100) : 0;
+        const totalInspections = scheduledCount + inProgressCount + completedCount + submittedCount + cancelledCount;
+        const finishedCount = completedCount + submittedCount;
+        const passRate = finishedCount > 0 ? Math.round((passedCount / finishedCount) * 100) : 0;
 
         const latest = recentCompleted[0];
         const lastInspectionDate = latest
-            ? (latest.completedAt ? latest.completedAt.toISOString() : latest.scheduledDate)
+            ? (latest.submittedAt ? latest.submittedAt.toISOString() : latest.completedAt ? latest.completedAt.toISOString() : latest.scheduledDate)
             : null;
 
         res.json({
@@ -859,6 +868,7 @@ const getVendorDetails = async (req, res) => {
                     scheduledCount,
                     inProgressCount,
                     completedCount,
+                    submittedCount,
                     passRate,
                     lastInspectionDate,
                 },
@@ -867,8 +877,8 @@ const getVendorDetails = async (req, res) => {
                 recentInspectionsMeta: {
                     limit: historyLimit,
                     returned: recentCompleted.length,
-                    total: completedCount,
-                    hasMore: completedCount > recentCompleted.length,
+                    total: finishedCount,
+                    hasMore: finishedCount > recentCompleted.length,
                 },
             },
         });
@@ -905,6 +915,9 @@ const getActiveInspectionForVendor = async (req, res) => {
             status: true,
             itemsToInspect: true,
             scheduledDate: true,
+            cycleNumber: true,
+            parentInspectionId: true,
+            rejectionReason: true,
             vendor: {
                 select: {
                     id: true,
@@ -932,7 +945,17 @@ const getActiveInspectionForVendor = async (req, res) => {
             select: inspectionSelect,
         });
 
-        res.json({ success: true, inspection });
+        // For re-inspections, fetch the previous rejection reason from the parent
+        let previousRejectionReason = null;
+        if (inspection?.parentInspectionId) {
+            const parent = await prisma.inspection.findUnique({
+                where: { id: inspection.parentInspectionId },
+                select: { rejectionReason: true, notes: true },
+            });
+            previousRejectionReason = parent?.rejectionReason || parent?.notes || null;
+        }
+
+        res.json({ success: true, inspection, previousRejectionReason });
     } catch (error) {
         console.error('Get active inspection error:', error);
         res.status(500).json({
@@ -979,6 +1002,29 @@ const approveVendorByQc = async (req, res) => {
                 completedInspections: { increment: 1 }
             }
         });
+
+        // Write audit log
+        // Find the latest inspection for this vendor to link the audit log
+        const latestInspection = await prisma.inspection.findFirst({
+            where: { vendorId, checkerId },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, cycleNumber: true },
+        });
+        if (latestInspection) {
+            await prisma.inspectionAuditLog.create({
+                data: {
+                    entityType: 'FACTORY_INSPECTION',
+                    entityId: latestInspection.id,
+                    action: 'QC_APPROVED',
+                    fromStatus: vendor.status,
+                    toStatus: 'UNDER_REVIEW',
+                    performedById: checkerId,
+                    performedByType: 'QC_CHECKER',
+                    performedByName: req.user?.name || req.user?.email || 'QC Checker',
+                    cycleNumber: latestInspection.cycleNumber || 1,
+                },
+            }).catch(err => console.error('Audit log write failed:', err));
+        }
 
         res.json({
             success: true,
@@ -1041,6 +1087,29 @@ const rejectVendorByQc = async (req, res) => {
                 completedInspections: { increment: 1 }
             }
         });
+
+        // Write audit log
+        const latestInspection = await prisma.inspection.findFirst({
+            where: { vendorId, checkerId },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, cycleNumber: true },
+        });
+        if (latestInspection) {
+            await prisma.inspectionAuditLog.create({
+                data: {
+                    entityType: 'FACTORY_INSPECTION',
+                    entityId: latestInspection.id,
+                    action: 'QC_REJECTED',
+                    fromStatus: vendor.status,
+                    toStatus: 'REJECTED',
+                    performedById: checkerId,
+                    performedByType: 'QC_CHECKER',
+                    performedByName: req.user?.name || req.user?.email || 'QC Checker',
+                    rejectionReason: reason,
+                    cycleNumber: latestInspection.cycleNumber || 1,
+                },
+            }).catch(err => console.error('Audit log write failed:', err));
+        }
 
         res.json({
             success: true,
@@ -1178,7 +1247,7 @@ const getProductReports = async (req, res) => {
 
         const where = {
             assignedQcId: qcCheckerId,
-            approvalStatus: { in: ['QC_APPROVED', 'APPROVED', 'REJECTED'] },
+            approvalStatus: { in: ['QC_APPROVED', 'APPROVED', 'REJECTED', 'REINSPECTION'] },
         };
         if (search) {
             where.OR = [
@@ -1373,6 +1442,8 @@ const approveProductByQc = async (req, res) => {
             ? await resolveBase64InValue(formData, { folder: 'qc-inspections' })
             : null;
 
+        const fromStatus = product.approvalStatus;
+
         const updatedProduct = await prisma.product.update({
             where: { id: productId },
             data: {
@@ -1381,6 +1452,28 @@ const approveProductByQc = async (req, res) => {
                 qcInspectionData: cleanFormData
             }
         });
+
+        // Write audit log
+        await prisma.inspectionAuditLog.create({
+            data: {
+                entityType: 'PRODUCT_INSPECTION',
+                entityId: productId,
+                action: approvalStatus === 'QC_APPROVED' ? 'QC_APPROVED' : approvalStatus === 'REINSPECTION' ? 'QC_REINSPECTION' : 'QC_REJECTED',
+                fromStatus,
+                toStatus: approvalStatus,
+                performedById: qcCheckerId,
+                performedByType: 'QC_CHECKER',
+                performedByName: req.user.name || req.user.email || 'QC Checker',
+                inspectionData: cleanFormData,
+                cycleNumber: product.inspectionCycleNumber || 1,
+            },
+        }).catch(err => console.error('Audit log write failed:', err));
+
+        // Notify admins when product needs review
+        if (approvalStatus === 'REJECTED' || approvalStatus === 'REINSPECTION') {
+            const { notifications } = require('../utils/notificationService');
+            notifications.inspectionSubmitted(product.name, approvalStatus).catch(console.error);
+        }
 
         res.status(200).json({
             success: true,
@@ -1439,15 +1532,44 @@ const rejectProductByQc = async (req, res) => {
             ? await resolveBase64InValue(formData, { folder: 'qc-inspections' })
             : null;
 
+        const fromStatus = product.approvalStatus;
+        const { remarks, notes, locationDetails } = req.body;
+
         const updatedProduct = await prisma.product.update({
             where: { id: productId },
             data: {
                 approvalStatus: 'REJECTED',
                 rejectionReason: reason,
+                rejectionRemarks: remarks || null,
+                rejectionNotes: notes || null,
                 status: 'INACTIVE',
                 qcInspectionData: cleanFormData
             }
         });
+
+        // Write audit log
+        await prisma.inspectionAuditLog.create({
+            data: {
+                entityType: 'PRODUCT_INSPECTION',
+                entityId: productId,
+                action: 'QC_REJECTED',
+                fromStatus,
+                toStatus: 'REJECTED',
+                performedById: qcCheckerId,
+                performedByType: 'QC_CHECKER',
+                performedByName: req.user.name || req.user.email || 'QC Checker',
+                rejectionReason: reason,
+                remarks: remarks || null,
+                notes: notes || null,
+                locationDetails: locationDetails || null,
+                inspectionData: cleanFormData,
+                cycleNumber: product.inspectionCycleNumber || 1,
+            },
+        }).catch(err => console.error('Audit log write failed:', err));
+
+        // Notify admins
+        const { notifications } = require('../utils/notificationService');
+        notifications.inspectionSubmitted(product.name, 'REJECTED').catch(console.error);
 
         res.status(200).json({
             success: true,

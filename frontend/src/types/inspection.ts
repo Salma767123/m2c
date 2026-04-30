@@ -6,7 +6,7 @@ export interface Vendor {
   location: string
   submittedDate?: string
   recentPO?: string
-  status: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'
+  status: 'PENDING' | 'UNDER_REVIEW' | 'REINSPECTION' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'
   inspectionStatus?: string | null
   contactPerson?: {
     name: string
@@ -121,6 +121,14 @@ export interface ProductDetailData {
   approvedBy?: string | null
   rejectionReason?: string | null
   qcInspectionData?: Record<string, unknown> | null
+  inspectionCycleNumber?: number
+  previousInspectionData?: Array<{
+    cycleNumber: number
+    data: Record<string, unknown>
+    rejectionReason?: string
+    reviewedAt?: string
+    reviewedBy?: string
+  }>
   createdAt: string
   updatedAt?: string | null
   images?: ProductImage[]

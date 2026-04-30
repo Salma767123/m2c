@@ -436,6 +436,7 @@ enum VendorStatus {
   UNDER_REVIEW
   APPROVED
   REJECTED
+  REINSPECTION
   SUSPENDED
 }
 
@@ -659,6 +660,9 @@ model Product {
   dimensions            String?
   weight                String?
   inStock               Boolean   @default(true)
+
+  // Logistics Configuration (per-product transport, weight rules, costs)
+  logisticsConfig       Json?     // LogisticsConfig object
   
   // Product Status & Approval
   status                ProductStatus @default(ACTIVE)
@@ -674,7 +678,16 @@ model Product {
   assignedQcId          String?   @db.ObjectId
   assignedQc            QCChecker? @relation("ProductQCChecker", fields: [assignedQcId], references: [id])
   qcInspectionData      Json?     // Stores the product inspection form data
-  
+
+  // Re-inspection tracking
+  inspectionCycleNumber   Int      @default(1)
+  previousInspectionData  Json[]   @default([]) // Array of past qcInspectionData snapshots
+  lastReviewedBy          String?  @db.ObjectId
+  lastReviewedAt          DateTime?
+  rejectionRemarks        String?
+  rejectionNotes          String?
+  rejectionAttachments    String[] @default([])
+
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -1489,7 +1502,23 @@ model Inspection {
   result            InspectionResult?
   score             Float?
   notes             String?
-  
+
+  // Re-inspection tracking
+  parentInspectionId  String?   @db.ObjectId
+  cycleNumber         Int       @default(1)
+
+  // Rejection details (populated when checker submits as failed)
+  rejectionReason     String?
+  rejectionRemarks    String?
+  rejectionNotes      String?
+  locationDetails     String?
+  rejectionAttachments String[] @default([])
+
+  // Review tracking
+  submittedAt         DateTime?
+  reviewedAt          DateTime?
+  reviewedBy          String?   @db.ObjectId
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -1497,12 +1526,17 @@ model Inspection {
   @@index([vendorId, status, result])
   @@index([checkerId, status])
   @@index([completedAt])
+  @@index([parentInspectionId])
   @@map("inspections")
 }
 
 enum InspectionStatus {
   SCHEDULED
   IN_PROGRESS
+  SUBMITTED
+  UNDER_ADMIN_REVIEW
+  REJECTED
+  REINSPECTION
   COMPLETED
   CANCELLED
 }
@@ -1510,6 +1544,47 @@ enum InspectionStatus {
 enum InspectionResult {
   PASSED
   FAILED
+}
+
+// ============================================
+// INSPECTION AUDIT TRAIL
+// ============================================
+
+model InspectionAuditLog {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Polymorphic reference: "FACTORY_INSPECTION" or "PRODUCT_INSPECTION"
+  entityType      String
+  entityId        String   @db.ObjectId
+
+  // What happened
+  action          String   // SUBMITTED, ADMIN_APPROVED, ADMIN_REJECTED, REINSPECTION_RAISED, REINSPECTION_STARTED, REINSPECTION_COMPLETED
+  fromStatus      String?
+  toStatus        String?
+
+  // Who did it
+  performedById   String   @db.ObjectId
+  performedByType String   // ADMIN, QC_CHECKER
+  performedByName String?
+
+  // Rejection / review details
+  rejectionReason String?
+  remarks         String?
+  notes           String?
+  locationDetails String?
+  attachments     String[] @default([]) // Cloudinary URLs
+  inspectionData  Json?    // Snapshot of form data at this point
+
+  // Re-inspection tracking
+  cycleNumber     Int      @default(1)
+  parentLogId     String?  @db.ObjectId
+
+  createdAt       DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([entityType, entityId, createdAt])
+  @@index([performedById])
+  @@map("inspection_audit_logs")
 }
 
 // Generic atomic counter for sequential code generation (vendor, future entities).
