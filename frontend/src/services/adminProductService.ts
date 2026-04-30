@@ -35,6 +35,7 @@ export interface AdminProduct {
   dimensions?: string;
   weight?: string;
   inStock: boolean;
+  logisticsConfig?: Record<string, unknown> | null;
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
   approvalStatus: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION';
   approvedAt?: string;

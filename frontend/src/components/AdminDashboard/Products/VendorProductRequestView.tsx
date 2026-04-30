@@ -342,7 +342,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           <Badge className={getStatusColor(product.approvalStatus)}>
             {product.approvalStatus.replace('_', ' ').charAt(0).toUpperCase() + product.approvalStatus.replace('_', ' ').slice(1).toLowerCase()}
           </Badge>
-          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION') && hasPermission('edit_products') && (
+          {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'QC_APPROVED' || product.approvalStatus === 'REINSPECTION' || product.approvalStatus === 'REJECTED') && hasPermission('edit_products') && (
             <>
               {product.approvalStatus === 'QC_APPROVED' ? (
                 <Button
@@ -353,25 +353,45 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   <Check className="h-4 w-4 mr-2" />
                   {actionLoading ? 'Processing...' : 'Approve'}
                 </Button>
-              ) : (
+              ) : product.approvalStatus === 'REINSPECTION' ? (
                 <div className="flex flex-col items-end">
-                  <Badge variant="outline" className={product.approvalStatus === 'REINSPECTION' ? "text-orange-600 mb-1 border-orange-200" : "text-yellow-600 mb-1 border-yellow-200"}>
-                    {product.approvalStatus === 'REINSPECTION' ? "Reinspection Required" : "Waiting for QC Approval"}
+                  <Badge variant="outline" className="text-orange-600 mb-1 border-orange-200">
+                    Awaiting QC Re-Inspection
                   </Badge>
                   <span className="text-[10px] text-gray-400 italic">
-                    {product.approvalStatus === 'REINSPECTION' ? "Must be reassigned or re-inspected" : "QC must approve first"}
+                    QC checker must complete re-inspection
+                  </span>
+                </div>
+              ) : product.approvalStatus === 'REJECTED' ? (
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.href = `/admin/dashboard/reinspection-review/product/${product.id}`}
+                  className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Review &amp; Re-Inspect
+                </Button>
+              ) : (
+                <div className="flex flex-col items-end">
+                  <Badge variant="outline" className="text-yellow-600 mb-1 border-yellow-200">
+                    Waiting for QC Approval
+                  </Badge>
+                  <span className="text-[10px] text-gray-400 italic">
+                    QC must approve first
                   </span>
                 </div>
               )}
-              <Button
-                variant="outline"
-                onClick={() => setShowRejectionModal(true)}
-                disabled={actionLoading}
-                className="border-red-300 text-red-600 hover:bg-red-50 ml-3"
-              >
-                <X className="h-4 w-4 mr-2" />
-                Reject
-              </Button>
+              {product.approvalStatus === 'PENDING' && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowRejectionModal(true)}
+                  disabled={actionLoading}
+                  className="border-red-300 text-red-600 hover:bg-red-50 ml-3"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Reject
+                </Button>
+              )}
             </>
           )}
         </div>

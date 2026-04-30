@@ -72,7 +72,10 @@ const createProduct = async (req, res) => {
       dimensions,
       weight,
       inStock,
-      status
+      status,
+
+      // Logistics Configuration
+      logisticsConfig
     } = req.body;
 
     // Resolve base64 images to URLs
@@ -214,6 +217,7 @@ const createProduct = async (req, res) => {
           dimensions,
           weight,
           inStock: inStock !== false,
+          logisticsConfig: logisticsConfig || null,
           status: 'ACTIVE', // Default status is ACTIVE
           approvalStatus: 'PENDING' // Default approval status is PENDING
         }
@@ -621,6 +625,7 @@ const updateProduct = async (req, res) => {
           ...(updateData.dimensions !== undefined && { dimensions: updateData.dimensions }),
           ...(updateData.weight !== undefined && { weight: updateData.weight }),
           ...(updateData.inStock !== undefined && { inStock: updateData.inStock }),
+          ...(updateData.logisticsConfig !== undefined && { logisticsConfig: updateData.logisticsConfig }),
           ...(updateData.status && { status: updateData.status.toUpperCase() })
         }
       });
@@ -1288,6 +1293,13 @@ const getProductForAdmin = async (req, res) => {
             status: true
           }
         },
+        assignedQc: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        },
         inventory: {
           select: {
             id: true,
@@ -1382,7 +1394,10 @@ const createProductByAdmin = async (req, res) => {
       weight,
       inStock,
       status,
-      approvalStatus // Admin can set approval status directly
+      approvalStatus, // Admin can set approval status directly
+
+      // Logistics Configuration
+      logisticsConfig
     } = req.body;
 
     // Resolve base64 images to URLs
@@ -1547,6 +1562,7 @@ const createProductByAdmin = async (req, res) => {
           dimensions,
           weight,
           inStock: inStock !== false,
+          logisticsConfig: logisticsConfig || null,
           status: status ? status.toUpperCase() : 'ACTIVE',
           approvalStatus: approvalStatus ? approvalStatus.toUpperCase() : 'PENDING', // Default to PENDING for admin creations
           approvedAt: approvalStatus === 'APPROVED' ? new Date() : null,
@@ -1808,6 +1824,7 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.dimensions !== undefined && { dimensions: updateData.dimensions }),
         ...(updateData.weight !== undefined && { weight: updateData.weight }),
         ...(updateData.inStock !== undefined && { inStock: updateData.inStock }),
+        ...(updateData.logisticsConfig !== undefined && { logisticsConfig: updateData.logisticsConfig }),
         ...(updateData.status && { status: updateData.status.toUpperCase() }),
         ...(updateData.approvalStatus && {
           approvalStatus: updateData.approvalStatus.toUpperCase(),
@@ -2375,6 +2392,7 @@ const getPublicProduct = async (req, res) => {
         dimensions: true,
         weight: true,
         dispatchTimeline: true,
+        logisticsConfig: true,
         createdAt: true,
         updatedAt: true,
         inventory: {
@@ -2393,9 +2411,36 @@ const getPublicProduct = async (req, res) => {
       });
     }
 
+    // Sanitize logisticsConfig — only expose customer-facing fields, not admin internals
+    let publicProduct = { ...product };
+    if (product.logisticsConfig) {
+      const lc = product.logisticsConfig;
+      publicProduct.logisticsConfig = {
+        unitWeight: lc.unitWeight || 0,
+        weightUom: lc.weightUom || 'KG',
+        maxWeight: lc.maxWeight || 0,
+        dimensions: lc.dimensions || null,
+        transportTypes: lc.transportTypes || ['AIR', 'SHIP'],
+        // Customer sees delivery days and total cost — NOT per-kg rates
+        airDeliveryDays: lc.airDeliveryDays || 7,
+        shipDeliveryDays: lc.shipDeliveryDays || 30,
+        // Send cost per KG for client-side calculation but keep weight ranges internal
+        airCostPerKg: lc.airCostPerKg || 0,
+        shipCostPerKg: lc.shipCostPerKg || 0,
+        // Weight ranges needed for auto-recommendation on frontend
+        weightRanges: (lc.weightRanges || []).map(r => ({
+          minWeight: r.minWeight,
+          maxWeight: r.maxWeight,
+          recommendedTransport: r.recommendedTransport,
+        })),
+        // Only show customer-facing notes, not internal admin notes
+        notes: lc.notes || '',
+      };
+    }
+
     res.json({
       success: true,
-      data: product
+      data: publicProduct
     });
   } catch (error) {
     console.error('Get public product error:', error);

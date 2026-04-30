@@ -8,9 +8,12 @@ export interface WishlistItem {
     name: string;
     image: string;
     basePrice: number;
+    adminFixedPrice?: number;
     originalPrice?: number;
     discount?: number;
     inStock: boolean;
+    totalStock?: number;
+    hasVariants?: boolean;
     rating?: number;
     reviews?: number;
     category: string;

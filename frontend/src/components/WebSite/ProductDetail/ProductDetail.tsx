@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Breadcrumb from '../Navigation/Breadcrumb';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
 import { productService, Product, ProductVariant } from '@/services/productService';
 import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
-import { Star, Heart, Truck, Shield, RotateCcw, Package } from 'lucide-react';
+import { Star, Heart, Truck, Shield, RotateCcw, Package, Plane, Ship, AlertTriangle, Info, Box } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils';
 import { wishlistService } from '@/services/wishlistService';
@@ -14,6 +14,7 @@ import { trackProductView } from '@/services/analyticsService';
 import reviewService from '@/services/reviewService';
 import Image from 'next/image';
 import { formatPrice } from '@/lib/currency';
+import { calculateLogistics, formatWeight, formatDimensions, LogisticsConfig } from '@/lib/logistics';
 import PromotionalPopup from '@/components/WebSite/PromotionalPopup/PromotionalPopup';
 
 interface ProductDetailProps {
@@ -31,9 +32,10 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [imageRef, setImageRef] = useState<HTMLImageElement | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [transportOverride, setTransportOverride] = useState<'AIR' | 'SHIP' | null>(null);
 
   // Reviews
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<{ id: string; rating: number; comment?: string; createdAt: string; user?: { name: string } }[]>([]);
   const [showReviews, setShowReviews] = useState(false);
   const [loadingReviews, setLoadingReviews] = useState(false);
 
@@ -90,6 +92,12 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
 
     fetchProduct();
   }, [productId]);
+
+  // Smart logistics calculation (must be before any conditional returns)
+  const logisticsResult = useMemo(() => {
+    if (!product?.logisticsConfig) return null;
+    return calculateLogistics(product.logisticsConfig as LogisticsConfig, quantity, transportOverride || undefined);
+  }, [product?.logisticsConfig, quantity, transportOverride]);
 
   if (loading) {
     return (
@@ -445,14 +453,14 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                         <span className="text-sm text-gray-600 font-medium">
                           {product.rating || 0} ({product.reviews || 0} reviews)
                         </span>
-                        {product.reviews && product.reviews > 0 && (
+                        {product.reviews != null && product.reviews > 0 ? (
                           <button
                             onClick={fetchReviews}
                             className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
                           >
                             {showReviews ? 'Hide reviews' : 'See all reviews'}
                           </button>
-                        )}
+                        ) : null}
                       </div>
 
                       {/* Price */}
@@ -658,6 +666,111 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                 (Total: {product.dispatchTimeline.totalDays} days)
                               </span>
                             </div>
+                          </div>
+                        )}
+
+                        {/* Smart Logistics Section */}
+                        {logisticsResult && product.logisticsConfig && (
+                          <div className="bg-white border border-gray-200 rounded-xl p-4 mb-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                                <Truck className="w-4 h-4 text-blue-600" />
+                                Shipping & Logistics
+                              </h3>
+                              {logisticsResult.recommendedTransport === logisticsResult.selectedTransport && (
+                                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">
+                                  Recommended
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Total Weight */}
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">Total Weight</span>
+                              <span className="font-semibold text-gray-900">
+                                {formatWeight(logisticsResult.totalWeightKg)}
+                                <span className="text-xs text-gray-500 ml-1">
+                                  ({quantity} x {formatWeight(logisticsResult.unitWeightKg)}/unit)
+                                </span>
+                              </span>
+                            </div>
+
+                            {/* Transport Toggle */}
+                            {(product.logisticsConfig as LogisticsConfig).transportTypes.length > 1 && (
+                              <div className="flex gap-2">
+                                {(product.logisticsConfig as LogisticsConfig).transportTypes.map((type) => {
+                                  const isSelected = logisticsResult.selectedTransport === type;
+                                  const isRecommended = logisticsResult.recommendedTransport === type;
+                                  return (
+                                    <button
+                                      key={type}
+                                      onClick={() => setTransportOverride(type)}
+                                      aria-label={`Select ${type === 'AIR' ? 'Air Freight' : 'Sea Freight'} shipping`}
+                                      aria-pressed={isSelected}
+                                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border-2 text-sm font-semibold transition-all duration-200 ${
+                                        isSelected
+                                          ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200'
+                                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300'
+                                      }`}
+                                    >
+                                      {type === 'AIR' ? <Plane className="w-4 h-4" /> : <Ship className="w-4 h-4" />}
+                                      {type === 'AIR' ? 'Air Freight' : 'Sea Freight'}
+                                      {isRecommended && !isSelected && (
+                                        <span className="text-[9px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded font-bold">Best</span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Single transport display */}
+                            {(product.logisticsConfig as LogisticsConfig).transportTypes.length === 1 && (
+                              <div className="flex items-center gap-2 py-2 px-3 rounded-lg bg-blue-50 border border-blue-200 text-sm font-semibold text-blue-700">
+                                {logisticsResult.selectedTransport === 'AIR' ? <Plane className="w-4 h-4" /> : <Ship className="w-4 h-4" />}
+                                {logisticsResult.selectedTransport === 'AIR' ? 'Air Freight' : 'Sea Freight'}
+                              </div>
+                            )}
+
+                            {/* Delivery & Cost */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                                <div className="text-xs text-gray-500 mb-0.5">Delivery Time</div>
+                                <div className="text-sm font-bold text-gray-900">{logisticsResult.deliveryDays} days</div>
+                              </div>
+                              <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                                <div className="text-xs text-gray-500 mb-0.5">Shipping Cost</div>
+                                <div className="text-sm font-bold text-gray-900">
+                                  {logisticsResult.totalShippingCost === 0 ? 'FREE' : formatPrice(logisticsResult.totalShippingCost)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Dimensions */}
+                            {(product.logisticsConfig as LogisticsConfig).dimensions && (
+                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                <Box className="w-3.5 h-3.5" />
+                                <span>Dimensions: {formatDimensions((product.logisticsConfig as LogisticsConfig).dimensions)}</span>
+                              </div>
+                            )}
+
+                            {/* Max weight warning */}
+                            {logisticsResult.exceedsMaxWeight && (
+                              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-700">
+                                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                                <span>
+                                  Total weight ({formatWeight(logisticsResult.totalWeightKg)}) exceeds the maximum limit of {formatWeight(logisticsResult.maxWeightKg)}. Please reduce quantity or contact support.
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Notes */}
+                            {(product.logisticsConfig as LogisticsConfig).notes && (
+                              <div className="flex items-start gap-1.5 text-xs text-gray-500">
+                                <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                <span>{(product.logisticsConfig as LogisticsConfig).notes}</span>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -870,7 +983,7 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                 <p className="text-gray-500 text-center py-8">No reviews yet</p>
               ) : (
                 <div className="space-y-4">
-                  {reviews.map((review: any) => (
+                  {reviews.map((review) => (
                     <div key={review.id} className="bg-gray-50 rounded-xl p-5">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-3">

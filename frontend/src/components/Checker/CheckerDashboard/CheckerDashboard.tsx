@@ -52,13 +52,13 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
 
   // Product counts
   const pendingProducts = assignedProducts.filter(p =>
-    p.approvalStatus === 'PENDING' || p.approvalStatus === 'REINSPECTION' || p.approvalStatus === 'UNDER_REVIEW'
+    p.approvalStatus === 'PENDING' || p.approvalStatus === 'REINSPECTION'
   ).length
   const passedProducts = assignedProducts.filter(p => p.approvalStatus === 'QC_APPROVED' || p.approvalStatus === 'APPROVED').length
   const failedProducts = assignedProducts.filter(p => p.approvalStatus === 'REJECTED').length
 
   // Vendor inspection counts
-  const pendingVendors = assignedVendors.filter(v => v.status === 'UNDER_REVIEW' || v.status === 'PENDING').length
+  const pendingVendors = assignedVendors.filter(v => v.status === 'UNDER_REVIEW' || v.status === 'PENDING' || v.status === 'REINSPECTION').length
   const passedVendors = completedInspections.filter(i => i.result === 'PASSED').length
   const failedVendors = completedInspections.filter(i => i.result === 'FAILED').length
 

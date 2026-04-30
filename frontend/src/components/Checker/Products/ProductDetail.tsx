@@ -567,7 +567,8 @@ function humanizeKey(key: string): string {
 
 function QcActivityTab({ product }: { product: ProductDetailData }) {
     const status: string = product.approvalStatus
-    const hasAction = Boolean(product.approvedAt || product.rejectionReason || product.qcInspectionData)
+    const isReinspection = status === "REINSPECTION"
+    const hasAction = Boolean(product.approvedAt || product.rejectionReason || product.qcInspectionData || isReinspection || (product.inspectionCycleNumber && product.inspectionCycleNumber > 1))
     const isRejected = status === "REJECTED"
     const isApproved = status === "QC_APPROVED" || status === "APPROVED"
     const qcSummary = summariseQcData(product.qcInspectionData)
@@ -589,13 +590,17 @@ function QcActivityTab({ product }: { product: ProductDetailData }) {
                     ? "bg-red-50 border-red-200"
                     : isApproved
                         ? "bg-emerald-50 border-emerald-200"
-                        : "bg-slate-50 border-slate-200"
+                        : isReinspection
+                            ? "bg-amber-50 border-amber-200"
+                            : "bg-slate-50 border-slate-200"
                     }`}
             >
                 {isRejected ? (
                     <XCircle className="w-5 h-5 mt-0.5 text-red-600" />
                 ) : isApproved ? (
                     <CheckCircle className="w-5 h-5 mt-0.5 text-emerald-600" />
+                ) : isReinspection ? (
+                    <RotateCw className="w-5 h-5 mt-0.5 text-amber-600" />
                 ) : (
                     <Clock className="w-5 h-5 mt-0.5 text-slate-500" />
                 )}
@@ -616,6 +621,23 @@ function QcActivityTab({ product }: { product: ProductDetailData }) {
                     )}
                 </div>
             </div>
+
+            {/* Re-inspection info */}
+            {isReinspection && product.inspectionCycleNumber && product.inspectionCycleNumber > 1 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <p className="text-sm font-semibold text-amber-800">
+                        Re-Inspection Cycle #{product.inspectionCycleNumber}
+                    </p>
+                    <p className="text-xs text-amber-700 mt-1">
+                        Previous inspection was rejected. Please re-evaluate this product thoroughly.
+                    </p>
+                    {product.previousInspectionData && product.previousInspectionData.length > 0 && (
+                        <p className="text-xs text-amber-600 mt-1">
+                            Previous reason: {product.previousInspectionData[product.previousInspectionData.length - 1]?.rejectionReason || 'N/A'}
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* Assigned QC */}
             {qc && (

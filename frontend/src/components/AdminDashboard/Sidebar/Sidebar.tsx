@@ -27,6 +27,7 @@ import {
   ShoppingCart,
   FileBarChart,
   ShoppingBag,
+  RefreshCcw,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -170,6 +171,12 @@ const navigation: NavigationItem[] = [
     title: "QC Reports",
     icon: ClipboardCheck,
     href: "/admin/dashboard/qc-reports",
+    permission: "view_reports",
+  },
+  {
+    title: "Re-Inspection Review",
+    icon: RefreshCcw,
+    href: "/admin/dashboard/reinspection-review",
     permission: "view_reports",
   },
   {

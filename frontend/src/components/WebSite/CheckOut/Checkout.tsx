@@ -13,6 +13,7 @@ import {
   Loader2,
   ShoppingBag
 } from "lucide-react"
+import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 import { formatPrice } from '@/lib/currency'
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
@@ -401,7 +402,18 @@ export default function Checkout() {
 
   const calculateTotals = () => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    const shipping = freeShippingApplied ? 0 : 0 // Free shipping if applied, otherwise standard free shipping
+    // Calculate logistics-based shipping from product configs
+    let logisticsShipping = 0;
+    if (!freeShippingApplied) {
+      for (const item of cartItems) {
+        const config = (item.product as any)?.logisticsConfig;
+        if (config) {
+          const result = calculateLogistics(config as LogisticsConfig, item.quantity);
+          logisticsShipping += result.totalShippingCost;
+        }
+      }
+    }
+    const shipping = freeShippingApplied ? 0 : logisticsShipping;
     const tax = cartItems.reduce((sum, item) => {
       const itemSubtotal = item.price * item.quantity
       const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0

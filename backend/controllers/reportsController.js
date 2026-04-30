@@ -669,7 +669,7 @@ const getQcFactoryReports = async (req, res) => {
         const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
         const skip = (page - 1) * limit;
 
-        const where = { status: 'COMPLETED' };
+        const where = { status: { in: ['COMPLETED', 'SUBMITTED', 'UNDER_ADMIN_REVIEW', 'REJECTED'] } };
         if (result === 'PASSED' || result === 'FAILED') where.result = result;
         if (search) {
             where.OR = [

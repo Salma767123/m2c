@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Clock,
 } from "lucide-react"
 import InspectionForm from "@/components/Checker/Vendor/InspectionForm"
 import VendorDetail from "@/components/Checker/Vendor/VendorDetail"
@@ -32,6 +33,7 @@ const PAGE_SIZE = 12
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
   { value: "UNDER_REVIEW", label: "Under Review by Admin" },
+  { value: "REINSPECTION", label: "Re-Inspection" },
   { value: "APPROVED", label: "Approved by Admin" },
   { value: "REJECTED", label: "Rejected" },
   { value: "SUSPENDED", label: "Suspended" },
@@ -46,6 +48,7 @@ const STATUS_COLORS: Record<string, string> = {
   APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
   PENDING: "bg-amber-100 text-amber-800 border-amber-200",
   UNDER_REVIEW: "bg-blue-100 text-blue-800 border-blue-200",
+  REINSPECTION: "bg-orange-100 text-orange-800 border-orange-200",
   REJECTED: "bg-red-100 text-red-800 border-red-200",
   SUSPENDED: "bg-slate-100 text-slate-800 border-slate-200",
 }
@@ -53,6 +56,7 @@ const STATUS_COLORS: Record<string, string> = {
 const getStatusColor = (status: string) => STATUS_COLORS[status] || STATUS_COLORS.PENDING
 const FRIENDLY_LABELS: Record<string, string> = {
   UNDER_REVIEW: "Under Review by Admin",
+  REINSPECTION: "Re-Inspection Required",
   QC_APPROVED: "Approved by QC",
   APPROVED: "Approved by Admin",
 }
@@ -64,7 +68,7 @@ function formatVendorLocation(city?: string | null, state?: string | null): stri
 }
 
 type VendorStatus = Vendor['status']
-const VALID_STATUSES: readonly VendorStatus[] = ['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'SUSPENDED']
+const VALID_STATUSES: readonly VendorStatus[] = ['PENDING', 'UNDER_REVIEW', 'REINSPECTION', 'APPROVED', 'REJECTED', 'SUSPENDED']
 const toVendorStatus = (s: string | null | undefined): VendorStatus =>
   (VALID_STATUSES as readonly string[]).includes(s ?? '') ? (s as VendorStatus) : 'PENDING'
 
@@ -80,7 +84,7 @@ interface RawVendor {
 
 // Pick an actionable inspection over a terminal one so the card button
 // (Start / Continue / Completed) reflects what the checker can actually do.
-const INSPECTION_PRIORITY = ["IN_PROGRESS", "SCHEDULED", "COMPLETED", "CANCELLED"] as const
+const INSPECTION_PRIORITY = ["IN_PROGRESS", "SCHEDULED", "SUBMITTED", "COMPLETED", "CANCELLED"] as const
 function pickInspectionStatus(inspections?: Array<{ status?: string | null }>): string | null {
   if (!inspections || inspections.length === 0) return null
   for (const target of INSPECTION_PRIORITY) {
@@ -470,6 +474,11 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
                   <div className="flex-1 bg-slate-100 text-slate-600 font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm border border-slate-200">
                     <X className="w-4 h-4" aria-hidden="true" />
                     Cancelled
+                  </div>
+                ) : vendor.inspectionStatus === "SUBMITTED" || vendor.status === "UNDER_REVIEW" ? (
+                  <div className="flex-1 bg-blue-50 text-blue-700 font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm border border-blue-200">
+                    <Clock className="w-4 h-4" aria-hidden="true" />
+                    Under Review
                   </div>
                 ) : (
                   <button

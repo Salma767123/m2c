@@ -72,6 +72,21 @@ export interface ProductFormData {
   dimensions?: string;
   weight?: string;
   inStock: boolean;
+
+  // Logistics Configuration
+  logisticsConfig?: {
+    unitWeight: number;
+    weightUom: 'KG' | 'GRAM' | 'TON';
+    maxWeight: number;
+    dimensions: { length: number; width: number; height: number; unit: 'CM' | 'IN' } | null;
+    transportTypes: ('AIR' | 'SHIP')[];
+    weightRanges: Array<{ minWeight: number; maxWeight: number; recommendedTransport: 'AIR' | 'SHIP' }>;
+    airDeliveryDays: number;
+    shipDeliveryDays: number;
+    airCostPerKg: number;
+    shipCostPerKg: number;
+    notes: string;
+  } | null;
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
   approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION';
   approvedAt?: string;

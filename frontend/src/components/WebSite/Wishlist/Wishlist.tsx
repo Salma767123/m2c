@@ -174,16 +174,16 @@ const Wishlist = () => {
                     fill
                     className="object-cover"
                   />
-                  {item.product.discount && (
+                  {item.product.discount ? (
                     <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-sm font-semibold">
                       {item.product.discount}% OFF
                     </div>
-                  )}
-                  {!item.product.inStock && (
-                    <div className="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded text-sm">
+                  ) : null}
+                  {!item.product.inStock ? (
+                    <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
                       Out of Stock
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Remove from Wishlist */}
                   <button
@@ -207,7 +207,7 @@ const Wishlist = () => {
                   </h3>
 
                   {/* Rating */}
-                  {item.product.rating && (
+                  {item.product.rating != null && item.product.rating > 0 ? (
                     <div className="flex items-center mb-2">
                       <div className="flex items-center">
                         {[...Array(5)].map((_, i) => (
@@ -224,19 +224,19 @@ const Wishlist = () => {
                         </span>
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Price */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
                       <span className="text-xl font-bold text-gray-900">
-                        {formatPrice(item.product.basePrice)}
+                        {formatPrice(item.product.adminFixedPrice ?? item.product.basePrice)}
                       </span>
-                      {item.product.originalPrice && (
+                      {item.product.originalPrice ? (
                         <span className="text-sm text-gray-500 line-through">
                           {formatPrice(item.product.originalPrice)}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
@@ -247,17 +247,27 @@ const Wishlist = () => {
 
                   {/* Action Buttons */}
                   <div className="flex space-x-2">
-                    <button
-                      onClick={() => addToCart(item.productId, item.product!.name)}
-                      disabled={!item.product.inStock}
-                      className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${item.product.inStock
-                        ? 'bg-gray-800 text-white hover:bg-gray-900'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }`}
-                    >
-                      <ShoppingCart className="w-4 h-4 inline mr-1" />
-                      {item.product.inStock ? 'Add to Cart' : 'Out of Stock'}
-                    </button>
+                    {item.product.hasVariants ? (
+                      <Link
+                        href={`/products/${item.productId}`}
+                        className="flex-1 py-2 px-3 rounded text-sm font-medium transition-colors bg-gray-800 text-white hover:bg-gray-900 text-center"
+                      >
+                        <ShoppingCart className="w-4 h-4 inline mr-1" />
+                        Choose Options
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => addToCart(item.productId, item.product!.name)}
+                        disabled={!item.product.inStock}
+                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${item.product.inStock
+                          ? 'bg-gray-800 text-white hover:bg-gray-900'
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          }`}
+                      >
+                        <ShoppingCart className="w-4 h-4 inline mr-1" />
+                        {item.product.inStock ? 'Add to Cart' : 'Out of Stock'}
+                      </button>
+                    )}
 
                     <button
                       onClick={() => shareProduct(item.productId, item.product!.name)}

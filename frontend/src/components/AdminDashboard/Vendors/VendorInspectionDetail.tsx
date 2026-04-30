@@ -9,6 +9,8 @@ import { Badge } from "../../UI/Badge";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import vendorService from "@/services/vendorService";
 import { hasPermission } from "@/lib/auth";
+import reinspectionService, { AuditLogEntry } from "@/services/reinspectionService";
+import InspectionAuditTimeline from "../ReInspection/InspectionAuditTimeline";
 
 interface InspectionData {
   vendorName?: string;
@@ -44,6 +46,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
   const [approving, setApproving] = useState(false);
   const [inspection, setInspection] = useState<any>(null);
   const [vendor, setVendor] = useState<any>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -68,6 +71,10 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
 
         if (inspRes.success && inspRes.inspection) {
           setInspection(inspRes.inspection);
+          // Fetch audit trail for this inspection
+          reinspectionService.getAuditTrail('FACTORY_INSPECTION', inspRes.inspection.id)
+            .then(res => setAuditLogs(res.logs || []))
+            .catch(() => {}); // Non-critical
         }
         if (vendorRes.vendor) setVendor(vendorRes.vendor);
       } catch (err: any) {
@@ -352,6 +359,18 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Audit Trail */}
+      {auditLogs.length > 0 && (
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Clock className="h-5 w-5" /> Inspection Audit Trail
+            </h2>
+            <InspectionAuditTimeline logs={auditLogs} />
           </CardContent>
         </Card>
       )}

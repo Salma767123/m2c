@@ -27,6 +27,8 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [inspectionId, setInspectionId] = useState<string | null>(null)
+  const [cycleNumber, setCycleNumber] = useState(1)
+  const [previousRejectionReason, setPreviousRejectionReason] = useState<string | null>(null)
   const [errors, setErrors] = useState<AllErrors>({})
   // Snapshot of which vendor-sourced fields had a value at autofill time.
   // Locked once, then used for readonly decisions across all steps — so typing
@@ -114,14 +116,22 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
         const inspection = res?.inspection
         if (inspection) {
           setInspectionId(inspection.id)
+          if (inspection.cycleNumber > 1) setCycleNumber(inspection.cycleNumber)
+          if (res.previousRejectionReason) setPreviousRejectionReason(res.previousRejectionReason)
+          else if (inspection.rejectionReason) setPreviousRejectionReason(inspection.rejectionReason)
 
-          const assignedCategories = Array.isArray(inspection.itemsToInspect)
-            ? inspection.itemsToInspect.map((i: any) => i.itemName).join(', ')
+          const items = inspection.itemsToInspect
+          const assignedCategories = Array.isArray(items)
+            ? items.map((i: any) => i.itemName).join(', ')
             : ""
 
-          // Prefill from vendor record. All fields stay editable — checker can
-          // correct discrepancies they see at the factory. prev.* takes precedence
-          // so user edits are never overwritten on re-renders.
+          // For re-inspections, itemsToInspect contains the previous inspection's
+          // full form data (copied when admin raised re-inspection). Use it to
+          // pre-fill all fields so the checker doesn't re-enter everything.
+          const prevForm = (!Array.isArray(items) && items && typeof items === 'object') ? items as Record<string, any> : null
+
+          // Prefill from vendor record + previous form data. All fields stay
+          // editable — checker can correct discrepancies they see at the factory.
           const v = inspection.vendor || {}
           const factoryAddressFull = [v.factoryAddress, v.factoryCity, v.factoryState, v.factoryZipCode]
             .map((p: string | null | undefined) => (p ?? "").trim())
@@ -131,14 +141,27 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
           setFormData(prev => ({
             ...prev,
             vendorCode: prev.vendorCode || v.vendorCode || "",
-            categoryToInspect: prev.categoryToInspect || assignedCategories,
-            factoryName: prev.factoryName || v.companyName || "",
-            contactPersonName: prev.contactPersonName || v.ownerName || "",
-            contactPhoneNumber: prev.contactPhoneNumber || v.businessPhone || "",
-            factoryAddress: prev.factoryAddress || factoryAddressFull,
-            gstTaxId: prev.gstTaxId || v.gstNumber || "",
-            businessRegistrationNumber: prev.businessRegistrationNumber || v.businessRegistrationNumber || "",
-            factoryLicenseNumber: prev.factoryLicenseNumber || v.tradeLicenseNumber || "",
+            categoryToInspect: prev.categoryToInspect || (prevForm?.categoryToInspect) || assignedCategories,
+            factoryName: prev.factoryName || (prevForm?.factoryName) || v.companyName || "",
+            contactPersonName: prev.contactPersonName || (prevForm?.contactPersonName) || v.ownerName || "",
+            contactPhoneNumber: prev.contactPhoneNumber || (prevForm?.contactPhoneNumber) || v.businessPhone || "",
+            factoryAddress: prev.factoryAddress || (prevForm?.factoryAddress) || factoryAddressFull,
+            gstTaxId: prev.gstTaxId || (prevForm?.gstTaxId) || v.gstNumber || "",
+            businessRegistrationNumber: prev.businessRegistrationNumber || (prevForm?.businessRegistrationNumber) || v.businessRegistrationNumber || "",
+            factoryLicenseNumber: prev.factoryLicenseNumber || (prevForm?.factoryLicenseNumber) || v.tradeLicenseNumber || "",
+            // Production Info (only from previous form data)
+            productsManufactured: prev.productsManufactured || (prevForm?.productsManufactured) || "",
+            monthlyProductionCapacity: prev.monthlyProductionCapacity || (prevForm?.monthlyProductionCapacity) || "",
+            numberOfProductionWorkers: prev.numberOfProductionWorkers || (prevForm?.numberOfProductionWorkers) || "",
+            // Infrastructure (from previous form)
+            machineryAvailable: prevForm?.machineryAvailable || prev.machineryAvailable,
+            electricityAvailable: prevForm?.electricityAvailable || prev.electricityAvailable,
+            waterAvailable: prevForm?.waterAvailable || prev.waterAvailable,
+            storageAreaAvailable: prevForm?.storageAreaAvailable || prev.storageAreaAvailable,
+            // Quality & Safety (from previous form)
+            qualityCheckProcess: prevForm?.qualityCheckProcess || prev.qualityCheckProcess,
+            safetyEquipment: prevForm?.safetyEquipment || prev.safetyEquipment,
+            cleanWorkingEnvironment: prevForm?.cleanWorkingEnvironment || prev.cleanWorkingEnvironment,
           }))
 
           // Lock-state snapshot: true only where the vendor (or admin, for
@@ -147,14 +170,14 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
           // types later.
           const isNonEmpty = (s?: string | null) => typeof s === "string" && s.trim() !== ""
           setAutofillSnapshot({
-            factoryName: isNonEmpty(v.companyName),
-            contactPersonName: isNonEmpty(v.ownerName),
-            contactPhoneNumber: isNonEmpty(v.businessPhone),
-            factoryAddress: isNonEmpty(factoryAddressFull),
-            gstTaxId: isNonEmpty(v.gstNumber),
-            businessRegistrationNumber: isNonEmpty(v.businessRegistrationNumber),
-            factoryLicenseNumber: isNonEmpty(v.tradeLicenseNumber),
-            categoryToInspect: isNonEmpty(assignedCategories),
+            factoryName: isNonEmpty(prevForm?.factoryName || v.companyName),
+            contactPersonName: isNonEmpty(prevForm?.contactPersonName || v.ownerName),
+            contactPhoneNumber: isNonEmpty(prevForm?.contactPhoneNumber || v.businessPhone),
+            factoryAddress: isNonEmpty(prevForm?.factoryAddress || factoryAddressFull),
+            gstTaxId: isNonEmpty(prevForm?.gstTaxId || v.gstNumber),
+            businessRegistrationNumber: isNonEmpty(prevForm?.businessRegistrationNumber || v.businessRegistrationNumber),
+            factoryLicenseNumber: isNonEmpty(prevForm?.factoryLicenseNumber || v.tradeLicenseNumber),
+            categoryToInspect: isNonEmpty(prevForm?.categoryToInspect || assignedCategories),
           })
 
           // Mark prefill complete so subsequent effect re-runs short-circuit.
@@ -358,6 +381,21 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
             </div>
           </div>
         </div>
+
+        {/* Re-inspection Banner */}
+        {cycleNumber > 1 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="bg-amber-200 text-amber-900 text-xs font-bold px-2 py-0.5 rounded">Re-Inspection #{cycleNumber}</span>
+            </div>
+            <p className="text-sm text-amber-800">Previous inspection was rejected. Please re-evaluate thoroughly.</p>
+            {previousRejectionReason && (
+              <p className="text-sm text-amber-700 mt-1">
+                <span className="font-medium">Previous reason:</span> {previousRejectionReason}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Step Indicator */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 mb-8 overflow-x-auto">

@@ -166,6 +166,21 @@ interface ProductFormData {
   weight?: string
   inStock: boolean
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
+
+  // Logistics Configuration
+  logisticsConfig?: {
+    unitWeight: number
+    weightUom: string
+    maxWeight: number
+    dimensions: { length: number; width: number; height: number; unit: string } | null
+    transportTypes: string[]
+    weightRanges: Array<{ minWeight: number; maxWeight: number; recommendedTransport: string }>
+    airDeliveryDays: number
+    shipDeliveryDays: number
+    airCostPerKg: number
+    shipCostPerKg: number
+    notes: string
+  }
 }
 
 interface AddEditProductProps {
@@ -262,7 +277,25 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     dimensions: '',
     weight: '',
     inStock: true,
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+
+    // Logistics Configuration
+    logisticsConfig: {
+      unitWeight: 0,
+      weightUom: 'KG',
+      maxWeight: 0,
+      dimensions: null as { length: number; width: number; height: number; unit: string } | null,
+      transportTypes: ['AIR', 'SHIP'] as string[],
+      weightRanges: [
+        { minWeight: 0, maxWeight: 50, recommendedTransport: 'AIR' },
+        { minWeight: 50, maxWeight: 5000, recommendedTransport: 'SHIP' }
+      ] as Array<{ minWeight: number; maxWeight: number; recommendedTransport: string }>,
+      airDeliveryDays: 7,
+      shipDeliveryDays: 30,
+      airCostPerKg: 0,
+      shipCostPerKg: 0,
+      notes: ''
+    }
   })
 
   const [selectedTag, setSelectedTag] = useState('')
@@ -476,7 +509,23 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
               dimensions: product.dimensions,
               weight: product.weight,
               inStock: product.inStock,
-              status: product.status || 'ACTIVE'
+              status: product.status || 'ACTIVE',
+              logisticsConfig: product.logisticsConfig || {
+                unitWeight: 0,
+                weightUom: 'KG',
+                maxWeight: 0,
+                dimensions: null,
+                transportTypes: ['AIR', 'SHIP'],
+                weightRanges: [
+                  { minWeight: 0, maxWeight: 50, recommendedTransport: 'AIR' },
+                  { minWeight: 50, maxWeight: 5000, recommendedTransport: 'SHIP' }
+                ],
+                airDeliveryDays: 7,
+                shipDeliveryDays: 30,
+                airCostPerKg: 0,
+                shipCostPerKg: 0,
+                notes: ''
+              }
             })
 
             // Set selected inventory item if exists
@@ -1169,7 +1218,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                 { id: 'variants', label: 'Variants' },
                 { id: 'pricing', label: 'Pricing' },
                 { id: 'inventory', label: 'Inventory' },
-                { id: 'shipping', label: 'Shipping' }
+                { id: 'shipping', label: 'Shipping' },
+                { id: 'logistics', label: 'Logistics' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1413,7 +1463,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Unit of Measurement (UOM)
+                        Selling Unit (UOM)
                       </label>
                       <Dropdown
                         label=""
@@ -1431,10 +1481,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         placeholder="Select UOM"
                         onChange={(value) => setFormData(prev => ({ ...prev, uom: value as string }))}
                       />
+                      <p className="text-xs text-gray-500 mt-1">How this product is sold to customers</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Dimensions
+                        Display Dimensions
                       </label>
                       <input
                         type="text"
@@ -1444,10 +1495,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                         placeholder="e.g., 230x250 cm"
                       />
+                      <p className="text-xs text-gray-500 mt-1">Shown on product page. For shipping dimensions, use Logistics tab.</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Weight
+                        Display Weight
                       </label>
                       <input
                         type="text"
@@ -1457,6 +1509,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                         placeholder="e.g., 1.2 kg"
                       />
+                      <p className="text-xs text-gray-500 mt-1">Shown on product page. For shipping weight, use Logistics tab.</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2362,6 +2415,361 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Logistics Tab */}
+            {activeTab === 'logistics' && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Shipping Weight Configuration</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">Used for shipping cost calculation. Different from the display weight in Basic Info.</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Weight per Unit *</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.logisticsConfig?.unitWeight || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: { ...prev.logisticsConfig!, unitWeight: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                          placeholder="e.g. 0.5"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Weight per single unit</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Weight Unit *</label>
+                        <select
+                          value={formData.logisticsConfig?.weightUom || 'KG'}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: { ...prev.logisticsConfig!, weightUom: e.target.value }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        >
+                          <option value="KG">Kilogram (KG)</option>
+                          <option value="GRAM">Gram (g)</option>
+                          <option value="TON">Ton</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Max Shippable Weight</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.logisticsConfig?.maxWeight || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: { ...prev.logisticsConfig!, maxWeight: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                          placeholder="e.g. 5000"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Max weight per order (in {formData.logisticsConfig?.weightUom || 'KG'})</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Shipping Dimensions</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">Exact dimensions for shipping cost (CBM/volumetric). Different from the display dimensions in Basic Info.</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Length</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={formData.logisticsConfig?.dimensions?.length || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: {
+                              ...prev.logisticsConfig!,
+                              dimensions: {
+                                ...(prev.logisticsConfig?.dimensions || { length: 0, width: 0, height: 0, unit: 'CM' }),
+                                length: parseFloat(e.target.value) || 0
+                              }
+                            }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Width</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={formData.logisticsConfig?.dimensions?.width || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: {
+                              ...prev.logisticsConfig!,
+                              dimensions: {
+                                ...(prev.logisticsConfig?.dimensions || { length: 0, width: 0, height: 0, unit: 'CM' }),
+                                width: parseFloat(e.target.value) || 0
+                              }
+                            }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Height</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={formData.logisticsConfig?.dimensions?.height || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: {
+                              ...prev.logisticsConfig!,
+                              dimensions: {
+                                ...(prev.logisticsConfig?.dimensions || { length: 0, width: 0, height: 0, unit: 'CM' }),
+                                height: parseFloat(e.target.value) || 0
+                              }
+                            }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Unit</label>
+                        <select
+                          value={formData.logisticsConfig?.dimensions?.unit || 'CM'}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: {
+                              ...prev.logisticsConfig!,
+                              dimensions: {
+                                ...(prev.logisticsConfig?.dimensions || { length: 0, width: 0, height: 0, unit: 'CM' }),
+                                unit: e.target.value
+                              }
+                            }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        >
+                          <option value="CM">CM</option>
+                          <option value="IN">Inches</option>
+                        </select>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Transport Configuration</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Available Transport Types</label>
+                      <div className="flex gap-4">
+                        {['AIR', 'SHIP'].map((type) => (
+                          <label key={type} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.logisticsConfig?.transportTypes?.includes(type) || false}
+                              onChange={(e) => {
+                                setFormData(prev => {
+                                  const types = prev.logisticsConfig?.transportTypes || [];
+                                  const updated = e.target.checked
+                                    ? [...types, type]
+                                    : types.filter((t: string) => t !== type);
+                                  return { ...prev, logisticsConfig: { ...prev.logisticsConfig!, transportTypes: updated.length > 0 ? updated : [type] } };
+                                });
+                              }}
+                              className="w-4 h-4 text-gray-700 border-gray-300 rounded focus:ring-gray-700"
+                            />
+                            <span className="text-sm font-medium text-gray-700">{type === 'AIR' ? 'Air Freight' : 'Sea Freight'}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Air Delivery Days</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={formData.logisticsConfig?.airDeliveryDays || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: { ...prev.logisticsConfig!, airDeliveryDays: parseInt(e.target.value) || 7 }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Ship Delivery Days</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={formData.logisticsConfig?.shipDeliveryDays || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: { ...prev.logisticsConfig!, shipDeliveryDays: parseInt(e.target.value) || 30 }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Air Cost per KG</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.logisticsConfig?.airCostPerKg || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: { ...prev.logisticsConfig!, airCostPerKg: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                          placeholder="e.g. 100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Ship Cost per KG</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.logisticsConfig?.shipCostPerKg || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            logisticsConfig: { ...prev.logisticsConfig!, shipCostPerKg: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                          placeholder="e.g. 20"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Weight Range Rules</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-gray-600">Define weight ranges to auto-recommend transport type. Weights are in KG (normalized).</p>
+                    <div className="space-y-3">
+                      {(formData.logisticsConfig?.weightRanges || []).map((range: { minWeight: number; maxWeight: number; recommendedTransport: string }, idx: number) => (
+                        <div key={idx} className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={range.minWeight}
+                              onChange={(e) => {
+                                setFormData(prev => {
+                                  const ranges = [...(prev.logisticsConfig?.weightRanges || [])];
+                                  ranges[idx] = { ...ranges[idx], minWeight: parseFloat(e.target.value) || 0 };
+                                  return { ...prev, logisticsConfig: { ...prev.logisticsConfig!, weightRanges: ranges } };
+                                });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-700"
+                              placeholder="Min KG"
+                            />
+                          </div>
+                          <span className="text-gray-400 text-sm">to</span>
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={range.maxWeight}
+                              onChange={(e) => {
+                                setFormData(prev => {
+                                  const ranges = [...(prev.logisticsConfig?.weightRanges || [])];
+                                  ranges[idx] = { ...ranges[idx], maxWeight: parseFloat(e.target.value) || 0 };
+                                  return { ...prev, logisticsConfig: { ...prev.logisticsConfig!, weightRanges: ranges } };
+                                });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-700"
+                              placeholder="Max KG"
+                            />
+                          </div>
+                          <select
+                            value={range.recommendedTransport}
+                            onChange={(e) => {
+                              setFormData(prev => {
+                                const ranges = [...(prev.logisticsConfig?.weightRanges || [])];
+                                ranges[idx] = { ...ranges[idx], recommendedTransport: e.target.value };
+                                return { ...prev, logisticsConfig: { ...prev.logisticsConfig!, weightRanges: ranges } };
+                              });
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-700"
+                          >
+                            <option value="AIR">Air</option>
+                            <option value="SHIP">Ship</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => {
+                                const ranges = (prev.logisticsConfig?.weightRanges || []).filter((_: unknown, i: number) => i !== idx);
+                                return { ...prev, logisticsConfig: { ...prev.logisticsConfig!, weightRanges: ranges } };
+                              });
+                            }}
+                            className="text-red-500 hover:text-red-700 text-sm font-medium px-2"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => {
+                          const ranges = [...(prev.logisticsConfig?.weightRanges || []), { minWeight: 0, maxWeight: 100, recommendedTransport: 'SHIP' }];
+                          return { ...prev, logisticsConfig: { ...prev.logisticsConfig!, weightRanges: ranges } };
+                        });
+                      }}
+                      className="text-sm text-gray-700 hover:text-gray-900 font-medium border border-gray-300 rounded-md px-4 py-2 hover:bg-gray-50 transition-colors"
+                    >
+                      + Add Weight Range
+                    </button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Customer-Facing Logistics Notes</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">This note will be visible to customers on the product page.</p>
+                  </CardHeader>
+                  <CardContent>
+                    <textarea
+                      value={formData.logisticsConfig?.notes || ''}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        logisticsConfig: { ...prev.logisticsConfig!, notes: e.target.value }
+                      }))}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+                      placeholder="e.g., Bulk orders above 50 KG ship via sea freight for best rates. Air freight available for urgent orders."
+                    />
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </div>
 
