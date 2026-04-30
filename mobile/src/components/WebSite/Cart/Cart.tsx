@@ -41,6 +41,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCart } from '@/context/CartContext';
 import type { StockSyncResult } from '@/lib/stockSync';
 import { CartSkeleton } from '@/components/ui/Skeleton';
+import BagSelector from './BagSelector';
+import type { BagType } from '@/services/bagTypeService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CartItem {
@@ -68,6 +70,9 @@ export default function Cart() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Bag add-on
+  const [selectedBag, setSelectedBag] = useState<BagType | null>(null);
 
   // Promo
   const [promoCode, setPromoCode] = useState('');
@@ -358,7 +363,8 @@ export default function Cart() {
     return Math.min(calc, subtotal);
   })();
 
-  const total = Math.max(0, subtotal + tax - effectiveDiscount);
+  const bagCost = selectedBag?.price ?? 0;
+  const total = Math.max(0, subtotal + tax - effectiveDiscount + bagCost);
   const hasStockIssue = cartItems.some((i) => !i.inStock || (i.availableStock != null && i.quantity > i.availableStock));
 
   const handleCheckout = () => {
@@ -621,6 +627,12 @@ export default function Cart() {
           );
         })}
 
+        {/* Bag add-on */}
+        <BagSelector
+          selectedBagId={selectedBag?.id ?? null}
+          onSelect={setSelectedBag}
+        />
+
         {/* Promo code */}
         <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e5e7eb' }}>
           <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 10 }}>
@@ -687,6 +699,8 @@ export default function Cart() {
         subtotal={subtotal}
         tax={tax}
         discount={effectiveDiscount}
+        bagCost={bagCost}
+        bagName={selectedBag?.name}
         total={total}
         hasStockIssue={hasStockIssue}
         onCheckout={handleCheckout}
@@ -732,6 +746,8 @@ function StickyCheckout({
   subtotal,
   tax,
   discount,
+  bagCost = 0,
+  bagName,
   total,
   hasStockIssue,
   onCheckout,
@@ -739,6 +755,8 @@ function StickyCheckout({
   subtotal: number;
   tax: number;
   discount: number;
+  bagCost?: number;
+  bagName?: string;
   total: number;
   hasStockIssue: boolean;
   onCheckout: () => void;
@@ -768,6 +786,7 @@ function StickyCheckout({
           <SummaryRow label="Subtotal" value={fmt(subtotal)} />
           {tax > 0 ? <SummaryRow label="Tax (GST)" value={fmt(tax)} /> : null}
           {discount > 0 ? <SummaryRow label="Discount" value={`-${fmt(discount)}`} color="#16a34a" /> : null}
+          {bagCost > 0 ? <SummaryRow label={`Bag (${bagName})`} value={fmt(bagCost)} /> : null}
           <SummaryRow label="Shipping" value="Free" color="#16a34a" />
           <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 2 }} />
         </View>

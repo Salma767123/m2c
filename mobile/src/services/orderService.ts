@@ -93,6 +93,7 @@ export interface CreateOrderParams {
   tax?: number;
   discount?: number;
   couponCode?: string;
+  bagTypeId?: string;
 }
 
 class OrderService {
