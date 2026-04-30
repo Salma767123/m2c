@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma } = require('../config/database');
 
 // Note: Install razorpay package: npm install razorpay
 // For now, we'll create the structure. Install command needed: npm install razorpay

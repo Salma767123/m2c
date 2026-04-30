@@ -1,7 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../config/database');
 const { sendVendorApprovalEmail, sendVendorRejectionEmail } = require('../utils/emailService');
-
-const prisma = new PrismaClient();
 
 // Public: Submit a vendor enquiry (from Contact page)
 const submitEnquiry = async (req, res) => {

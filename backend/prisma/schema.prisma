@@ -186,7 +186,8 @@ model CartItem {
   variantId String?  @db.ObjectId
   quantity  Int      @default(1)
   price     Float    // Store price at time of adding to cart
-  
+  currency  String   @default("INR") // INR or USD
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -653,6 +654,7 @@ model Product {
   dispatchTimeline      Json      // DispatchTimeline object
   
   // Additional Info
+  uom                   String    @default("pcs") // Unit of Measurement: pcs, meters, kg, yards, sets, rolls
   tags                  String[]  @default([])
   dimensions            String?
   weight                String?
@@ -665,6 +667,9 @@ model Product {
   approvedBy            String?   @db.ObjectId // Admin ID who approved
   rejectionReason       String?
   adminFixedPrice       Float?    // Admin can override the vendor's base price
+  priceINR              Float?    // Admin selling price in INR (for .in domain)
+  priceUSD              Float?    // Admin selling price in USD (for .com domain)
+  priceVisibility       PriceVisibility @default(BOTH)
   
   assignedQcId          String?   @db.ObjectId
   assignedQc            QCChecker? @relation("ProductQCChecker", fields: [assignedQcId], references: [id])
@@ -694,6 +699,9 @@ model ProductVariant {
   originalPrice   Float?    // Original price before discount
   discount        Float?    // Discount percentage
   adminFixedPrice Float?    // Admin's fixed price for this variant
+  priceINR        Float?    // Admin selling price in INR for this variant
+  priceUSD        Float?    // Admin selling price in USD for this variant
+  priceVisibility PriceVisibility @default(BOTH)
   stock           Int       @default(0)
   images          String[]  @default([]) // Array of image URLs
   
@@ -736,6 +744,12 @@ enum ProductApprovalStatus {
   REINSPECTION
 }
 
+enum PriceVisibility {
+  IN_ONLY
+  COM_ONLY
+  BOTH
+}
+
 // ============================================
 // ORDER MANAGEMENT SYSTEM
 // ============================================
@@ -769,6 +783,9 @@ model Order {
   bagTypeId             String?   @db.ObjectId
   bagTypeName           String?
   bagTypePrice          Float?    @default(0)
+
+  // Currency
+  currency              String    @default("INR") // INR or USD
 
   // Payment Information
   paymentStatus         PaymentStatus @default(PENDING)
@@ -991,6 +1008,13 @@ model Coupon {
   // Dynamic Free Shipping on Nth Orders
   freeShipping      Boolean       @default(false)  // Whether this coupon grants free shipping
   freeShippingOrderNumbers Int[]  // Which order numbers get free shipping (e.g., [3, 5, 10] = 3rd, 5th, 10th orders)
+
+  // Promotional Popup Fields
+  showAsPopup             Boolean       @default(false)
+  popupImage              String?       // Cloudinary URL
+  popupTitle              String?
+  popupMessage            String?
+  applicableCategories    String[]      // Category names to target (e.g., ["Towel", "Apron"])
 
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt

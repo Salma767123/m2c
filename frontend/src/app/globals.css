@@ -63,6 +63,7 @@ button, [role="button"], a, select, summary, [type="checkbox"], [type="radio"] {
 
 @theme inline {
   --font-sans: var(--font-outfit);
+  --font-playfair: var(--font-playfair);
 }
 
 body {

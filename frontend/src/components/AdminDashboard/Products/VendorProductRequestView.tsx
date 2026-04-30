@@ -38,8 +38,14 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
   const [rejectionReason, setRejectionReason] = useState('')
   const [adminPrice, setAdminPrice] = useState('')
   const [originalPrice, setOriginalPrice] = useState('')
+  const [priceINR, setPriceINR] = useState('')
+  const [priceUSD, setPriceUSD] = useState('')
+  const [priceVisibility, setPriceVisibility] = useState<'IN_ONLY' | 'COM_ONLY' | 'BOTH'>('BOTH')
   const [variantPrices, setVariantPrices] = useState<Record<string, string>>({})
   const [variantOriginalPrices, setVariantOriginalPrices] = useState<Record<string, string>>({})
+  const [variantPricesINR, setVariantPricesINR] = useState<Record<string, string>>({})
+  const [variantPricesUSD, setVariantPricesUSD] = useState<Record<string, string>>({})
+  const [variantVisibilities, setVariantVisibilities] = useState<Record<string, string>>({})
   const [actionLoading, setActionLoading] = useState(false)
 
   // Fetch product data from backend
@@ -54,16 +60,30 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
           setAdminPrice((response.data.adminFixedPrice || response.data.basePrice).toString())
           setOriginalPrice(response.data.originalPrice?.toString() || '')
 
+          // Initialize multi-currency prices
+          setPriceINR(response.data.priceINR?.toString() || (response.data.adminFixedPrice || response.data.basePrice).toString())
+          setPriceUSD(response.data.priceUSD?.toString() || '')
+          setPriceVisibility(response.data.priceVisibility || 'BOTH')
+
           // Initialize variant prices if product has variants
           if (response.data.hasVariants && response.data.variants) {
             const initialVariantPrices: Record<string, string> = {}
             const initialVariantOriginalPrices: Record<string, string> = {}
+            const initialVariantPricesINR: Record<string, string> = {}
+            const initialVariantPricesUSD: Record<string, string> = {}
+            const initialVariantVisibilities: Record<string, string> = {}
             response.data.variants.forEach(variant => {
               initialVariantPrices[variant.id] = (variant.adminFixedPrice || variant.price).toString()
               initialVariantOriginalPrices[variant.id] = variant.originalPrice?.toString() || ''
+              initialVariantPricesINR[variant.id] = (variant as any).priceINR?.toString() || (variant.adminFixedPrice || variant.price).toString()
+              initialVariantPricesUSD[variant.id] = (variant as any).priceUSD?.toString() || ''
+              initialVariantVisibilities[variant.id] = (variant as any).priceVisibility || 'BOTH'
             })
             setVariantPrices(initialVariantPrices)
             setVariantOriginalPrices(initialVariantOriginalPrices)
+            setVariantPricesINR(initialVariantPricesINR)
+            setVariantPricesUSD(initialVariantPricesUSD)
+            setVariantVisibilities(initialVariantVisibilities)
           }
         } else {
           showErrorToast('Error', 'Product not found')
@@ -149,12 +169,37 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         )
         : undefined
 
+      // Prepare multi-currency data
+      const variantPricesINRNum = product.hasVariants && product.variants
+        ? Object.fromEntries(
+          Object.entries(variantPricesINR)
+            .filter(([, price]) => price && parseFloat(price) > 0)
+            .map(([id, price]) => [id, parseFloat(price)])
+        )
+        : undefined
+
+      const variantPricesUSDNum = product.hasVariants && product.variants
+        ? Object.fromEntries(
+          Object.entries(variantPricesUSD)
+            .filter(([, price]) => price && parseFloat(price) > 0)
+            .map(([id, price]) => [id, parseFloat(price)])
+        )
+        : undefined
+
       const response = await adminProductService.approveProduct(
         product.id,
         parseFloat(adminPrice),
         variantPricesNum,
         originalPrice ? parseFloat(originalPrice) : undefined,
-        variantOriginalPricesNum && Object.keys(variantOriginalPricesNum).length > 0 ? variantOriginalPricesNum : undefined
+        variantOriginalPricesNum && Object.keys(variantOriginalPricesNum).length > 0 ? variantOriginalPricesNum : undefined,
+        {
+          priceINR: priceINR ? parseFloat(priceINR) : undefined,
+          priceUSD: priceUSD ? parseFloat(priceUSD) : undefined,
+          priceVisibility,
+          variantPricesINR: variantPricesINRNum && Object.keys(variantPricesINRNum).length > 0 ? variantPricesINRNum : undefined,
+          variantPricesUSD: variantPricesUSDNum && Object.keys(variantPricesUSDNum).length > 0 ? variantPricesUSDNum : undefined,
+          variantVisibilities: Object.keys(variantVisibilities).length > 0 ? variantVisibilities : undefined,
+        }
       )
 
       if (response.success) {
@@ -797,6 +842,61 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               </div>
             </div>
 
+            {/* Multi-Currency Pricing */}
+            <div className="mb-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
+              <h4 className="text-sm font-semibold text-blue-900 mb-3">Multi-Currency Pricing (.in / .com)</h4>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    INR Price (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={priceINR}
+                    onChange={(e) => setPriceINR(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="Price for .in"
+                    step="0.01"
+                    min="0"
+                    disabled={actionLoading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    USD Price ($)
+                  </label>
+                  <input
+                    type="number"
+                    value={priceUSD}
+                    onChange={(e) => setPriceUSD(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="Price for .com"
+                    step="0.01"
+                    min="0"
+                    disabled={actionLoading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Display On
+                  </label>
+                  <select
+                    value={priceVisibility}
+                    onChange={(e) => setPriceVisibility(e.target.value as 'IN_ONLY' | 'COM_ONLY' | 'BOTH')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    disabled={actionLoading}
+                  >
+                    <option value="BOTH">Both (.in & .com)</option>
+                    <option value="IN_ONLY">.in only (India)</option>
+                    <option value="COM_ONLY">.com only (Global)</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-xs text-blue-700 mt-2">
+                INR price shows on .in domain, USD price on .com domain. Leave USD empty to hide from .com.
+              </p>
+            </div>
+
             {/* Variant Prices - shown only when product has variants */}
             {product.hasVariants && product.variants && product.variants.length > 0 && (
               <div className="mb-4">
@@ -863,6 +963,48 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                               {Math.round(((parseFloat(variantOriginalPrices[variant.id]) - parseFloat(variantPrices[variant.id])) / parseFloat(variantPrices[variant.id])) * 100)}% off
                             </p>
                           )}
+                        </div>
+                      </div>
+                      {/* Variant Multi-Currency */}
+                      <div className="mt-2 grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-blue-700 mb-1">INR Price (₹)</label>
+                          <input
+                            type="number"
+                            value={variantPricesINR[variant.id] || ''}
+                            onChange={(e) => setVariantPricesINR(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                            className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            placeholder="INR"
+                            step="0.01"
+                            min="0"
+                            disabled={actionLoading}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-blue-700 mb-1">USD Price ($)</label>
+                          <input
+                            type="number"
+                            value={variantPricesUSD[variant.id] || ''}
+                            onChange={(e) => setVariantPricesUSD(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                            className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            placeholder="USD"
+                            step="0.01"
+                            min="0"
+                            disabled={actionLoading}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-blue-700 mb-1">Display On</label>
+                          <select
+                            value={variantVisibilities[variant.id] || 'BOTH'}
+                            onChange={(e) => setVariantVisibilities(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                            className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            disabled={actionLoading}
+                          >
+                            <option value="BOTH">Both</option>
+                            <option value="IN_ONLY">.in only</option>
+                            <option value="COM_ONLY">.com only</option>
+                          </select>
                         </div>
                       </div>
                     </div>

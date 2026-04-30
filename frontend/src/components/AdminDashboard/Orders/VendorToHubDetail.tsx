@@ -232,7 +232,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <div>
             <p className="text-sm text-gray-600">Tracking Ref</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              {order.trackingReference || "N/A"}
+              {order?.trackingReference || "N/A"}
             </p>
           </div>
         </div>
@@ -240,31 +240,31 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           <div>
             <p className="text-sm text-gray-600">Subtotal</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              ₹{order.subtotal?.toLocaleString() || 0}
+              ₹{order?.subtotal?.toLocaleString() || 0}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Tax</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              ₹{order.tax?.toLocaleString() || 0}
+              ₹{order?.tax?.toLocaleString() || 0}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Shipping</p>
             <p className="text-base font-medium text-gray-900 mt-1">
-              ₹{order.shippingCost?.toLocaleString() || 0}
+              ₹{order?.shippingCost?.toLocaleString() || 0}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Discount</p>
             <p className="text-base font-medium text-green-600 mt-1">
-              -₹{order.discount?.toLocaleString() || 0}
+              -₹{order?.discount?.toLocaleString() || 0}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Total Amount</p>
             <p className="text-lg font-bold text-gray-900 mt-1">
-              ₹{order.totalAmount?.toLocaleString() || 0}
+              ₹{order?.totalAmount?.toLocaleString() || 0}
             </p>
           </div>
         </div>
@@ -279,14 +279,14 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-2">Customer Info</h3>
-            <p className="text-sm text-gray-600">{order.customerName}</p>
-            <p className="text-sm text-gray-600">{order.customerEmail}</p>
-            <p className="text-sm text-gray-600">{order.customerPhone}</p>
+            <p className="text-sm text-gray-600">{order?.customerName}</p>
+            <p className="text-sm text-gray-600">{order?.customerEmail}</p>
+            <p className="text-sm text-gray-600">{order?.customerPhone}</p>
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-2">Shipping Address</h3>
             <div className="text-sm text-gray-600">
-              {order.shippingAddress ? (
+              {order?.shippingAddress ? (
                 <>
                   <p>{order.shippingAddress.address || order.shippingAddress.street}</p>
                   {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
@@ -363,15 +363,15 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-gray-600">Payment Method</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentMethod || "N/A"}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order?.paymentMethod || "N/A"}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Transaction ID</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.paymentId || "N/A"}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order?.paymentId || "N/A"}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Payment Status</p>
-            <p className="text-base font-medium text-green-600 mt-1">{order.paymentStatus || "PENDING"}</p>
+            <p className="text-base font-medium text-green-600 mt-1">{order?.paymentStatus || "PENDING"}</p>
           </div>
         </div>
       </div>

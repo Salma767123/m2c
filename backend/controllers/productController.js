@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma } = require('../config/database');
 const {
   resolveProductImageUrls,
   resolveVariantImageUrls,
@@ -68,6 +67,7 @@ const createProduct = async (req, res) => {
       dispatchTimeline,
 
       // Additional Info
+      uom,
       tags,
       dimensions,
       weight,
@@ -209,6 +209,7 @@ const createProduct = async (req, res) => {
             shippingDays: 3,
             totalDays: 4
           },
+          uom: uom || 'pcs',
           tags: tags || [],
           dimensions,
           weight,
@@ -615,6 +616,7 @@ const updateProduct = async (req, res) => {
               totalDays: parseInt(updateData.dispatchTimeline.totalDays) || 4
             } : updateData.dispatchTimeline
           }),
+          ...(updateData.uom !== undefined && { uom: updateData.uom }),
           ...(updateData.tags !== undefined && { tags: updateData.tags }),
           ...(updateData.dimensions !== undefined && { dimensions: updateData.dimensions }),
           ...(updateData.weight !== undefined && { weight: updateData.weight }),
@@ -946,7 +948,7 @@ const getAvailableInventoryItems = async (req, res) => {
 const approveProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices } = req.body;
+    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantVisibilities } = req.body;
     const adminId = req.user.id;
 
     // Find the product with variants
@@ -1027,6 +1029,16 @@ const approveProduct = async (req, res) => {
               variantData.discount = Math.round(((origPrice - adminFixed) / adminFixed) * 100);
             }
           }
+          // Multi-currency pricing per variant
+          if (variantPricesINR && variantPricesINR[variant.id]) {
+            variantData.priceINR = parseFloat(variantPricesINR[variant.id]);
+          }
+          if (variantPricesUSD && variantPricesUSD[variant.id]) {
+            variantData.priceUSD = parseFloat(variantPricesUSD[variant.id]);
+          }
+          if (variantVisibilities && variantVisibilities[variant.id]) {
+            variantData.priceVisibility = variantVisibilities[variant.id];
+          }
           return prisma.productVariant.update({
             where: { id: variant.id },
             data: variantData
@@ -1069,6 +1081,17 @@ const approveProduct = async (req, res) => {
           updateData.discount = Math.round(((origPrice - parseFloat(finalAdminPrice)) / parseFloat(finalAdminPrice)) * 100);
         }
       }
+    }
+
+    // Multi-currency pricing for product
+    if (priceINR !== undefined && priceINR !== null && parseFloat(priceINR) > 0) {
+      updateData.priceINR = parseFloat(priceINR);
+    }
+    if (priceUSD !== undefined && priceUSD !== null && parseFloat(priceUSD) > 0) {
+      updateData.priceUSD = parseFloat(priceUSD);
+    }
+    if (priceVisibility) {
+      updateData.priceVisibility = priceVisibility;
     }
 
     // Update product approval status
@@ -1324,6 +1347,9 @@ const createProductByAdmin = async (req, res) => {
       discount,
       gstPercentage,
       adminFixedPrice, // Admin can set their own price
+      priceINR,
+      priceUSD,
+      priceVisibility,
 
       // Single Unit Pricing Configuration
       singleUnitSize,
@@ -1350,6 +1376,7 @@ const createProductByAdmin = async (req, res) => {
       dispatchTimeline,
 
       // Additional Info
+      uom,
       tags,
       dimensions,
       weight,
@@ -1490,6 +1517,9 @@ const createProductByAdmin = async (req, res) => {
           discount: discount ? parseFloat(discount) : null,
           gstPercentage: gstPercentage !== null && gstPercentage !== undefined && gstPercentage !== '' ? parseFloat(gstPercentage) : null,
           adminFixedPrice: adminFixedPrice ? parseFloat(adminFixedPrice) : null,
+          priceINR: priceINR ? parseFloat(priceINR) : null,
+          priceUSD: priceUSD ? parseFloat(priceUSD) : null,
+          priceVisibility: priceVisibility || 'BOTH',
 
           // Single Unit Pricing Configuration
           singleUnitSize: singleUnitSize || null,
@@ -1512,6 +1542,7 @@ const createProductByAdmin = async (req, res) => {
             shippingDays: 3,
             totalDays: 4
           },
+          uom: uom || 'pcs',
           tags: tags || [],
           dimensions,
           weight,
@@ -1737,6 +1768,13 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.adminFixedPrice !== undefined && {
           adminFixedPrice: updateData.adminFixedPrice ? parseFloat(updateData.adminFixedPrice) : null
         }),
+        ...(updateData.priceINR !== undefined && {
+          priceINR: updateData.priceINR ? parseFloat(updateData.priceINR) : null
+        }),
+        ...(updateData.priceUSD !== undefined && {
+          priceUSD: updateData.priceUSD ? parseFloat(updateData.priceUSD) : null
+        }),
+        ...(updateData.priceVisibility !== undefined && { priceVisibility: updateData.priceVisibility }),
 
         // Single Unit Pricing Configuration
         ...(updateData.singleUnitSize !== undefined && { singleUnitSize: updateData.singleUnitSize }),
@@ -1765,6 +1803,7 @@ const updateProductByAdmin = async (req, res) => {
             totalDays: parseInt(updateData.dispatchTimeline.totalDays) || 4
           } : updateData.dispatchTimeline
         }),
+        ...(updateData.uom !== undefined && { uom: updateData.uom }),
         ...(updateData.tags !== undefined && { tags: updateData.tags }),
         ...(updateData.dimensions !== undefined && { dimensions: updateData.dimensions }),
         ...(updateData.weight !== undefined && { weight: updateData.weight }),
@@ -2087,7 +2126,8 @@ const getPublicProducts = async (req, res) => {
       inStock,
       tag,
       colors,
-      minRating
+      minRating,
+      region
     } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -2097,6 +2137,13 @@ const getPublicProducts = async (req, res) => {
       status: 'ACTIVE',
       approvalStatus: 'APPROVED'
     };
+
+    // Filter by region visibility
+    if (region === 'IN') {
+      where.priceVisibility = { in: ['IN_ONLY', 'BOTH'] };
+    } else if (region === 'US') {
+      where.priceVisibility = { in: ['COM_ONLY', 'BOTH'] };
+    }
 
     if (tag) {
       where.tags = { has: tag };
@@ -2218,12 +2265,19 @@ const getPublicProducts = async (req, res) => {
             originalPrice: true,
             discount: true,
             adminFixedPrice: true,
+            priceINR: true,
+            priceUSD: true,
+            priceVisibility: true,
             stock: true,
             images: true
           }
         },
         fabricType: true,
         material: true,
+        uom: true,
+        priceINR: true,
+        priceUSD: true,
+        priceVisibility: true,
         dimensions: true,
         weight: true,
         createdAt: true
@@ -2275,6 +2329,9 @@ const getPublicProduct = async (req, res) => {
         subCategory: true,
         basePrice: true,
         adminFixedPrice: true, // Include admin fixed price
+        priceINR: true,
+        priceUSD: true,
+        priceVisibility: true,
         originalPrice: true,
         discount: true,
         singleUnitSize: true,
@@ -2300,6 +2357,9 @@ const getPublicProduct = async (req, res) => {
             originalPrice: true,
             discount: true,
             adminFixedPrice: true,
+            priceINR: true,
+            priceUSD: true,
+            priceVisibility: true,
             stock: true,
             images: true
           },
@@ -2308,6 +2368,10 @@ const getPublicProduct = async (req, res) => {
         fabricType: true,
         material: true,
         fabricSpecifications: true,
+        uom: true,
+        priceINR: true,
+        priceUSD: true,
+        priceVisibility: true,
         dimensions: true,
         weight: true,
         dispatchTimeline: true,

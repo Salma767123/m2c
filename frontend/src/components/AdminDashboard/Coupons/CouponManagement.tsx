@@ -13,7 +13,9 @@ import {
   XCircle,
   Clock,
   Loader2,
-  Truck
+  Truck,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
 import {
@@ -30,6 +32,20 @@ import { couponService, Coupon } from '@/services/couponService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
 
+const PAGE_SIZE = 10;
+
+function getPageRange(current: number, total: number): Array<number | '...'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '...'> = [1];
+  if (current > 4) pages.push('...');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('...');
+  pages.push(total);
+  return pages;
+}
+
 const CouponManagement = () => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +55,7 @@ const CouponManagement = () => {
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
   const [showFreeShippingModal, setShowFreeShippingModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const initialFormData: Partial<Coupon> = {
     code: '',
@@ -135,6 +152,12 @@ const CouponManagement = () => {
 
     return matchesSearch && matchesStatus;
   });
+
+  const totalPages = Math.ceil(filteredCoupons.length / PAGE_SIZE);
+  const paginatedCoupons = filteredCoupons.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   const handleCreate = () => {
     setModalMode('create');
@@ -289,7 +312,7 @@ const CouponManagement = () => {
               type="text"
               placeholder="Search by coupon code or description..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             />
           </div>
@@ -303,7 +326,7 @@ const CouponManagement = () => {
                 { value: 'inactive', label: 'Inactive' },
                 { value: 'expired', label: 'Expired' }
               ]}
-              onChange={(value) => setStatusFilter(value as any)}
+              onChange={(value) => { setStatusFilter(value as any); setCurrentPage(1); }}
               placeholder="Filter by status"
             />
           </div>
@@ -329,14 +352,14 @@ const CouponManagement = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCoupons.length === 0 ? (
+              {paginatedCoupons.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-12 text-gray-500">
                     No coupons found
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCoupons.map((coupon) => (
+                paginatedCoupons.map((coupon) => (
                   <TableRow key={coupon.id}>
                     <TableCell>
                       <div>
@@ -432,6 +455,23 @@ const CouponManagement = () => {
               )}
             </TableBody>
           </Table>
+        )}
+
+        {!loading && filteredCoupons.length > 0 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+            <p className="text-sm text-gray-600">
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredCoupons.length)} of {filteredCoupons.length}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end gap-3 text-sm">
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+                  {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

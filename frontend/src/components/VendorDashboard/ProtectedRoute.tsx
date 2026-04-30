@@ -28,9 +28,6 @@ export default function VendorProtectedRoute({ children }: VendorProtectedRouteP
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Wait for storage to be ready (especially important for new tabs)
-        await new Promise(resolve => setTimeout(resolve, 200))
-
         // Check if vendor is logged in
         if (!isVendorLoggedIn()) {
           console.log('VendorProtectedRoute: No vendor login found')

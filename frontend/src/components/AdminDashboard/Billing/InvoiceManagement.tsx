@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Eye, RefreshCw, FileText, Receipt } from "lucide-react";
+import { Search, Eye, RefreshCw, FileText, Receipt, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -34,6 +34,20 @@ const statusColor = (s: string) => {
   return "bg-red-100 text-red-800";
 };
 
+const PAGE_SIZE = 10;
+
+function getPageRange(current: number, total: number): Array<number | '...'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '...'> = [1];
+  if (current > 4) pages.push('...');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('...');
+  pages.push(total);
+  return pages;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function InvoiceManagement() {
@@ -42,6 +56,7 @@ export default function InvoiceManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const statusOptions = ["All", "Paid", "Pending", "Overdue"];
 
@@ -85,6 +100,12 @@ export default function InvoiceManagement() {
 
     return matchSearch && matchStatus;
   });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginatedInvoices = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   // ── Print invoice in new tab ──────────────────────────────────────────────
   const handlePrintInvoice = async (order: Order) => {
@@ -131,7 +152,7 @@ export default function InvoiceManagement() {
               type="text"
               placeholder="Search by Invoice No, Order ID or Customer…"
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-500 focus:border-transparent"
             />
           </div>
@@ -139,7 +160,7 @@ export default function InvoiceManagement() {
             <Dropdown
               value={statusFilter}
               options={statusOptions}
-              onChange={v => setStatusFilter(v as string)}
+              onChange={v => { setStatusFilter(v as string); setCurrentPage(1); }}
               placeholder="Filter by Status"
             />
           </div>
@@ -176,7 +197,7 @@ export default function InvoiceManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 ? (
+              {paginatedInvoices.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-12 text-gray-400">
                     <Receipt className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -187,7 +208,7 @@ export default function InvoiceManagement() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map(order => {
+                paginatedInvoices.map(order => {
                   const status = invoiceStatus(order.paymentStatus);
                   return (
                     <TableRow key={order.id}>
@@ -247,14 +268,24 @@ export default function InvoiceManagement() {
             </TableBody>
           </Table>
         )}
-      </div>
 
-      {/* ── Footer count ── */}
-      {!loading && filtered.length > 0 && (
-        <p className="text-xs text-gray-400 text-right">
-          Showing {filtered.length} of {orders.length} orders
-        </p>
-      )}
+        {!loading && filtered.length > 0 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+            <p className="text-sm text-gray-600">
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end gap-3 text-sm">
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+                  {getPageRange(currentPage, totalPages).map((p, i) => p === '...' ? (<span key={`e-${i}`} className="px-2 text-slate-400">...</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

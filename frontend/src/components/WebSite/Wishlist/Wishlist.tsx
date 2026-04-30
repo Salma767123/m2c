@@ -8,6 +8,7 @@ import { wishlistService, WishlistItem } from '@/services/wishlistService';
 import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
 import Image from 'next/image';
+import { formatPrice } from '@/lib/currency';
 
 const Wishlist = () => {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
@@ -229,11 +230,11 @@ const Wishlist = () => {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
                       <span className="text-xl font-bold text-gray-900">
-                        ${item.product.basePrice.toFixed(2)}
+                        {formatPrice(item.product.basePrice)}
                       </span>
                       {item.product.originalPrice && (
                         <span className="text-sm text-gray-500 line-through">
-                          ${item.product.originalPrice.toFixed(2)}
+                          {formatPrice(item.product.originalPrice)}
                         </span>
                       )}
                     </div>

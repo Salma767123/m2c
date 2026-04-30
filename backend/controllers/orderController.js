@@ -16,6 +16,7 @@ const createOrder = async (req, res) => {
             discount = 0,
             bagTypeId = null,
             couponCode = null,
+            currency = 'INR',
         } = req.body;
 
         // 1. Validate Input
@@ -206,6 +207,7 @@ const createOrder = async (req, res) => {
                     bagTypeName,
                     bagTypePrice,
                     couponCode: couponCode || null,
+                    currency,
                     paymentStatus: paymentMethod === 'COD' ? 'PENDING' : 'PAID',
                     paymentMethod,
                     paymentId,

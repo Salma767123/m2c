@@ -27,6 +27,10 @@ export interface AdminProduct {
     shippingDays: number;
     totalDays: number;
   };
+  priceINR?: number;
+  priceUSD?: number;
+  priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
+  uom?: string;
   tags: string[];
   dimensions?: string;
   weight?: string;
@@ -169,7 +173,15 @@ class AdminProductService {
     adminPrice?: number,
     variantPrices?: Record<string, number>,
     originalPrice?: number,
-    variantOriginalPrices?: Record<string, number>
+    variantOriginalPrices?: Record<string, number>,
+    multiCurrency?: {
+      priceINR?: number;
+      priceUSD?: number;
+      priceVisibility?: string;
+      variantPricesINR?: Record<string, number>;
+      variantPricesUSD?: Record<string, number>;
+      variantVisibilities?: Record<string, string>;
+    }
   ): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
     try {
       const payload: any = {};
@@ -184,6 +196,15 @@ class AdminProductService {
       }
       if (variantOriginalPrices !== undefined) {
         payload.variantOriginalPrices = variantOriginalPrices;
+      }
+      // Multi-currency fields
+      if (multiCurrency) {
+        if (multiCurrency.priceINR !== undefined) payload.priceINR = multiCurrency.priceINR;
+        if (multiCurrency.priceUSD !== undefined) payload.priceUSD = multiCurrency.priceUSD;
+        if (multiCurrency.priceVisibility) payload.priceVisibility = multiCurrency.priceVisibility;
+        if (multiCurrency.variantPricesINR) payload.variantPricesINR = multiCurrency.variantPricesINR;
+        if (multiCurrency.variantPricesUSD) payload.variantPricesUSD = multiCurrency.variantPricesUSD;
+        if (multiCurrency.variantVisibilities) payload.variantVisibilities = multiCurrency.variantVisibilities;
       }
       const response = await axios.put(`/products/${id}/approve`, payload);
       return response.data;

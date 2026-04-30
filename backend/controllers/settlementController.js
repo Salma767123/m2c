@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma } = require('../config/database');
 
 // Admin: Get all settlements
 const getAllSettlements = async (req, res) => {

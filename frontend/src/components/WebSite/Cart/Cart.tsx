@@ -8,6 +8,7 @@ import { publicProductService, PublicProduct } from "@/services/publicProductSer
 import { userAuthService } from "@/services/userAuthService"
 import bagTypeService, { BagType } from "@/services/bagTypeService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
+import { formatPrice } from "@/lib/currency"
 import {
   ShoppingCart,
   Plus,
@@ -387,7 +388,7 @@ export default function Order() {
         // Ensure discount doesn't exceed total (though backend handles this, good to be safe)
         setDiscountAmount(response.data.discountAmount)
         setPromoCode("") // Clear input field
-        showSuccessToast("Success", `Coupon "${response.data.code}" applied! You saved $${response.data.discountAmount.toFixed(2)}`)
+        showSuccessToast("Success", `Coupon "${response.data.code}" applied! You saved ${formatPrice(response.data.discountAmount)}`)
 
         // Save to local storage for Checkout page to retrieve
         localStorage.setItem('appliedCoupon', JSON.stringify({
@@ -549,9 +550,9 @@ export default function Order() {
                         {/* Price and Quantity */}
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-slate-900">${item.price.toFixed(2)}</span>
+                            <span className="text-xl font-bold text-slate-900">{formatPrice(item.price)}</span>
                             {item.originalPrice && (
-                              <span className="text-sm text-slate-500 line-through">${item.originalPrice.toFixed(2)}</span>
+                              <span className="text-sm text-slate-500 line-through">{formatPrice(item.originalPrice)}</span>
                             )}
                           </div>
 
@@ -630,7 +631,7 @@ export default function Order() {
                       <CheckCircle className="w-5 h-5" />
                       <div>
                         <span className="font-medium block">Code &quot;{appliedPromo}&quot; applied!</span>
-                        <span className="text-xs text-green-700">You saved ${discountAmount.toFixed(2)}</span>
+                        <span className="text-xs text-green-700">You saved {formatPrice(discountAmount)}</span>
                       </div>
                     </div>
                     <button
@@ -708,7 +709,7 @@ export default function Order() {
                           <p className="text-sm font-medium text-slate-900">{bag.name}</p>
                           {bag.description && <p className="text-xs text-slate-500 truncate">{bag.description}</p>}
                         </div>
-                        <span className="text-sm font-bold text-slate-900 shrink-0">${bag.price.toFixed(2)}</span>
+                        <span className="text-sm font-bold text-slate-900 shrink-0">{formatPrice(bag.price)}</span>
                       </button>
                     ))}
                   </div>
@@ -724,7 +725,7 @@ export default function Order() {
                   <div className="space-y-4 mb-6">
                     <div className="flex justify-between">
                       <span className="text-slate-600">Subtotal</span>
-                      <span className="font-medium">${summary.subtotal.toFixed(2)}</span>
+                      <span className="font-medium">{formatPrice(summary.subtotal)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-600">Shipping</span>
@@ -735,13 +736,13 @@ export default function Order() {
                             Free
                           </span>
                         ) : (
-                          `$${summary.shipping.toFixed(2)}`
+                          `${formatPrice(summary.shipping)}`
                         )}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-600">Tax (GST)</span>
-                      <span className="font-medium">${summary.tax.toFixed(2)}</span>
+                      <span className="font-medium">{formatPrice(summary.tax)}</span>
                     </div>
                     {/* GST Breakdown by Product */}
                     {cartItems.some(item => item.gstPercentage) && (
@@ -753,7 +754,7 @@ export default function Order() {
                           return (
                             <div key={item.id} className="flex justify-between text-xs text-slate-500">
                               <span className="truncate max-w-[150px]">{item.name} ({item.gstPercentage}%)</span>
-                              <span>${itemTax.toFixed(2)}</span>
+                              <span>{formatPrice(itemTax)}</span>
                             </div>
                           )
                         })}
@@ -762,7 +763,7 @@ export default function Order() {
                     {summary.discount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>Discount</span>
-                        <span className="font-medium">-${summary.discount.toFixed(2)}</span>
+                        <span className="font-medium">-{formatPrice(summary.discount)}</span>
                       </div>
                     )}
                     {summary.bagCost > 0 && (
@@ -770,13 +771,13 @@ export default function Order() {
                         <span className="text-slate-600">
                           Bag ({availableBagTypes.find(b => b.id === selectedBagTypeId)?.name})
                         </span>
-                        <span className="font-medium">${summary.bagCost.toFixed(2)}</span>
+                        <span className="font-medium">{formatPrice(summary.bagCost)}</span>
                       </div>
                     )}
                     <div className="border-t border-slate-200 pt-4">
                       <div className="flex justify-between text-lg font-bold">
                         <span>Total</span>
-                        <span>${summary.total.toFixed(2)}</span>
+                        <span>{formatPrice(summary.total)}</span>
                       </div>
                     </div>
                   </div>

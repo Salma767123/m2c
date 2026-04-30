@@ -14,6 +14,7 @@ export interface OrderItem {
     variantId?: string;
     size?: string;
     color?: string;
+    colorHex?: string;
     shipmentId?: string;
 }
 
@@ -69,6 +70,7 @@ export interface VendorShipment {
         invoiceNo?: string;
         bagTypeName?: string;
         bagTypePrice?: number;
+        trackingReference?: string;
     };
     statusHistory?: any[];
     adminReview?: AdminReviewData | null;

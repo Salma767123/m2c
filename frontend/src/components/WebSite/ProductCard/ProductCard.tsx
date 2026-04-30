@@ -11,6 +11,7 @@ import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { formatPrice } from '@/lib/currency';
 
 interface ProductCardProps {
   product: ServiceProduct | PublicProduct | MockProduct;
@@ -251,11 +252,11 @@ const ProductCard = ({ product }: ProductCardProps) => {
             <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-1">
               <div className="flex items-center space-x-1 sm:space-x-2">
                 <span className="text-lg sm:text-xl font-bold text-gray-900">
-                  ${displayPrice?.toFixed(2) || '0.00'}
+                  {formatPrice(displayPrice || 0)}
                 </span>
                 {product.originalPrice && (
                   <span className="text-xs text-red-600 line-through">
-                    ${product.originalPrice.toFixed(2)}
+                    {formatPrice(product.originalPrice)}
                   </span>
                 )}
               </div>

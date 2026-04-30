@@ -1,8 +1,10 @@
 'use client';
 
-import { X, Tag, Percent, Calendar, TrendingUp, Info } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, Tag, Percent, Calendar, TrendingUp, Info, Upload, Megaphone, ChevronDown } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
 import { Coupon } from '@/services/couponService';
+import { categoryService } from '@/services/categoryService';
 
 interface CouponModalProps {
   isOpen: boolean;
@@ -23,7 +25,49 @@ const CouponModal = ({
   setFormData,
   onSubmit
 }: CouponModalProps) => {
+  const [popupImagePreview, setPopupImagePreview] = useState<string>('');
+  const popupFileInputRef = useRef<HTMLInputElement>(null);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
+
+  // Fetch categories for the dropdown
+  useEffect(() => {
+    if (isOpen) {
+      setPopupImagePreview(formData.popupImage || '');
+      categoryService.getAllCategories({ status: 'ACTIVE', includeSubcategories: 'true' }).then(res => {
+        if (res.success && res.data) {
+          setAvailableCategories(res.data.map(c => c.name));
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen, formData.popupImage]);
+
   if (!isOpen) return null;
+
+  const handlePopupImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be less than 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setFormData({ ...formData, popupImage: base64 });
+      setPopupImagePreview(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePopupImage = () => {
+    setFormData({ ...formData, popupImage: '' });
+    setPopupImagePreview('');
+    if (popupFileInputRef.current) popupFileInputRef.current.value = '';
+  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
@@ -197,6 +241,53 @@ const CouponModal = ({
                   </div>
                 </div>
               </div>
+
+              {/* Promotional Popup Info (View Mode) */}
+              {coupon.showAsPopup && (
+                <div className="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Megaphone className="w-5 h-5 text-gray-700" />
+                    <h3 className="font-semibold text-gray-900">Promotional Popup</h3>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                      Enabled
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {coupon.popupImage && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Popup Image</label>
+                        <img src={coupon.popupImage} alt="Popup" className="w-full max-w-xs h-32 object-cover rounded-lg border border-gray-200" />
+                      </div>
+                    )}
+                    <div className="space-y-3">
+                      {coupon.popupTitle && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Popup Title</label>
+                          <div className="text-gray-900 text-sm">{coupon.popupTitle}</div>
+                        </div>
+                      )}
+                      {coupon.popupMessage && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Popup Message</label>
+                          <div className="text-gray-900 text-sm">{coupon.popupMessage}</div>
+                        </div>
+                      )}
+                      {coupon.applicableCategories && coupon.applicableCategories.length > 0 && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Applicable Categories</label>
+                          <div className="flex flex-wrap gap-1">
+                            {coupon.applicableCategories.map((cat, idx) => (
+                              <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {cat}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
             </div>
           ) : (
@@ -381,6 +472,165 @@ const CouponModal = ({
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Promotional Popup Section */}
+                <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Megaphone className="w-5 h-5 text-gray-700" />
+                      <h3 className="font-semibold text-gray-900">Promotional Popup</h3>
+                    </div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={formData.showAsPopup || false}
+                          onChange={(e) => setFormData({ ...formData, showAsPopup: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-gray-900 rounded-full peer peer-checked:bg-green-600 transition-colors"></div>
+                        <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform"></div>
+                      </div>
+                      <span className="text-sm text-gray-700">{formData.showAsPopup ? 'Enabled' : 'Disabled'}</span>
+                    </label>
+                  </div>
+
+                  {formData.showAsPopup && (
+                    <div className="space-y-4">
+                      {/* Popup Image */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Popup Image <span className="text-xs font-normal text-gray-400">(optional)</span></label>
+                        <p className="text-xs text-gray-500 mb-2">If not uploaded, the category image will be used automatically.</p>
+                        <div>
+                          {popupImagePreview ? (
+                            <div className="relative inline-block">
+                              <img src={popupImagePreview} alt="Popup Preview" className="w-full max-w-xs h-32 object-cover rounded-lg border border-gray-200" />
+                              <button
+                                type="button"
+                                onClick={handleRemovePopupImage}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => popupFileInputRef.current?.click()}
+                              className="w-full max-w-xs h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-gray-400 hover:text-gray-500 transition-colors"
+                            >
+                              <Upload className="w-6 h-6" />
+                              <span className="text-xs">Upload Popup Image</span>
+                            </button>
+                          )}
+                          <input
+                            ref={popupFileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePopupImageChange}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Popup Title */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Popup Title</label>
+                          <input
+                            type="text"
+                            value={formData.popupTitle || ''}
+                            onChange={(e) => setFormData({ ...formData, popupTitle: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                            placeholder="e.g., Special Offer on Towels!"
+                          />
+                        </div>
+
+                        {/* Applicable Categories */}
+                        <div className="relative">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Applicable Categories
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => { setShowCategoryDropdown(prev => !prev); setCategorySearch(''); }}
+                            className="w-full flex items-center justify-between px-4 py-2.5 border border-gray-300 rounded-lg bg-white hover:border-gray-400 transition-colors text-left"
+                          >
+                            <span className={`text-sm ${(formData.applicableCategories || []).length > 0 ? 'text-gray-900' : 'text-gray-400'}`}>
+                              {(formData.applicableCategories || []).length > 0
+                                ? (formData.applicableCategories || []).join(', ')
+                                : 'Select categories'}
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                          </button>
+                          {showCategoryDropdown && (
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                              <div className="p-2 border-b border-gray-100">
+                                <input
+                                  type="text"
+                                  value={categorySearch}
+                                  onChange={(e) => setCategorySearch(e.target.value)}
+                                  placeholder="Search categories..."
+                                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-400 focus:border-gray-400 outline-none"
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="max-h-48 overflow-y-auto">
+                                {availableCategories
+                                  .filter(cat => cat.toLowerCase().includes(categorySearch.toLowerCase()))
+                                  .map(cat => {
+                                    const selected = (formData.applicableCategories || []).includes(cat);
+                                    return (
+                                      <label
+                                        key={cat}
+                                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={selected}
+                                          onChange={() => {
+                                            const current = formData.applicableCategories || [];
+                                            setFormData({
+                                              ...formData,
+                                              applicableCategories: selected
+                                                ? current.filter(c => c !== cat)
+                                                : [...current, cat],
+                                            });
+                                          }}
+                                          className="w-4 h-4 accent-gray-800 rounded"
+                                        />
+                                        <span className="text-sm text-gray-700">{cat}</span>
+                                      </label>
+                                    );
+                                  })}
+                                {availableCategories.filter(cat => cat.toLowerCase().includes(categorySearch.toLowerCase())).length === 0 && (
+                                  <p className="px-4 py-3 text-sm text-gray-400">No categories found</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Popup Message */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Popup Message</label>
+                        <textarea
+                          rows={3}
+                          value={formData.popupMessage || ''}
+                          onChange={(e) => setFormData({ ...formData, popupMessage: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                          placeholder="Message to display in the popup"
+                        />
+                      </div>
+
+                      <div className="flex items-start gap-2 text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>This popup will appear when customers visit the specified category or product pages. Each customer sees it once per session per category.</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               </div>

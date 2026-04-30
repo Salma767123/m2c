@@ -13,6 +13,7 @@ import {
   Loader2,
   ShoppingBag
 } from "lucide-react"
+import { formatPrice } from '@/lib/currency'
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
 import ReviewOrder from "./CheckoutProcess/ReviewOrder"
@@ -847,7 +848,7 @@ export default function Checkout() {
                             )}
                           </div>
                         </div>
-                        <span className="font-medium text-slate-900">${(item.price * item.quantity).toFixed(2)}</span>
+                        <span className="font-medium text-slate-900">{formatPrice(item.price * item.quantity)}</span>
                       </div>
                     )
                   })}
@@ -859,7 +860,7 @@ export default function Checkout() {
                         <ShoppingBag className="w-4 h-4 text-amber-600" />
                         <span>Bag: {bagTypeName}</span>
                       </div>
-                      <span className="font-medium text-slate-900">${bagTypePrice.toFixed(2)}</span>
+                      <span className="font-medium text-slate-900">{formatPrice(bagTypePrice)}</span>
                     </div>
                   )}
                 </div>
@@ -867,7 +868,7 @@ export default function Checkout() {
                 <div className="space-y-4 mb-6 border-t border-slate-200 pt-4">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Subtotal</span>
-                    <span className="font-medium">${orderSummary.subtotal.toFixed(2)}</span>
+                    <span className="font-medium">{formatPrice(orderSummary.subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Shipping</span>
@@ -878,13 +879,13 @@ export default function Checkout() {
                           Free
                         </span>
                       ) : (
-                        `$${orderSummary.shipping.toFixed(2)}`
+                        `${formatPrice(orderSummary.shipping)}`
                       )}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Tax (GST)</span>
-                    <span className="font-medium">${orderSummary.tax.toFixed(2)}</span>
+                    <span className="font-medium">{formatPrice(orderSummary.tax)}</span>
                   </div>
                   {/* GST Breakdown by Product */}
                   {cartItems.some(item => item.product?.gstPercentage) && (
@@ -896,7 +897,7 @@ export default function Checkout() {
                         return (
                           <div key={item.id} className="flex justify-between text-xs text-slate-500">
                             <span className="truncate max-w-[150px]">{item.product.name} ({item.product.gstPercentage}%)</span>
-                            <span>${itemTax.toFixed(2)}</span>
+                            <span>{formatPrice(itemTax)}</span>
                           </div>
                         )
                       })}
@@ -905,19 +906,19 @@ export default function Checkout() {
                   {orderSummary.discount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
-                      <span className="font-medium">-${orderSummary.discount.toFixed(2)}</span>
+                      <span className="font-medium">-{formatPrice(orderSummary.discount)}</span>
                     </div>
                   )}
                   {orderSummary.bagCost > 0 && (
                     <div className="flex justify-between">
                       <span className="text-slate-600">Bag ({bagTypeName})</span>
-                      <span className="font-medium">${orderSummary.bagCost.toFixed(2)}</span>
+                      <span className="font-medium">{formatPrice(orderSummary.bagCost)}</span>
                     </div>
                   )}
                   <div className="border-t border-slate-200 pt-4">
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <span>${orderSummary.total.toFixed(2)}</span>
+                      <span>{formatPrice(orderSummary.total)}</span>
                     </div>
                   </div>
                 </div>

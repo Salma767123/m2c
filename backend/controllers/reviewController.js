@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma } = require('../config/database');
 const { resolveVariantImageUrls } = require('../config/cloudinary');
 
 // Create a review
@@ -198,19 +197,15 @@ exports.getAllReviews = async (req, res) => {
             );
         }
 
-        // Get counts
-        const totalCount = await prisma.review.count();
-        const pendingCount = await prisma.review.count({ where: { status: 'PENDING' } });
-        const approvedCount = await prisma.review.count({ where: { status: 'APPROVED' } });
-        const rejectedCount = await prisma.review.count({ where: { status: 'REJECTED' } });
-
-        // Calculate average rating
-        const allReviews = await prisma.review.findMany({
-            select: { rating: true }
-        });
-        const avgRating = allReviews.length > 0
-            ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
-            : 0;
+        // Get counts and average rating in parallel
+        const [totalCount, pendingCount, approvedCount, rejectedCount, ratingAggregate] = await Promise.all([
+            prisma.review.count(),
+            prisma.review.count({ where: { status: 'PENDING' } }),
+            prisma.review.count({ where: { status: 'APPROVED' } }),
+            prisma.review.count({ where: { status: 'REJECTED' } }),
+            prisma.review.aggregate({ _avg: { rating: true }, where: { status: 'APPROVED' } })
+        ]);
+        const avgRating = ratingAggregate._avg.rating || 0;
 
         res.status(200).json({
             success: true,

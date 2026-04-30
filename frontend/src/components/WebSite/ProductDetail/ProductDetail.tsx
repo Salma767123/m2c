@@ -8,11 +8,13 @@ import { cartService } from '@/services/cartService';
 import { userAuthService } from '@/services/userAuthService';
 import { Star, Heart, Truck, Shield, RotateCcw, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils';
 import { wishlistService } from '@/services/wishlistService';
 import { trackProductView } from '@/services/analyticsService';
 import reviewService from '@/services/reviewService';
 import Image from 'next/image';
+import { formatPrice } from '@/lib/currency';
+import PromotionalPopup from '@/components/WebSite/PromotionalPopup/PromotionalPopup';
 
 interface ProductDetailProps {
   productId: string;
@@ -188,6 +190,31 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
     }
   };
 
+  // Handle manual quantity input
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '') {
+      setQuantity(0 as any); // temporary empty state while typing
+      return;
+    }
+    const num = parseInt(value, 10);
+    if (!isNaN(num) && num >= 0) {
+      if (num > availableStock) {
+        showWarningToast('Stock Limit', `Only ${availableStock} ${product?.uom || 'pcs'} available in stock`);
+        setQuantity(availableStock);
+      } else {
+        setQuantity(num);
+      }
+    }
+  };
+
+  // On blur, ensure quantity is at least 1
+  const handleQuantityBlur = () => {
+    if (!quantity || quantity < 1) {
+      setQuantity(1);
+    }
+  };
+
   const handleBuyNow = () => {
     if (!product) return;
 
@@ -275,6 +302,7 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
 
   return (
     <>
+      <PromotionalPopup category={product.category} />
       {/* Breadcrumb */}
       <div className="bg-white">
         <div className="max-w-7xl xl:max-w-420 mx-auto px-4 sm:px-6 lg:px-8 xl:px-0 py-4">
@@ -430,12 +458,12 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                       {/* Price */}
                       <div className="bg-[#fdfdfd] rounded-2xl shadow-md p-6">
                         <div className="flex items-baseline space-x-3 mb-2">
-                          <span className="text-4xl font-bold text-gray-900">${currentPrice?.toFixed(2)}</span>
+                          <span className="text-4xl font-bold text-gray-900">{formatPrice(currentPrice || 0)}</span>
                           {originalPrice && originalPrice > currentPrice && (
                             <>
-                              <span className="text-xl text-gray-500 line-through">${originalPrice.toFixed(2)}</span>
+                              <span className="text-xl text-gray-500 line-through">{formatPrice(originalPrice)}</span>
                               <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">
-                                Save ${(originalPrice - currentPrice).toFixed(2)}
+                                Save {formatPrice(originalPrice - currentPrice)}
                               </span>
                             </>
                           )}
@@ -496,9 +524,9 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                       <span className="text-xs text-gray-600">{product.singleUnitColor}</span>
                                     )}
                                   </div>
-                                  <div className="text-lg font-bold text-gray-900 mt-1">${(product.adminFixedPrice ?? product.basePrice).toFixed(2)}</div>
+                                  <div className="text-lg font-bold text-gray-900 mt-1">{formatPrice(product.adminFixedPrice ?? product.basePrice)}</div>
                                   {product.originalPrice && product.originalPrice > (product.adminFixedPrice ?? product.basePrice) && (
-                                    <span className="text-xs text-gray-400 line-through">${product.originalPrice.toFixed(2)}</span>
+                                    <span className="text-xs text-gray-400 line-through">{formatPrice(product.originalPrice)}</span>
                                   )}
                                   <div className="text-xs text-gray-500">
                                     {(product.inventory?.baseStock ?? product.totalStock ?? 0) > 0
@@ -550,9 +578,9 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                       <span className="text-xs text-gray-600">{variant.color}</span>
                                     </div>
                                     <div className="flex items-center gap-1 mt-1">
-                                      <span className="text-lg font-bold text-gray-900">${(variant.adminFixedPrice ?? variant.price).toFixed(2)}</span>
+                                      <span className="text-lg font-bold text-gray-900">{formatPrice(variant.adminFixedPrice ?? variant.price)}</span>
                                       {variant.originalPrice && variant.originalPrice > (variant.adminFixedPrice ?? variant.price) && (
-                                        <span className="text-xs text-gray-400 line-through">${variant.originalPrice.toFixed(2)}</span>
+                                        <span className="text-xs text-gray-400 line-through">{formatPrice(variant.originalPrice)}</span>
                                       )}
                                       {variant.discount && variant.discount > 0 && (
                                         <span className="text-xs text-green-600 font-medium">{variant.discount}% off</span>
@@ -646,7 +674,15 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                               >
                                 <span className="text-xl font-semibold">−</span>
                               </button>
-                              <span className="w-16 text-center font-bold text-lg">{quantity}</span>
+                              <input
+                                type="number"
+                                min={1}
+                                max={availableStock}
+                                value={quantity || ''}
+                                onChange={handleQuantityChange}
+                                onBlur={handleQuantityBlur}
+                                className="w-20 text-center font-bold text-lg border-2 border-gray-300 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
                               <button
                                 onClick={handleIncrement}
                                 disabled={quantity >= availableStock}
@@ -654,6 +690,7 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                               >
                                 <span className="text-xl font-semibold">+</span>
                               </button>
+                              <span className="text-sm font-medium text-gray-500">{product?.uom || 'pcs'}</span>
                             </div>
 
                             <div className="mt-4 w-full">

@@ -1,4 +1,5 @@
 import axios from '@/lib/axios';
+import { getCurrency } from '@/lib/currency';
 
 export interface CartItem {
   id: string;
@@ -21,6 +22,9 @@ export interface CartItem {
     reviews?: number;
     material?: string;
     discount?: number;
+    singleUnitColor?: string;
+    singleUnitSize?: string;
+    singleUnitColorHex?: string;
   };
   variant?: {
     size: string;
@@ -47,7 +51,8 @@ class CartService {
   // Add item to cart
   async addToCart(productId: string, quantity: number = 1, variantId?: string): Promise<CartResponse> {
     try {
-      const response = await axios.post('/cart/add', { productId, quantity, variantId });
+      const currency = getCurrency();
+      const response = await axios.post('/cart/add', { productId, quantity, variantId, currency });
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to add item to cart');

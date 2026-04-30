@@ -32,8 +32,24 @@ import {
   Phone,
   Activity,
   UserCheck,
-  UserX
+  UserX,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+
+const PAGE_SIZE = 10;
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
+}
 
 export default function UserManagement() {
   const router = useRouter();
@@ -42,8 +58,10 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchStaff();
     fetchRoles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,6 +136,9 @@ export default function UserManagement() {
 
   // Filtering is now done server-side; keep local reference for table
   const filteredUsers = users;
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -311,6 +332,11 @@ export default function UserManagement() {
       </Card>
 
       {/* Users Table */}
+      {filteredUsers.length > 0 && (
+        <div className="text-sm text-slate-600 mb-2">
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length}
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Internal Staff</CardTitle>
@@ -339,7 +365,7 @@ export default function UserManagement() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => (
+                paginatedUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -459,6 +485,16 @@ export default function UserManagement() {
           </Table>
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-3 text-sm">
+          <div className="flex items-center gap-1">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+            {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -61,7 +61,13 @@ export interface ProductFormData {
     totalDays: number;
   };
 
+  // Multi-currency pricing
+  priceINR?: number;
+  priceUSD?: number;
+  priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
+
   // Additional Info
+  uom?: string;
   tags: string[];
   dimensions?: string;
   weight?: string;
@@ -83,6 +89,9 @@ export interface ProductVariant {
   originalPrice?: number;
   discount?: number;
   adminFixedPrice?: number;
+  priceINR?: number;
+  priceUSD?: number;
+  priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
   stock: number;
   images: string[];
 }

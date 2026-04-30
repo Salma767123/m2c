@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MessageCircle, Plus, Search, Eye, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { MessageCircle, Plus, Search, Eye, Clock, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/UI/Card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
@@ -9,10 +9,13 @@ import Dropdown from '@/components/UI/Dropdown'
 import supportService, { SupportTicket } from '@/services/supportService'
 import { useEffect } from 'react'
 
+const PAGE_SIZE = 10
+
 export default function Support() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -73,6 +76,12 @@ export default function Support() {
 
     return matchesSearch && matchesStatus && matchesPriority
   })
+
+  const totalPages = Math.ceil(filteredTickets.length / PAGE_SIZE)
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  )
 
   const stats = {
     total: tickets.length,
@@ -156,7 +165,7 @@ export default function Support() {
                   type="text"
                   placeholder="Search tickets..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -173,7 +182,7 @@ export default function Support() {
                     { value: 'resolved', label: 'Resolved' },
                     { value: 'closed', label: 'Closed' }
                   ]}
-                  onChange={(val) => setStatusFilter(val as string)}
+                  onChange={(val) => { setStatusFilter(val as string); setCurrentPage(1) }}
                   placeholder="Filter by status"
                 />
               </div>
@@ -188,7 +197,7 @@ export default function Support() {
                     { value: 'medium', label: 'Medium' },
                     { value: 'low', label: 'Low' }
                   ]}
-                  onChange={(val) => setPriorityFilter(val as string)}
+                  onChange={(val) => { setPriorityFilter(val as string); setCurrentPage(1) }}
                   placeholder="Filter by priority"
                 />
               </div>
@@ -213,8 +222,8 @@ export default function Support() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredTickets.length > 0 ? (
-              filteredTickets.map((ticket) => (
+            {paginatedTickets.length > 0 ? (
+              paginatedTickets.map((ticket) => (
                 <TableRow key={ticket.id}>
                   <TableCell>
                     <div>
@@ -265,6 +274,33 @@ export default function Support() {
             )}
           </TableBody>
         </Table>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
+            <p className="text-xs text-gray-500">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+                className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+                className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Next page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   )

@@ -120,6 +120,10 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
       '/admin/dashboard/support': { title: 'Support', icon: HelpCircle },
       '/admin/dashboard/roles-permissions': { title: 'Roles & Permissions', icon: Shield },
       '/admin/dashboard/coupons': { title: 'Coupons', icon: Tags },
+      '/admin/dashboard/bag-types': { title: 'Bag Types', icon: Tags },
+      '/admin/dashboard/analytics': { title: 'Analytics', icon: FileText },
+      '/admin/dashboard/qc-reports': { title: 'QC Reports', icon: Shield },
+      '/admin/dashboard/general/website-enquiries': { title: 'Website Enquiries', icon: MessageSquare },
       '/admin/dashboard/settings': { title: 'Settings', icon: Settings },
     }
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Download, Search, Calendar, DollarSign, CheckCircle, Clock, AlertCircle, Eye, X, Edit, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Download, Search, Calendar, DollarSign, CheckCircle, Clock, AlertCircle, Eye, X, Edit, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
@@ -11,11 +11,14 @@ import { settlementService, Settlement } from '@/services/settlementService';
 import VendorService, { VendorBankDetails } from '@/services/vendorService';
 import { showErrorToast } from '@/lib/toast-utils';
 
+const PAGE_SIZE = 10;
+
 export default function PayoutsEnhanced() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('All Status');
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [bankDetails, setBankDetails] = useState<VendorBankDetails | null>(null);
@@ -59,6 +62,12 @@ export default function PayoutsEnhanced() {
     const matchesStatus = filterStatus === 'All Status' || settlement.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  const totalPages = Math.ceil(filteredSettlements.length / PAGE_SIZE);
+  const paginatedSettlements = filteredSettlements.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -296,7 +305,7 @@ export default function PayoutsEnhanced() {
                 type="text"
                 placeholder="Search by settlement number or order number..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 transition"
               />
             </div>
@@ -305,7 +314,7 @@ export default function PayoutsEnhanced() {
               <Dropdown
                 value={filterStatus}
                 options={["All Status", "Paid", "Processing", "Pending", "Failed"]}
-                onChange={(val) => setFilterStatus(val as string)}
+                onChange={(val) => { setFilterStatus(val as string); setCurrentPage(1); }}
                 placeholder="Filter by status"
               />
             </div>
@@ -343,8 +352,8 @@ export default function PayoutsEnhanced() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSettlements.length > 0 ? (
-                filteredSettlements.map((settlement) => (
+              {paginatedSettlements.length > 0 ? (
+                paginatedSettlements.map((settlement) => (
                   <TableRow key={settlement.id} className="hover:bg-gray-50">
                     <TableCell>
                       <div className="font-semibold text-indigo-600">{settlement.settlementNumber}</div>
@@ -408,6 +417,33 @@ export default function PayoutsEnhanced() {
               )}
             </TableBody>
           </Table>
+        )}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
+            <p className="text-xs text-gray-500">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+                className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+                className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Next page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         )}
       </Card>
 

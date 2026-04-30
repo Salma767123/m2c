@@ -168,6 +168,7 @@ interface ProductFormData {
   }
 
   // Additional Info
+  uom: string
   tags: string[]
   dimensions?: string
   weight?: string
@@ -253,6 +254,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     },
 
     // Additional Info
+    uom: 'pcs',
     tags: [],
     dimensions: '',
     weight: '',
@@ -451,6 +453,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 totalDays: 0
               },
 
+              uom: product.uom || 'pcs',
               tags: product.tags || [],
               dimensions: product.dimensions || '',
               weight: product.weight || '',
@@ -1157,7 +1160,28 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Unit of Measurement (UOM)
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={formData.uom}
+                        options={[
+                          { value: 'pcs', label: 'Pieces (pcs)' },
+                          { value: 'meters', label: 'Meters' },
+                          { value: 'kg', label: 'Kilograms (kg)' },
+                          { value: 'yards', label: 'Yards' },
+                          { value: 'sets', label: 'Sets' },
+                          { value: 'rolls', label: 'Rolls' },
+                          { value: 'pairs', label: 'Pairs' },
+                          { value: 'dozen', label: 'Dozen' },
+                        ]}
+                        placeholder="Select UOM"
+                        onChange={(value) => setFormData(prev => ({ ...prev, uom: value as string }))}
+                      />
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Dimensions

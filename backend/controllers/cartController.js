@@ -3,7 +3,7 @@ const { prisma } = require('../config/database');
 // Add item to cart
 const addToCart = async (req, res) => {
   try {
-    const { productId, quantity = 1, variantId } = req.body;
+    const { productId, quantity = 1, variantId, currency = 'INR' } = req.body;
     const userId = req.userId;
 
     if (!productId) {
@@ -21,6 +21,8 @@ const addToCart = async (req, res) => {
         name: true,
         basePrice: true,
         adminFixedPrice: true,
+        priceINR: true,
+        priceUSD: true,
         inStock: true,
         totalStock: true,
         variants: variantId ? {
@@ -29,6 +31,8 @@ const addToCart = async (req, res) => {
             id: true,
             price: true,
             adminFixedPrice: true,
+            priceINR: true,
+            priceUSD: true,
             stock: true,
           }
         } : false
@@ -80,10 +84,20 @@ const addToCart = async (req, res) => {
       }
     });
 
-    let price = product.adminFixedPrice || product.basePrice;
+    // Resolve price based on currency (INR or USD)
+    let price;
+    if (currency === 'USD') {
+      price = product.priceUSD || product.adminFixedPrice || product.basePrice;
+    } else {
+      price = product.priceINR || product.adminFixedPrice || product.basePrice;
+    }
     if (variantId && product.variants && product.variants.length > 0) {
       const v = product.variants[0];
-      price = v.adminFixedPrice || v.price;
+      if (currency === 'USD') {
+        price = v.priceUSD || v.adminFixedPrice || v.price;
+      } else {
+        price = v.priceINR || v.adminFixedPrice || v.price;
+      }
     }
 
     if (existingItem) {
@@ -92,7 +106,8 @@ const addToCart = async (req, res) => {
         where: { id: existingItem.id },
         data: {
           quantity: existingItem.quantity + quantity,
-          price // Update price in case it changed
+          price, // Update price in case it changed
+          currency
         }
       });
     } else {
@@ -103,7 +118,8 @@ const addToCart = async (req, res) => {
           productId,
           variantId: variantId || null,
           quantity,
-          price
+          price,
+          currency
         }
       });
     }
