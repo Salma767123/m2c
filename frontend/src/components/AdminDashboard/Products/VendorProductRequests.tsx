@@ -36,7 +36,7 @@ interface VendorProductRequest {
   assignedQcId?: string | null
   assignedQc?: {
     id: string
-    checkerId: string
+    checkerId?: string
     name?: string
     email?: string
     status?: string

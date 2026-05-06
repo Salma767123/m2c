@@ -1,10 +1,24 @@
 'use client';
 
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { companyInfoService } from "@/services/companyInfoService";
 
+const DEFAULT_COMPANY_NAME = 'M2C MarkDowns Private Limited';
+
+function getCompanyName() {
+  return companyInfoService.getCachedCompanyInfo().companyName || DEFAULT_COMPANY_NAME;
+}
+
+function getServerCompanyName() {
+  return DEFAULT_COMPANY_NAME;
+}
+
+// No-op subscribe — company name doesn't change during the session
+const subscribe = () => () => {};
+
 const BottomBar = () => {
-  const companyName = companyInfoService.getCachedCompanyInfo().companyName;
+  const companyName = useSyncExternalStore(subscribe, getCompanyName, getServerCompanyName);
 
   return (
     <div className="bg-[#000000] text-white border-t border-gray-800">

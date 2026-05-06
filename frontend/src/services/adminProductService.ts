@@ -29,6 +29,8 @@ export interface AdminProduct {
   };
   priceINR?: number;
   priceUSD?: number;
+  originalPriceINR?: number;
+  originalPriceUSD?: number;
   priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
   uom?: string;
   tags: string[];
@@ -96,7 +98,13 @@ export interface AdminProduct {
     sku: string;
     price: number;
     originalPrice?: number;
-    adminFixedPrice?: number; // Admin's fixed price for this variant
+    discount?: number;
+    adminFixedPrice?: number;
+    priceINR?: number;
+    priceUSD?: number;
+    originalPriceINR?: number;
+    originalPriceUSD?: number;
+    priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
     stock: number;
     images?: string[];
   }>;

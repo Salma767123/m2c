@@ -36,7 +36,7 @@ const Wishlist = () => {
       if (response.success && response.data) {
         setWishlistItems(response.data.items);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading wishlist:', error);
       showErrorToast('Load Failed', 'Unable to load wishlist');
     } finally {
@@ -49,7 +49,7 @@ const Wishlist = () => {
       await wishlistService.removeFromWishlist(productId);
       setWishlistItems(items => items.filter(item => item.productId !== productId));
       showSuccessToast('Removed', 'Item removed from wishlist');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error removing from wishlist:', error);
       showErrorToast('Failed', 'Unable to remove item from wishlist');
     }
@@ -59,7 +59,7 @@ const Wishlist = () => {
     try {
       await cartService.addToCart(productId, 1);
       showSuccessToast('Added to Cart!', `${productName} has been added to your cart.`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding to cart:', error);
       showErrorToast('Failed to Add', 'Unable to add item to cart. Please try again.');
     }
@@ -86,8 +86,8 @@ const Wishlist = () => {
         await navigator.clipboard.writeText(url);
         showSuccessToast('Link Copied!', 'Shareable wishlist link has been copied to clipboard.');
       }
-    } catch (error: any) {
-      if (error?.name !== 'AbortError') {
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
         showErrorToast('Share Failed', 'Unable to share wishlist. Please try again.');
       }
     } finally {
@@ -269,7 +269,7 @@ const Wishlist = () => {
                       </span>
                       {(getRegionalOriginalPrice(item.product) || item.product.originalPrice) ? (
                         <span className="text-sm text-gray-500 line-through">
-                          {formatPrice(getRegionalOriginalPrice(item.product) || item.product.originalPrice)}
+                          {formatPrice(getRegionalOriginalPrice(item.product) || item.product.originalPrice || 0)}
                         </span>
                       ) : null}
                     </div>
@@ -282,7 +282,7 @@ const Wishlist = () => {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-2 mt-auto pt-3">
                     {item.product.hasVariants ? (
                       <Link
                         href={`/products/${item.productId}`}

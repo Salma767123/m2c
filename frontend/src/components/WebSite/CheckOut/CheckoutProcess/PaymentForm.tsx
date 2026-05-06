@@ -68,7 +68,7 @@ export default function PaymentForm({ formData, updateFormData, paymentSettings 
                   name="paymentMethod"
                   value={method.id}
                   checked={formData.paymentMethod === method.id}
-                  onChange={(e) => updateFormData("paymentMethod", e.target.value as any)}
+                  onChange={(e) => updateFormData("paymentMethod", e.target.value)}
                   className="mr-3"
                 />
                 <Icon className="w-5 h-5 mr-3 text-slate-600" />
@@ -87,7 +87,7 @@ export default function PaymentForm({ formData, updateFormData, paymentSettings 
         <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
           <h4 className="font-medium text-blue-900 mb-2">Razorpay Payment</h4>
           <p className="text-sm text-blue-700">
-            You will be redirected to Razorpay's secure payment gateway to complete your payment using cards, UPI, net banking, or wallets.
+            You will be redirected to Razorpay&apos;s secure payment gateway to complete your payment using cards, UPI, net banking, or wallets.
           </p>
         </div>
       )}
@@ -97,7 +97,7 @@ export default function PaymentForm({ formData, updateFormData, paymentSettings 
         <div className="p-4 bg-purple-50 rounded-xl border border-purple-200">
           <h4 className="font-medium text-purple-900 mb-2">PayU Payment</h4>
           <p className="text-sm text-purple-700">
-            You will be redirected to PayU's secure payment gateway to complete your payment using cards, UPI, net banking, or wallets.
+            You will be redirected to PayU&apos;s secure payment gateway to complete your payment using cards, UPI, net banking, or wallets.
           </p>
         </div>
       )}

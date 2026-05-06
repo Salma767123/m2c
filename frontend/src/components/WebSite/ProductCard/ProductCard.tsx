@@ -252,22 +252,22 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
           {/* Bottom content - fixed at bottom */}
           <div className="shrink-0">
-            <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-1">
+            <div className="flex items-center justify-between mb-2 sm:mb-3 gap-1 min-h-8">
               <div className="flex items-center space-x-1 sm:space-x-2">
                 <span className="text-lg sm:text-xl font-bold text-gray-900">
                   {formatPrice(displayPrice || 0)}
                 </span>
-                {product.originalPrice && (
+                {product.originalPrice ? (
                   <span className="text-xs text-red-600 line-through">
                     {formatPrice(product.originalPrice)}
                   </span>
-                )}
+                ) : null}
               </div>
-              {product.discount && (
+              {product.discount ? (
                 <span className="text-xs bg-[#1A2830] text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md font-semibold">
                   {product.discount}% OFF
                 </span>
-              )}
+              ) : null}
             </div>
 
             {/* Quantity Selector */}
