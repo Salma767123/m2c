@@ -27,7 +27,9 @@ const STATUS_LABELS: Record<string, string> = {
   APPROVED: 'Approved by Admin',
   QC_APPROVED: 'Approved by QC',
   REJECTED: 'Rejected',
-  REINSPECTION: 'Reinspection',
+  REINSPECTION: 'Re-Inspection',
+  UNDER_ADMIN_REVIEW: 'Under Admin Review',
+  SUBMITTED: 'Submitted for Review',
   PENDING: 'Pending',
   UNDER_REVIEW: 'Under Review by Admin',
   SUSPENDED: 'Suspended',
@@ -148,7 +150,7 @@ export function CheckerDashboard({ checkerId }: { checkerId: string | null }) {
   ).length;
 
   const pendingVendors = assignedVendors.filter(
-    (v) => v.status === 'UNDER_REVIEW' || v.status === 'PENDING',
+    (v) => v.status === 'UNDER_REVIEW' || v.status === 'PENDING' || v.status === 'REINSPECTION',
   ).length;
 
   const passedProducts = assignedProducts.filter(

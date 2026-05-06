@@ -234,6 +234,12 @@ const createProduct = async (req, res) => {
           price: parseFloat(variant.price),
           originalPrice: variant.originalPrice ? parseFloat(variant.originalPrice) : null,
           discount: variant.discount ? parseFloat(variant.discount) : null,
+          adminFixedPrice: variant.adminFixedPrice ? parseFloat(variant.adminFixedPrice) : null,
+          priceINR: variant.priceINR ? parseFloat(variant.priceINR) : null,
+          priceUSD: variant.priceUSD ? parseFloat(variant.priceUSD) : null,
+          originalPriceINR: variant.originalPriceINR ? parseFloat(variant.originalPriceINR) : null,
+          originalPriceUSD: variant.originalPriceUSD ? parseFloat(variant.originalPriceUSD) : null,
+          priceVisibility: variant.priceVisibility || 'BOTH',
           stock: parseInt(variant.stock) || 0,
           images: variant.images || []
         }));
@@ -648,6 +654,12 @@ const updateProduct = async (req, res) => {
             price: parseFloat(variant.price),
             originalPrice: variant.originalPrice ? parseFloat(variant.originalPrice) : null,
             discount: variant.discount ? parseFloat(variant.discount) : null,
+            adminFixedPrice: variant.adminFixedPrice ? parseFloat(variant.adminFixedPrice) : null,
+            priceINR: variant.priceINR ? parseFloat(variant.priceINR) : null,
+            priceUSD: variant.priceUSD ? parseFloat(variant.priceUSD) : null,
+            originalPriceINR: variant.originalPriceINR ? parseFloat(variant.originalPriceINR) : null,
+            originalPriceUSD: variant.originalPriceUSD ? parseFloat(variant.originalPriceUSD) : null,
+            priceVisibility: variant.priceVisibility || 'BOTH',
             stock: parseInt(variant.stock) || 0,
             images: variant.images || []
           }));
@@ -953,7 +965,7 @@ const getAvailableInventoryItems = async (req, res) => {
 const approveProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantVisibilities } = req.body;
+    const { adminPrice, variantPrices, originalPrice, variantOriginalPrices, priceINR, priceUSD, originalPriceINR, originalPriceUSD, priceVisibility, variantPricesINR, variantPricesUSD, variantOriginalPricesINR, variantOriginalPricesUSD, variantVisibilities } = req.body;
     const adminId = req.user.id;
 
     // Find the product with variants
@@ -1041,6 +1053,12 @@ const approveProduct = async (req, res) => {
           if (variantPricesUSD && variantPricesUSD[variant.id]) {
             variantData.priceUSD = parseFloat(variantPricesUSD[variant.id]);
           }
+          if (variantOriginalPricesINR && variantOriginalPricesINR[variant.id]) {
+            variantData.originalPriceINR = parseFloat(variantOriginalPricesINR[variant.id]);
+          }
+          if (variantOriginalPricesUSD && variantOriginalPricesUSD[variant.id]) {
+            variantData.originalPriceUSD = parseFloat(variantOriginalPricesUSD[variant.id]);
+          }
           if (variantVisibilities && variantVisibilities[variant.id]) {
             variantData.priceVisibility = variantVisibilities[variant.id];
           }
@@ -1094,6 +1112,12 @@ const approveProduct = async (req, res) => {
     }
     if (priceUSD !== undefined && priceUSD !== null && parseFloat(priceUSD) > 0) {
       updateData.priceUSD = parseFloat(priceUSD);
+    }
+    if (originalPriceINR !== undefined && originalPriceINR !== null && parseFloat(originalPriceINR) > 0) {
+      updateData.originalPriceINR = parseFloat(originalPriceINR);
+    }
+    if (originalPriceUSD !== undefined && originalPriceUSD !== null && parseFloat(originalPriceUSD) > 0) {
+      updateData.originalPriceUSD = parseFloat(originalPriceUSD);
     }
     if (priceVisibility) {
       updateData.priceVisibility = priceVisibility;
@@ -1581,6 +1605,12 @@ const createProductByAdmin = async (req, res) => {
           price: parseFloat(variant.price),
           originalPrice: variant.originalPrice ? parseFloat(variant.originalPrice) : null,
           discount: variant.discount ? parseFloat(variant.discount) : null,
+          adminFixedPrice: variant.adminFixedPrice ? parseFloat(variant.adminFixedPrice) : null,
+          priceINR: variant.priceINR ? parseFloat(variant.priceINR) : null,
+          priceUSD: variant.priceUSD ? parseFloat(variant.priceUSD) : null,
+          originalPriceINR: variant.originalPriceINR ? parseFloat(variant.originalPriceINR) : null,
+          originalPriceUSD: variant.originalPriceUSD ? parseFloat(variant.originalPriceUSD) : null,
+          priceVisibility: variant.priceVisibility || 'BOTH',
           stock: parseInt(variant.stock) || 0,
           images: variant.images || []
         }));
@@ -1790,6 +1820,12 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.priceUSD !== undefined && {
           priceUSD: updateData.priceUSD ? parseFloat(updateData.priceUSD) : null
         }),
+        ...(updateData.originalPriceINR !== undefined && {
+          originalPriceINR: updateData.originalPriceINR ? parseFloat(updateData.originalPriceINR) : null
+        }),
+        ...(updateData.originalPriceUSD !== undefined && {
+          originalPriceUSD: updateData.originalPriceUSD ? parseFloat(updateData.originalPriceUSD) : null
+        }),
         ...(updateData.priceVisibility !== undefined && { priceVisibility: updateData.priceVisibility }),
 
         // Single Unit Pricing Configuration
@@ -1873,6 +1909,12 @@ const updateProductByAdmin = async (req, res) => {
             price: parseFloat(variant.price),
             originalPrice: variant.originalPrice ? parseFloat(variant.originalPrice) : null,
             discount: variant.discount ? parseFloat(variant.discount) : null,
+            adminFixedPrice: variant.adminFixedPrice ? parseFloat(variant.adminFixedPrice) : null,
+            priceINR: variant.priceINR ? parseFloat(variant.priceINR) : null,
+            priceUSD: variant.priceUSD ? parseFloat(variant.priceUSD) : null,
+            originalPriceINR: variant.originalPriceINR ? parseFloat(variant.originalPriceINR) : null,
+            originalPriceUSD: variant.originalPriceUSD ? parseFloat(variant.originalPriceUSD) : null,
+            priceVisibility: variant.priceVisibility || 'BOTH',
             stock: parseInt(variant.stock) || 0,
             images: variant.images || []
           }));
@@ -2348,6 +2390,8 @@ const getPublicProduct = async (req, res) => {
         adminFixedPrice: true, // Include admin fixed price
         priceINR: true,
         priceUSD: true,
+        originalPriceINR: true,
+        originalPriceUSD: true,
         priceVisibility: true,
         originalPrice: true,
         discount: true,
@@ -2376,6 +2420,8 @@ const getPublicProduct = async (req, res) => {
             adminFixedPrice: true,
             priceINR: true,
             priceUSD: true,
+            originalPriceINR: true,
+            originalPriceUSD: true,
             priceVisibility: true,
             stock: true,
             images: true

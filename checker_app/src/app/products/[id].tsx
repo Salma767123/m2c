@@ -29,7 +29,8 @@ import {
   AlertCircle,
   X,
 } from 'lucide-react-native';
-import qcCheckerService from '../../services/qcCheckerService';
+import qcCheckerService, { AuditLogEntry } from '../../services/qcCheckerService';
+import AuditTimeline from '../../components/General/AuditTimeline';
 
 type Tab = 'overview' | 'images' | 'activity';
 const TABS: { id: Tab; label: string }[] = [
@@ -41,6 +42,7 @@ const TABS: { id: Tab; label: string }[] = [
 const APPROVAL_STYLE: Record<string, { bg: string; text: string }> = {
   PENDING: { bg: '#fef3c7', text: '#92400e' },
   REINSPECTION: { bg: '#ffedd5', text: '#9a3412' },
+  UNDER_ADMIN_REVIEW: { bg: '#fef3c7', text: '#92400e' },
   QC_APPROVED: { bg: '#d1fae5', text: '#065f46' },
   APPROVED: { bg: '#d1fae5', text: '#065f46' },
   REJECTED: { bg: '#fee2e2', text: '#991b1b' },
@@ -84,6 +86,7 @@ export default function ProductDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lightboxUri, setLightboxUri] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -101,7 +104,14 @@ export default function ProductDetailScreen() {
     }
   }, [id, product]);
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    load();
+    if (id) {
+      qcCheckerService.getAuditTrail('PRODUCT_INSPECTION', id)
+        .then(res => setAuditLogs(res.logs || []))
+        .catch(() => {});
+    }
+  }, [id]);
 
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
 
@@ -420,7 +430,21 @@ export default function ProductDetailScreen() {
                   <Card title="Timeline">
                     <InfoRow label="Listed on" value={fmt(product.createdAt)} />
                     <InfoRow label="Last updated" value={fmt(product.updatedAt)} />
+                    {product.inspectionCycleNumber > 1 && (
+                      <InfoRow label="Inspection Cycle" value={`#${product.inspectionCycleNumber}`} />
+                    )}
                   </Card>
+
+                  {/* Audit Trail */}
+                  {auditLogs.length > 0 && (
+                    <View className="bg-white rounded-2xl border border-slate-200 p-4">
+                      <View className="flex-row items-center mb-3">
+                        <Clock size={16} color="#475569" />
+                        <Text className="text-sm font-bold text-slate-900 ml-2">Audit Trail</Text>
+                      </View>
+                      <AuditTimeline logs={auditLogs} />
+                    </View>
+                  )}
                 </>
               );
             })()}

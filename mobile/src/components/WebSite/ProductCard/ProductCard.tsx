@@ -12,6 +12,7 @@ import { useWishlist } from "@/context/WishlistContext";
 import { Product as ServiceProduct } from "@/services/productService";
 import { PublicProduct } from "@/services/publicProductService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { getRegionalPrice, formatPrice as fmtCurrency } from "@/lib/currency";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface MockProduct {
@@ -57,9 +58,7 @@ function getPrimaryImage(product: Product): string | undefined {
 
 function getDisplayPrice(product: Product): number {
   if (isServiceProduct(product)) {
-    return product.adminFixedPrice != null
-      ? product.adminFixedPrice
-      : product.basePrice;
+    return getRegionalPrice(product as any);
   }
   return (product as any).price ?? 0;
 }
@@ -351,11 +350,11 @@ function ProductCardImpl({
           {/* Price row — matches web: price + strikethrough original + discount pill */}
           <View className="flex-row items-center flex-wrap gap-1.5 mb-2.5">
             <Text className="text-lg font-black text-[#111827]">
-              ${displayPrice.toFixed(2)}
+              {fmtCurrency(displayPrice)}
             </Text>
             {product.originalPrice ? (
               <Text className="text-xs text-red-500 line-through font-medium opacity-80">
-                ${product.originalPrice.toFixed(2)}
+                {fmtCurrency(product.originalPrice)}
               </Text>
             ) : null}
             {product.discount && product.discount > 0 ? (

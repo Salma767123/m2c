@@ -11,7 +11,7 @@ import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
-import { formatPrice } from '@/lib/currency';
+import { formatPrice, getRegionalPrice } from '@/lib/currency';
 
 interface ProductCardProps {
   product: ServiceProduct | PublicProduct | MockProduct;
@@ -156,15 +156,11 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
   const imageUrl = primaryImage || placeholderImage;
 
-  // Get price - use adminFixedPrice if available, otherwise basePrice or price
+  // Get price - use regional price (priceINR/priceUSD) → adminFixedPrice → basePrice
   let displayPrice: number | undefined;
 
   if (isServiceProduct(product)) {
-    // For API products, prioritize adminFixedPrice, then basePrice
-    // Use nullish coalescing to handle 0 values correctly
-    displayPrice = product.adminFixedPrice !== null && product.adminFixedPrice !== undefined
-      ? product.adminFixedPrice
-      : product.basePrice;
+    displayPrice = getRegionalPrice(product);
   } else {
     // For mock products, use price property
     displayPrice = (product as any).price;

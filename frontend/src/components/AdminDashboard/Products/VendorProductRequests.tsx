@@ -88,6 +88,16 @@ export default function VendorProductRequests() {
   const [originalPrice, setOriginalPrice] = useState<string>('')
   const [variantPrices, setVariantPrices] = useState<Record<string, string>>({})
   const [variantOriginalPrices, setVariantOriginalPrices] = useState<Record<string, string>>({})
+  const [priceINR, setPriceINR] = useState('')
+  const [priceUSD, setPriceUSD] = useState('')
+  const [originalPriceINR, setOriginalPriceINR] = useState('')
+  const [originalPriceUSD, setOriginalPriceUSD] = useState('')
+  const [priceVisibility, setPriceVisibility] = useState<'IN_ONLY' | 'COM_ONLY' | 'BOTH'>('BOTH')
+  const [variantPricesINR, setVariantPricesINR] = useState<Record<string, string>>({})
+  const [variantPricesUSD, setVariantPricesUSD] = useState<Record<string, string>>({})
+  const [variantOriginalPricesINR, setVariantOriginalPricesINR] = useState<Record<string, string>>({})
+  const [variantOriginalPricesUSD, setVariantOriginalPricesUSD] = useState<Record<string, string>>({})
+  const [variantVisibilities, setVariantVisibilities] = useState<Record<string, string>>({})
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -231,18 +241,45 @@ export default function VendorProductRequests() {
           )
         : undefined
 
+      const toNumMap = (m: Record<string, string>) =>
+        Object.fromEntries(Object.entries(m).filter(([, v]) => v).map(([id, v]) => [id, parseFloat(v)]));
+
+      const multiCurrency = {
+        priceINR: priceINR ? parseFloat(priceINR) : undefined,
+        priceUSD: priceUSD ? parseFloat(priceUSD) : undefined,
+        originalPriceINR: originalPriceINR ? parseFloat(originalPriceINR) : undefined,
+        originalPriceUSD: originalPriceUSD ? parseFloat(originalPriceUSD) : undefined,
+        priceVisibility,
+        variantPricesINR: Object.keys(variantPricesINR).length > 0 ? toNumMap(variantPricesINR) : undefined,
+        variantPricesUSD: Object.keys(variantPricesUSD).length > 0 ? toNumMap(variantPricesUSD) : undefined,
+        variantOriginalPricesINR: Object.keys(variantOriginalPricesINR).length > 0 ? toNumMap(variantOriginalPricesINR) : undefined,
+        variantOriginalPricesUSD: Object.keys(variantOriginalPricesUSD).length > 0 ? toNumMap(variantOriginalPricesUSD) : undefined,
+        variantVisibilities: Object.keys(variantVisibilities).length > 0 ? variantVisibilities : undefined,
+      }
+
       const response = await adminProductService.approveProduct(
         approvingRequest.id,
         parseFloat(adminPrice),
         variantPricesNum,
         originalPrice ? parseFloat(originalPrice) : undefined,
-        variantOriginalPricesNum && Object.keys(variantOriginalPricesNum).length > 0 ? variantOriginalPricesNum : undefined
+        variantOriginalPricesNum && Object.keys(variantOriginalPricesNum).length > 0 ? variantOriginalPricesNum : undefined,
+        multiCurrency
       )
 
       if (response.success) {
         showSuccessToast('Product Approved', 'The vendor product has been approved successfully.')
         setShowApprovalModal(false)
         setApprovingRequest(null)
+        setPriceINR('')
+        setPriceUSD('')
+        setOriginalPriceINR('')
+        setOriginalPriceUSD('')
+        setPriceVisibility('BOTH')
+        setVariantPricesINR({})
+        setVariantPricesUSD({})
+        setVariantOriginalPricesINR({})
+        setVariantOriginalPricesUSD({})
+        setVariantVisibilities({})
         loadRequests()
       }
     } catch (error: any) {
@@ -662,6 +699,91 @@ export default function VendorProductRequests() {
               </div>
             </div>
 
+            {/* Multi-Currency Pricing */}
+            <div className="mb-4 p-4 border border-blue-200 bg-blue-50 rounded-lg">
+              <h4 className="text-sm font-semibold text-blue-900 mb-3">Multi-Currency Pricing (.in / .com)</h4>
+
+              {/* Selling Prices */}
+              <p className="text-xs font-medium text-gray-600 mb-2 border-b border-blue-200 pb-1">Selling Prices</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div>
+                  <label htmlFor="base-price-inr" className="block text-xs font-medium text-gray-700 mb-1">INR Price (₹)</label>
+                  <input
+                    id="base-price-inr"
+                    type="number"
+                    value={priceINR}
+                    onChange={(e) => setPriceINR(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    placeholder="Selling price for .in domain"
+                    step="0.01"
+                    min="0"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Shown on .in domain</p>
+                </div>
+                <div>
+                  <label htmlFor="base-price-usd" className="block text-xs font-medium text-gray-700 mb-1">USD Price ($)</label>
+                  <input
+                    id="base-price-usd"
+                    type="number"
+                    value={priceUSD}
+                    onChange={(e) => setPriceUSD(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    placeholder="Selling price for .com domain"
+                    step="0.01"
+                    min="0"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Selling on .com</p>
+                </div>
+              </div>
+
+              {/* Original Prices (MRP) */}
+              <p className="text-xs font-medium text-gray-600 mb-2 mt-4 border-b border-blue-200 pb-1">Original Prices (MRP)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div>
+                  <label htmlFor="base-original-inr" className="block text-xs font-medium text-gray-700 mb-1">Original ₹ (MRP)</label>
+                  <input
+                    id="base-original-inr"
+                    type="number"
+                    value={originalPriceINR}
+                    onChange={(e) => setOriginalPriceINR(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    placeholder="MRP for .in domain"
+                    step="0.01"
+                    min="0"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Strikethrough on .in</p>
+                </div>
+                <div>
+                  <label htmlFor="base-original-usd" className="block text-xs font-medium text-gray-700 mb-1">Original $ (MRP)</label>
+                  <input
+                    id="base-original-usd"
+                    type="number"
+                    value={originalPriceUSD}
+                    onChange={(e) => setOriginalPriceUSD(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    placeholder="MRP for .com domain"
+                    step="0.01"
+                    min="0"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Strikethrough on .com</p>
+                </div>
+                <div>
+                  <label htmlFor="base-visibility" className="block text-xs font-medium text-gray-700 mb-1">Visibility</label>
+                  <select
+                    id="base-visibility"
+                    value={priceVisibility}
+                    onChange={(e) => setPriceVisibility(e.target.value as 'IN_ONLY' | 'COM_ONLY' | 'BOTH')}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                  >
+                    <option value="BOTH">Both (.in + .com)</option>
+                    <option value="IN_ONLY">.in Only (India)</option>
+                    <option value="COM_ONLY">.com Only (International)</option>
+                  </select>
+                  <p className="text-[10px] text-gray-500 mt-1">Where this product appears</p>
+                </div>
+              </div>
+            </div>
+
             {/* Variant Prices */}
             {approvingRequest.variants && approvingRequest.variants.length > 0 && (
               <div className="mb-4">
@@ -722,6 +844,80 @@ export default function VendorProductRequests() {
                               {Math.round(((parseFloat(variantOriginalPrices[variant.id]) - parseFloat(variantPrices[variant.id])) / parseFloat(variantPrices[variant.id])) * 100)}% off
                             </p>
                           )}
+                        </div>
+                      </div>
+                      {/* Variant multi-currency */}
+                      <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                        <p className="text-[10px] font-medium text-blue-600 mb-1.5">Selling Prices</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                          <div>
+                            <label htmlFor={`var-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">INR (₹)</label>
+                            <input
+                              id={`var-inr-${variant.id}`}
+                              type="number"
+                              value={variantPricesINR[variant.id] || ''}
+                              onChange={(e) => setVariantPricesINR(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                              placeholder="Selling price for .in"
+                              step="0.01"
+                              min="0"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor={`var-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">USD ($)</label>
+                            <input
+                              id={`var-usd-${variant.id}`}
+                              type="number"
+                              value={variantPricesUSD[variant.id] || ''}
+                              onChange={(e) => setVariantPricesUSD(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                              placeholder="Selling price for .com"
+                              step="0.01"
+                              min="0"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-[10px] font-medium text-blue-600 mb-1.5 mt-2">Original Prices (MRP)</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                          <div>
+                            <label htmlFor={`var-orig-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original ₹</label>
+                            <input
+                              id={`var-orig-inr-${variant.id}`}
+                              type="number"
+                              value={variantOriginalPricesINR[variant.id] || ''}
+                              onChange={(e) => setVariantOriginalPricesINR(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                              placeholder="MRP for .in domain"
+                              step="0.01"
+                              min="0"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor={`var-orig-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original $</label>
+                            <input
+                              id={`var-orig-usd-${variant.id}`}
+                              type="number"
+                              value={variantOriginalPricesUSD[variant.id] || ''}
+                              onChange={(e) => setVariantOriginalPricesUSD(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                              placeholder="MRP for .com domain"
+                              step="0.01"
+                              min="0"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor={`var-vis-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Visibility</label>
+                            <select
+                              id={`var-vis-${variant.id}`}
+                              value={variantVisibilities[variant.id] || 'BOTH'}
+                              onChange={(e) => setVariantVisibilities(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                            >
+                              <option value="BOTH">Both</option>
+                              <option value="IN_ONLY">.in</option>
+                              <option value="COM_ONLY">.com</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>

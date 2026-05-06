@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { calculateLogistics, type LogisticsConfig } from '@/lib/logistics';
+import { getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 import {
   View,
   Text,
@@ -59,9 +61,10 @@ interface CartItem {
   discount?: number;
   gstPercentage?: number;
   variantDetails?: { size: string; color: string; colorHex?: string; sku?: string };
+  product?: any;
 }
 
-const fmt = (n: number) => `$${n.toFixed(2)}`;
+const fmt = (n: number) => fmtCurrency(n);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Cart() {
@@ -163,8 +166,8 @@ export default function Cart() {
 
               // Price: use live product/variant price, not stale cart price
               const livePrice = hasVariant
-                ? (item.variant.adminFixedPrice ?? item.variant.price ?? item.price)
-                : (item.product?.adminFixedPrice ?? item.product?.basePrice ?? item.price);
+                ? getRegionalPrice(item.variant as any)
+                : getRegionalPrice(item.product as any);
 
               // Stock: variant stock takes priority
               const liveStock = hasVariant
@@ -211,6 +214,7 @@ export default function Cart() {
                 discount: liveDiscount,
                 gstPercentage: item.product?.gstPercentage,
                 variantDetails,
+                product: item.product || null,
               };
             }),
           );
@@ -228,7 +232,7 @@ export default function Cart() {
                 id: ci.id,
                 productId: ci.productId,
                 name: p.name,
-                price: p.adminFixedPrice ?? p.basePrice,
+                price: getRegionalPrice(p as any),
                 originalPrice: p.originalPrice,
                 images: url ? [url] : [],
                 category: p.category || '',
@@ -237,6 +241,7 @@ export default function Cart() {
                 quantity: ci.quantity,
                 discount: p.discount,
                 gstPercentage: p.gstPercentage,
+                product: p,
               });
             }
           } catch { /* skip broken items */ }
@@ -348,6 +353,19 @@ export default function Cart() {
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
   const tax = cartItems.reduce((s, i) => s + i.price * i.quantity * ((i.gstPercentage ?? 0) / 100), 0);
 
+  // Calculate logistics-based shipping
+  const shippingCost = useMemo(() => {
+    let cost = 0;
+    for (const item of cartItems) {
+      const config = (item as any).product?.logisticsConfig;
+      if (config) {
+        const result = calculateLogistics(config as LogisticsConfig, item.quantity);
+        cost += result.totalShippingCost;
+      }
+    }
+    return cost;
+  }, [cartItems]);
+
   // Recalculate discount from coupon metadata when subtotal changes
   const effectiveDiscount = (() => {
     if (!couponMeta || !appliedPromo) return discountAmount;
@@ -363,8 +381,8 @@ export default function Cart() {
     return Math.min(calc, subtotal);
   })();
 
-  const bagCost = selectedBag?.price ?? 0;
-  const total = Math.max(0, subtotal + tax - effectiveDiscount + bagCost);
+  const bagCost = selectedBag ? getRegionalPrice({ basePrice: selectedBag.price, priceINR: (selectedBag as any).priceINR, priceUSD: (selectedBag as any).priceUSD }) : 0;
+  const total = Math.max(0, subtotal + shippingCost + tax - effectiveDiscount + bagCost);
   const hasStockIssue = cartItems.some((i) => !i.inStock || (i.availableStock != null && i.quantity > i.availableStock));
 
   const handleCheckout = () => {
@@ -697,6 +715,7 @@ export default function Cart() {
       {/* Sticky bottom — summary + checkout, always visible */}
       <StickyCheckout
         subtotal={subtotal}
+        shipping={shippingCost}
         tax={tax}
         discount={effectiveDiscount}
         bagCost={bagCost}
@@ -744,6 +763,7 @@ function SummaryRow({ label, value, color }: { label: string; value: string; col
 // ─── Sticky Checkout with expandable summary ──────────────────────────────────
 function StickyCheckout({
   subtotal,
+  shipping = 0,
   tax,
   discount,
   bagCost = 0,
@@ -753,6 +773,7 @@ function StickyCheckout({
   onCheckout,
 }: {
   subtotal: number;
+  shipping?: number;
   tax: number;
   discount: number;
   bagCost?: number;
@@ -787,7 +808,7 @@ function StickyCheckout({
           {tax > 0 ? <SummaryRow label="Tax (GST)" value={fmt(tax)} /> : null}
           {discount > 0 ? <SummaryRow label="Discount" value={`-${fmt(discount)}`} color="#16a34a" /> : null}
           {bagCost > 0 ? <SummaryRow label={`Bag (${bagName})`} value={fmt(bagCost)} /> : null}
-          <SummaryRow label="Shipping" value="Free" color="#16a34a" />
+          <SummaryRow label="Shipping" value={shipping > 0 ? fmt(shipping) : 'Free'} color={shipping > 0 ? undefined : '#16a34a'} />
           <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 2 }} />
         </View>
       ) : null}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import {
   View, Text, ScrollView, Pressable,
   ActivityIndicator, useWindowDimensions, StyleSheet,
@@ -11,7 +11,10 @@ import { useRouter } from 'expo-router';
 import {
   Star, Heart, Truck, Shield, RotateCcw, Package,
   ChevronDown, ChevronUp, ShoppingCart, Tag, Check,
+  Plane, Ship as ShipIcon, AlertTriangle, Info, Box,
 } from 'lucide-react-native';
+import { calculateLogistics, formatWeight, formatDimensions, type LogisticsConfig } from '@/lib/logistics';
+import { getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 import { PublicProduct } from '@/services/publicProductService';
 import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
@@ -42,6 +45,7 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [transportOverride, setTransportOverride] = useState<'AIR' | 'SHIP' | null>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showAllDetails, setShowAllDetails] = useState(false);
 
@@ -54,11 +58,17 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
     : product.images || [];
 
   const currentPrice = selectedVariant
-    ? (selectedVariant.adminFixedPrice ?? selectedVariant.price)
-    : (product.adminFixedPrice ?? product.basePrice);
+    ? getRegionalPrice(selectedVariant as any)
+    : getRegionalPrice(product as any);
   const originalPrice = selectedVariant
-    ? selectedVariant.originalPrice
-    : product.originalPrice;
+    ? getRegionalOriginalPrice(selectedVariant as any) ?? selectedVariant.originalPrice
+    : getRegionalOriginalPrice(product as any) ?? product.originalPrice;
+
+  // Smart logistics calculation
+  const logisticsResult = useMemo(() => {
+    if (!(product as any).logisticsConfig) return null;
+    return calculateLogistics((product as any).logisticsConfig as LogisticsConfig, quantity, transportOverride || undefined);
+  }, [(product as any).logisticsConfig, quantity, transportOverride]);
   const currentImageUrl = displayImages[selectedImage]?.url;
   const savings = originalPrice && originalPrice > currentPrice ? originalPrice - currentPrice : 0;
 
@@ -75,7 +85,7 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
     (product.fabricSpecifications as any).careInstructions.length > 0;
 
   // ── Helpers ────────────────────────────────────────────────────────────
-  const fmt = (n: number) => `$${n.toFixed(2)}`;
+  const fmt = (n: number) => fmtCurrency(n);
 
   const renderStars = (rating: number) =>
     [0, 1, 2, 3, 4].map(i => (
@@ -421,7 +431,7 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
                 label={product.singleUnitSize || product.singleUnitColor || 'Base Unit'}
                 colorName={product.singleUnitColor || 'Base'}
                 colorHex={product.singleUnitColorHex}
-                price={fmt(product.adminFixedPrice || product.basePrice)}
+                price={fmt(getRegionalPrice(product as any))}
                 stock={product.inventory?.baseStock ?? (product.hasVariants ? 0 : product.totalStock)}
                 onPress={handleSelectBaseVariant}
                 accessibilityLabel="Select Base Variant"
@@ -430,8 +440,9 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
 
               {/* Named variants */}
               {product.variants.map((variant: any) => {
-                const variantPrice = variant.adminFixedPrice ?? variant.price;
-                const hasDiscount = variant.originalPrice != null && variant.originalPrice > variantPrice;
+                const variantPrice = getRegionalPrice(variant as any);
+                const variantOriginal = getRegionalOriginalPrice(variant as any) ?? variant.originalPrice;
+                const hasDiscount = variantOriginal != null && variantOriginal > variantPrice;
                 return (
                   <VariantCard
                     key={variant.id}
@@ -525,6 +536,96 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
             </View>
           </View>
         ) : null}
+
+        {/* Smart Logistics Section */}
+        {logisticsResult && (product as any).logisticsConfig && (
+          <View className="bg-white border border-gray-200 rounded-2xl p-4 mt-3" style={{ gap: 12 }}>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center" style={{ gap: 6 }}>
+                <Truck size={16} color="#2563eb" />
+                <Text className="text-[13px] font-bold text-gray-900">Shipping & Logistics</Text>
+              </View>
+              {logisticsResult.recommendedTransport === logisticsResult.selectedTransport && (
+                <View className="bg-green-100 px-2 py-0.5 rounded-full">
+                  <Text className="text-[9px] font-bold text-green-700">Recommended</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Total Weight */}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-[12px] text-gray-600">Total Weight</Text>
+              <Text className="text-[12px] font-semibold text-gray-900">
+                {formatWeight(logisticsResult.totalWeightKg)} ({quantity} x {formatWeight(logisticsResult.unitWeightKg)}/unit)
+              </Text>
+            </View>
+
+            {/* Transport Toggle */}
+            {((product as any).logisticsConfig as LogisticsConfig).transportTypes.length > 1 && (
+              <View className="flex-row" style={{ gap: 8 }}>
+                {((product as any).logisticsConfig as LogisticsConfig).transportTypes.map((type) => {
+                  const isSelected = logisticsResult.selectedTransport === type;
+                  return (
+                    <Pressable
+                      key={type}
+                      accessible
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select ${type === 'AIR' ? 'Air Freight' : 'Sea Freight'} shipping`}
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setTransportOverride(type);
+                      }}
+                      className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl border-2 ${
+                        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                      }`}
+                      style={{ gap: 6 }}
+                    >
+                      {type === 'AIR' ? <Plane size={14} color={isSelected ? '#2563eb' : '#6b7280'} /> : <ShipIcon size={14} color={isSelected ? '#2563eb' : '#6b7280'} />}
+                      <Text className={`text-[12px] font-semibold ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>
+                        {type === 'AIR' ? 'Air Freight' : 'Sea Freight'}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Delivery & Cost */}
+            <View className="flex-row" style={{ gap: 8 }}>
+              <View className="flex-1 bg-gray-50 rounded-xl p-3 items-center">
+                <Text className="text-[10px] text-gray-500 mb-0.5">Delivery</Text>
+                <Text className="text-[13px] font-bold text-gray-900">{logisticsResult.deliveryDays} days</Text>
+              </View>
+              <View className="flex-1 bg-gray-50 rounded-xl p-3 items-center">
+                <Text className="text-[10px] text-gray-500 mb-0.5">Shipping</Text>
+                <Text className="text-[13px] font-bold text-gray-900">
+                  {logisticsResult.totalShippingCost === 0 ? 'FREE' : fmt(logisticsResult.totalShippingCost)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Max weight warning */}
+            {logisticsResult.exceedsMaxWeight && (
+              <View className="flex-row items-start bg-red-50 border border-red-200 rounded-xl p-3" style={{ gap: 6 }}>
+                <AlertTriangle size={14} color="#dc2626" />
+                <Text className="flex-1 text-[11px] text-red-700">
+                  Weight ({formatWeight(logisticsResult.totalWeightKg)}) exceeds limit of {formatWeight(logisticsResult.maxWeightKg)}. Reduce quantity or contact support.
+                </Text>
+              </View>
+            )}
+
+            {/* Notes */}
+            {((product as any).logisticsConfig as LogisticsConfig).notes ? (
+              <View className="flex-row items-start" style={{ gap: 4 }}>
+                <Info size={12} color="#9ca3af" />
+                <Text className="flex-1 text-[11px] text-gray-500">
+                  {((product as any).logisticsConfig as LogisticsConfig).notes}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        )}
       </View>
 
       {/* ── Product Details ─────────────────────────────────────────────────── */}

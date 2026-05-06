@@ -2,14 +2,8 @@ export type Region = 'IN' | 'US'
 export type Currency = 'INR' | 'USD'
 
 export function getRegion(): Region {
-  // Env var (set per Vercel deployment) takes priority
-  const envRegion = process.env.NEXT_PUBLIC_SITE_REGION
+  const envRegion = process.env.EXPO_PUBLIC_SITE_REGION
   if (envRegion === 'IN' || envRegion === 'US') return envRegion
-
-  // Fallback: check hostname
-  if (typeof window !== 'undefined') {
-    if (window.location.hostname.endsWith('.in')) return 'IN'
-  }
   return 'US' // default
 }
 
@@ -17,25 +11,20 @@ export function getCurrency(): Currency {
   return getRegion() === 'IN' ? 'INR' : 'USD'
 }
 
-export function getCurrencySymbol(): string {
-  return getCurrency() === 'INR' ? '₹' : '$'
-}
-
 export function formatPrice(price: number, currency?: Currency): string {
   const c = currency || getCurrency()
-  return new Intl.NumberFormat(c === 'INR' ? 'en-IN' : 'en-US', {
-    style: 'currency',
-    currency: c,
-    minimumFractionDigits: 2,
-  }).format(price)
+  return c === 'INR'
+    ? `₹${price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+    : `$${price.toFixed(2)}`
 }
 
 /**
  * Pick the correct price based on region.
- * Priority: priceINR/priceUSD → adminFixedPrice → basePrice
+ * Priority: priceINR/priceUSD → adminFixedPrice → basePrice/price
  */
 export function getRegionalPrice(product: {
   basePrice?: number;
+  price?: number;
   adminFixedPrice?: number | null;
   priceINR?: number | null;
   priceUSD?: number | null;
@@ -43,13 +32,9 @@ export function getRegionalPrice(product: {
   const region = getRegion()
   if (region === 'IN' && product.priceINR) return product.priceINR
   if (region === 'US' && product.priceUSD) return product.priceUSD
-  return product.adminFixedPrice ?? product.basePrice ?? 0
+  return product.adminFixedPrice ?? product.basePrice ?? product.price ?? 0
 }
 
-/**
- * Pick the correct original price based on region.
- * Priority: originalPriceINR/originalPriceUSD → originalPrice
- */
 export function getRegionalOriginalPrice(product: {
   originalPrice?: number | null;
   originalPriceINR?: number | null;
@@ -59,15 +44,4 @@ export function getRegionalOriginalPrice(product: {
   if (region === 'IN' && product.originalPriceINR) return product.originalPriceINR
   if (region === 'US' && product.originalPriceUSD) return product.originalPriceUSD
   return product.originalPrice ?? null
-}
-
-/**
- * Check if a product is visible in the current region.
- */
-export function isVisibleInRegion(priceVisibility?: string): boolean {
-  if (!priceVisibility || priceVisibility === 'BOTH') return true
-  const region = getRegion()
-  if (region === 'IN' && priceVisibility === 'IN_ONLY') return true
-  if (region === 'US' && priceVisibility === 'COM_ONLY') return true
-  return false
 }

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Product as ServiceProduct } from '@/services/productService';
 import { PublicProduct } from '@/services/publicProductService';
+import { getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 
 // Type definitions matching frontend
 interface MockProduct {
@@ -61,16 +62,12 @@ export default function ProductCardSimple({ product }: ProductCardSimpleProps) {
   const placeholderImage = 'https://via.placeholder.com/400x400?text=No+Image';
   const imageUrl = primaryImage || placeholderImage;
 
-  // Get price - use adminFixedPrice if available, otherwise basePrice or price
+  // Get price - use regional price (priceINR/priceUSD) → adminFixedPrice → basePrice
   let displayPrice: number | undefined;
-  
+
   if (isServiceProduct(product)) {
-    // For API products, prioritize adminFixedPrice, then basePrice
-    displayPrice = product.adminFixedPrice !== null && product.adminFixedPrice !== undefined 
-      ? product.adminFixedPrice 
-      : product.basePrice;
+    displayPrice = getRegionalPrice(product as any);
   } else {
-    // For mock products, use price property
     displayPrice = (product as any).price;
   }
 
@@ -100,11 +97,11 @@ export default function ProductCardSimple({ product }: ProductCardSimpleProps) {
         {/* Price */}
         <View className="flex-row items-center">
           <Text className="text-xl font-bold text-gray-900">
-            ${displayPrice?.toFixed(2) || '0.00'}
+            {fmtCurrency(displayPrice || 0)}
           </Text>
           {product.originalPrice && (
             <Text className="text-sm text-red-600 line-through ml-2">
-              ${product.originalPrice.toFixed(2)}
+              {fmtCurrency(product.originalPrice)}
             </Text>
           )}
         </View>

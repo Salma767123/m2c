@@ -5,6 +5,8 @@ export interface BagType {
   name: string;
   description?: string;
   price: number;
+  priceINR?: number | null;
+  priceUSD?: number | null;
   image?: string;
 }
 

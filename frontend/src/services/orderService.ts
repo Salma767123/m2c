@@ -134,6 +134,7 @@ export interface CreateOrderParams {
     discount?: number;
     freeShipping?: boolean;
     bagTypeId?: string;
+    currency?: string;
 }
 
 class OrderService {

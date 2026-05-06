@@ -32,11 +32,12 @@ import { publicProductService, type PublicProduct } from '@/services/publicProdu
 import Sidebar from '../Sidebar/Sidebar';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
+import { getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 
 /* ── Hoisted constants (allocated once) ───────────────────────────────────── */
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT = 8;
-const fmt = (n: number) => `$${n.toFixed(2)}`;
+const fmt = (n: number) => fmtCurrency(n);
 
 // ─── Main Header ─────────────────────────────────────────────────────────────
 export function Header() {
@@ -393,7 +394,7 @@ const SuggestionRow = memo(function SuggestionRow({
   onPress: (p: PublicProduct) => void;
   onSearchPress: (q: string) => void;
 }) {
-  const price = product.adminFixedPrice ?? product.basePrice;
+  const price = getRegionalPrice(product as any);
   const imageUrl = product.images?.find((i) => i.isPrimary)?.url || product.images?.[0]?.url;
 
   return (

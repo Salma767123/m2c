@@ -13,7 +13,7 @@ import { wishlistService } from '@/services/wishlistService';
 import { trackProductView } from '@/services/analyticsService';
 import reviewService from '@/services/reviewService';
 import Image from 'next/image';
-import { formatPrice } from '@/lib/currency';
+import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, isVisibleInRegion } from '@/lib/currency';
 import { calculateLogistics, formatWeight, formatDimensions, LogisticsConfig } from '@/lib/logistics';
 import PromotionalPopup from '@/components/WebSite/PromotionalPopup/PromotionalPopup';
 
@@ -107,12 +107,12 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
     );
   }
 
-  if (!product) {
+  if (!product || !isVisibleInRegion((product as any).priceVisibility)) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Product Not Found</h1>
-          <p className="text-gray-600 mb-8">The product you're looking for doesn't exist or is no longer available.</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Product Not Available</h1>
+          <p className="text-gray-600 mb-8">This product is not available in your region or no longer exists.</p>
           <a href="/products" className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors">
             Back to Products
           </a>
@@ -297,13 +297,13 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
     ? selectedVariant.stock
     : (product.inventory?.baseStock ?? product.totalStock ?? 0);
 
-  // Get current price based on selected variant or admin fixed price or base price
+  // Get current price based on region + selected variant
   const currentPrice = selectedVariant
-    ? (selectedVariant.adminFixedPrice ?? selectedVariant.price)
-    : (product.adminFixedPrice ?? product.basePrice);
+    ? getRegionalPrice(selectedVariant)
+    : getRegionalPrice(product);
   const originalPrice = selectedVariant
-    ? selectedVariant.originalPrice
-    : product.originalPrice;
+    ? getRegionalOriginalPrice(selectedVariant) ?? selectedVariant.originalPrice
+    : getRegionalOriginalPrice(product) ?? product.originalPrice;
 
   // Get current image URL
   const currentImageUrl = displayImages[selectedImage]?.url;
@@ -532,8 +532,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                       <span className="text-xs text-gray-600">{product.singleUnitColor}</span>
                                     )}
                                   </div>
-                                  <div className="text-lg font-bold text-gray-900 mt-1">{formatPrice(product.adminFixedPrice ?? product.basePrice)}</div>
-                                  {product.originalPrice && product.originalPrice > (product.adminFixedPrice ?? product.basePrice) && (
+                                  <div className="text-lg font-bold text-gray-900 mt-1">{formatPrice(getRegionalPrice(product))}</div>
+                                  {product.originalPrice && product.originalPrice > getRegionalPrice(product) && (
                                     <span className="text-xs text-gray-400 line-through">{formatPrice(product.originalPrice)}</span>
                                   )}
                                   <div className="text-xs text-gray-500">
@@ -586,8 +586,8 @@ const ProductDetail = ({ productId }: ProductDetailProps) => {
                                       <span className="text-xs text-gray-600">{variant.color}</span>
                                     </div>
                                     <div className="flex items-center gap-1 mt-1">
-                                      <span className="text-lg font-bold text-gray-900">{formatPrice(variant.adminFixedPrice ?? variant.price)}</span>
-                                      {variant.originalPrice && variant.originalPrice > (variant.adminFixedPrice ?? variant.price) && (
+                                      <span className="text-lg font-bold text-gray-900">{formatPrice(getRegionalPrice(variant))}</span>
+                                      {variant.originalPrice && variant.originalPrice > getRegionalPrice(variant) && (
                                         <span className="text-xs text-gray-400 line-through">{formatPrice(variant.originalPrice)}</span>
                                       )}
                                       {variant.discount && variant.discount > 0 && (

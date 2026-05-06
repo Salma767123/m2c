@@ -18,12 +18,23 @@ import {
   FileText,
   Image as ImageIcon,
   Layers,
-  Warehouse
+  Warehouse,
+  UserCheck
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Image from 'next/image'
 import { adminProductService, type AdminProduct } from '@/services/adminProductService'
 import { hasPermission } from '@/lib/auth'
+
+// Hoisted static array — allocated once, not re-created every render (Rule 6.3)
+const QC_SCORE_FIELDS = [
+  { key: 'shipperCartonRemark', label: 'Shipper Carton' },
+  { key: 'innerCartonRemark', label: 'Inner Carton' },
+  { key: 'retailPackagingRemark', label: 'Retail Packaging' },
+  { key: 'productTypeRemark', label: 'Product Type' },
+  { key: 'aqlWorkmanshipRemark', label: 'AQL Workmanship' },
+  { key: 'onSiteTestsRemark', label: 'On-site Tests' },
+] as const;
 
 interface VendorProductRequestViewProps {
   requestId: string
@@ -40,11 +51,15 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
   const [originalPrice, setOriginalPrice] = useState('')
   const [priceINR, setPriceINR] = useState('')
   const [priceUSD, setPriceUSD] = useState('')
+  const [originalPriceINR, setOriginalPriceINR] = useState('')
+  const [originalPriceUSD, setOriginalPriceUSD] = useState('')
   const [priceVisibility, setPriceVisibility] = useState<'IN_ONLY' | 'COM_ONLY' | 'BOTH'>('BOTH')
   const [variantPrices, setVariantPrices] = useState<Record<string, string>>({})
   const [variantOriginalPrices, setVariantOriginalPrices] = useState<Record<string, string>>({})
   const [variantPricesINR, setVariantPricesINR] = useState<Record<string, string>>({})
   const [variantPricesUSD, setVariantPricesUSD] = useState<Record<string, string>>({})
+  const [variantOriginalPricesINR, setVariantOriginalPricesINR] = useState<Record<string, string>>({})
+  const [variantOriginalPricesUSD, setVariantOriginalPricesUSD] = useState<Record<string, string>>({})
   const [variantVisibilities, setVariantVisibilities] = useState<Record<string, string>>({})
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -195,9 +210,17 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
         {
           priceINR: priceINR ? parseFloat(priceINR) : undefined,
           priceUSD: priceUSD ? parseFloat(priceUSD) : undefined,
+          originalPriceINR: originalPriceINR ? parseFloat(originalPriceINR) : undefined,
+          originalPriceUSD: originalPriceUSD ? parseFloat(originalPriceUSD) : undefined,
           priceVisibility,
           variantPricesINR: variantPricesINRNum && Object.keys(variantPricesINRNum).length > 0 ? variantPricesINRNum : undefined,
           variantPricesUSD: variantPricesUSDNum && Object.keys(variantPricesUSDNum).length > 0 ? variantPricesUSDNum : undefined,
+          variantOriginalPricesINR: Object.keys(variantOriginalPricesINR).length > 0
+            ? Object.fromEntries(Object.entries(variantOriginalPricesINR).filter(([, v]) => v).map(([id, v]) => [id, parseFloat(v)]))
+            : undefined,
+          variantOriginalPricesUSD: Object.keys(variantOriginalPricesUSD).length > 0
+            ? Object.fromEntries(Object.entries(variantOriginalPricesUSD).filter(([, v]) => v).map(([id, v]) => [id, parseFloat(v)]))
+            : undefined,
           variantVisibilities: Object.keys(variantVisibilities).length > 0 ? variantVisibilities : undefined,
         }
       )
@@ -494,6 +517,35 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                         <p className="text-sm font-semibold text-blue-700">{product.inventory?.baseStock ?? 0} units</p>
                       </div>
                     </div>
+                    {/* Multi-currency prices for base product */}
+                    {(product.priceINR || product.priceUSD) && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                        {product.priceINR && (
+                          <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                            <p className="text-xs text-blue-600 mb-1">INR Price</p>
+                            <p className="text-sm font-semibold text-blue-800">₹{product.priceINR.toLocaleString()}</p>
+                          </div>
+                        )}
+                        {product.priceUSD && (
+                          <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                            <p className="text-xs text-blue-600 mb-1">USD Price</p>
+                            <p className="text-sm font-semibold text-blue-800">${product.priceUSD.toFixed(2)}</p>
+                          </div>
+                        )}
+                        {product.originalPriceINR && (
+                          <div className="bg-white p-3 rounded border border-blue-100">
+                            <p className="text-xs text-gray-500 mb-1">Original ₹</p>
+                            <p className="text-sm font-semibold text-gray-500 line-through">₹{product.originalPriceINR.toLocaleString()}</p>
+                          </div>
+                        )}
+                        {product.originalPriceUSD && (
+                          <div className="bg-white p-3 rounded border border-blue-100">
+                            <p className="text-xs text-gray-500 mb-1">Original $</p>
+                            <p className="text-sm font-semibold text-gray-500 line-through">${product.originalPriceUSD.toFixed(2)}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {product.variants.map((variant, index) => (
@@ -546,6 +598,36 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                           <p className="text-sm font-semibold text-gray-900">{variant.stock} units</p>
                         </div>
                       </div>
+
+                      {/* Variant Multi-Currency Display */}
+                      {((variant as any).priceINR || (variant as any).priceUSD) ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4" role="group" aria-label="Variant regional pricing">
+                          {(variant as any).priceINR && (
+                            <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                              <p className="text-xs text-blue-600 mb-1">INR Price</p>
+                              <p className="text-sm font-semibold text-blue-800">₹{(variant as any).priceINR.toLocaleString()}</p>
+                            </div>
+                          )}
+                          {(variant as any).priceUSD && (
+                            <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                              <p className="text-xs text-blue-600 mb-1">USD Price</p>
+                              <p className="text-sm font-semibold text-blue-800">${(variant as any).priceUSD.toFixed(2)}</p>
+                            </div>
+                          )}
+                          {(variant as any).originalPriceINR && (
+                            <div className="bg-white p-3 rounded border border-blue-100">
+                              <p className="text-xs text-gray-500 mb-1">Original ₹</p>
+                              <p className="text-sm font-semibold text-gray-500 line-through">₹{(variant as any).originalPriceINR.toLocaleString()}</p>
+                            </div>
+                          )}
+                          {(variant as any).originalPriceUSD && (
+                            <div className="bg-white p-3 rounded border border-blue-100">
+                              <p className="text-xs text-gray-500 mb-1">Original $</p>
+                              <p className="text-sm font-semibold text-gray-500 line-through">${(variant as any).originalPriceUSD.toFixed(2)}</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
 
                       {/* Variant Images */}
                       {variant.images && variant.images.length > 0 && (
@@ -687,9 +769,27 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   {product.adminFixedPrice && (
                     <p className="text-sm text-green-600 font-medium">Admin Price: ₹{product.adminFixedPrice}</p>
                   )}
-                  {product.gstPercentage && (
-                    <p className="text-sm text-gray-600">GST: {product.gstPercentage}%</p>
+                  {product.priceINR && (
+                    <p className="text-sm text-blue-600">INR: ₹{product.priceINR.toLocaleString()}</p>
                   )}
+                  {product.priceUSD && (
+                    <p className="text-sm text-blue-600">USD: ${product.priceUSD.toFixed(2)}</p>
+                  )}
+                  {product.originalPriceINR && (
+                    <p className="text-xs text-gray-500">Original ₹: ₹{product.originalPriceINR.toLocaleString()}</p>
+                  )}
+                  {product.originalPriceUSD && (
+                    <p className="text-xs text-gray-500">Original $: ${product.originalPriceUSD.toFixed(2)}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Visibility: {product.priceVisibility === 'IN_ONLY' ? '.in only (India)' : product.priceVisibility === 'COM_ONLY' ? '.com only (International)' : 'Both (.in + .com)'}
+                  </p>
+                  {product.gstPercentage ? (
+                    <p className="text-sm text-gray-600">GST: {product.gstPercentage}%</p>
+                  ) : null}
+                  {product.discount ? (
+                    <p className="text-sm text-green-600 font-medium">Discount: {product.discount}% off</p>
+                  ) : null}
                 </div>
               </div>
               <div className="flex items-center space-x-3">
@@ -741,8 +841,80 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </div>
                 </div>
               )}
+
+              {/* Assigned QC Checker */}
+              {product.assignedQc && (
+                <div className="flex items-center space-x-3">
+                  <UserCheck className="h-4 w-4 text-blue-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">QC Checker</p>
+                    <p className="text-sm text-gray-600">{product.assignedQc.name}</p>
+                    <p className="text-xs text-gray-500">{product.assignedQc.email}</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* QC Inspection Summary */}
+          {product.qcInspectionData && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">QC Inspection Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {product.qcInspectionData.finalDecision && (
+                    <div className={`p-2 rounded text-center ${product.qcInspectionData.finalDecision === 'Approved' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                      <p className="text-[10px] text-gray-500">Decision</p>
+                      <p className="text-xs font-semibold">{product.qcInspectionData.finalDecision}</p>
+                    </div>
+                  )}
+                  {product.qcInspectionData.inspectionDate && (
+                    <div className="p-2 rounded bg-gray-50 text-center">
+                      <p className="text-[10px] text-gray-500">Inspected</p>
+                      <p className="text-xs font-semibold text-gray-800">{product.qcInspectionData.inspectionDate}</p>
+                    </div>
+                  )}
+                </div>
+                {product.qcInspectionData.inspectionType && (
+                  <p className="text-xs text-gray-600">Type: {product.qcInspectionData.inspectionType}</p>
+                )}
+
+                {/* Remark Scores */}
+                {(product.qcInspectionData.shipperCartonRemark || product.qcInspectionData.aqlWorkmanshipRemark) ? (
+                  <div role="list" aria-label="Quality inspection scores">
+                    <p className="text-[10px] font-medium text-gray-500 mb-1.5">Quality Scores</p>
+                    <div className="space-y-1">
+                      {QC_SCORE_FIELDS.map(({ key, label }) => {
+                        const score = product.qcInspectionData?.[key];
+                        if (!score) return null;
+                        const num = parseInt(score);
+                        const color = num >= 8 ? 'text-green-700 bg-green-50' : num >= 6 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50';
+                        return (
+                          <div key={key} role="listitem" className="flex items-center justify-between text-xs" aria-label={`${label}: ${score} out of 10`}>
+                            <span className="text-gray-600">{label}</span>
+                            <span className={`px-1.5 py-0.5 rounded font-semibold transition-colors duration-200 ${color}`}>{score}/10</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {product.qcInspectionData.finalRemarks && (
+                  <div className="p-2 bg-gray-50 rounded">
+                    <p className="text-[10px] font-medium text-gray-500 mb-1">Remarks</p>
+                    <p className="text-xs text-gray-700">{product.qcInspectionData.finalRemarks}</p>
+                  </div>
+                )}
+
+                {product.inspectionCycleNumber && product.inspectionCycleNumber > 1 ? (
+                  <p className="text-xs text-amber-600 font-medium">Inspection Cycle #{product.inspectionCycleNumber}</p>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Vendor Details */}
           <Card>
@@ -865,45 +1037,78 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             {/* Multi-Currency Pricing */}
             <div className="mb-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
               <h4 className="text-sm font-semibold text-blue-900 mb-3">Multi-Currency Pricing (.in / .com)</h4>
-              <div className="grid grid-cols-3 gap-4">
+
+              {/* Selling Prices */}
+              <p className="text-xs font-medium text-gray-600 mb-2 border-b border-blue-200 pb-1">Selling Prices</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    INR Price (₹)
-                  </label>
+                  <label htmlFor="view-price-inr" className="block text-xs font-medium text-gray-700 mb-1">INR Price (₹)</label>
                   <input
+                    id="view-price-inr"
                     type="number"
                     value={priceINR}
                     onChange={(e) => setPriceINR(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    placeholder="Price for .in"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    placeholder="Selling price for .in domain"
                     step="0.01"
                     min="0"
                     disabled={actionLoading}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    USD Price ($)
-                  </label>
+                  <label htmlFor="view-price-usd" className="block text-xs font-medium text-gray-700 mb-1">USD Price ($)</label>
                   <input
+                    id="view-price-usd"
                     type="number"
                     value={priceUSD}
                     onChange={(e) => setPriceUSD(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    placeholder="Price for .com"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    placeholder="Selling price for .com domain"
+                    step="0.01"
+                    min="0"
+                    disabled={actionLoading}
+                  />
+                </div>
+              </div>
+
+              {/* Original Prices (MRP) */}
+              <p className="text-xs font-medium text-gray-600 mb-2 mt-4 border-b border-blue-200 pb-1">Original Prices (MRP)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div>
+                  <label htmlFor="view-original-inr" className="block text-xs font-medium text-gray-700 mb-1">Original ₹ (MRP)</label>
+                  <input
+                    id="view-original-inr"
+                    type="number"
+                    value={originalPriceINR}
+                    onChange={(e) => setOriginalPriceINR(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    placeholder="MRP for .in domain"
                     step="0.01"
                     min="0"
                     disabled={actionLoading}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Display On
-                  </label>
+                  <label htmlFor="view-original-usd" className="block text-xs font-medium text-gray-700 mb-1">Original $ (MRP)</label>
+                  <input
+                    id="view-original-usd"
+                    type="number"
+                    value={originalPriceUSD}
+                    onChange={(e) => setOriginalPriceUSD(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
+                    placeholder="MRP for .com domain"
+                    step="0.01"
+                    min="0"
+                    disabled={actionLoading}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="view-display-on" className="block text-xs font-medium text-gray-700 mb-1">Display On</label>
                   <select
+                    id="view-display-on"
                     value={priceVisibility}
                     onChange={(e) => setPriceVisibility(e.target.value as 'IN_ONLY' | 'COM_ONLY' | 'BOTH')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
                     disabled={actionLoading}
                   >
                     <option value="BOTH">Both (.in & .com)</option>
@@ -912,8 +1117,8 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   </select>
                 </div>
               </div>
-              <p className="text-xs text-blue-700 mt-2">
-                INR price shows on .in domain, USD price on .com domain. Leave USD empty to hide from .com.
+              <p className="text-xs text-blue-700 mt-3">
+                INR/USD prices override admin selling price for their region. Original prices show as strikethrough.
               </p>
             </div>
 
@@ -986,45 +1191,82 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                         </div>
                       </div>
                       {/* Variant Multi-Currency */}
-                      <div className="mt-2 grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-blue-700 mb-1">INR Price (₹)</label>
-                          <input
-                            type="number"
-                            value={variantPricesINR[variant.id] || ''}
-                            onChange={(e) => setVariantPricesINR(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                            className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            placeholder="INR"
-                            step="0.01"
-                            min="0"
-                            disabled={actionLoading}
-                          />
+                      <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                        <p className="text-[10px] font-medium text-blue-600 mb-1.5">Selling Prices</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                          <div>
+                            <label htmlFor={`view-var-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">INR (₹)</label>
+                            <input
+                              id={`view-var-inr-${variant.id}`}
+                              type="number"
+                              value={variantPricesINR[variant.id] || ''}
+                              onChange={(e) => setVariantPricesINR(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                              placeholder="Selling price for .in"
+                              step="0.01"
+                              min="0"
+                              disabled={actionLoading}
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor={`view-var-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">USD ($)</label>
+                            <input
+                              id={`view-var-usd-${variant.id}`}
+                              type="number"
+                              value={variantPricesUSD[variant.id] || ''}
+                              onChange={(e) => setVariantPricesUSD(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                              placeholder="Selling price for .com"
+                              step="0.01"
+                              min="0"
+                              disabled={actionLoading}
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium text-blue-700 mb-1">USD Price ($)</label>
-                          <input
-                            type="number"
-                            value={variantPricesUSD[variant.id] || ''}
-                            onChange={(e) => setVariantPricesUSD(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                            className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            placeholder="USD"
-                            step="0.01"
-                            min="0"
-                            disabled={actionLoading}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-blue-700 mb-1">Display On</label>
-                          <select
-                            value={variantVisibilities[variant.id] || 'BOTH'}
-                            onChange={(e) => setVariantVisibilities(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                            className="w-full px-3 py-2 border border-blue-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            disabled={actionLoading}
-                          >
-                            <option value="BOTH">Both</option>
-                            <option value="IN_ONLY">.in only</option>
-                            <option value="COM_ONLY">.com only</option>
-                          </select>
+                        <p className="text-[10px] font-medium text-blue-600 mb-1.5 mt-2">Original Prices (MRP)</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                          <div>
+                            <label htmlFor={`view-var-orig-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original ₹</label>
+                            <input
+                              id={`view-var-orig-inr-${variant.id}`}
+                              type="number"
+                              value={variantOriginalPricesINR[variant.id] || ''}
+                              onChange={(e) => setVariantOriginalPricesINR(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                              placeholder="MRP for .in domain"
+                              step="0.01"
+                              min="0"
+                              disabled={actionLoading}
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor={`view-var-orig-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original $</label>
+                            <input
+                              id={`view-var-orig-usd-${variant.id}`}
+                              type="number"
+                              value={variantOriginalPricesUSD[variant.id] || ''}
+                              onChange={(e) => setVariantOriginalPricesUSD(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                              placeholder="MRP for .com domain"
+                              step="0.01"
+                              min="0"
+                              disabled={actionLoading}
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor={`view-var-vis-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Display</label>
+                            <select
+                              id={`view-var-vis-${variant.id}`}
+                              value={variantVisibilities[variant.id] || 'BOTH'}
+                              onChange={(e) => setVariantVisibilities(prev => ({ ...prev, [variant.id]: e.target.value }))}
+                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                              disabled={actionLoading}
+                            >
+                              <option value="BOTH">Both</option>
+                              <option value="IN_ONLY">.in</option>
+                              <option value="COM_ONLY">.com</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>

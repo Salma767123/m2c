@@ -66,11 +66,13 @@ export interface AdminProduct {
   assignedQcId?: string | null;
   assignedQc?: {
     id: string;
-    checkerId: string;
+    checkerId?: string;
     name?: string;
     email?: string;
     status?: string;
   } | null;
+  qcInspectionData?: Record<string, any> | null;
+  inspectionCycleNumber?: number;
   inventory?: {
     id: string;
     name: string;
@@ -190,9 +192,13 @@ class AdminProductService {
     multiCurrency?: {
       priceINR?: number;
       priceUSD?: number;
+      originalPriceINR?: number;
+      originalPriceUSD?: number;
       priceVisibility?: string;
       variantPricesINR?: Record<string, number>;
       variantPricesUSD?: Record<string, number>;
+      variantOriginalPricesINR?: Record<string, number>;
+      variantOriginalPricesUSD?: Record<string, number>;
       variantVisibilities?: Record<string, string>;
     }
   ): Promise<{ success: boolean; data?: AdminProduct; message?: string }> {
@@ -215,8 +221,12 @@ class AdminProductService {
         if (multiCurrency.priceINR !== undefined) payload.priceINR = multiCurrency.priceINR;
         if (multiCurrency.priceUSD !== undefined) payload.priceUSD = multiCurrency.priceUSD;
         if (multiCurrency.priceVisibility) payload.priceVisibility = multiCurrency.priceVisibility;
+        if (multiCurrency.originalPriceINR !== undefined) payload.originalPriceINR = multiCurrency.originalPriceINR;
+        if (multiCurrency.originalPriceUSD !== undefined) payload.originalPriceUSD = multiCurrency.originalPriceUSD;
         if (multiCurrency.variantPricesINR) payload.variantPricesINR = multiCurrency.variantPricesINR;
         if (multiCurrency.variantPricesUSD) payload.variantPricesUSD = multiCurrency.variantPricesUSD;
+        if (multiCurrency.variantOriginalPricesINR) payload.variantOriginalPricesINR = multiCurrency.variantOriginalPricesINR;
+        if (multiCurrency.variantOriginalPricesUSD) payload.variantOriginalPricesUSD = multiCurrency.variantOriginalPricesUSD;
         if (multiCurrency.variantVisibilities) payload.variantVisibilities = multiCurrency.variantVisibilities;
       }
       const response = await axios.put(`/products/${id}/approve`, payload);

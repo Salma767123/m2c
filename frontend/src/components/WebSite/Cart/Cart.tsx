@@ -9,7 +9,12 @@ import { publicProductService, PublicProduct } from "@/services/publicProductSer
 import { userAuthService } from "@/services/userAuthService"
 import bagTypeService, { BagType } from "@/services/bagTypeService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
-import { formatPrice } from "@/lib/currency"
+import { formatPrice, getRegionalPrice, getRegionalOriginalPrice } from "@/lib/currency"
+import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
+
+/** Map BagType's `price` field to `basePrice` so getRegionalPrice() resolves correctly */
+const getBagRegionalPrice = (bag: { price: number; priceINR?: number | null; priceUSD?: number | null }) =>
+  getRegionalPrice({ basePrice: bag.price, priceINR: bag.priceINR, priceUSD: bag.priceUSD })
 import {
   ShoppingCart,
   Plus,
@@ -91,7 +96,7 @@ export default function Order() {
 
                 // If local cart has variantId, find the variant data inside the public product
                 let variantDetails = undefined;
-                let finalPrice = product.adminFixedPrice || product.basePrice;
+                let finalPrice = getRegionalPrice(product as any);
                 let finalImages = product.images.map(img => img.url);
                 let stock = product.totalStock;
 
@@ -136,7 +141,8 @@ export default function Order() {
                   material: product.material,
                   discount: product.discount,
                   gstPercentage: product.gstPercentage,
-                  variantDetails
+                  variantDetails,
+                  product: product,
                 }
               }
             } catch (err) {
@@ -161,20 +167,20 @@ export default function Order() {
                 ? item.variant.images
                 : (hasProductImg ? item.product.images.map((img: any) => img.url) : []);
 
-              // Use live variant pricing, not stale cart price
+              // Use live regional pricing
               const livePrice = hasVariant
-                ? (item.variant.adminFixedPrice ?? item.variant.price ?? item.price)
-                : (item.product?.adminFixedPrice ?? item.product?.basePrice ?? item.price);
+                ? getRegionalPrice(item.variant as any)
+                : getRegionalPrice(item.product as any);
 
               // Variant stock takes priority
               const liveStock = hasVariant
                 ? item.variant.stock
                 : (item.product?.availableStock ?? item.product?.totalStock);
 
-              // Variant-specific discount/originalPrice
+              // Variant-specific discount/originalPrice (region-aware)
               const liveOriginalPrice = hasVariant
-                ? (item.variant.originalPrice ?? item.product?.originalPrice)
-                : item.product?.originalPrice;
+                ? getRegionalOriginalPrice(item.variant as any) ?? item.product?.originalPrice
+                : getRegionalOriginalPrice(item.product as any);
               const liveDiscount = hasVariant
                 ? (item.variant.discount ?? item.product?.discount)
                 : item.product?.discount;
@@ -206,7 +212,8 @@ export default function Order() {
                   color: item.product.singleUnitColor || '',
                   colorHex: item.product.singleUnitColorHex,
                   sku: item.product.baseSku || ''
-                } : undefined
+                } : undefined,
+                product: item.product || null,
               }
             })
             setCartItems(items)
@@ -264,7 +271,7 @@ export default function Order() {
     if (bagTypeId) {
       const bag = availableBagTypes.find(b => b.id === bagTypeId)
       if (bag) {
-        localStorage.setItem('selectedBagType', JSON.stringify({ id: bag.id, name: bag.name, price: bag.price }))
+        localStorage.setItem('selectedBagType', JSON.stringify({ id: bag.id, name: bag.name, price: getBagRegionalPrice(bag) }))
       }
     } else {
       localStorage.removeItem('selectedBagType')
@@ -458,7 +465,18 @@ export default function Order() {
 
   const calculateSummary = (): OrderSummary => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    const shipping = freeShippingApplied ? 0 : 0 // Free shipping or standard free shipping
+    // Calculate logistics-based shipping from product configs
+    let logisticsShipping = 0
+    if (!freeShippingApplied) {
+      for (const item of cartItems) {
+        const config = (item as any).product?.logisticsConfig
+        if (config) {
+          const result = calculateLogistics(config as LogisticsConfig, item.quantity)
+          logisticsShipping += result.totalShippingCost
+        }
+      }
+    }
+    const shipping = freeShippingApplied ? 0 : logisticsShipping
     const discount = discountAmount
 
     // Calculate tax based on individual product GST percentages
@@ -470,7 +488,7 @@ export default function Order() {
 
     // Bag add-on cost
     const selectedBag = availableBagTypes.find(b => b.id === selectedBagTypeId)
-    const bagCost = selectedBag ? selectedBag.price : 0
+    const bagCost = selectedBag ? getBagRegionalPrice(selectedBag) : 0
 
     const total = subtotal + shipping + tax - discount + bagCost
 
@@ -760,7 +778,7 @@ export default function Order() {
                           <p className="text-sm font-medium text-slate-900">{bag.name}</p>
                           {bag.description && <p className="text-xs text-slate-500 truncate">{bag.description}</p>}
                         </div>
-                        <span className="text-sm font-bold text-slate-900 shrink-0">{formatPrice(bag.price)}</span>
+                        <span className="text-sm font-bold text-slate-900 shrink-0">{formatPrice(getBagRegionalPrice(bag))}</span>
                       </button>
                     ))}
                   </div>

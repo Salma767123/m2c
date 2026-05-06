@@ -14,7 +14,8 @@ import {
   ShoppingBag
 } from "lucide-react"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
-import { formatPrice } from '@/lib/currency'
+import { formatPrice, getCurrency, getRegionalPrice } from '@/lib/currency'
+import bagTypeService from "@/services/bagTypeService"
 import ShippingForm from "./CheckoutProcess/ShippingForm"
 import PaymentForm from "./CheckoutProcess/PaymentForm"
 import ReviewOrder from "./CheckoutProcess/ReviewOrder"
@@ -146,14 +147,34 @@ export default function Checkout() {
       }
     }
 
-    // Load selected bag type
+    // Load selected bag type — use localStorage for ID, then re-validate price from API
     const savedBag = localStorage.getItem('selectedBagType')
     if (savedBag) {
       try {
         const { id, name, price } = JSON.parse(savedBag)
         setSelectedBagTypeId(id)
         setBagTypeName(name)
-        setBagTypePrice(price)
+        setBagTypePrice(price) // Temporary — will be corrected below from API
+
+        // Re-fetch the bag type from API to get the correct regional price
+        bagTypeService.getActiveBagTypes().then(res => {
+          if (res.success && res.data) {
+            const liveBag = res.data.find(b => b.id === id)
+            if (liveBag) {
+              const correctPrice = getRegionalPrice({ basePrice: liveBag.price, priceINR: liveBag.priceINR, priceUSD: liveBag.priceUSD })
+              setBagTypeName(liveBag.name)
+              setBagTypePrice(correctPrice)
+              // Update localStorage with correct price
+              localStorage.setItem('selectedBagType', JSON.stringify({ id: liveBag.id, name: liveBag.name, price: correctPrice }))
+            } else {
+              // Bag no longer active — clear selection
+              setSelectedBagTypeId(null)
+              setBagTypeName('')
+              setBagTypePrice(0)
+              localStorage.removeItem('selectedBagType')
+            }
+          }
+        }).catch(() => { /* keep localStorage value as fallback */ })
       } catch {
         localStorage.removeItem('selectedBagType')
       }
@@ -400,8 +421,21 @@ export default function Checkout() {
     })
   }
 
+  /** Resolve the correct regional price for a checkout cart item */
+  const getItemPrice = (item: CartItem) => {
+    // Use variant regional pricing if variant exists, otherwise product pricing
+    if (item.variant) {
+      return getRegionalPrice(item.variant as any)
+    }
+    if (item.product) {
+      return getRegionalPrice(item.product as any)
+    }
+    // Fallback to stored cart price
+    return item.price
+  }
+
   const calculateTotals = () => {
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    const subtotal = cartItems.reduce((sum, item) => sum + (getItemPrice(item) * item.quantity), 0)
     // Calculate logistics-based shipping from product configs
     let logisticsShipping = 0;
     if (!freeShippingApplied) {
@@ -415,7 +449,7 @@ export default function Checkout() {
     }
     const shipping = freeShippingApplied ? 0 : logisticsShipping;
     const tax = cartItems.reduce((sum, item) => {
-      const itemSubtotal = item.price * item.quantity
+      const itemSubtotal = getItemPrice(item) * item.quantity
       const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0
       return sum + (itemSubtotal * gstRate)
     }, 0)
@@ -579,7 +613,8 @@ export default function Checkout() {
         tax: orderSummary.tax,
         discount: orderSummary.discount,
         freeShipping: freeShippingApplied,
-        bagTypeId: selectedBagTypeId || undefined
+        bagTypeId: selectedBagTypeId || undefined,
+        currency: getCurrency(),
       })
 
       if (response.success && response.data) {
@@ -860,7 +895,7 @@ export default function Checkout() {
                             )}
                           </div>
                         </div>
-                        <span className="font-medium text-slate-900">{formatPrice(item.price * item.quantity)}</span>
+                        <span className="font-medium text-slate-900">{formatPrice(getItemPrice(item) * item.quantity)}</span>
                       </div>
                     )
                   })}

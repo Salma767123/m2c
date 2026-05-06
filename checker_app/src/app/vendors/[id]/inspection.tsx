@@ -93,6 +93,8 @@ export default function FactoryInspectionScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [inspectionId, setInspectionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cycleNumber, setCycleNumber] = useState(1);
+  const [previousRejectionReason, setPreviousRejectionReason] = useState<string | null>(null);
 
   // ── Selfie gates ──────────────────────────────────────────────────
   const [showBeforeSelfie, setShowBeforeSelfie] = useState(true);
@@ -158,12 +160,24 @@ export default function FactoryInspectionScreen() {
         const inspection = res?.inspection;
         if (inspection) {
           setInspectionId(inspection.id);
+          if (inspection.cycleNumber > 1) {
+            setCycleNumber(inspection.cycleNumber);
+          }
+          if (res.previousRejectionReason) {
+            setPreviousRejectionReason(res.previousRejectionReason);
+          } else if (inspection.rejectionReason) {
+            setPreviousRejectionReason(inspection.rejectionReason);
+          }
 
-          const assignedCategories = Array.isArray(inspection.itemsToInspect)
-            ? inspection.itemsToInspect.map((i: any) => i.itemName).join(', ')
+          const items = inspection.itemsToInspect;
+          const assignedCategories = Array.isArray(items)
+            ? items.map((i: any) => i.itemName).join(', ')
             : '';
 
-          // Prefill from the vendor record attached to the inspection
+          // For re-inspections, itemsToInspect contains previous form data
+          const prevForm = (!Array.isArray(items) && items && typeof items === 'object') ? items as Record<string, any> : null;
+
+          // Prefill from vendor record + previous form data
           const v = inspection.vendor || {};
           const factoryAddressFull = [
             v.factoryAddress, v.factoryCity, v.factoryState, v.factoryZipCode,
@@ -174,28 +188,40 @@ export default function FactoryInspectionScreen() {
 
           setFormData((prev) => ({
             ...prev,
-            categoryToInspect: prev.categoryToInspect || assignedCategories,
-            factoryName: prev.factoryName || v.companyName || '',
-            contactPersonName: prev.contactPersonName || v.ownerName || '',
-            contactPhoneNumber: prev.contactPhoneNumber || v.businessPhone || '',
-            factoryAddress: prev.factoryAddress || factoryAddressFull,
-            gstTaxId: prev.gstTaxId || v.gstNumber || '',
-            businessRegistrationNumber: prev.businessRegistrationNumber || v.businessRegistrationNumber || '',
-            factoryLicenseNumber: prev.factoryLicenseNumber || v.tradeLicenseNumber || '',
+            categoryToInspect: prev.categoryToInspect || (prevForm?.categoryToInspect) || assignedCategories,
+            factoryName: prev.factoryName || (prevForm?.factoryName) || v.companyName || '',
+            contactPersonName: prev.contactPersonName || (prevForm?.contactPersonName) || v.ownerName || '',
+            contactPhoneNumber: prev.contactPhoneNumber || (prevForm?.contactPhoneNumber) || v.businessPhone || '',
+            factoryAddress: prev.factoryAddress || (prevForm?.factoryAddress) || factoryAddressFull,
+            gstTaxId: prev.gstTaxId || (prevForm?.gstTaxId) || v.gstNumber || '',
+            businessRegistrationNumber: prev.businessRegistrationNumber || (prevForm?.businessRegistrationNumber) || v.businessRegistrationNumber || '',
+            factoryLicenseNumber: prev.factoryLicenseNumber || (prevForm?.factoryLicenseNumber) || v.tradeLicenseNumber || '',
+            // Production Info
+            productsManufactured: prev.productsManufactured || (prevForm?.productsManufactured) || '',
+            monthlyProductionCapacity: prev.monthlyProductionCapacity || (prevForm?.monthlyProductionCapacity) || '',
+            numberOfProductionWorkers: prev.numberOfProductionWorkers || (prevForm?.numberOfProductionWorkers) || '',
+            // Infrastructure
+            machineryAvailable: prevForm?.machineryAvailable || prev.machineryAvailable,
+            electricityAvailable: prevForm?.electricityAvailable || prev.electricityAvailable,
+            waterAvailable: prevForm?.waterAvailable || prev.waterAvailable,
+            storageAreaAvailable: prevForm?.storageAreaAvailable || prev.storageAreaAvailable,
+            // Quality & Safety
+            qualityCheckProcess: prevForm?.qualityCheckProcess || prev.qualityCheckProcess,
+            safetyEquipment: prevForm?.safetyEquipment || prev.safetyEquipment,
+            cleanWorkingEnvironment: prevForm?.cleanWorkingEnvironment || prev.cleanWorkingEnvironment,
           }));
 
-          // Lock-state snapshot: true only where vendor supplied a value.
-          // Fields left empty stay editable for the entire session.
+          // Lock-state snapshot
           const has = (s?: string | null) => typeof s === 'string' && s.trim() !== '';
           setAutofillSnapshot({
-            factoryName: has(v.companyName) ? v.companyName : '',
-            contactPersonName: has(v.ownerName) ? v.ownerName : '',
-            contactPhoneNumber: has(v.businessPhone) ? v.businessPhone : '',
-            factoryAddress: has(factoryAddressFull) ? factoryAddressFull : '',
-            gstTaxId: has(v.gstNumber) ? v.gstNumber : '',
-            businessRegistrationNumber: has(v.businessRegistrationNumber) ? v.businessRegistrationNumber : '',
-            factoryLicenseNumber: has(v.tradeLicenseNumber) ? v.tradeLicenseNumber : '',
-            categoryToInspect: has(assignedCategories) ? assignedCategories : '',
+            factoryName: has(prevForm?.factoryName || v.companyName) ? (prevForm?.factoryName || v.companyName) : '',
+            contactPersonName: has(prevForm?.contactPersonName || v.ownerName) ? (prevForm?.contactPersonName || v.ownerName) : '',
+            contactPhoneNumber: has(prevForm?.contactPhoneNumber || v.businessPhone) ? (prevForm?.contactPhoneNumber || v.businessPhone) : '',
+            factoryAddress: has(prevForm?.factoryAddress || factoryAddressFull) ? (prevForm?.factoryAddress || factoryAddressFull) : '',
+            gstTaxId: has(prevForm?.gstTaxId || v.gstNumber) ? (prevForm?.gstTaxId || v.gstNumber) : '',
+            businessRegistrationNumber: has(prevForm?.businessRegistrationNumber || v.businessRegistrationNumber) ? (prevForm?.businessRegistrationNumber || v.businessRegistrationNumber) : '',
+            factoryLicenseNumber: has(prevForm?.factoryLicenseNumber || v.tradeLicenseNumber) ? (prevForm?.factoryLicenseNumber || v.tradeLicenseNumber) : '',
+            categoryToInspect: has(prevForm?.categoryToInspect || assignedCategories) ? (prevForm?.categoryToInspect || assignedCategories) : '',
           });
 
           // Fire-and-forget auto-start
@@ -472,6 +498,23 @@ export default function FactoryInspectionScreen() {
           handleComplete(result);
         }}
       />
+
+      {/* Re-inspection banner */}
+      {cycleNumber > 1 && (
+        <View className="mx-4 mt-2 mb-1 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <Text className="text-xs font-bold text-amber-800">
+            Re-Inspection #{cycleNumber}
+          </Text>
+          <Text className="text-[11px] text-amber-700 mt-0.5">
+            Previous inspection was rejected. Please re-evaluate thoroughly.
+          </Text>
+          {previousRejectionReason && (
+            <Text className="text-[11px] text-amber-600 mt-1">
+              Previous reason: {previousRejectionReason}
+            </Text>
+          )}
+        </View>
+      )}
 
       {/* Stepper */}
       <View className="bg-white border-b border-slate-200 pt-3 pb-4">

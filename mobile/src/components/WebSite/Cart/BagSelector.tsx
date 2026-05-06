@@ -8,7 +8,12 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { ShoppingBag, Check, Package } from 'lucide-react-native';
+import { formatPrice as fmtCurrency, getRegionalPrice } from '@/lib/currency';
 import { bagTypeService, type BagType } from '@/services/bagTypeService';
+
+/** Map BagType's `price` field to `basePrice` so getRegionalPrice() resolves correctly */
+const getBagRegionalPrice = (bag: BagType) =>
+  getRegionalPrice({ basePrice: bag.price, priceINR: bag.priceINR, priceUSD: bag.priceUSD });
 
 interface BagSelectorProps {
   selectedBagId: string | null;
@@ -95,7 +100,7 @@ const BagOption = memo(function BagOption({
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected: isSelected }}
-      accessibilityLabel={`${bag.name}, $${bag.price.toFixed(2)}`}
+      accessibilityLabel={`${bag.name}, ${fmtCurrency(getBagRegionalPrice(bag))}`}
       style={[s.option, isSelected ? s.optionSelected : null]}
     >
       <View style={[s.radio, isSelected ? s.radioSelected : null]}>
@@ -119,7 +124,7 @@ const BagOption = memo(function BagOption({
           <Text style={s.bagDesc} numberOfLines={1}>{bag.description}</Text>
         ) : null}
       </View>
-      <Text style={s.bagPrice}>${bag.price.toFixed(2)}</Text>
+      <Text style={s.bagPrice}>{fmtCurrency(getBagRegionalPrice(bag))}</Text>
     </Pressable>
   );
 });

@@ -500,6 +500,51 @@ class QCCheckerService {
     const token = await this.getCheckerToken();
     return !!token;
   }
+
+  // ── Re-inspection audit trail ──────────────────────────────────────────────
+
+  async getAuditTrail(entityType: 'FACTORY_INSPECTION' | 'PRODUCT_INSPECTION', entityId: string) {
+    const response = await axios.get(`/reinspections/${entityType}/${entityId}/audit-trail`);
+    return response.data as {
+      success: boolean;
+      logs: AuditLogEntry[];
+      inspectionChain: InspectionChainItem[];
+    };
+  }
+}
+
+// ── Audit trail types ──────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  fromStatus: string | null;
+  toStatus: string | null;
+  performedById: string;
+  performedByType: string;
+  performedByName: string | null;
+  rejectionReason: string | null;
+  remarks: string | null;
+  notes: string | null;
+  locationDetails: string | null;
+  attachments: string[];
+  cycleNumber: number;
+  createdAt: string;
+}
+
+export interface InspectionChainItem {
+  id: string;
+  status: string;
+  result: string | null;
+  cycleNumber: number;
+  parentInspectionId: string | null;
+  scheduledDate: string;
+  submittedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  checker: { id: string; name: string };
 }
 
 export const qcCheckerService = new QCCheckerService();

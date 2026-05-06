@@ -674,6 +674,8 @@ model Product {
   adminFixedPrice       Float?    // Admin can override the vendor's base price
   priceINR              Float?    // Admin selling price in INR (for .in domain)
   priceUSD              Float?    // Admin selling price in USD (for .com domain)
+  originalPriceINR      Float?    // Original/MRP price in INR (for strikethrough)
+  originalPriceUSD      Float?    // Original/MRP price in USD (for strikethrough)
   priceVisibility       PriceVisibility @default(BOTH)
   
   assignedQcId          String?   @db.ObjectId
@@ -715,6 +717,8 @@ model ProductVariant {
   adminFixedPrice Float?    // Admin's fixed price for this variant
   priceINR        Float?    // Admin selling price in INR for this variant
   priceUSD        Float?    // Admin selling price in USD for this variant
+  originalPriceINR Float?   // Original price in INR for this variant
+  originalPriceUSD Float?   // Original price in USD for this variant
   priceVisibility PriceVisibility @default(BOTH)
   stock           Int       @default(0)
   images          String[]  @default([]) // Array of image URLs
@@ -1061,6 +1065,8 @@ model BagType {
   name        String
   description String?
   price       Float
+  priceINR    Float?    // Price for .in domain
+  priceUSD    Float?    // Price for .com domain
   image       String?
   isActive    Boolean  @default(true)
   sortOrder   Int      @default(0)

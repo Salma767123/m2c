@@ -12,6 +12,8 @@ const getActiveBagTypes = async (req, res) => {
                 name: true,
                 description: true,
                 price: true,
+                priceINR: true,
+                priceUSD: true,
                 image: true,
             },
         });
@@ -115,7 +117,7 @@ const getBagType = async (req, res) => {
 // Admin: Create bag type
 const createBagType = async (req, res) => {
     try {
-        const { name, description, price, image, isActive = true, sortOrder = 0 } = req.body;
+        const { name, description, price, priceINR, priceUSD, image, isActive = true, sortOrder = 0 } = req.body;
 
         if (!name || !String(name).trim() || price === undefined || price === null) {
             return res.status(400).json({ success: false, message: 'Name and price are required' });
@@ -158,6 +160,8 @@ const createBagType = async (req, res) => {
                 name: trimmedName,
                 description: description || null,
                 price,
+                priceINR: priceINR ? parseFloat(priceINR) : null,
+                priceUSD: priceUSD ? parseFloat(priceUSD) : null,
                 image: imageUrl,
                 isActive,
                 sortOrder: finalSortOrder,
@@ -175,7 +179,7 @@ const createBagType = async (req, res) => {
 const updateBagType = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, price, image, isActive, sortOrder } = req.body;
+        const { name, description, price, priceINR, priceUSD, image, isActive, sortOrder } = req.body;
 
         const existing = await prisma.bagType.findUnique({ where: { id } });
         if (!existing) {
@@ -204,6 +208,8 @@ const updateBagType = async (req, res) => {
         if (name !== undefined) updateData.name = String(name).trim() || existing.name;
         if (description !== undefined) updateData.description = description;
         if (price !== undefined) updateData.price = price;
+        if (priceINR !== undefined) updateData.priceINR = priceINR ? parseFloat(priceINR) : null;
+        if (priceUSD !== undefined) updateData.priceUSD = priceUSD ? parseFloat(priceUSD) : null;
         if (isActive !== undefined) updateData.isActive = isActive;
         if (sortOrder !== undefined) updateData.sortOrder = Math.max(0, parseInt(sortOrder) || 0);
 

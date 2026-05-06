@@ -103,7 +103,17 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            const unitPrice = variant ? (variant.adminFixedPrice || variant.price) : (product.adminFixedPrice || product.basePrice);
+            // Pick regional price based on currency: priceINR/priceUSD → adminFixedPrice → basePrice
+            let unitPrice;
+            if (currency === 'USD') {
+                unitPrice = variant
+                    ? (variant.priceUSD || variant.adminFixedPrice || variant.price)
+                    : (product.priceUSD || product.adminFixedPrice || product.basePrice);
+            } else {
+                unitPrice = variant
+                    ? (variant.priceINR || variant.adminFixedPrice || variant.price)
+                    : (product.priceINR || product.adminFixedPrice || product.basePrice);
+            }
             const itemTotal = unitPrice * item.quantity;
             subtotal += itemTotal;
 
@@ -165,7 +175,9 @@ const createOrder = async (req, res) => {
                 });
             }
             bagTypeName = bagType.name;
-            bagTypePrice = bagType.price;
+            bagTypePrice = currency === 'USD'
+                ? (bagType.priceUSD || bagType.price)
+                : (bagType.priceINR || bagType.price);
         }
 
         // 6. Create Order

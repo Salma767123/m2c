@@ -29,6 +29,7 @@ import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
 import { WishlistSkeleton } from '@/components/ui/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -43,7 +44,7 @@ type StockInfo = {
   liveDiscount?: number;
 };
 
-const fmt = (n: number) => `$${n.toFixed(2)}`;
+const fmt = (n: number) => fmtCurrency(n);
 
 export default function Wishlist() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
@@ -87,8 +88,8 @@ export default function Wishlist() {
           const stock = p.hasVariants
             ? (p.inventory?.baseStock ?? 0)
             : (p.inventory?.availableStock ?? p.totalStock ?? 0);
-          const livePrice = p.adminFixedPrice ?? p.basePrice;
-          const oldPrice = item.product?.adminFixedPrice ?? item.product?.basePrice ?? 0;
+          const livePrice = getRegionalPrice(p as any);
+          const oldPrice = getRegionalPrice(item.product as any);
           const priceChanged = Math.abs(oldPrice - livePrice) >= 0.01;
           const primaryImg = p.images?.find((img: any) => img.isPrimary)?.url || p.images?.[0]?.url;
 
@@ -99,7 +100,7 @@ export default function Wishlist() {
             priceChanged,
             liveName: p.name,
             liveImage: primaryImg,
-            liveOriginalPrice: p.originalPrice,
+            liveOriginalPrice: getRegionalOriginalPrice(p as any) ?? p.originalPrice,
             liveDiscount: p.discount,
           };
 
@@ -236,7 +237,7 @@ export default function Wishlist() {
           const inStock = live ? live.status !== 'out_of_stock' : item.product.inStock;
           const isLowStock = live?.status === 'low_stock';
           const isOOS = live ? live.status === 'out_of_stock' : !item.product.inStock;
-          const serverPrice = item.product.adminFixedPrice ?? item.product.basePrice;
+          const serverPrice = getRegionalPrice(item.product as any);
           const displayPrice = live?.livePrice ?? serverPrice;
           const displayName = live?.liveName ?? item.product.name;
           const displayImage = live?.liveImage ?? item.product.image;

@@ -31,7 +31,8 @@ import {
   AlertCircle,
   RefreshCw,
 } from 'lucide-react-native';
-import qcCheckerService from '../../services/qcCheckerService';
+import qcCheckerService, { AuditLogEntry } from '../../services/qcCheckerService';
+import AuditTimeline from '../../components/General/AuditTimeline';
 
 type TabId = 'overview' | 'history' | 'upcoming' | 'performance';
 const TABS: { id: TabId; label: string }[] = [
@@ -53,6 +54,8 @@ const statusStyle = (status: string) => {
     passed: { bg: '#d1fae5', text: '#065f46', dot: '#10b981' },
     failed: { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444' },
     rejected: { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444' },
+    reinspection: { bg: '#ffedd5', text: '#9a3412', dot: '#f59e0b' },
+    submitted: { bg: '#dbeafe', text: '#1e40af', dot: '#3b82f6' },
     suspended: { bg: '#e2e8f0', text: '#334155', dot: '#64748b' },
   };
   return map[key] || map.active;
@@ -97,6 +100,7 @@ export default function VendorDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   const loadAll = useCallback(async (limitOverride?: number) => {
     if (!id) return;
@@ -122,6 +126,13 @@ export default function VendorDetailScreen() {
 
   useEffect(() => {
     loadAll();
+    // Fetch audit trail for this vendor's inspections
+    if (id) {
+      // Try to find the latest inspection and get its audit trail
+      qcCheckerService.getAuditTrail('FACTORY_INSPECTION', id)
+        .then(res => setAuditLogs(res.logs || []))
+        .catch(() => {}); // Non-critical
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -615,6 +626,17 @@ export default function VendorDetailScreen() {
                 </TouchableOpacity>
               </View>
             ) : null}
+
+            {/* Audit Trail */}
+            {auditLogs.length > 0 && (
+              <View className="mt-5 bg-white rounded-2xl border border-slate-200 p-4">
+                <View className="flex-row items-center mb-3">
+                  <Clock size={16} color="#475569" />
+                  <Text className="text-sm font-extrabold text-slate-900 ml-2">Audit Trail</Text>
+                </View>
+                <AuditTimeline logs={auditLogs} />
+              </View>
+            )}
           </View>
         ) : null}
 

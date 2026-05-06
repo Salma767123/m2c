@@ -75,6 +75,12 @@ interface ProductVariant {
   price: number
   originalPrice?: number
   discount?: number
+  adminFixedPrice?: number | null
+  priceINR?: number | null
+  priceUSD?: number | null
+  originalPriceINR?: number | null
+  originalPriceUSD?: number | null
+  priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH'
   stock: number
   images: string[]
 }
@@ -122,6 +128,12 @@ interface ProductFormData {
   originalPrice?: number
   discount?: number // Discount percentage (e.g., 25 for 25% off)
   gstPercentage?: number // GST Percentage for the product
+  adminFixedPrice?: number | null
+  priceINR?: number | null
+  priceUSD?: number | null
+  originalPriceINR?: number | null
+  originalPriceUSD?: number | null
+  priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH'
 
   // Basic Product Info - Size & Color
   singleUnitSize?: string
@@ -227,6 +239,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     originalPrice: undefined,
     discount: undefined,
     gstPercentage: undefined,
+    adminFixedPrice: null,
+    priceINR: null,
+    priceUSD: null,
+    originalPriceINR: null,
+    originalPriceUSD: null,
+    priceVisibility: 'BOTH',
 
     // Basic Product Info - Size & Color
     singleUnitSize: '',
@@ -447,6 +465,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
               originalPrice: product.originalPrice,
               discount: product.discount,
               gstPercentage: product.gstPercentage,
+              adminFixedPrice: product.adminFixedPrice || null,
+              priceINR: product.priceINR || null,
+              priceUSD: product.priceUSD || null,
+              originalPriceINR: product.originalPriceINR || null,
+              originalPriceUSD: product.originalPriceUSD || null,
+              priceVisibility: product.priceVisibility || 'BOTH',
 
               // Basic Product Info - Size & Color
               singleUnitSize: product.singleUnitSize || '',
@@ -473,8 +497,16 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                 size: v.size,
                 color: v.color,
                 colorHex: v.colorHex || '#000000',
-                sku: v.sku, // Use stored SKU
+                sku: v.sku,
                 price: v.price,
+                originalPrice: v.originalPrice,
+                discount: v.discount,
+                adminFixedPrice: v.adminFixedPrice || null,
+                priceINR: v.priceINR || null,
+                priceUSD: v.priceUSD || null,
+                originalPriceINR: v.originalPriceINR || null,
+                originalPriceUSD: v.originalPriceUSD || null,
+                priceVisibility: v.priceVisibility || 'BOTH',
                 stock: v.stock,
                 images: v.images || []
               })) || [],
@@ -2233,6 +2265,131 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
                   </div>
 
+                  {/* Multi-Currency Pricing Section */}
+                  <div className="border-2 border-blue-200 rounded-lg p-6 bg-blue-50/30">
+                    <h4 className="font-semibold text-gray-900 mb-1">Multi-Currency Pricing</h4>
+                    <p className="text-xs text-gray-500 mb-4">Set regional prices for .in (India) and .com (International) domains. Leave blank to use the base price.</p>
+
+                    {/* Admin Override */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+                      <div>
+                        <label htmlFor="edit-admin-fixed" className="block text-sm font-medium text-gray-700 mb-2">Admin Fixed Price</label>
+                        <div className="relative">
+                          <input
+                            id="edit-admin-fixed"
+                            type="number"
+                            value={formData.adminFixedPrice ?? ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, adminFixedPrice: e.target.value ? parseFloat(e.target.value) : null }))}
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-colors duration-200"
+                            placeholder="Override vendor base price"
+                            step="0.01"
+                            min="0"
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">Overrides vendor base price</p>
+                      </div>
+                    </div>
+
+                    {/* Selling Prices */}
+                    <p className="text-xs font-medium text-gray-600 mb-2 border-b border-blue-200 pb-1">Selling Prices</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div>
+                        <label htmlFor="edit-price-inr" className="block text-sm font-medium text-gray-700 mb-2">INR Price (₹)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-gray-500">₹</span>
+                          <input
+                            id="edit-price-inr"
+                            type="number"
+                            value={formData.priceINR ?? ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceINR: e.target.value ? parseFloat(e.target.value) : null }))}
+                            className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                            placeholder="Selling price for .in"
+                            step="0.01"
+                            min="0"
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">Shown on .in domain</p>
+                      </div>
+                      <div>
+                        <label htmlFor="edit-price-usd" className="block text-sm font-medium text-gray-700 mb-2">USD Price ($)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                          <input
+                            id="edit-price-usd"
+                            type="number"
+                            value={formData.priceUSD ?? ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceUSD: e.target.value ? parseFloat(e.target.value) : null }))}
+                            className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                            placeholder="Selling price for .com"
+                            step="0.01"
+                            min="0"
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">Shown on .com domain</p>
+                      </div>
+                    </div>
+
+                    {/* Original Prices (MRP) */}
+                    <p className="text-xs font-medium text-gray-600 mb-2 mt-4 border-b border-blue-200 pb-1">Original Prices (MRP)</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div>
+                        <label htmlFor="edit-original-inr" className="block text-sm font-medium text-gray-700 mb-2">Original ₹ (MRP)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-gray-500">₹</span>
+                          <input
+                            id="edit-original-inr"
+                            type="number"
+                            value={formData.originalPriceINR ?? ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, originalPriceINR: e.target.value ? parseFloat(e.target.value) : null }))}
+                            className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                            placeholder="MRP for .in domain"
+                            step="0.01"
+                            min="0"
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">Strikethrough on .in</p>
+                      </div>
+                      <div>
+                        <label htmlFor="edit-original-usd" className="block text-sm font-medium text-gray-700 mb-2">Original $ (MRP)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                          <input
+                            id="edit-original-usd"
+                            type="number"
+                            value={formData.originalPriceUSD ?? ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, originalPriceUSD: e.target.value ? parseFloat(e.target.value) : null }))}
+                            className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                            placeholder="MRP for .com domain"
+                            step="0.01"
+                            min="0"
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">Strikethrough on .com</p>
+                      </div>
+                      <div>
+                        <label htmlFor="edit-visibility" className="block text-sm font-medium text-gray-700 mb-2">Visibility</label>
+                        <select
+                          id="edit-visibility"
+                          value={formData.priceVisibility || 'BOTH'}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceVisibility: e.target.value as 'IN_ONLY' | 'COM_ONLY' | 'BOTH' }))}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                        >
+                          <option value="BOTH">Both (.in + .com)</option>
+                          <option value="IN_ONLY">.in Only (India)</option>
+                          <option value="COM_ONLY">.com Only (International)</option>
+                        </select>
+                        <p className="text-[10px] text-gray-500 mt-1">Where product appears</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 p-3 bg-blue-100/50 rounded-lg">
+                      <p className="text-xs text-blue-800">
+                        <strong>Price priority:</strong> INR/USD Price → Admin Fixed Price → Base Price.
+                        Customers on .in see INR price, .com see USD price. If not set, falls back to admin fixed price, then base price.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Variant Pricing Section */}
                   {formData.hasVariants && formData.variants.length > 0 && (
                     <div className="border-2 border-gray-300 rounded-lg p-6">
@@ -2251,10 +2408,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               </span>
                               <span className="text-xs text-gray-500 font-mono">({variant.sku})</span>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Selling Price (₹) *
+                                  Base Price (₹) *
                                 </label>
                                 <div className="relative">
                                   <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">₹</span>
@@ -2263,6 +2420,91 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                     value={variant.price}
                                     onChange={(e) => updateVariant(variant.id, 'price', parseFloat(e.target.value) || 0)}
                                     className="w-full pl-6 pr-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                                    step="0.01"
+                                    min="0"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Admin Fixed</label>
+                                <input
+                                  type="number"
+                                  value={variant.adminFixedPrice ?? ''}
+                                  onChange={(e) => updateVariant(variant.id, 'adminFixedPrice', e.target.value ? parseFloat(e.target.value) : null)}
+                                  className="w-full px-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                                  placeholder="Override"
+                                  step="0.01"
+                                  min="0"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Visibility</label>
+                                <select
+                                  value={variant.priceVisibility || 'BOTH'}
+                                  onChange={(e) => updateVariant(variant.id, 'priceVisibility', e.target.value)}
+                                  className="w-full px-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                                >
+                                  <option value="BOTH">Both</option>
+                                  <option value="IN_ONLY">.in</option>
+                                  <option value="COM_ONLY">.com</option>
+                                </select>
+                              </div>
+                            </div>
+                            {/* Variant multi-currency */}
+                            <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                              <p className="text-[10px] font-medium text-blue-600 mb-1.5">Selling Prices</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div>
+                                  <label htmlFor={`edit-var-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">INR (₹)</label>
+                                  <input
+                                    id={`edit-var-inr-${variant.id}`}
+                                    type="number"
+                                    value={variant.priceINR ?? ''}
+                                    onChange={(e) => updateVariant(variant.id, 'priceINR', e.target.value ? parseFloat(e.target.value) : null)}
+                                    className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                                    placeholder="Selling price for .in"
+                                    step="0.01"
+                                    min="0"
+                                  />
+                                </div>
+                                <div>
+                                  <label htmlFor={`edit-var-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">USD ($)</label>
+                                  <input
+                                    id={`edit-var-usd-${variant.id}`}
+                                    type="number"
+                                    value={variant.priceUSD ?? ''}
+                                    onChange={(e) => updateVariant(variant.id, 'priceUSD', e.target.value ? parseFloat(e.target.value) : null)}
+                                    className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                                    placeholder="Selling price for .com"
+                                    step="0.01"
+                                    min="0"
+                                  />
+                                </div>
+                              </div>
+                              <p className="text-[10px] font-medium text-blue-600 mb-1.5 mt-2">Original Prices (MRP)</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div>
+                                  <label htmlFor={`edit-var-orig-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original ₹</label>
+                                  <input
+                                    id={`edit-var-orig-inr-${variant.id}`}
+                                    type="number"
+                                    value={variant.originalPriceINR ?? ''}
+                                    onChange={(e) => updateVariant(variant.id, 'originalPriceINR', e.target.value ? parseFloat(e.target.value) : null)}
+                                    className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                                    placeholder="MRP for .in domain"
+                                    step="0.01"
+                                    min="0"
+                                  />
+                                </div>
+                                <div>
+                                  <label htmlFor={`edit-var-orig-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original $</label>
+                                  <input
+                                    id={`edit-var-orig-usd-${variant.id}`}
+                                    type="number"
+                                    value={variant.originalPriceUSD ?? ''}
+                                    onChange={(e) => updateVariant(variant.id, 'originalPriceUSD', e.target.value ? parseFloat(e.target.value) : null)}
+                                    className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                                    placeholder="MRP for .com domain"
                                     step="0.01"
                                     min="0"
                                   />

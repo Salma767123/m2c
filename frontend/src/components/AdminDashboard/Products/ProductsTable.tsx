@@ -28,6 +28,9 @@ interface Product {
   basePrice: number
   originalPrice?: number
   adminFixedPrice?: number // Admin's fixed price
+  priceINR?: number | null
+  priceUSD?: number | null
+  priceVisibility?: string
   hasVariants?: boolean
   totalStock: number
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
@@ -479,6 +482,13 @@ export default function ProductsTable() {
                     {product.adminFixedPrice && (
                       <div className="text-sm text-green-600 font-medium">
                         Admin: {formatPrice(product.adminFixedPrice)}
+                      </div>
+                    )}
+                    {(product.priceINR || product.priceUSD) && (
+                      <div className="text-xs text-blue-600 mt-0.5">
+                        {product.priceINR ? `₹${product.priceINR.toLocaleString()}` : ''}
+                        {product.priceINR && product.priceUSD ? ' / ' : ''}
+                        {product.priceUSD ? `$${product.priceUSD.toFixed(2)}` : ''}
                       </div>
                     )}
                   </div>

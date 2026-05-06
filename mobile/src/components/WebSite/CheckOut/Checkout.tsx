@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getCurrency, formatPrice as fmtCurrency } from '@/lib/currency';
 import {
   View,
   Text,
@@ -542,6 +543,7 @@ export default function Checkout() {
         shippingCost: orderSummary.shipping,
         tax: orderSummary.tax,
         discount: orderSummary.discount,
+        currency: getCurrency(),
       };
 
 
@@ -1029,7 +1031,7 @@ export default function Checkout() {
                         alignSelf: 'center',
                       }}
                     >
-                      ${(item.price * item.quantity).toFixed(2)}
+                      {fmtCurrency(item.price * item.quantity)}
                     </Text>
                   </View>
                 );
@@ -1049,7 +1051,7 @@ export default function Checkout() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ fontSize: 15, color: '#6b7280', fontWeight: '600' }}>Subtotal</Text>
                 <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
-                  ${orderSummary.subtotal.toFixed(2)}
+                  {fmtCurrency(orderSummary.subtotal)}
                 </Text>
               </View>
 
@@ -1069,7 +1071,7 @@ export default function Checkout() {
                       color: orderSummary.shipping === 0 ? '#16a34a' : '#111827',
                     }}
                   >
-                    {orderSummary.shipping === 0 ? '$0.00' : `$${orderSummary.shipping.toFixed(2)}`}
+                    {orderSummary.shipping === 0 ? fmtCurrency(0) : fmtCurrency(orderSummary.shipping)}
                   </Text>
                 </View>
               </View>
@@ -1078,7 +1080,7 @@ export default function Checkout() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ fontSize: 15, color: '#6b7280', fontWeight: '600' }}>Tax (GST)</Text>
                 <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
-                  ${orderSummary.tax.toFixed(2)}
+                  {fmtCurrency(orderSummary.tax)}
                 </Text>
               </View>
 
@@ -1101,7 +1103,7 @@ export default function Checkout() {
                           {item.product.name} ({item.product.gstPercentage}%)
                         </Text>
                         <Text style={{ fontSize: 11, color: '#9ca3af', fontWeight: '700' }}>
-                          ${itemTax.toFixed(2)}
+                          {fmtCurrency(itemTax)}
                         </Text>
                       </View>
                     );
@@ -1128,7 +1130,7 @@ export default function Checkout() {
                     <Text style={{ fontSize: 15, color: '#16a34a', fontWeight: '700' }}>Discount</Text>
                   </View>
                   <Text style={{ fontSize: 15, fontWeight: '800', color: '#16a34a' }}>
-                    -${orderSummary.discount.toFixed(2)}
+                    -{fmtCurrency(orderSummary.discount)}
                   </Text>
                 </View>
               )}
@@ -1154,7 +1156,7 @@ export default function Checkout() {
                     Total Amount
                   </Text>
                   <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827', letterSpacing: -0.5 }}>
-                    ${orderSummary.total.toFixed(2)}
+                    {fmtCurrency(orderSummary.total)}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
