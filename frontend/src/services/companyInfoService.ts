@@ -21,6 +21,9 @@ export interface CompanyInfo {
   bankAccountNumber?: string;
   bankIfscCode?: string;
   bankBranch?: string;
+  socialInstagram?: string;
+  socialFacebook?: string;
+  socialYoutube?: string;
   updatedAt: string;
 }
 
@@ -29,6 +32,9 @@ export interface UpdateBasicInfoData {
   companyEmail?: string;
   companyPhone?: string;
   companyWebsite?: string;
+  socialInstagram?: string;
+  socialFacebook?: string;
+  socialYoutube?: string;
 }
 
 export interface UpdateLegalInfoData {
@@ -54,7 +60,61 @@ export interface UpdateBankDetailsData {
   bankBranch?: string;
 }
 
+export interface PublicCompanyInfo {
+  companyName: string;
+  companyLogo: string | null;
+  companyEmail: string | null;
+  companyPhone: string | null;
+  companyWebsite: string | null;
+  registeredAddress: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  zipCode: string | null;
+  socialInstagram: string | null;
+  socialFacebook: string | null;
+  socialYoutube: string | null;
+}
+
+const LOGO_CACHE_KEY = 'companyInfo_public';
+const DEFAULT_INFO: PublicCompanyInfo = {
+  companyName: 'M2C MarkDowns Private Limited',
+  companyLogo: null,
+  companyEmail: null,
+  companyPhone: null,
+  companyWebsite: null,
+  registeredAddress: null,
+  city: null,
+  state: null,
+  country: null,
+  zipCode: null,
+  socialInstagram: null,
+  socialFacebook: null,
+  socialYoutube: null,
+};
+
 export const companyInfoService = {
+  // Get cached company info instantly (no API call — for initial render)
+  getCachedCompanyInfo: (): PublicCompanyInfo => {
+    try {
+      const cached = localStorage.getItem(LOGO_CACHE_KEY);
+      if (cached) return { ...DEFAULT_INFO, ...JSON.parse(cached) };
+    } catch { /* ignore */ }
+    return DEFAULT_INFO;
+  },
+
+  // Get public company info with localStorage caching (no auth required)
+  getPublicCompanyInfo: async (): Promise<PublicCompanyInfo> => {
+    try {
+      const response = await axios.get('/company-info/public');
+      const data = { ...DEFAULT_INFO, ...(response.data?.data || {}) };
+      try { localStorage.setItem(LOGO_CACHE_KEY, JSON.stringify(data)); } catch { /* ignore */ }
+      return data;
+    } catch {
+      return companyInfoService.getCachedCompanyInfo();
+    }
+  },
+
   // Get company info
   getCompanyInfo: async () => {
     try {

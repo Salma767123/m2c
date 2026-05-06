@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/UI/Button'
@@ -16,6 +16,7 @@ import {
   Settings 
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+import { companyInfoService } from '@/services/companyInfoService'
 
 interface RegistrationFormData {
   firstName: string
@@ -33,9 +34,16 @@ export default function AdminRegistration() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo)
   const [emailError, setEmailError] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const [passwordStrength, setPasswordStrength] = useState("")
+
+  useEffect(() => {
+    companyInfoService.getPublicCompanyInfo().then(info => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo)
+    }).catch(() => {})
+  }, [])
 
   const [registrationData, setRegistrationData] = useState<RegistrationFormData>({
     firstName: '',
@@ -204,13 +212,11 @@ export default function AdminRegistration() {
             {/* Logo Section */}
             <div className="mb-8">
               <div className="inline-flex items-center justify-center w-44 h-36 bg-white rounded-2xl mb-6 shadow-xl">
-                <Image
-                  src="/assets/logo/logo2.png"
-                  alt="Company Logo"
-                  width={190}
-                  height={150}
-                  className="object-contain"
-                />
+                {companyLogo ? (
+                  <img src={companyLogo} alt="Company Logo" className="object-contain" style={{ width: 190, height: 150 }} />
+                ) : (
+                  <Image src="/assets/logo/m2c-logo.png" alt="Company Logo" width={190} height={150} className="object-contain" />
+                )}
               </div>
               <h1 className="text-4xl font-bold mb-3">
                 Join Our Team

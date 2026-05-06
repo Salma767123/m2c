@@ -39,7 +39,7 @@ export default function RecentOrders({ orders }: { orders: any[] }) {
         <CardTitle>Recent Orders</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-100 overflow-y-auto">
           <table className="w-full divide-y divide-gray-200">
             <thead className="bg-gray-800">
               <tr>

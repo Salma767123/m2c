@@ -8,11 +8,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Edit, Eye, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { productService, type Product } from '@/services/productService'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
+}
 
 export default function Products() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteModal, setDeleteModal] = useState<{ show: boolean; product: Product | null; loading: boolean }>({
+    show: false, product: null, loading: false
+  });
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -55,17 +71,23 @@ export default function Products() {
     router.push(`/vendor/dashboard/products/edit/${product.id}`);
   };
 
-  const handleDeleteProduct = async (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      try {
-        const response = await productService.deleteProduct(id);
-        if (response.success) {
-          showSuccessToast('Product Deleted', 'Product has been deleted successfully');
-          loadProducts(pagination.currentPage); // Reload current page
-        }
-      } catch (error: any) {
-        showErrorToast('Delete Failed', error.message || 'Unable to delete product');
+  const handleDeleteProduct = (product: Product) => {
+    setDeleteModal({ show: true, product, loading: false });
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!deleteModal.product) return;
+    setDeleteModal(prev => ({ ...prev, loading: true }));
+    try {
+      const response = await productService.deleteProduct(deleteModal.product.id);
+      if (response.success) {
+        showSuccessToast('Product Deleted', 'Product has been deleted successfully');
+        loadProducts(pagination.currentPage);
       }
+    } catch (error: any) {
+      showErrorToast('Delete Failed', error.message || 'Unable to delete product');
+    } finally {
+      setDeleteModal({ show: false, product: null, loading: false });
     }
   };
 
@@ -112,6 +134,15 @@ export default function Products() {
           Add Product
         </Button>
       </div>
+
+      {/* Results summary */}
+      {products.length > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+          <span>
+            Showing {((pagination.currentPage - 1) * 10) + 1}–{Math.min(pagination.currentPage * 10, pagination.totalItems)} of {pagination.totalItems} product{pagination.totalItems === 1 ? '' : 's'}
+          </span>
+        </div>
+      )}
 
       <Card className="border border-gray-200">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
@@ -228,7 +259,7 @@ export default function Products() {
                             if (product.approvalStatus === 'APPROVED') {
                               showWarningToast('Delete Restricted', 'This product has been approved. Only admin can delete the product.')
                             } else {
-                              handleDeleteProduct(product.id)
+                              handleDeleteProduct(product)
                             }
                           }}
                         >
@@ -244,34 +275,27 @@ export default function Products() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
-              <p className="text-xs text-gray-500">
-                Page {pagination.currentPage} of {pagination.totalPages}
-              </p>
+            <div className="flex items-center justify-end gap-3 text-sm px-5 py-3 border-t border-gray-200">
               <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={!pagination.hasPrevPage}
-                  onClick={() => loadProducts(pagination.currentPage - 1)}
-                  className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label="Previous page"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  disabled={!pagination.hasNextPage}
-                  onClick={() => loadProducts(pagination.currentPage + 1)}
-                  className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label="Next page"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+                <button onClick={() => loadProducts(pagination.currentPage - 1)} disabled={!pagination.hasPrevPage} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+                {getPageRange(pagination.currentPage, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => loadProducts(p as number)} aria-current={p === pagination.currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                <button onClick={() => loadProducts(pagination.currentPage + 1)} disabled={!pagination.hasNextPage} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      <DeleteConfirmModal
+        show={deleteModal.show}
+        title="Delete Product"
+        itemName={deleteModal.product?.name}
+        itemDetail={deleteModal.product?.baseSku ? `SKU: ${deleteModal.product.baseSku}` : undefined}
+        loading={deleteModal.loading}
+        confirmLabel="Delete Permanently"
+        onConfirm={confirmDeleteProduct}
+        onCancel={() => setDeleteModal({ show: false, product: null, loading: false })}
+      />
     </div>
   )
 }

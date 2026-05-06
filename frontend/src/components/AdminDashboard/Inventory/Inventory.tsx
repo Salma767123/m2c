@@ -13,7 +13,8 @@ import {
   TableRow,
 } from '@/components/UI/Table'
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb'
-import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2 } from 'lucide-react'
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
+import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Filter, Loader2, History, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import axiosInstance from '@/lib/axios'
@@ -40,6 +41,18 @@ interface InventoryItem {
   updatedAt: string
   hasProductCreated: boolean
   productApprovalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | null
+}
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
 }
 
 const getStatusBadge = (currentStock: number, lowStockAlert: number) => {
@@ -81,6 +94,10 @@ export default function Inventory() {
     outOfStockItems: 0,
     totalStockUnits: 0
   })
+
+  // Delete modal state
+  const [deleteModal, setDeleteModal] = useState<{ show: boolean; item: InventoryItem } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Stock history modal state
   const [stockHistoryModal, setStockHistoryModal] = useState<{
@@ -155,18 +172,19 @@ export default function Inventory() {
     setStockHistoryModal({ isOpen: true, item })
   }
 
-  const handleDelete = async (item: InventoryItem) => {
+  const handleDeleteClick = (item: InventoryItem) => {
     if (item.hasProductCreated) {
       alert('Cannot delete this inventory item because it has been used to create a product.')
       return
     }
+    setDeleteModal({ show: true, item })
+  }
 
-    if (!confirm('Are you sure you want to delete this inventory item? This action cannot be undone.')) {
-      return
-    }
-
+  const confirmDelete = async () => {
+    if (!deleteModal) return
+    setIsDeleting(true)
     try {
-      await inventoryService.adminDeleteItem(item.id)
+      await inventoryService.adminDeleteItem(deleteModal.item.id)
 
       // Reload data
       const params: any = {
@@ -191,6 +209,9 @@ export default function Inventory() {
       console.error('Error deleting item:', error)
       const errorMessage = error.message || error.response?.data?.message || 'Failed to delete item'
       alert(errorMessage)
+    } finally {
+      setIsDeleting(false)
+      setDeleteModal(null)
     }
   }
 
@@ -306,6 +327,13 @@ export default function Inventory() {
         </CardContent>
       </Card>
 
+      {/* Showing */}
+      {!isLoading && totalItems > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+          <span>Showing {(currentPage - 1) * 10 + 1}–{Math.min(currentPage * 10, totalItems)} of {totalItems}</span>
+        </div>
+      )}
+
       {/* Inventory Table */}
       <Card>
         <CardHeader>
@@ -420,7 +448,7 @@ export default function Inventory() {
                                 variant="outline"
                                 size="sm"
                                 className={`${item.hasProductCreated ? 'opacity-50 cursor-not-allowed' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
-                                onClick={() => handleDelete(item)}
+                                onClick={() => handleDeleteClick(item)}
                                 title={item.hasProductCreated ? "Cannot delete: Product created from this item" : "Delete item"}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -436,27 +464,11 @@ export default function Inventory() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <div className="text-sm text-gray-600">
-                    Page {currentPage} of {totalPages}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
+                <div className="flex items-center justify-end gap-3 text-sm mt-4">
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+                    {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                    <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
                   </div>
                 </div>
               )}
@@ -464,6 +476,19 @@ export default function Inventory() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirm Modal */}
+      <DeleteConfirmModal
+        show={!!deleteModal?.show}
+        title="Delete Inventory Item"
+        itemName={deleteModal?.item.name}
+        itemDetail={`SKU: ${deleteModal?.item.sku}`}
+        loading={isDeleting}
+        confirmLabel="Delete Permanently"
+        loadingLabel="Deleting..."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteModal(null)}
+      />
 
       {/* Stock History Modal */}
       {stockHistoryModal.item && (

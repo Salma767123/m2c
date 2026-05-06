@@ -28,6 +28,7 @@ import {
 } from '@/components/UI/Table';
 import CouponModal from './CouponModal';
 import FreeShippingModal from './FreeShippingModal';
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 import { couponService, Coupon } from '@/services/couponService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
@@ -56,6 +57,8 @@ const CouponManagement = () => {
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
   const [showFreeShippingModal, setShowFreeShippingModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; code: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const initialFormData: Partial<Coupon> = {
     code: '',
@@ -178,17 +181,24 @@ const CouponManagement = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this coupon? This action cannot be undone.')) {
-      try {
-        const response = await couponService.deleteCoupon(id);
-        if (response.success) {
-          setCoupons(prev => prev.filter(c => c.id !== id));
-          showSuccessToast('Success', 'Coupon deleted successfully');
-        }
-      } catch (error: any) {
-        showErrorToast('Error', error.message || 'Failed to delete coupon');
+  const handleDeleteClick = (coupon: Coupon) => {
+    setDeleteTarget({ id: coupon.id, code: coupon.code });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      setDeleting(true);
+      const response = await couponService.deleteCoupon(deleteTarget.id);
+      if (response.success) {
+        setCoupons(prev => prev.filter(c => c.id !== deleteTarget.id));
+        showSuccessToast('Success', 'Coupon deleted successfully');
       }
+    } catch (error: any) {
+      showErrorToast('Error', error.message || 'Failed to delete coupon');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -333,6 +343,13 @@ const CouponManagement = () => {
         </div>
       </div>
 
+      {/* Showing */}
+      {!loading && filteredCoupons.length > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+          <span>Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredCoupons.length)} of {filteredCoupons.length}</span>
+        </div>
+      )}
+
       {/* Coupons Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
@@ -441,7 +458,7 @@ const CouponManagement = () => {
                         )}
                         {hasPermission('delete_coupons') && (
                           <button
-                            onClick={() => handleDelete(coupon.id)}
+                            onClick={() => handleDeleteClick(coupon)}
                             className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
                             title="Delete"
                           >
@@ -457,11 +474,8 @@ const CouponManagement = () => {
           </Table>
         )}
 
-        {!loading && filteredCoupons.length > 0 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredCoupons.length)} of {filteredCoupons.length}
-            </p>
+        {!loading && filteredCoupons.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200">
             {totalPages > 1 && (
               <div className="flex items-center justify-end gap-3 text-sm">
                 <div className="flex items-center gap-1">
@@ -491,6 +505,15 @@ const CouponManagement = () => {
         isOpen={showFreeShippingModal}
         onClose={() => setShowFreeShippingModal(false)}
         onSaved={fetchCoupons}
+      />
+
+      <DeleteConfirmModal
+        show={!!deleteTarget}
+        title="Delete Coupon"
+        itemName={deleteTarget?.code}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   );

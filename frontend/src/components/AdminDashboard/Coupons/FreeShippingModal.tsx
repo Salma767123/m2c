@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Truck, Info, Plus, Trash2, Package } from 'lucide-react';
 import { couponService, FreeShippingOffer } from '@/services/couponService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 import { hasPermission } from '@/lib/auth';
 
 const getOrdinalSuffix = (n: number) => {
@@ -25,6 +26,9 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
   const [freeShippingOffers, setFreeShippingOffers] = useState<FreeShippingOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<{ show: boolean; offer: FreeShippingOffer | null; loading: boolean }>({
+    show: false, offer: null, loading: false
+  });
 
   // Form for creating/editing
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -97,16 +101,23 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this free shipping offer?')) return;
+  const handleDelete = (offer: FreeShippingOffer) => {
+    setDeleteModal({ show: true, offer, loading: false });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.offer) return;
+    setDeleteModal(prev => ({ ...prev, loading: true }));
     try {
-      await couponService.deleteFreeShippingOffer(id);
+      await couponService.deleteFreeShippingOffer(deleteModal.offer.id);
       showSuccessToast('Success', 'Deleted');
       loadFreeShippingCoupons();
       onSaved();
-      if (editingId === id) resetForm();
+      if (editingId === deleteModal.offer.id) resetForm();
     } catch {
       showErrorToast('Error', 'Failed to delete');
+    } finally {
+      setDeleteModal({ show: false, offer: null, loading: false });
     }
   };
 
@@ -178,7 +189,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
                       )}
                       {canDelete && (
                         <button
-                          onClick={() => handleDelete(offer.id)}
+                          onClick={() => handleDelete(offer)}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -280,6 +291,21 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
             </div>
           </div>
         </div>
+
+        <DeleteConfirmModal
+          show={deleteModal.show}
+          title="Delete Free Shipping Offer"
+          itemName={deleteModal.offer ? (
+            deleteModal.offer.orderNumbers && deleteModal.offer.orderNumbers.length > 0
+              ? `Free shipping on ${deleteModal.offer.orderNumbers.map(n => `${n}${getOrdinalSuffix(n)}`).join(', ')} order(s)`
+              : 'Free shipping on all orders'
+          ) : undefined}
+          itemDetail={deleteModal.offer?.minOrderValue ? `Min order: ₹${deleteModal.offer.minOrderValue}` : undefined}
+          loading={deleteModal.loading}
+          confirmLabel="Delete Permanently"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteModal({ show: false, offer: null, loading: false })}
+        />
       </div>
     </div>
   );

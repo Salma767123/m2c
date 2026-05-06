@@ -19,6 +19,7 @@ import {
   Trash2
 } from 'lucide-react';
 import Dropdown from '@/components/UI/Dropdown';
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 import {
   Table,
   TableBody,
@@ -43,6 +44,7 @@ const EnquiryForm = () => {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ show: boolean; id: string; name: string } | null>(null);
 
   const fetchEnquiries = useCallback(async () => {
     setIsLoading(true);
@@ -143,18 +145,23 @@ const EnquiryForm = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this enquiry?')) return;
-    setDeletingId(id);
+  const handleDeleteClick = (id: string, name: string) => {
+    setDeleteModal({ show: true, id, name });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal) return;
+    setDeletingId(deleteModal.id);
     try {
-      await enquiryService.deleteEnquiry(id);
-      setEnquiries(prev => prev.filter(e => e.id !== id));
+      await enquiryService.deleteEnquiry(deleteModal.id);
+      setEnquiries(prev => prev.filter(e => e.id !== deleteModal.id));
       showSuccessToast('Deleted', 'Enquiry deleted successfully.');
       setShowDetailModal(false);
     } catch (err: any) {
       showErrorToast('Delete Failed', err.message || 'Failed to delete enquiry.');
     } finally {
       setDeletingId(null);
+      setDeleteModal(null);
     }
   };
 
@@ -333,6 +340,18 @@ const EnquiryForm = () => {
         )}
       </div>
 
+      {/* Delete Confirm Modal */}
+      <DeleteConfirmModal
+        show={!!deleteModal?.show}
+        title="Delete Enquiry"
+        itemName={deleteModal?.name}
+        loading={!!deletingId}
+        confirmLabel="Delete Permanently"
+        loadingLabel="Deleting..."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteModal(null)}
+      />
+
       {/* Detail Modal */}
       {showDetailModal && selectedEnquiry && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -446,7 +465,7 @@ const EnquiryForm = () => {
               {/* Delete button on left */}
               {canManage ? (
                 <button
-                  onClick={() => handleDelete(selectedEnquiry.id)}
+                  onClick={() => handleDeleteClick(selectedEnquiry.id, selectedEnquiry.name)}
                   disabled={!!deletingId}
                   className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
                 >

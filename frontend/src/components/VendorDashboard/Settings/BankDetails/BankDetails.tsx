@@ -5,6 +5,7 @@ import { Save, AlertCircle, CheckCircle, Eye, EyeOff, Upload, FileText, File, Im
 import VendorService, { VendorBankDetails, VendorDocument } from '@/services/vendorService'
 import Dropdown from '@/components/UI/Dropdown'
 import { Button } from '@/components/UI/Button'
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 
 interface BankDetailsForm {
   accountHolderName: string
@@ -24,6 +25,13 @@ export default function BankDetails() {
   const [documents, setDocuments] = useState<VendorDocument[]>([])
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
   const [bankDetails, setBankDetails] = useState<VendorBankDetails | null>(null)
+
+  const [deleteDocModal, setDeleteDocModal] = useState<{
+    show: boolean
+    documentId: string
+    documentType: string
+    loading: boolean
+  }>({ show: false, documentId: '', documentType: '', loading: false })
 
   const [formData, setFormData] = useState<BankDetailsForm>({
     accountHolderName: '',
@@ -120,20 +128,23 @@ export default function BankDetails() {
     }
   }
 
-  const handleDocumentDelete = async (documentId: string) => {
+  const handleDocumentDelete = (documentId: string, documentType: string) => {
     if (!documentId) return
-    
-    if (!confirm('Are you sure you want to delete this document?')) return
+    setDeleteDocModal({ show: true, documentId, documentType, loading: false })
+  }
 
+  const confirmDocumentDelete = async () => {
+    setDeleteDocModal(prev => ({ ...prev, loading: true }))
     setUploadingDoc('deleting')
     try {
-      await VendorService.deleteVendorDocument(documentId)
+      await VendorService.deleteVendorDocument(deleteDocModal.documentId)
       setMessage({ type: 'success', text: 'Document deleted successfully!' })
       await loadDocuments()
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'Failed to delete document' })
     } finally {
       setUploadingDoc(null)
+      setDeleteDocModal({ show: false, documentId: '', documentType: '', loading: false })
     }
   }
 
@@ -511,7 +522,7 @@ export default function BankDetails() {
                       <Button
                         variant="link"
                         size="sm"
-                        onClick={() => handleDocumentDelete(documents.find(d => d.type === type)?.id || '')}
+                        onClick={() => handleDocumentDelete(documents.find(d => d.type === type)?.id || '', label)}
                         disabled={uploadingDoc === 'deleting'}
                         className="h-auto p-0 text-red-600 hover:text-red-700 disabled:text-gray-400"
                       >
@@ -559,6 +570,17 @@ export default function BankDetails() {
           </div>
         </div>
       </div>
+
+      <DeleteConfirmModal
+        show={deleteDocModal.show}
+        title="Delete Document"
+        itemName={deleteDocModal.documentType}
+        itemDetail="This document will be permanently removed"
+        loading={deleteDocModal.loading}
+        confirmLabel="Delete Permanently"
+        onConfirm={confirmDocumentDelete}
+        onCancel={() => setDeleteDocModal({ show: false, documentId: '', documentType: '', loading: false })}
+      />
     </div>
   )
 }

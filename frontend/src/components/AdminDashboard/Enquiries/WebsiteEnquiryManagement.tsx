@@ -5,9 +5,11 @@ import { contactEnquiryService, ContactEnquiry } from '@/services/contactEnquiry
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
+import Dropdown from '@/components/UI/Dropdown';
 import { Mail, Phone, Calendar, Eye, Trash2, MessageSquare, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 
 const PAGE_SIZE = 10;
 
@@ -32,6 +34,8 @@ export default function WebsiteEnquiryManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [stats, setStats] = useState({ total: 0, new: 0, read: 0, replied: 0, closed: 0 });
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; subject: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchEnquiries();
@@ -88,16 +92,24 @@ export default function WebsiteEnquiryManagement() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this enquiry?')) return;
+  const handleDeleteClick = (enquiry: ContactEnquiry) => {
+    setDeleteTarget({ id: enquiry.id, name: enquiry.name, subject: enquiry.subject });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
 
     try {
-      await contactEnquiryService.deleteEnquiry(id);
+      setDeleting(true);
+      await contactEnquiryService.deleteEnquiry(deleteTarget.id);
       showSuccessToast('Success', 'Enquiry deleted');
       fetchEnquiries();
       fetchStats();
     } catch (error: any) {
       showErrorToast('Error', error.message || 'Failed to delete enquiry');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -156,17 +168,20 @@ export default function WebsiteEnquiryManagement() {
                 />
               </div>
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
-            >
-              <option value="all">All Status</option>
-              <option value="new">New</option>
-              <option value="read">Read</option>
-              <option value="replied">Replied</option>
-              <option value="closed">Closed</option>
-            </select>
+            <div className="w-full md:w-64">
+              <Dropdown
+                value={statusFilter}
+                options={[
+                  { value: 'all', label: 'All Status' },
+                  { value: 'new', label: 'New' },
+                  { value: 'read', label: 'Read' },
+                  { value: 'replied', label: 'Replied' },
+                  { value: 'closed', label: 'Closed' },
+                ]}
+                onChange={(value) => { setStatusFilter(value as string); setCurrentPage(1); }}
+                placeholder="Filter by Status"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -174,7 +189,7 @@ export default function WebsiteEnquiryManagement() {
       {/* Enquiries Table */}
       {enquiries.length > 0 && (
         <p className="text-sm text-slate-600">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, enquiries.length)} of {enquiries.length}
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, enquiries.length)} of {enquiries.length}
         </p>
       )}
       <Card>
@@ -239,7 +254,7 @@ export default function WebsiteEnquiryManagement() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleDelete(enquiry.id)}
+                              onClick={() => handleDeleteClick(enquiry)}
                               className="text-red-600 hover:text-red-700"
                               title="Delete"
                             >
@@ -266,6 +281,16 @@ export default function WebsiteEnquiryManagement() {
           </div>
         </div>
       )}
+
+      <DeleteConfirmModal
+        show={!!deleteTarget}
+        title="Delete Enquiry"
+        itemName={deleteTarget?.name || ''}
+        itemDetail={deleteTarget?.subject || ''}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       {/* View Modal */}
       {showModal && selectedEnquiry && (
@@ -309,14 +334,21 @@ export default function WebsiteEnquiryManagement() {
                   <div>{getStatusBadge(selectedEnquiry.status)}</div>
                 </div>
 
-                {hasPermission('manage_enquiries') && (
+                {hasPermission('manage_enquiries') && selectedEnquiry.status !== 'closed' && (
                   <div className="flex gap-2 pt-4 border-t">
-                    <Button onClick={() => handleUpdateStatus('replied')} className="flex-1">
-                      Mark as Replied
-                    </Button>
+                    {selectedEnquiry.status !== 'replied' && (
+                      <Button onClick={() => handleUpdateStatus('replied')} className="flex-1">
+                        Mark as Replied
+                      </Button>
+                    )}
                     <Button onClick={() => handleUpdateStatus('closed')} variant="outline" className="flex-1">
                       Close Enquiry
                     </Button>
+                  </div>
+                )}
+                {selectedEnquiry.status === 'closed' && (
+                  <div className="pt-4 border-t">
+                    <p className="text-sm text-gray-500 text-center italic">This enquiry has been closed.</p>
                   </div>
                 )}
               </div>

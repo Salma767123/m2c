@@ -36,7 +36,10 @@ const updateBasicInfo = async (req, res) => {
       companyName,
       companyEmail,
       companyPhone,
-      companyWebsite
+      companyWebsite,
+      socialInstagram,
+      socialFacebook,
+      socialYoutube
     } = req.body;
     
     // Validation
@@ -55,6 +58,9 @@ const updateBasicInfo = async (req, res) => {
       companyEmail,
       companyPhone,
       companyWebsite,
+      socialInstagram: socialInstagram || null,
+      socialFacebook: socialFacebook || null,
+      socialYoutube: socialYoutube || null,
       updatedBy: req.user?.id
     };
     
@@ -260,8 +266,53 @@ const updateLogo = async (req, res) => {
   }
 };
 
+// Public: Get company logo and name (no auth required)
+const getPublicCompanyInfo = async (req, res) => {
+  try {
+    const companyInfo = await prisma.companyInfo.findFirst({
+      select: {
+        companyName: true,
+        companyLogo: true,
+        companyEmail: true,
+        companyPhone: true,
+        companyWebsite: true,
+        registeredAddress: true,
+        city: true,
+        state: true,
+        country: true,
+        zipCode: true,
+        socialInstagram: true,
+        socialFacebook: true,
+        socialYoutube: true,
+      },
+    });
+    res.json({
+      success: true,
+      data: {
+        companyName: companyInfo?.companyName || 'M2C MarkDowns Private Limited',
+        companyLogo: companyInfo?.companyLogo || null,
+        companyEmail: companyInfo?.companyEmail || null,
+        companyPhone: companyInfo?.companyPhone || null,
+        companyWebsite: companyInfo?.companyWebsite || null,
+        registeredAddress: companyInfo?.registeredAddress || null,
+        city: companyInfo?.city || null,
+        state: companyInfo?.state || null,
+        country: companyInfo?.country || null,
+        zipCode: companyInfo?.zipCode || null,
+        socialInstagram: companyInfo?.socialInstagram || null,
+        socialFacebook: companyInfo?.socialFacebook || null,
+        socialYoutube: companyInfo?.socialYoutube || null,
+      },
+    });
+  } catch (error) {
+    console.error('Get public company info error:', error);
+    res.json({ success: true, data: { companyName: 'M2C MarkDowns Private Limited', companyLogo: null } });
+  }
+};
+
 module.exports = {
   getCompanyInfo,
+  getPublicCompanyInfo,
   updateBasicInfo,
   updateLegalInfo,
   updateAddress,

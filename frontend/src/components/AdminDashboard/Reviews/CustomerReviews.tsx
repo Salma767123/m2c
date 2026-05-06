@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Star, Search, Eye, Trash2, CheckCircle, XCircle, RefreshCw, MessageSquare, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
+import { Star, Search, Eye, Trash2, CheckCircle, XCircle, RefreshCw, MessageSquare, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import DeleteConfirmModal from "../../UI/DeleteConfirmModal";
 import { Card, CardContent } from "../../UI/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../UI/Table";
 import Dropdown from "../../UI/Dropdown";
@@ -39,6 +40,7 @@ export default function CustomerReviews() {
     rejected: 0,
     averageRating: 0,
   });
+  const [deleteModal, setDeleteModal] = useState<{ show: boolean; review: AdminReview | null }>({ show: false, review: null });
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -116,8 +118,13 @@ export default function CustomerReviews() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this review? This action cannot be undone.")) return;
+  const handleDeleteClick = (review: AdminReview) => {
+    setDeleteModal({ show: true, review });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.review) return;
+    const id = deleteModal.review.id;
     try {
       setActionLoading(id);
       await reviewService.deleteReview(id);
@@ -131,6 +138,7 @@ export default function CustomerReviews() {
       if (selectedReview?.id === id) {
         setSelectedReview(null);
       }
+      setDeleteModal({ show: false, review: null });
     } catch (error) {
       console.error("Error deleting review:", error);
     } finally {
@@ -279,7 +287,7 @@ export default function CustomerReviews() {
       {/* Reviews Table */}
       {!loading && reviews.length > 0 && (
         <div className="text-sm text-slate-600 mb-2">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, reviews.length)} of {reviews.length}
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, reviews.length)} of {reviews.length}
         </div>
       )}
       <Card>
@@ -380,7 +388,7 @@ export default function CustomerReviews() {
                         )}
                         {hasPermission('delete_reviews') && (
                           <button
-                            onClick={() => handleDelete(review.id)}
+                            onClick={() => handleDeleteClick(review)}
                             disabled={actionLoading === review.id}
                             className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete"
@@ -447,11 +455,9 @@ export default function CustomerReviews() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
                     {selectedReview.user?.image ? (
-                      <Image
+                      <img
                         src={selectedReview.user.image}
                         alt={selectedReview.user.name}
-                        width={40}
-                        height={40}
                         className="w-10 h-10 rounded-full object-cover"
                       />
                     ) : (
@@ -564,10 +570,7 @@ export default function CustomerReviews() {
 
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
-                  onClick={() => {
-                    handleDelete(selectedReview.id);
-                    setSelectedReview(null);
-                  }}
+                  onClick={() => handleDeleteClick(selectedReview)}
                   disabled={actionLoading === selectedReview.id}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
                 >
@@ -585,6 +588,16 @@ export default function CustomerReviews() {
           </Card>
         </div>
       )}
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        show={deleteModal.show && !!deleteModal.review}
+        title="Delete Review"
+        itemName={deleteModal.review?.user?.name || 'Unknown User'}
+        itemDetail={deleteModal.review?.product?.name || 'Unknown Product'}
+        loading={!!deleteModal.review && actionLoading === deleteModal.review.id}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteModal({ show: false, review: null })}
+      />
     </div>
   );
 }

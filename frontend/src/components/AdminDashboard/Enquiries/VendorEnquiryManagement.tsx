@@ -5,6 +5,8 @@ import { enquiryService, VendorEnquiry } from '@/services/enquiryService';
 import { Card, CardContent } from '@/components/UI/Card';
 import { Badge } from '@/components/UI/Badge';
 import { Button } from '@/components/UI/Button';
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
+import Dropdown from '@/components/UI/Dropdown';
 import { Mail, Phone, Building2, FileText, Eye, Trash2, CheckCircle, XCircle, Search, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { hasPermission } from '@/lib/auth';
@@ -31,6 +33,8 @@ export default function VendorEnquiryManagement() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [confirmModal, setConfirmModal] = useState<{ show: boolean; type: 'approve' | 'reject' | 'delete'; id: string; name: string } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     fetchEnquiries();
@@ -56,41 +60,41 @@ export default function VendorEnquiryManagement() {
     setShowModal(true);
   };
 
-  const handleApprove = async (id: string) => {
-    if (!confirm('Are you sure you want to approve this vendor enquiry? This will send a registration email.')) return;
-
-    try {
-      await enquiryService.approveEnquiry(id);
-      showSuccessToast('Success', 'Vendor enquiry approved and registration email sent');
-      setShowModal(false);
-      fetchEnquiries();
-    } catch (error: any) {
-      showErrorToast('Error', error.message || 'Failed to approve enquiry');
-    }
+  const handleApproveClick = (id: string, name: string) => {
+    setConfirmModal({ show: true, type: 'approve', id, name });
   };
 
-  const handleReject = async (id: string) => {
-    if (!confirm('Are you sure you want to reject this vendor enquiry?')) return;
-
-    try {
-      await enquiryService.rejectEnquiry(id);
-      showSuccessToast('Success', 'Vendor enquiry rejected');
-      setShowModal(false);
-      fetchEnquiries();
-    } catch (error: any) {
-      showErrorToast('Error', error.message || 'Failed to reject enquiry');
-    }
+  const handleRejectClick = (id: string, name: string) => {
+    setConfirmModal({ show: true, type: 'reject', id, name });
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this enquiry?')) return;
+  const handleDeleteClick = (id: string, name: string) => {
+    setConfirmModal({ show: true, type: 'delete', id, name });
+  };
 
+  const handleConfirmAction = async () => {
+    if (!confirmModal) return;
+    setActionLoading(true);
     try {
-      await enquiryService.deleteEnquiry(id);
-      showSuccessToast('Success', 'Enquiry deleted');
+      if (confirmModal.type === 'approve') {
+        await enquiryService.approveEnquiry(confirmModal.id);
+        showSuccessToast('Success', 'Vendor enquiry approved and registration email sent');
+        setShowModal(false);
+      } else if (confirmModal.type === 'reject') {
+        await enquiryService.rejectEnquiry(confirmModal.id);
+        showSuccessToast('Success', 'Vendor enquiry rejected');
+        setShowModal(false);
+      } else {
+        await enquiryService.deleteEnquiry(confirmModal.id);
+        showSuccessToast('Success', 'Enquiry deleted');
+      }
       fetchEnquiries();
     } catch (error: any) {
-      showErrorToast('Error', error.message || 'Failed to delete enquiry');
+      const action = confirmModal.type === 'approve' ? 'approve' : confirmModal.type === 'reject' ? 'reject' : 'delete';
+      showErrorToast('Error', error.message || `Failed to ${action} enquiry`);
+    } finally {
+      setActionLoading(false);
+      setConfirmModal(null);
     }
   };
 
@@ -154,16 +158,19 @@ export default function VendorEnquiryManagement() {
                 />
               </div>
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
+            <div className="w-full md:w-64">
+              <Dropdown
+                value={statusFilter}
+                options={[
+                  { value: 'all', label: 'All Status' },
+                  { value: 'pending', label: 'Pending' },
+                  { value: 'approved', label: 'Approved' },
+                  { value: 'rejected', label: 'Rejected' },
+                ]}
+                onChange={(value) => { setStatusFilter(value as string); setCurrentPage(1); }}
+                placeholder="Filter by Status"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -171,7 +178,7 @@ export default function VendorEnquiryManagement() {
       {/* Enquiries Table */}
       {enquiries.length > 0 && (
         <p className="text-sm text-slate-600">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, enquiries.length)} of {enquiries.length}
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, enquiries.length)} of {enquiries.length}
         </p>
       )}
       <Card>
@@ -237,7 +244,7 @@ export default function VendorEnquiryManagement() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleApprove(enquiry.id)}
+                                onClick={() => handleApproveClick(enquiry.id, enquiry.name)}
                                 className="text-green-600 hover:text-green-700"
                                 title="Approve"
                               >
@@ -246,7 +253,7 @@ export default function VendorEnquiryManagement() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleReject(enquiry.id)}
+                                onClick={() => handleRejectClick(enquiry.id, enquiry.name)}
                                 className="text-red-600 hover:text-red-700"
                                 title="Reject"
                               >
@@ -258,7 +265,7 @@ export default function VendorEnquiryManagement() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => handleDelete(enquiry.id)}
+                              onClick={() => handleDeleteClick(enquiry.id, enquiry.name)}
                               className="text-red-600 hover:text-red-700"
                               title="Delete"
                             >
@@ -285,6 +292,20 @@ export default function VendorEnquiryManagement() {
           </div>
         </div>
       )}
+
+      {/* Confirm Action Modal */}
+      <DeleteConfirmModal
+        show={!!confirmModal?.show}
+        variant={confirmModal?.type === 'approve' ? 'confirm' : confirmModal?.type === 'reject' ? 'warning' : 'danger'}
+        title={confirmModal?.type === 'approve' ? 'Approve Vendor Enquiry' : confirmModal?.type === 'reject' ? 'Reject Vendor Enquiry' : 'Delete Enquiry'}
+        subtitle={confirmModal?.type === 'approve' ? 'This will send a registration email' : undefined}
+        itemName={confirmModal?.name}
+        loading={actionLoading}
+        confirmLabel={confirmModal?.type === 'approve' ? 'Approve' : confirmModal?.type === 'reject' ? 'Reject' : 'Delete Permanently'}
+        loadingLabel={confirmModal?.type === 'approve' ? 'Approving...' : confirmModal?.type === 'reject' ? 'Rejecting...' : 'Deleting...'}
+        onConfirm={handleConfirmAction}
+        onCancel={() => setConfirmModal(null)}
+      />
 
       {/* View Modal */}
       {showModal && selectedEnquiry && (
@@ -353,11 +374,11 @@ export default function VendorEnquiryManagement() {
 
                 {selectedEnquiry.status === 'pending' && (
                   <div className="flex gap-2 pt-4 border-t">
-                    <Button onClick={() => handleApprove(selectedEnquiry.id)} className="flex-1 bg-green-600 hover:bg-green-700">
+                    <Button onClick={() => handleApproveClick(selectedEnquiry.id, selectedEnquiry.name)} className="flex-1 bg-green-600 hover:bg-green-700">
                       <CheckCircle className="w-4 h-4 mr-2" />
                       Approve & Send Email
                     </Button>
-                    <Button onClick={() => handleReject(selectedEnquiry.id)} variant="outline" className="flex-1 border-red-600 text-red-600 hover:bg-red-50">
+                    <Button onClick={() => handleRejectClick(selectedEnquiry.id, selectedEnquiry.name)} variant="outline" className="flex-1 border-red-600 text-red-600 hover:bg-red-50">
                       <XCircle className="w-4 h-4 mr-2" />
                       Reject
                     </Button>

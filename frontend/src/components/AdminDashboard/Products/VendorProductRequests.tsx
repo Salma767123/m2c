@@ -7,7 +7,7 @@ import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { Eye, Check, X, Search, AlertCircle, UserPlus, UserCog, CheckCircle } from 'lucide-react'
+import { Eye, Check, X, Search, AlertCircle, UserPlus, UserCog, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { adminProductService } from '@/services/adminProductService'
 import qcCheckerService from '@/services/qcCheckerService'
@@ -56,6 +56,18 @@ interface VendorProductRequest {
   fabricType?: string
   material?: string
   baseSku: string
+}
+
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
 }
 
 export default function VendorProductRequests() {
@@ -392,6 +404,13 @@ export default function VendorProductRequests() {
         </CardContent>
       </Card>
 
+      {/* Showing */}
+      {!loading && pagination.totalCount > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+          <span>Showing {(pagination.currentPage - 1) * pagination.limit + 1}–{Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of {pagination.totalCount}</span>
+        </div>
+      )}
+
       {/* Requests Table */}
       <Card>
         <CardHeader>
@@ -579,30 +598,11 @@ export default function VendorProductRequests() {
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-500">
-            Showing {requests.length} of {pagination.totalCount} products
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.currentPage === 1}
-              onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-gray-500">
-              Page {pagination.currentPage} of {pagination.totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pagination.currentPage === pagination.totalPages}
-              onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
-            >
-              Next
-            </Button>
+        <div className="flex items-center justify-end gap-3 text-sm">
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))} disabled={pagination.currentPage === 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+            {getPageRange(pagination.currentPage, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setPagination(prev => ({ ...prev, currentPage: p as number }))} aria-current={p === pagination.currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            <button onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))} disabled={pagination.currentPage === pagination.totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
       )}

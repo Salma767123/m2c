@@ -46,9 +46,9 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
       if (orderRes.success) setOrder(orderRes.data);
       if (companyRes?.data?.success) {
         setCompanyName(companyRes.data.data?.companyName || "M2C Store");
-        setCompanyLogo(companyRes.data.data?.companyLogo || "/assets/logo/logo2.png");
+        setCompanyLogo(companyRes.data.data?.companyLogo || "/assets/logo/m2c-logo.png");
       } else {
-        setCompanyLogo("/assets/logo/logo2.png");
+        setCompanyLogo("/assets/logo/m2c-logo.png");
       }
     } catch (err: any) {
       showErrorToast("Error", err.message || "Failed to load invoice");

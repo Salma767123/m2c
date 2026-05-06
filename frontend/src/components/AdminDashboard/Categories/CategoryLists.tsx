@@ -10,6 +10,7 @@ import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight } fr
 import Link from 'next/link'
 import { categoryService, Category, CategoryStats } from '@/services/categoryService'
 import { hasPermission } from '@/lib/auth'
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 
 const PAGE_SIZE = 10
 
@@ -33,6 +34,8 @@ export default function CategoryLists() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE'>('all')
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     loadCategories()
@@ -105,15 +108,22 @@ export default function CategoryLists() {
     setExpandedCategories(newExpanded)
   }
 
-  const handleDelete = async (categoryId: string) => {
-    if (confirm('Are you sure you want to delete this category? This action cannot be undone.')) {
-      try {
-        await categoryService.deleteCategory(categoryId)
-        await loadCategories()
-        await loadStats()
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'Failed to delete category')
-      }
+  const handleDeleteClick = (category: Category) => {
+    setDeleteTarget({ id: category.id, name: category.name })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      setDeleting(true)
+      await categoryService.deleteCategory(deleteTarget.id)
+      await loadCategories()
+      await loadStats()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete category')
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -204,7 +214,7 @@ export default function CategoryLists() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleDelete(category.id)}
+              onClick={() => handleDeleteClick(category)}
               className="text-red-600 hover:text-red-800"
             >
               <Trash2 className="h-4 w-4" />
@@ -231,6 +241,52 @@ export default function CategoryLists() {
             </Button>
           </Link>
         )}
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-900">{stats?.total || 0}</div>
+              <div className="text-sm text-gray-500">Main Categories</div>
+              <div className="text-xs text-gray-400 mt-1">Root level categories</div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {stats?.active || 0}
+              </div>
+              <div className="text-sm text-gray-500">Active Categories</div>
+              <div className="text-xs text-gray-400 mt-1">Currently visible</div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {stats?.subcategories || 0}
+              </div>
+              <div className="text-sm text-gray-500">Total Subcategories</div>
+              <div className="text-xs text-gray-400 mt-1">Nested under main categories</div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600">
+                {categories.reduce((sum, c) => sum + c.productCount, 0)}
+              </div>
+              <div className="text-sm text-gray-500">Total Products</div>
+              <div className="text-xs text-gray-400 mt-1">Across all categories</div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -264,15 +320,17 @@ export default function CategoryLists() {
         </CardContent>
       </Card>
 
+      {/* Showing */}
+      {filteredCategories.length > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+          <span>Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredCategories.length)} of {filteredCategories.length}</span>
+        </div>
+      )}
+
       {/* Categories Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Categories List</CardTitle>
-            <span className="text-sm text-slate-500">
-              Showing {filteredCategories.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredCategories.length)} of {filteredCategories.length}
-            </span>
-          </div>
+          <CardTitle>Categories List</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -328,51 +386,14 @@ export default function CategoryLists() {
         )}
       </Card>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">{stats?.total || 0}</div>
-              <div className="text-sm text-gray-500">Main Categories</div>
-              <div className="text-xs text-gray-400 mt-1">Root level categories</div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {stats?.active || 0}
-              </div>
-              <div className="text-sm text-gray-500">Active Categories</div>
-              <div className="text-xs text-gray-400 mt-1">Currently visible</div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {stats?.subcategories || 0}
-              </div>
-              <div className="text-sm text-gray-500">Total Subcategories</div>
-              <div className="text-xs text-gray-400 mt-1">Nested under main categories</div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {categories.reduce((sum, c) => sum + c.productCount, 0)}
-              </div>
-              <div className="text-sm text-gray-500">Total Products</div>
-              <div className="text-xs text-gray-400 mt-1">Across all categories</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <DeleteConfirmModal
+        show={!!deleteTarget}
+        title="Delete Category"
+        itemName={deleteTarget?.name || ''}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

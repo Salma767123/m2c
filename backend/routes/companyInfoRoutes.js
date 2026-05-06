@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getCompanyInfo,
+  getPublicCompanyInfo,
   updateBasicInfo,
   updateLegalInfo,
   updateAddress,
@@ -10,7 +11,10 @@ const {
 } = require('../controllers/companyInfoController');
 const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
 
-// All routes require authentication
+// Public route (no auth required)
+router.get('/public', getPublicCompanyInfo);
+
+// All routes below require authentication
 router.use(authenticateToken);
 
 // Get company info - accessible by anyone with view_settings or manage_settings

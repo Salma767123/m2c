@@ -33,13 +33,24 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
 export default function HubToCustomer() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("Active");
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Statuses relevant for Hub to Customer tracking
-  const statusOptions = ["All", "RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED", "CANCELLED", "RETURNED"];
+  const STATUS_LABELS: Record<string, string> = {
+    "Active": "Active Orders",
+    "All": "All Statuses",
+    "RECEIVED_AT_ADMIN_HUB": "Received at Hub",
+    "APPROVED_BY_ADMIN_HUB": "Approved by Hub",
+    "SHIPPED_TO_CUSTOMER": "Shipped to Customer",
+    "DELIVERED": "Delivered",
+    "CANCELLED": "Cancelled",
+    "RETURNED": "Returned",
+  };
+  const ACTIVE_STATUSES = ["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER"];
+  const statusDisplayOptions = Object.keys(STATUS_LABELS).map(key => ({ value: key, label: STATUS_LABELS[key] }));
 
   useEffect(() => {
     fetchOrders();
@@ -70,7 +81,10 @@ export default function HubToCustomer() {
       productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "All" || order.status === statusFilter;
+    const matchesStatus =
+      statusFilter === "All" ||
+      (statusFilter === "Active" && ACTIVE_STATUSES.includes(order.status)) ||
+      order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -155,7 +169,7 @@ export default function HubToCustomer() {
           <div className="w-full md:w-64">
             <Dropdown
               value={statusFilter}
-              options={statusOptions}
+              options={statusDisplayOptions}
               onChange={(value) => setStatusFilter(value as string)}
               placeholder="Filter by Status"
             />

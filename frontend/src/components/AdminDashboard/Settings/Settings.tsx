@@ -80,6 +80,9 @@ export default function Settings() {
     bankAccountNumber: "1234567890",
     bankIfscCode: "HDFC0001234",
     bankBranch: "MG Road Branch",
+    socialInstagram: "",
+    socialFacebook: "",
+    socialYoutube: "",
   });
 
   // Razorpay settings state (only for super_admin)
@@ -168,6 +171,9 @@ export default function Settings() {
               bankAccountNumber: companyResponse.data.bankAccountNumber || "",
               bankIfscCode: companyResponse.data.bankIfscCode || "",
               bankBranch: companyResponse.data.bankBranch || "",
+              socialInstagram: companyResponse.data.socialInstagram || "",
+              socialFacebook: companyResponse.data.socialFacebook || "",
+              socialYoutube: companyResponse.data.socialYoutube || "",
             });
           }
         } catch (error) {
@@ -246,7 +252,10 @@ export default function Settings() {
           companyName: companyInfo.companyName,
           companyEmail: companyInfo.companyEmail,
           companyPhone: companyInfo.companyPhone,
-          companyWebsite: companyInfo.companyWebsite
+          companyWebsite: companyInfo.companyWebsite,
+          socialInstagram: companyInfo.socialInstagram,
+          socialFacebook: companyInfo.socialFacebook,
+          socialYoutube: companyInfo.socialYoutube,
         });
       } else if (formId === 'legal-info-form') {
         response = await companyInfoService.updateLegalInfo({
@@ -815,6 +824,44 @@ export default function Settings() {
                       onChange={(e) => setCompanyInfo({ ...companyInfo, companyWebsite: e.target.value })}
                       disabled={currentUser.role !== "super_admin"}
                       placeholder="https://www.example.com"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                    />
+                  </div>
+
+                  {/* Social Media Links */}
+                  <div className="md:col-span-2 pt-2">
+                    <p className="text-sm font-medium text-gray-700 mb-3">Social Media Links</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Instagram URL</label>
+                    <input
+                      type="url"
+                      value={companyInfo.socialInstagram}
+                      onChange={(e) => setCompanyInfo({ ...companyInfo, socialInstagram: e.target.value })}
+                      disabled={currentUser.role !== "super_admin"}
+                      placeholder="https://www.instagram.com/yourpage"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Facebook URL</label>
+                    <input
+                      type="url"
+                      value={companyInfo.socialFacebook}
+                      onChange={(e) => setCompanyInfo({ ...companyInfo, socialFacebook: e.target.value })}
+                      disabled={currentUser.role !== "super_admin"}
+                      placeholder="https://www.facebook.com/yourpage"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">YouTube URL</label>
+                    <input
+                      type="url"
+                      value={companyInfo.socialYoutube}
+                      onChange={(e) => setCompanyInfo({ ...companyInfo, socialYoutube: e.target.value })}
+                      disabled={currentUser.role !== "super_admin"}
+                      placeholder="https://www.youtube.com/@yourchannel"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-100"
                     />
                   </div>

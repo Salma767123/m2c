@@ -107,8 +107,6 @@ export default function CustomerManagement() {
     switch (status) {
       case 'active':
         return <Badge className="bg-green-100 text-green-800">Active</Badge>;
-      case 'inactive':
-        return <Badge className="bg-gray-100 text-gray-800">Inactive</Badge>;
       case 'suspended':
         return <Badge className="bg-red-100 text-red-800">Suspended</Badge>;
       case 'pending':
@@ -262,8 +260,7 @@ export default function CustomerManagement() {
                 options={[
                   { value: 'all', label: 'All Status' },
                   { value: 'active', label: 'Active' },
-                  { value: 'inactive', label: 'Inactive' },
-                  { value: 'suspended', label: 'Suspended' },
+                                    { value: 'suspended', label: 'Suspended' },
                   { value: 'pending', label: 'Pending' }
                 ]}
                 onChange={(value) => setStatusFilter(value as string)}
@@ -293,7 +290,7 @@ export default function CustomerManagement() {
       {/* Customers Table */}
       {filteredCustomers.length > 0 && (
         <div className="text-sm text-slate-600 mb-2">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredCustomers.length)} of {filteredCustomers.length}
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredCustomers.length)} of {filteredCustomers.length}
         </div>
       )}
       <Card>

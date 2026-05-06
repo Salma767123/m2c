@@ -23,6 +23,7 @@ import { wishlistService } from "@/services/wishlistService";
 import { userAuthService } from "@/services/userAuthService";
 import { categoryService } from "@/services/categoryService";
 import { couponService } from "@/services/couponService";
+import { companyInfoService } from "@/services/companyInfoService";
 
 const Header = () => {
   const pathname = usePathname();
@@ -39,6 +40,7 @@ const Header = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
+  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [promotionalOffers, setPromotionalOffers] = useState<string[]>([]);
@@ -81,6 +83,13 @@ const Header = () => {
     const openModal = () => setShowSearchModal(true);
     window.addEventListener('open-search-modal', openModal);
     return () => window.removeEventListener('open-search-modal', openModal);
+  }, []);
+
+  // Fetch company logo
+  useEffect(() => {
+    companyInfoService.getPublicCompanyInfo().then(info => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    }).catch(() => {});
   }, []);
 
   // Close dropdowns when clicking outside
@@ -333,15 +342,23 @@ const Header = () => {
             {/* Section 1: Logo (30% on desktop, 50% on mobile/tablet) */}
             <div className="w-[50%] md:w-[30%] flex justify-start shrink-0">
               <Link href="/" className="flex items-center">
-                <Image
-                  src="/assets/logo/logo2.png"
-                  alt="Company Logo"
-                  width={200}
-                  height={100}
-                  sizes="(max-width: 640px) 32px, (max-width: 768px) 40px, (max-width: 1024px) 56px, (max-width: 1280px) 80px, 120px"
-                  className="h-8 sm:h-10 md:h-14 lg:h-20 xl:h-24 w-auto object-contain"
-                  priority
-                />
+                {companyLogo ? (
+                  <img
+                    src={companyLogo}
+                    alt="Company Logo"
+                    className="h-8 sm:h-10 md:h-14 lg:h-20 xl:h-24 w-auto object-contain"
+                  />
+                ) : (
+                  <Image
+                    src="/assets/logo/m2c-logo.png"
+                    alt="Company Logo"
+                    width={200}
+                    height={100}
+                    sizes="(max-width: 640px) 32px, (max-width: 768px) 40px, (max-width: 1024px) 56px, (max-width: 1280px) 80px, 120px"
+                    className="h-8 sm:h-10 md:h-14 lg:h-20 xl:h-24 w-auto object-contain"
+                    priority
+                  />
+                )}
               </Link>
             </div>
 

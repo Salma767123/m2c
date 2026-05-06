@@ -5,9 +5,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { Instagram, Facebook, Youtube } from "lucide-react";
 import { categoryService, Category } from "@/services/categoryService";
+import { companyInfoService, PublicCompanyInfo } from "@/services/companyInfoService";
 
 const MainFooterContent = () => {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [companyInfo, setCompanyInfo] = useState<PublicCompanyInfo>(() => companyInfoService.getCachedCompanyInfo());
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -17,7 +19,6 @@ const MainFooterContent = () => {
           showRootOnly: 'true'
         });
         if (response.success && response.data) {
-          // Take top 5 or 6 categories
           setCategories(response.data.slice(0, 6));
         }
       } catch (error) {
@@ -26,7 +27,15 @@ const MainFooterContent = () => {
     };
 
     fetchCategories();
+    companyInfoService.getPublicCompanyInfo().then(info => {
+      setCompanyInfo(info);
+    }).catch(() => {});
   }, []);
+
+  const buildAddress = () => {
+    const parts = [companyInfo.registeredAddress, companyInfo.city, companyInfo.state, companyInfo.country].filter(Boolean);
+    return parts.join(', ');
+  };
 
   return (
     <div className="bg-[#000000] text-white">
@@ -40,15 +49,23 @@ const MainFooterContent = () => {
             <div className="space-y-3 sm:space-y-4 md:space-y-6">
               <div className="bg-white p-2 sm:p-3 rounded-lg inline-block">
                 <Link href="/" className="block">
-                  <Image
-                    src="/assets/logo/logo2.png"
-                    alt="Nav Nit Textile Logo"
-                    width={190}
-                    height={50}
-                    sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
-                    className="object-cover w-32 sm:w-40 md:w-48 lg:w-52 h-auto"
-                    priority
-                  />
+                  {companyInfo.companyLogo ? (
+                    <img
+                      src={companyInfo.companyLogo}
+                      alt="Company Logo"
+                      className="object-cover w-32 sm:w-40 md:w-48 lg:w-52 h-auto"
+                    />
+                  ) : (
+                    <Image
+                      src="/assets/logo/m2c-logo.png"
+                      alt="Company Logo"
+                      width={190}
+                      height={50}
+                      sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+                      className="object-cover w-32 sm:w-40 md:w-48 lg:w-52 h-auto"
+                      priority
+                    />
+                  )}
                 </Link>
               </div>
 
@@ -132,47 +149,66 @@ const MainFooterContent = () => {
               Contact Info
             </h4>
             <div className="space-y-3 sm:space-y-4 md:space-y-6">
-              <div>
-                <p className="text-gray-200 text-xs sm:text-sm md:text-base break-all sm:break-normal">
-                  info@navnittextiles.com
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-200 text-xs sm:text-sm md:text-base">
-                  Jaipur Raj 302012
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-200 text-xs sm:text-sm md:text-base leading-relaxed max-w-xs sm:max-w-sm mx-auto sm:mx-0">
-                  307/A, Gumasta Marg, Pul, Jaipur Disawer, Rajasthan-Jaipur,
-                  Rajasthan, Rajasthan 302001
-                </p>
-              </div>
+              {companyInfo.companyEmail && (
+                <div>
+                  <p className="text-gray-200 text-xs sm:text-sm md:text-base break-all sm:break-normal">
+                    {companyInfo.companyEmail}
+                  </p>
+                </div>
+              )}
+              {companyInfo.companyPhone && (
+                <div>
+                  <p className="text-gray-200 text-xs sm:text-sm md:text-base">
+                    {companyInfo.companyPhone}
+                  </p>
+                </div>
+              )}
+              {buildAddress() && (
+                <div>
+                  <p className="text-gray-200 text-xs sm:text-sm md:text-base leading-relaxed max-w-xs sm:max-w-sm mx-auto sm:mx-0">
+                    {buildAddress()}{companyInfo.zipCode ? ` – ${companyInfo.zipCode}` : ''}
+                  </p>
+                </div>
+              )}
 
               {/* Social Media Icons */}
-              <div className="flex justify-center sm:justify-start space-x-3 sm:space-x-4 pt-2 sm:pt-4">
-                <a
-                  href="#"
-                  className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-[#3d3d3d] rounded-full flex items-center justify-center text-gray-200 hover:bg-gray-600 hover:text-white transition-colors"
-                  aria-label="Instagram"
-                >
-                  <Instagram className="w-4 h-4 sm:w-5 sm:h-5" />
-                </a>
-                <a
-                  href="#"
-                  className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-[#3d3d3d] rounded-full flex items-center justify-center text-gray-200 hover:bg-gray-600 hover:text-white transition-colors"
-                  aria-label="Facebook"
-                >
-                  <Facebook className="w-4 h-4 sm:w-5 sm:h-5" />
-                </a>
-                <a
-                  href="#"
-                  className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-[#3d3d3d] rounded-full flex items-center justify-center text-gray-200 hover:bg-gray-600 hover:text-white transition-colors"
-                  aria-label="YouTube"
-                >
-                  <Youtube className="w-4 h-4 sm:w-5 sm:h-5" />
-                </a>
-              </div>
+              {(companyInfo.socialInstagram || companyInfo.socialFacebook || companyInfo.socialYoutube) && (
+                <div className="flex justify-center sm:justify-start space-x-3 sm:space-x-4 pt-2 sm:pt-4">
+                  {companyInfo.socialInstagram && (
+                    <a
+                      href={companyInfo.socialInstagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-[#3d3d3d] rounded-full flex items-center justify-center text-gray-200 hover:bg-gray-600 hover:text-white transition-colors"
+                      aria-label="Instagram"
+                    >
+                      <Instagram className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </a>
+                  )}
+                  {companyInfo.socialFacebook && (
+                    <a
+                      href={companyInfo.socialFacebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-[#3d3d3d] rounded-full flex items-center justify-center text-gray-200 hover:bg-gray-600 hover:text-white transition-colors"
+                      aria-label="Facebook"
+                    >
+                      <Facebook className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </a>
+                  )}
+                  {companyInfo.socialYoutube && (
+                    <a
+                      href={companyInfo.socialYoutube}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 bg-[#3d3d3d] rounded-full flex items-center justify-center text-gray-200 hover:bg-gray-600 hover:text-white transition-colors"
+                      aria-label="YouTube"
+                    >
+                      <Youtube className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

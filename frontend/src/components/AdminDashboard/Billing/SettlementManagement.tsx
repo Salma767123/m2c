@@ -186,6 +186,13 @@ export default function SettlementManagement() {
         </div>
       </div>
 
+      {/* Showing */}
+      {!loading && filteredSettlements.length > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+          <span>Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredSettlements.length)} of {filteredSettlements.length}</span>
+        </div>
+      )}
+
       {/* Settlements Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
@@ -252,11 +259,8 @@ export default function SettlementManagement() {
           </Table>
         )}
 
-        {!loading && filteredSettlements.length > 0 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredSettlements.length)} of {filteredSettlements.length}
-            </p>
+        {!loading && filteredSettlements.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200">
             {totalPages > 1 && (
               <div className="flex items-center justify-end gap-3 text-sm">
                 <div className="flex items-center gap-1">

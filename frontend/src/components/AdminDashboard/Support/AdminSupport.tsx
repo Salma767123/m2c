@@ -235,7 +235,7 @@ export default function AdminSupport() {
       {/* Tickets Table */}
       {filteredTickets.length > 0 && (
         <p className="text-sm text-slate-600">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredTickets.length)} of {filteredTickets.length}
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredTickets.length)} of {filteredTickets.length}
         </p>
       )}
       <Card>

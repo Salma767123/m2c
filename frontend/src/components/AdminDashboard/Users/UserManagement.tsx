@@ -18,6 +18,7 @@ import {
 import { Breadcrumb } from '@/components/AdminDashboard/Breadcrumb/Breadcrumb';
 import { useRouter } from 'next/navigation';
 import Dropdown from '@/components/UI/Dropdown';
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 import {
   Users as UsersIcon,
   UserPlus,
@@ -59,6 +60,8 @@ export default function UserManagement() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -100,13 +103,21 @@ export default function UserManagement() {
     }
   };
 
-  const handleDelete = async (userId: string) => {
-    if (!window.confirm('Are you sure you want to delete this staff member?')) return;
+  const handleDeleteClick = (user: Staff) => {
+    setDeleteTarget({ id: user.id, name: `${user.firstName} ${user.lastName}`, email: user.email });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await userManagementService.deleteStaff(userId);
+      setDeleting(true);
+      await userManagementService.deleteStaff(deleteTarget.id);
       fetchStaff();
     } catch (error) {
       console.error('Failed to delete staff', error);
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -144,8 +155,6 @@ export default function UserManagement() {
     switch (status) {
       case 'active':
         return <Badge className="bg-green-100 text-green-800">Active</Badge>;
-      case 'inactive':
-        return <Badge className="bg-gray-100 text-gray-800">Inactive</Badge>;
       case 'suspended':
         return <Badge className="bg-red-100 text-red-800">Suspended</Badge>;
       case 'pending':
@@ -319,7 +328,6 @@ export default function UserManagement() {
                 options={[
                   { value: 'all', label: 'All Status' },
                   { value: 'active', label: 'Active' },
-                  { value: 'inactive', label: 'Inactive' },
                   { value: 'suspended', label: 'Suspended' },
                   { value: 'pending', label: 'Pending' }
                 ]}
@@ -334,7 +342,7 @@ export default function UserManagement() {
       {/* Users Table */}
       {filteredUsers.length > 0 && (
         <div className="text-sm text-slate-600 mb-2">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length}
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length}
         </div>
       )}
       <Card>
@@ -471,7 +479,7 @@ export default function UserManagement() {
                             size="sm"
                             className="hover:bg-red-100 text-red-600"
                             title="Delete User"
-                            onClick={() => handleDelete(user.id)}
+                            onClick={() => handleDeleteClick(user)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -495,6 +503,16 @@ export default function UserManagement() {
           </div>
         </div>
       )}
+
+      <DeleteConfirmModal
+        show={!!deleteTarget}
+        title="Delete Staff Member"
+        itemName={deleteTarget?.name || ''}
+        itemDetail={deleteTarget?.email || ''}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, CheckCircle, XCircle, Percent } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
+import DeleteConfirmModal from "@/components/UI/DeleteConfirmModal";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { gstSettingsService, GSTSetting } from "@/services/gstSettingsService";
 import { hasPermission } from "@/lib/auth";
@@ -14,6 +15,8 @@ export default function GSTSettingsTab() {
     const [creating, setCreating] = useState(false);
     const [newPercentage, setNewPercentage] = useState("");
     const [newDescription, setNewDescription] = useState("");
+    const [deleteModal, setDeleteModal] = useState<{ show: boolean; id: string; name: string } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchSettings();
@@ -61,17 +64,24 @@ export default function GSTSettingsTab() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this GST setting?")) return;
+    const handleDeleteClick = (id: string, name: string) => {
+        setDeleteModal({ show: true, id, name });
+    };
 
+    const confirmDelete = async () => {
+        if (!deleteModal) return;
+        setIsDeleting(true);
         try {
-            const response = await gstSettingsService.deleteSetting(id);
+            const response = await gstSettingsService.deleteSetting(deleteModal.id);
             if (response.success) {
                 showSuccessToast("Success", "GST setting deleted successfully");
-                setSettings(settings.filter(s => s.id !== id));
+                setSettings(settings.filter(s => s.id !== deleteModal.id));
             }
         } catch (error: any) {
             showErrorToast("Error", error.message || "Failed to delete GST setting");
+        } finally {
+            setIsDeleting(false);
+            setDeleteModal(null);
         }
     };
 
@@ -145,6 +155,19 @@ export default function GSTSettingsTab() {
             </Card>
             )}
 
+            {/* Delete Confirm Modal */}
+            <DeleteConfirmModal
+                show={!!deleteModal?.show}
+                title="Delete GST Setting"
+                itemName={deleteModal?.name}
+                itemDetail={deleteModal?.name ? `This GST rate will be permanently removed` : undefined}
+                loading={isDeleting}
+                confirmLabel="Delete Permanently"
+                loadingLabel="Deleting..."
+                onConfirm={confirmDelete}
+                onCancel={() => setDeleteModal(null)}
+            />
+
             {/* List Existing Settings */}
             <Card>
                 <CardContent className="p-6">
@@ -195,7 +218,7 @@ export default function GSTSettingsTab() {
                                             <td className="py-3 px-4 text-right">
                                                 {canManage && (
                                                     <button
-                                                        onClick={() => handleDelete(setting.id)}
+                                                        onClick={() => handleDeleteClick(setting.id, `${setting.percentage}% GST`)}
                                                         className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
                                                         title="Delete"
                                                     >

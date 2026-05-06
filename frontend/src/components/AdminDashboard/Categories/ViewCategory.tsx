@@ -9,6 +9,7 @@ import { Edit, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { categoryService, Category } from '@/services/categoryService'
 import { hasPermission } from '@/lib/auth'
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 
 interface ViewCategoryProps {
   categoryId: string
@@ -19,6 +20,8 @@ export default function ViewCategory({ categoryId }: ViewCategoryProps) {
   const [category, setCategory] = useState<Category | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     loadCategory()
@@ -37,16 +40,22 @@ export default function ViewCategory({ categoryId }: ViewCategoryProps) {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!category) return
-    
-    if (confirm('Are you sure you want to delete this category? This action cannot be undone.')) {
-      try {
-        await categoryService.deleteCategory(category.id)
-        router.push('/admin/dashboard/categories')
-      } catch (err) {
-        alert(err instanceof Error ? err.message : 'Failed to delete category')
-      }
+    setShowDeleteModal(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!category) return
+    try {
+      setDeleting(true)
+      await categoryService.deleteCategory(category.id)
+      router.push('/admin/dashboard/categories')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete category')
+    } finally {
+      setDeleting(false)
+      setShowDeleteModal(false)
     }
   }
 
@@ -341,6 +350,15 @@ export default function ViewCategory({ categoryId }: ViewCategoryProps) {
           </Card>
         </div>
       </div>
+
+      <DeleteConfirmModal
+        show={showDeleteModal}
+        title="Delete Category"
+        itemName={category.name}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteModal(false)}
+      />
     </div>
   )
 }

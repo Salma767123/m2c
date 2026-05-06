@@ -24,6 +24,7 @@ import {
   Target,
 } from "lucide-react";
 import { qcCheckerService } from "@/services/qcCheckerService";
+import { companyInfoService } from '@/services/companyInfoService';
 
 interface LoginPageProps {
   onLogin: (checkerID: string) => void;
@@ -32,6 +33,7 @@ interface LoginPageProps {
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [checkerID, setCheckerID] = useState("");
   const [password, setPassword] = useState("");
+  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [checkerIDError, setCheckerIDError] = useState("");
@@ -39,6 +41,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showInspectionInfo, setShowInspectionInfo] = useState(false);
   const checkerIDInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    companyInfoService.getPublicCompanyInfo().then(info => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    }).catch(() => {});
+  }, []);
 
   // Autofocus checker ID field on mount
   useEffect(() => {
@@ -135,13 +143,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             {/* Logo Section */}
             <div className="mb-8">
               <div className="inline-flex items-center justify-center w-44 h-36 bg-white rounded-2xl mb-6 shadow-xl">
-                <Image
-                  src="/assets/logo/logo2.png"
-                  alt="Company Logo"
-                  width={190}
-                  height={150}
-                  className="object-contain"
-                />
+                {companyLogo ? (
+                  <img src={companyLogo} alt="Company Logo" className="object-contain" style={{ width: 190, height: 150 }} />
+                ) : (
+                  <Image src="/assets/logo/m2c-logo.png" alt="Company Logo" width={190} height={150} className="object-contain" />
+                )}
               </div>
               <h1 className="text-4xl font-bold mb-3">
                 QC Portal

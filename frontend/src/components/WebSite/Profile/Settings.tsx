@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import { Settings, Globe, Moon, Sun, Monitor, Trash2, Download, Upload, AlertTriangle } from 'lucide-react'
 import Dropdown from '@/components/UI/Dropdown'
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 
 export default function SettingsTab() {
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [theme, setTheme] = useState('system')
   const [language, setLanguage] = useState('en')
   const [currency, setCurrency] = useState('INR')
@@ -54,10 +56,13 @@ export default function SettingsTab() {
   }
 
   const handleDeleteAccount = () => {
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteAccount = () => {
     // Handle account deletion
-    if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-      console.log('Deleting account...')
-    }
+    console.log('Deleting account...')
+    setShowDeleteModal(false)
   }
 
   return (
@@ -245,6 +250,15 @@ export default function SettingsTab() {
           Save Settings
         </button>
       </div>
+
+      <DeleteConfirmModal
+        show={showDeleteModal}
+        title="Delete Account"
+        subtitle="This action is permanent and cannot be reversed"
+        confirmLabel="Delete My Account"
+        onConfirm={confirmDeleteAccount}
+        onCancel={() => setShowDeleteModal(false)}
+      />
     </div>
   )
 }

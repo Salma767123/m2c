@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const crypto = require('crypto');
 
 // Add item to wishlist
 const addToWishlist = async (req, res) => {
@@ -316,10 +317,127 @@ const clearWishlist = async (req, res) => {
   }
 };
 
+// Generate or get share token for wishlist
+const generateShareToken = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    let wishlist = await prisma.wishlist.findUnique({
+      where: { userId }
+    });
+
+    if (!wishlist) {
+      return res.status(404).json({ success: false, error: 'Wishlist not found' });
+    }
+
+    // Return existing token if already generated
+    if (wishlist.shareToken) {
+      return res.json({ success: true, shareToken: wishlist.shareToken });
+    }
+
+    // Generate a unique token
+    const shareToken = crypto.randomBytes(16).toString('hex');
+
+    wishlist = await prisma.wishlist.update({
+      where: { id: wishlist.id },
+      data: { shareToken }
+    });
+
+    res.json({ success: true, shareToken: wishlist.shareToken });
+  } catch (error) {
+    console.error('Generate share token error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate share link' });
+  }
+};
+
+// Get public wishlist by share token (no auth required)
+const getPublicWishlist = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const wishlist = await prisma.wishlist.findUnique({
+      where: { shareToken: token },
+      include: { items: true }
+    });
+
+    if (!wishlist) {
+      return res.status(404).json({ success: false, error: 'Wishlist not found' });
+    }
+
+    // Get product details for each item
+    const itemsWithProducts = await Promise.all(
+      wishlist.items.map(async (item) => {
+        const product = await prisma.product.findUnique({
+          where: { id: item.productId },
+          select: {
+            id: true,
+            name: true,
+            basePrice: true,
+            adminFixedPrice: true,
+            originalPrice: true,
+            discount: true,
+            inStock: true,
+            totalStock: true,
+            rating: true,
+            reviews: true,
+            category: true,
+            images: {
+              where: { isPrimary: true },
+              take: 1,
+              select: { url: true }
+            }
+          }
+        });
+
+        return {
+          id: item.id,
+          productId: item.productId,
+          createdAt: item.createdAt,
+          product: product ? {
+            id: product.id,
+            name: product.name,
+            image: product.images[0]?.url || '',
+            basePrice: product.basePrice,
+            adminFixedPrice: product.adminFixedPrice,
+            originalPrice: product.originalPrice,
+            discount: product.discount,
+            inStock: product.inStock && product.totalStock > 0,
+            rating: product.rating,
+            reviews: product.reviews,
+            category: product.category,
+          } : null
+        };
+      })
+    );
+
+    const validItems = itemsWithProducts.filter(item => item.product !== null);
+
+    // Get owner name for display
+    const user = await prisma.user.findUnique({
+      where: { id: wishlist.userId },
+      select: { name: true }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ownerName: user?.name?.split(' ')[0] || 'Someone',
+        items: validItems,
+        count: validItems.length
+      }
+    });
+  } catch (error) {
+    console.error('Get public wishlist error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch wishlist' });
+  }
+};
+
 module.exports = {
   addToWishlist,
   getWishlist,
   removeFromWishlist,
   checkInWishlist,
-  clearWishlist
+  clearWishlist,
+  generateShareToken,
+  getPublicWishlist
 };

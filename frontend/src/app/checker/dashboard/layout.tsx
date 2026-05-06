@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Header from '@/components/Checker/CheckerHeader/CheckerHeader'
 import Sidebar from '@/components/Checker/CheckerSidebar/CheckerSidebar'
 import Footer from '@/components/Checker/CheckerFooter/CheckerFooter'
+import CheckerProtectedRoute from '@/components/Checker/CheckerProtectedRoute'
 import { Toaster } from '@/components/UI/Toaster'
 
 export default function DashboardLayout({
@@ -18,6 +19,7 @@ export default function DashboardLayout({
   }
 
   return (
+    <CheckerProtectedRoute>
     <div className="flex h-screen bg-white">
       {/* Sidebar */}
       <div className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
@@ -49,5 +51,6 @@ export default function DashboardLayout({
       </div>
       <Toaster />
     </div>
+    </CheckerProtectedRoute>
   )
 }

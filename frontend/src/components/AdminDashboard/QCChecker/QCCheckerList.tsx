@@ -10,6 +10,7 @@ import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { hasPermission } from "@/lib/auth";
+import DeleteConfirmModal from "../../UI/DeleteConfirmModal";
 
 const PAGE_SIZE = 10;
 
@@ -33,6 +34,7 @@ export default function QCCheckerList() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [confirmModal, setConfirmModal] = useState<{ type: 'delete' | 'resend'; id: string; label: string } | null>(null);
 
   // Fetch QC Checkers
   const fetchCheckers = async () => {
@@ -69,37 +71,41 @@ export default function QCCheckerList() {
   }, [searchTerm]);
 
   // Delete handler
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete QC Checker "${name}"? This action cannot be undone.`)) {
-      return;
-    }
+  const handleDeleteClick = (id: string, name: string) => {
+    setConfirmModal({ type: 'delete', id, label: name });
+  };
 
-    setDeletingId(id);
+  const confirmDeleteAction = async () => {
+    if (!confirmModal || confirmModal.type !== 'delete') return;
+    setDeletingId(confirmModal.id);
     try {
-      await qcCheckerService.deleteQCChecker(id);
-      showSuccessToast("Deleted!", `QC Checker "${name}" has been deleted.`);
+      await qcCheckerService.deleteQCChecker(confirmModal.id);
+      showSuccessToast("Deleted!", `QC Checker "${confirmModal.label}" has been deleted.`);
       fetchCheckers();
     } catch (error: any) {
       showErrorToast("Delete Failed", error.message || "Failed to delete QC checker");
     } finally {
       setDeletingId(null);
+      setConfirmModal(null);
     }
   };
 
   // Resend credentials
-  const handleResendCredentials = async (id: string, email: string) => {
-    if (!confirm(`Resend login credentials to ${email}? This will reset the password.`)) {
-      return;
-    }
+  const handleResendClick = (id: string, email: string) => {
+    setConfirmModal({ type: 'resend', id, label: email });
+  };
 
-    setResendingId(id);
+  const confirmResendAction = async () => {
+    if (!confirmModal || confirmModal.type !== 'resend') return;
+    setResendingId(confirmModal.id);
     try {
-      const result = await qcCheckerService.resendCredentials(id);
-      showSuccessToast("Credentials Sent!", result.message || `New credentials sent to ${email}`);
+      const result = await qcCheckerService.resendCredentials(confirmModal.id);
+      showSuccessToast("Credentials Sent!", result.message || `New credentials sent to ${confirmModal.label}`);
     } catch (error: any) {
       showErrorToast("Failed", error.message || "Failed to resend credentials");
     } finally {
       setResendingId(null);
+      setConfirmModal(null);
     }
   };
 
@@ -214,7 +220,7 @@ export default function QCCheckerList() {
       {/* Checkers Table */}
       {!loading && checkers.length > 0 && (
         <div className="text-sm text-slate-600 mb-2">
-          Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, checkers.length)} of {checkers.length}
+          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, checkers.length)} of {checkers.length}
         </div>
       )}
       <Card>
@@ -283,7 +289,7 @@ export default function QCCheckerList() {
                       <div className="flex items-center gap-1">
                         {hasPermission('edit_qc_checkers') && (
                           <button
-                            onClick={() => handleResendCredentials(checker.id, checker.email)}
+                            onClick={() => handleResendClick(checker.id, checker.email)}
                             disabled={resendingId === checker.id}
                             className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50"
                             title="Resend Credentials"
@@ -293,7 +299,7 @@ export default function QCCheckerList() {
                         )}
                         {hasPermission('delete_qc_checkers') && (
                           <button
-                            onClick={() => handleDelete(checker.id, checker.name)}
+                            onClick={() => handleDeleteClick(checker.id, checker.name)}
                             disabled={deletingId === checker.id}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete Checker"
@@ -337,6 +343,18 @@ export default function QCCheckerList() {
           </div>
         </div>
       )}
+      <DeleteConfirmModal
+        show={!!confirmModal}
+        variant={confirmModal?.type === 'resend' ? 'warning' : 'danger'}
+        title={confirmModal?.type === 'resend' ? 'Resend Credentials' : 'Delete QC Checker'}
+        subtitle={confirmModal?.type === 'resend' ? 'This will reset the password' : 'This action cannot be undone'}
+        itemName={confirmModal?.label}
+        confirmLabel={confirmModal?.type === 'resend' ? 'Resend' : 'Delete Permanently'}
+        loadingLabel={confirmModal?.type === 'resend' ? 'Sending...' : 'Deleting...'}
+        loading={confirmModal?.type === 'resend' ? resendingId === confirmModal?.id : deletingId === confirmModal?.id}
+        onConfirm={confirmModal?.type === 'resend' ? confirmResendAction : confirmDeleteAction}
+        onCancel={() => setConfirmModal(null)}
+      />
     </div>
   );
 }

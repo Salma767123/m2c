@@ -53,15 +53,26 @@ function getGroupStatus(shipments: VendorShipment[]): string {
 export default function VendorToHub() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("Active");
   const [shipments, setShipments] = useState<VendorShipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
-  const statusOptions = ["All", "ORDER_CREATED", "VENDOR_PROCESSING", "PACKED_BY_VENDOR", "IN_TRANSIT_TO_ADMIN_HUB", "RECEIVED_AT_ADMIN_HUB"];
+  const STATUS_LABELS: Record<string, string> = {
+    "Active": "Active Orders",
+    "All": "All Statuses",
+    "ORDER_CREATED": "Order Created",
+    "VENDOR_PROCESSING": "Vendor Processing",
+    "PACKED_BY_VENDOR": "Packed by Vendor",
+    "IN_TRANSIT_TO_ADMIN_HUB": "In Transit to Hub",
+    "RECEIVED_AT_ADMIN_HUB": "Received at Hub",
+  };
+  const ACTIVE_STATUSES = ["ORDER_CREATED", "VENDOR_PROCESSING", "PACKED_BY_VENDOR", "IN_TRANSIT_TO_ADMIN_HUB"];
+  const statusOptions = Object.keys(STATUS_LABELS);
+  const statusDisplayOptions = statusOptions.map(key => ({ value: key, label: STATUS_LABELS[key] }));
 
   const isFetchingRef = useRef(false);
 
@@ -116,7 +127,10 @@ export default function VendorToHub() {
     };
   }, [fetchShipments]);
 
-  const handleManualRefresh = () => fetchShipments(true);
+  const handleManualRefresh = () => {
+    isFetchingRef.current = false; // allow manual refresh even if polling is in-flight
+    fetchShipments(true);
+  };
 
   // Group shipments by order
   const orderGroups: OrderGroup[] = useMemo(() => {
@@ -158,7 +172,10 @@ export default function VendorToHub() {
     });
 
     // Status filter: match if ANY shipment in the group matches
-    const matchesStatus = statusFilter === "All" || group.shipments.some(s => s.status === statusFilter);
+    const matchesStatus =
+      statusFilter === "All" ||
+      (statusFilter === "Active" && group.shipments.some(s => ACTIVE_STATUSES.includes(s.status))) ||
+      group.shipments.some(s => s.status === statusFilter);
 
     return matchesSearch && matchesStatus;
   });
@@ -197,12 +214,7 @@ export default function VendorToHub() {
   };
 
   const toggleExpanded = (orderId: string) => {
-    setExpandedOrders((prev) => {
-      const next = new Set(prev);
-      if (next.has(orderId)) next.delete(orderId);
-      else next.add(orderId);
-      return next;
-    });
+    setExpandedOrder((prev) => (prev === orderId ? null : orderId));
   };
 
   if (isLoading) {
@@ -259,7 +271,7 @@ export default function VendorToHub() {
           <div className="w-full md:w-64">
             <Dropdown
               value={statusFilter}
-              options={statusOptions}
+              options={statusDisplayOptions}
               onChange={(value) => setStatusFilter(value as string)}
               placeholder="Filter by Status"
             />
@@ -316,7 +328,7 @@ export default function VendorToHub() {
               </TableRow>
             ) : (
               paginatedGroups.map((group) => {
-                const isExpanded = expandedOrders.has(group.orderId);
+                const isExpanded = expandedOrder === group.orderId;
 
                 if (!group.isMultiVendor) {
                   // Single-vendor order — render one flat row

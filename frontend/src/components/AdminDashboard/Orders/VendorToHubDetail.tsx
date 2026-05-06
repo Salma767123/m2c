@@ -123,9 +123,16 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       });
 
       const nextStatus = isApproved ? "APPROVED_BY_ADMIN_HUB" : "REJECTED_BY_ADMIN_HUB";
-      await handleUpdateStatus(nextStatus);
+
+      // Update status without showing its own toast — we show a specific message below
+      if (!shipment) return;
+      const res = await orderService.updateAdminShipmentStatus(shipment.id, nextStatus);
+      if (res.success) {
+        await fetchShipmentDetails();
+      }
+
       setShowReviewModal(false);
-      showSuccessToast(isApproved ? "Shipment approved" : "Shipment rejected");
+      showSuccessToast(isApproved ? "Shipment approved successfully" : "Shipment rejected");
 
       if (isApproved) {
         setTimeout(() => {

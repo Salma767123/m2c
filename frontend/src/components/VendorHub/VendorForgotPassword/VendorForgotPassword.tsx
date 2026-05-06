@@ -15,6 +15,7 @@ import {
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Link from 'next/link'
 import axios from '@/lib/axios'
+import { companyInfoService } from '@/services/companyInfoService'
 
 interface ForgotPasswordData {
   email: string
@@ -24,10 +25,17 @@ export default function VendorForgotPassword() {
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [emailError, setEmailError] = useState("")
+  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo)
   const [formData, setFormData] = useState<ForgotPasswordData>({
     email: ''
   })
   const emailInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    companyInfoService.getPublicCompanyInfo().then(info => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo)
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (emailInputRef.current) {
@@ -118,13 +126,11 @@ export default function VendorForgotPassword() {
               {/* Logo Section */}
               <div className="mb-8">
                 <div className="inline-flex items-center justify-center w-44 h-36 bg-white rounded-2xl mb-6 shadow-xl">
-                  <Image
-                    src="/assets/logo/logo2.png"
-                    alt="Company Logo"
-                    width={190}
-                    height={150}
-                    className="object-contain"
-                  />
+                  {companyLogo ? (
+                    <img src={companyLogo} alt="Company Logo" className="object-contain" style={{ width: 190, height: 150 }} />
+                  ) : (
+                    <Image src="/assets/logo/m2c-logo.png" alt="Company Logo" width={190} height={150} className="object-contain" />
+                  )}
                 </div>
                 <h1 className="text-4xl font-bold mb-3">
                   Vendor Portal
@@ -214,13 +220,11 @@ export default function VendorForgotPassword() {
             {/* Logo Section */}
             <div className="mb-8">
               <div className="inline-flex items-center justify-center w-44 h-36 bg-white rounded-2xl mb-6 shadow-xl">
-                <Image
-                  src="/assets/logo/logo2.png"
-                  alt="Company Logo"
-                  width={190}
-                  height={150}
-                  className="object-contain"
-                />
+                {companyLogo ? (
+                  <img src={companyLogo} alt="Company Logo" className="object-contain" style={{ width: 190, height: 150 }} />
+                ) : (
+                  <Image src="/assets/logo/m2c-logo.png" alt="Company Logo" width={190} height={150} className="object-contain" />
+                )}
               </div>
               <h1 className="text-4xl font-bold mb-3">
                 Vendor Portal

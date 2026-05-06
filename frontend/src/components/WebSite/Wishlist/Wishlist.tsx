@@ -65,6 +65,36 @@ const Wishlist = () => {
     }
   };
 
+  const [isSharing, setIsSharing] = useState(false);
+
+  const shareWishlist = async () => {
+    try {
+      setIsSharing(true);
+      const shareToken = await wishlistService.getShareToken();
+      const url = `${window.location.origin}/wishlist/shared/${shareToken}`;
+      const productNames = wishlistItems
+        .filter(item => item.product)
+        .map(item => item.product!.name)
+        .slice(0, 5);
+      const text = productNames.length > 0
+        ? `Check out my wishlist: ${productNames.join(', ')}${wishlistItems.length > 5 ? ` and ${wishlistItems.length - 5} more` : ''}`
+        : 'Check out my wishlist!';
+
+      if (navigator.share) {
+        await navigator.share({ title: 'My Wishlist', text, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        showSuccessToast('Link Copied!', 'Shareable wishlist link has been copied to clipboard.');
+      }
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') {
+        showErrorToast('Share Failed', 'Unable to share wishlist. Please try again.');
+      }
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   const shareProduct = (productId: string, productName: string) => {
     try {
       const url = `${window.location.origin}/products/${productId}`;
@@ -147,8 +177,12 @@ const Wishlist = () => {
           </div>
 
           <div className="flex space-x-4 mt-4 sm:mt-0">
-            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              Share Wishlist
+            <button
+              onClick={shareWishlist}
+              disabled={isSharing || wishlistItems.length === 0}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSharing ? 'Generating Link...' : 'Share Wishlist'}
             </button>
             <Link
               href="/products"

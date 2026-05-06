@@ -148,6 +148,10 @@ export default function OrderHistory() {
         </div>
       ) : (
         <>
+          <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600 mb-4">
+            <span>Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(currentPage * ORDERS_PER_PAGE, orders.length)} of {orders.length}</span>
+          </div>
+
           <div className="space-y-6">
             {paginatedOrders.map((order) => (
               <div key={order.id} className="border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">

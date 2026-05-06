@@ -185,42 +185,40 @@ const Profile = () => {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               {/* User Profile Card in Sidebar */}
               <div className="bg-linear-to-b from-gray-50 to-gray-100 rounded-lg p-4 mb-6 border border-gray-200">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 text-sm">
-                      {userProfile.firstName} {userProfile.lastName}
-                    </h3>
-                    <p className="text-xs text-slate-600 truncate mt-1">{userProfile.email}</p>
-                  </div>
-                  {!isEditing ? (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="ml-2 p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors"
-                      title="Edit Profile"
-                    >
-                      <SquarePen className="w-4 h-4" />
-                    </button>
-                  ) : (
-                    <div className="flex gap-1 ml-2">
-                      <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors disabled:opacity-50"
-                        title="Save"
-                      >
-                        <Save className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={handleCancel}
-                        disabled={isSaving}
-                        className="p-1.5 text-slate-600 hover:bg-slate-100 rounded transition-colors disabled:opacity-50"
-                        title="Cancel"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
+                <div className="mb-3">
+                  <h3 className="font-semibold text-slate-900 text-sm">
+                    {userProfile.firstName} {userProfile.lastName}
+                  </h3>
+                  <p className="text-xs text-slate-600 truncate mt-1">{userProfile.email}</p>
                 </div>
+                {!isEditing ? (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <SquarePen className="w-3.5 h-3.5" />
+                    Edit Profile
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      {isSaving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      disabled={isSaving}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
 
               <nav className="space-y-2">

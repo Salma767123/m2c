@@ -11,6 +11,18 @@ type Pagination = Awaited<ReturnType<typeof orderService.getVendorReviews>>["pag
 
 const PAGE_SIZE = 20;
 
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
+}
+
 export default function VendorReviewsPage() {
   const [data, setData] = useState<ReviewsPayload | null>(null);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -143,6 +155,15 @@ export default function VendorReviewsPage() {
         </div>
       </div>
 
+      {/* Results summary */}
+      {pagination && pagination.total > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+          <span>
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, pagination.total)} of {pagination.total} review{pagination.total === 1 ? '' : 's'}
+          </span>
+        </div>
+      )}
+
       {/* Filter + List */}
       <div className={`bg-white rounded-xl shadow-sm border border-gray-200 ${pageLoading ? "opacity-60 pointer-events-none" : ""}`}>
         <div className="p-4 border-b border-gray-200 flex items-center justify-between gap-3 flex-wrap">
@@ -263,29 +284,11 @@ export default function VendorReviewsPage() {
 
         {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
-            <p className="text-xs text-gray-500">
-              Page {pagination.page} of {pagination.totalPages}
-            </p>
+          <div className="flex items-center justify-end gap-3 text-sm px-5 py-3 border-t border-gray-200">
             <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => goToPage(page - 1)}
-                className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                disabled={page >= pagination.totalPages}
-                onClick={() => goToPage(page + 1)}
-                className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+              <button onClick={() => goToPage(page - 1)} disabled={page <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+              {getPageRange(page, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => goToPage(p as number)} aria-current={p === page ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === page ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+              <button onClick={() => goToPage(page + 1)} disabled={page >= pagination.totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
             </div>
           </div>
         )}

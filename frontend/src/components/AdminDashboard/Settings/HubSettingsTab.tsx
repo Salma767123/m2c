@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { MapPin, Plus, Edit, Trash2, Save, X, Loader2 } from "lucide-react";
 import { Card, CardContent } from "../../UI/Card";
+import DeleteConfirmModal from "@/components/UI/DeleteConfirmModal";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import hubService, { Hub } from "@/services/hubService";
 import { hasPermission } from "@/lib/auth";
@@ -24,6 +25,8 @@ export default function HubSettingsTab() {
     isActive: true,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<{ show: boolean; hubId: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch hubs on mount
   useEffect(() => {
@@ -74,15 +77,22 @@ export default function HubSettingsTab() {
     setShowModal(true);
   };
 
-  const handleDeleteHub = async (hubId: string) => {
-    if (confirm("Are you sure you want to delete this hub?")) {
-      try {
-        await hubService.deleteHub(hubId);
-        setHubs(hubs.filter((h) => h.id !== hubId));
-        showSuccessToast("Hub Deleted", "Hub has been deleted successfully");
-      } catch (error: any) {
-        showErrorToast("Error", error.message || "Failed to delete hub");
-      }
+  const handleDeleteHubClick = (hubId: string, name: string) => {
+    setDeleteModal({ show: true, hubId, name });
+  };
+
+  const confirmDeleteHub = async () => {
+    if (!deleteModal) return;
+    setIsDeleting(true);
+    try {
+      await hubService.deleteHub(deleteModal.hubId);
+      setHubs(hubs.filter((h) => h.id !== deleteModal.hubId));
+      showSuccessToast("Hub Deleted", "Hub has been deleted successfully");
+    } catch (error: any) {
+      showErrorToast("Error", error.message || "Failed to delete hub");
+    } finally {
+      setIsDeleting(false);
+      setDeleteModal(null);
     }
   };
 
@@ -248,7 +258,7 @@ export default function HubSettingsTab() {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDeleteHub(hub.id)}
+                    onClick={() => handleDeleteHubClick(hub.id, hub.name)}
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors text-sm"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -283,6 +293,18 @@ export default function HubSettingsTab() {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Confirm Modal */}
+      <DeleteConfirmModal
+        show={!!deleteModal?.show}
+        title="Delete Hub"
+        itemName={deleteModal?.name}
+        loading={isDeleting}
+        confirmLabel="Delete Permanently"
+        loadingLabel="Deleting..."
+        onConfirm={confirmDeleteHub}
+        onCancel={() => setDeleteModal(null)}
+      />
 
       {/* Add/Edit Hub Modal */}
       {showModal && (

@@ -21,23 +21,23 @@ export default function RecentVendors({ vendors }: { vendors: any[] }) {
         <CardTitle>Recently Added Vendors</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-100 overflow-y-auto">
           {vendors && vendors.map((vendor) => (
-            <div key={vendor.id} className="flex items-start justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
-              <div className="flex items-start space-x-4">
+            <div key={vendor.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors gap-3">
+              <div className="flex items-center space-x-4 min-w-0 flex-1">
                 <div className="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center shrink-0">
                   <Store className="h-5 w-5" />
                 </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-900">{vendor.companyName}</h4>
+                <div className="min-w-0">
+                  <h4 className="text-sm font-semibold text-gray-900 truncate">{vendor.companyName}</h4>
                   <div className="flex items-center mt-1 space-x-2 text-xs text-gray-500">
-                    <span>{vendor.vendorType}</span>
+                    <span className="truncate">{vendor.vendorType}</span>
                     <span>•</span>
-                    <span>Joined {new Date(vendor.createdAt).toLocaleDateString()}</span>
+                    <span className="whitespace-nowrap">Joined {new Date(vendor.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>
-              <div className="flex flex-col items-end space-y-2">
+              <div className="shrink-0">
                 {getStatusBadge(vendor.status)}
               </div>
             </div>
