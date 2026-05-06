@@ -268,6 +268,10 @@ const checkInWishlist = async (req, res) => {
     const { productId } = req.params;
     const userId = req.userId;
 
+    if (!userId) {
+      return res.json({ success: true, inWishlist: false });
+    }
+
     const wishlist = await prisma.wishlist.findUnique({
       where: { userId }
     });
