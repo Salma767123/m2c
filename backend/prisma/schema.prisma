@@ -1145,7 +1145,12 @@ model CompanyInfo {
   bankAccountNumber         String?
   bankIfscCode              String?
   bankBranch                String?
-  
+
+  // Social Media Links
+  socialInstagram           String?
+  socialFacebook            String?
+  socialYoutube             String?
+
   // Metadata
   updatedBy                 String?   @db.ObjectId
   createdAt                 DateTime  @default(now())

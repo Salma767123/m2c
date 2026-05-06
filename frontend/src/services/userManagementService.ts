@@ -16,7 +16,7 @@ export interface Customer {
     lastName: string;
     email: string;
     phone: string;
-    status: 'active' | 'inactive' | 'suspended' | 'pending';
+    status: 'active' | 'suspended' | 'pending';
     joinDate: string;
     lastLogin: string;
     totalOrders: number;
@@ -39,7 +39,7 @@ export interface Staff {
     role: string;
     roleId?: string | null;
     permissions?: string[];
-    status: 'active' | 'inactive' | 'suspended' | 'pending';
+    status: 'active' | 'suspended' | 'pending';
     joinDate: string;
     lastLogin: string;
     totalOrders: number;
