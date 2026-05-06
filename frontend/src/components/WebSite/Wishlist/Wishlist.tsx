@@ -202,12 +202,14 @@ const Wishlist = () => {
               <div key={item.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
                 {/* Product Image */}
                 <div className="relative h-64 shrink-0">
-                  <Image
-                    src={item.product.image || '/placeholder.png'}
-                    alt={item.product.name}
-                    fill
-                    className="object-cover"
-                  />
+                  <Link href={`/products/${item.product?.slug || item.productId}`} className="block h-full">
+                    <Image
+                      src={item.product.image || '/placeholder.png'}
+                      alt={item.product.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </Link>
                   {item.product.discount ? (
                     <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-sm font-semibold">
                       {item.product.discount}% OFF
