@@ -40,7 +40,7 @@ const Header = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [promotionalOffers, setPromotionalOffers] = useState<string[]>([]);

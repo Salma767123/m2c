@@ -27,7 +27,7 @@ const Category = () => {
           sortBy: 'sortOrder',
           sortOrder: 'asc'
         });
-        
+
         if (response.success && response.data) {
           setCategories(response.data);
         }
@@ -49,8 +49,10 @@ const Category = () => {
     return (
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="h-12 flex items-center justify-center">
-            <div className="text-sm text-gray-500">Loading categories...</div>
+          <div className="h-12 flex items-center justify-center gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-7 rounded-lg bg-gray-100 animate-pulse shrink-0" style={{ width: `${60 + (i % 3) * 20}px` }} />
+            ))}
           </div>
         </div>
       </div>
@@ -61,7 +63,7 @@ const Category = () => {
     <div className="bg-white shadow-sm">
       <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="h-12 flex items-center justify-center mx-auto overflow-x-auto scrollbar-hide">
-          
+
           {categories.slice(0, 8).map((category) => (
             <Link
               key={category.id}

@@ -44,7 +44,7 @@ const Products = () => {
   const [totalItems, setTotalItems] = useState(0);
 
   // Filter states
-  const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 100000 });
   const [selectedRating, setSelectedRating] = useState(0);
   const [inStockOnly, setInStockOnly] = useState(false);
 
@@ -67,15 +67,11 @@ const Products = () => {
           setCategoriesList(categoriesResponse.data);
 
           if (categoryParam) {
-            console.log('Looking for category with slug:', categoryParam);
-            console.log('Available categories:', categoriesResponse.data.map((c: any) => ({ name: c.name, slug: c.slug })));
-            
             const foundCategory = categoriesResponse.data.find(
               (cat: any) => cat.slug.toLowerCase() === categoryParam.toLowerCase()
             );
 
             if (foundCategory) {
-              console.log('Found category:', foundCategory.name);
               setCategoryName(foundCategory.name);
               setSelectedCategory(foundCategory.name);
 
@@ -89,8 +85,6 @@ const Products = () => {
                   setSelectedSubcategory(foundSubcategory.name);
                 }
               }
-            } else {
-              console.log('Category not found for slug:', categoryParam);
             }
           }
         }
@@ -117,14 +111,12 @@ const Products = () => {
           category: selectedCategory !== 'All' ? selectedCategory : undefined,
           subCategory: selectedSubcategory || undefined,
           minPrice: priceRange.min > 0 ? priceRange.min : undefined,
-          maxPrice: priceRange.max < 1000 ? priceRange.max : undefined,
+          maxPrice: priceRange.max < 100000 ? priceRange.max : undefined,
           sortBy: sortBy === 'price-low' || sortBy === 'price-high' ? 'basePrice' : sortBy,
           sortOrder: sortBy === 'price-low' ? 'asc' : 'desc',
           inStock: inStockOnly || undefined,
           minRating: selectedRating > 0 ? selectedRating : undefined
         };
-        
-        console.log('Fetching products with params:', params);
         
         const response = await productService.getPublicProducts(params);
 
@@ -177,7 +169,7 @@ const Products = () => {
 
   // Clear all filters
   const clearAllFilters = () => {
-    setPriceRange({ min: 0, max: 1000 });
+    setPriceRange({ min: 0, max: 100000 });
     setSelectedRating(0);
     setSelectedCategory('All');
     setCategoryName('');
@@ -194,7 +186,7 @@ const Products = () => {
   const activeFiltersCount = (selectedCategory !== 'All' ? 1 : 0) +
     (selectedSubcategory ? 1 : 0) +
     (selectedRating > 0 ? 1 : 0) +
-    (priceRange.min > 0 || priceRange.max < 1000 ? 1 : 0) +
+    (priceRange.min > 0 || priceRange.max < 100000 ? 1 : 0) +
     (inStockOnly ? 1 : 0);
 
   return (
@@ -261,7 +253,7 @@ const Products = () => {
                   <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0" />
                 </button>
                 {showSortDropdown && (
-                  <div className="absolute right-0 z-10 w-56 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                  <div className="absolute right-0 z-50 w-56 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
                     <div className="py-1">
                       {[
                         { value: 'createdAt', label: 'Newest First' },
@@ -343,16 +335,16 @@ const Products = () => {
                           <input
                             type="number"
                             placeholder="Min"
-                            value={priceRange.min}
-                            onChange={(e) => setPriceRange({ ...priceRange, min: Number(e.target.value) })}
+                            value={priceRange.min || ''}
+                            onChange={(e) => setPriceRange({ ...priceRange, min: Number(e.target.value) || 0 })}
                             className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-amber-500 focus:border-amber-500"
                           />
                           <span className="text-gray-500">to</span>
                           <input
                             type="number"
                             placeholder="Max"
-                            value={priceRange.max}
-                            onChange={(e) => setPriceRange({ ...priceRange, max: Number(e.target.value) })}
+                            value={priceRange.max < 100000 ? priceRange.max : ''}
+                            onChange={(e) => setPriceRange({ ...priceRange, max: Number(e.target.value) || 100000 })}
                             className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-amber-500 focus:border-amber-500"
                           />
                         </div>

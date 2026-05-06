@@ -9,7 +9,21 @@ import { companyInfoService, PublicCompanyInfo } from "@/services/companyInfoSer
 
 const MainFooterContent = () => {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [companyInfo, setCompanyInfo] = useState<PublicCompanyInfo>(() => companyInfoService.getCachedCompanyInfo());
+  const [companyInfo, setCompanyInfo] = useState<PublicCompanyInfo>({
+    companyName: 'M2C MarkDowns Private Limited',
+    companyLogo: null,
+    companyEmail: null,
+    companyPhone: null,
+    companyWebsite: null,
+    registeredAddress: null,
+    city: null,
+    state: null,
+    country: null,
+    zipCode: null,
+    socialInstagram: null,
+    socialFacebook: null,
+    socialYoutube: null,
+  });
 
   useEffect(() => {
     const fetchCategories = async () => {
