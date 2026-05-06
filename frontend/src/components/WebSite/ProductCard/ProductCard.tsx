@@ -20,21 +20,26 @@ interface ProductCardProps {
 const ProductCard = ({ product }: ProductCardProps) => {
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
-  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
   // Check if user is authenticated
   const isAuthenticated = userAuthService.isAuthenticated();
 
-  // Check if product is in wishlist on mount
+  // Check wishlist status from cache + listen for changes
   useEffect(() => {
-    if (isAuthenticated) {
-      // For authenticated users, check via API (can be implemented later)
-      setIsInWishlist(false);
-    } else {
-      // Not authenticated - wishlist status is false
-      setIsInWishlist(false);
-    }
+    if (!isAuthenticated) return;
+
+    // Initial check from cache (instant) then preload if needed
+    setIsInWishlist(wishlistService.isInWishlistSync(product.id));
+    wishlistService.preloadIds().then(ids => setIsInWishlist(ids.has(product.id)));
+
+    // Listen for wishlist changes from other components
+    const handler = (e: Event) => {
+      const ids = (e as CustomEvent).detail.ids as string[];
+      setIsInWishlist(ids.includes(product.id));
+    };
+    window.addEventListener('wishlist-changed', handler);
+    return () => window.removeEventListener('wishlist-changed', handler);
   }, [product.id, isAuthenticated]);
 
   // Handle Add to Cart
@@ -104,24 +109,26 @@ const ProductCard = ({ product }: ProductCardProps) => {
       return;
     }
 
-    setIsTogglingWishlist(true);
+    // Optimistic update — UI changes instantly
+    const wasInWishlist = isInWishlist;
+    setIsInWishlist(!wasInWishlist);
 
     try {
-      // Toggle via API
-      if (isInWishlist) {
+      if (wasInWishlist) {
         await wishlistService.removeFromWishlist(product.id);
-        setIsInWishlist(false);
         showSuccessToast('Removed', `${product.name} removed from wishlist`);
       } else {
         await wishlistService.addToWishlist(product.id);
-        setIsInWishlist(true);
         showSuccessToast('Added', `${product.name} added to wishlist`);
       }
     } catch (error: any) {
-      console.error('Error toggling wishlist:', error);
-      showErrorToast('Failed', error.message || 'Unable to update wishlist');
-    } finally {
-      setIsTogglingWishlist(false);
+      if (error.message?.includes('already in wishlist')) {
+        setIsInWishlist(true);
+      } else {
+        // Revert on failure
+        setIsInWishlist(wasInWishlist);
+        showErrorToast('Failed', error.message || 'Unable to update wishlist');
+      }
     }
   };
 
@@ -178,7 +185,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
   const isActuallyInStock = currentStock > 0;
 
   return (
-    <Link href={`/products/${product.id}`} className="block h-full">
+    <Link href={`/products/${product.slug || product.id}`} className="block h-full">
       <div className="bg-white font-sans rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col cursor-pointer">
         <div className="relative h-48 sm:h-64 md:h-72 w-full overflow-hidden shrink-0 bg-linear-to-br from-gray-100 to-gray-200">
           <Image
@@ -201,7 +208,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
           {/* Wishlist Button */}
           <button
             onClick={handleToggleWishlist}
-            disabled={isTogglingWishlist}
+            disabled={false}
             className={`absolute top-2 right-2 p-1.5 sm:p-2 rounded-full transition-all duration-200 ${isInWishlist
               ? 'bg-red-500 text-white hover:bg-red-600'
               : 'bg-white/90 text-gray-700 hover:bg-white hover:text-red-500'

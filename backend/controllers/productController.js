@@ -4,6 +4,28 @@ const {
   resolveVariantImageUrls,
 } = require('../config/cloudinary');
 
+const generateSlug = (name) => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+};
+
+const generateUniqueSlug = async (name, excludeId = null) => {
+  let slug = generateSlug(name);
+  let suffix = 0;
+  let candidate = slug;
+
+  while (true) {
+    const existing = await prisma.product.findUnique({ where: { slug: candidate } });
+    if (!existing || (excludeId && existing.id === excludeId)) return candidate;
+    suffix++;
+    candidate = `${slug}-${suffix}`;
+  }
+};
+
 // Uploads any base64 data URIs in `images` and `variants[].images` to
 // Cloudinary and replaces them with secure URLs. Mutates and returns input.
 const ensureImageUrls = async ({ images, variants }) => {
@@ -173,6 +195,9 @@ const createProduct = async (req, res) => {
         baseStockValue = productStock;
       }
 
+      // Generate unique slug
+      const slug = await generateUniqueSlug(name);
+
       // Create product
       const product = await tx.product.create({
         data: {
@@ -180,6 +205,7 @@ const createProduct = async (req, res) => {
           inventoryItemId: isFromInventory ? inventoryItemId : null,
           isFromInventory: isFromInventory || false,
           name,
+          slug,
           description,
           category,
           subCategory,
@@ -1502,6 +1528,9 @@ const createProductByAdmin = async (req, res) => {
         baseStockValue = productStock;
       }
 
+      // Generate unique slug
+      const adminSlug = await generateUniqueSlug(name);
+
       // Create product
       const product = await tx.product.create({
         data: {
@@ -1509,6 +1538,7 @@ const createProductByAdmin = async (req, res) => {
           inventoryItemId: isFromInventory ? inventoryItemId : null,
           isFromInventory: isFromInventory || false,
           name,
+          slug: adminSlug,
           description,
           category,
           subCategory,
@@ -2237,6 +2267,7 @@ const getPublicProducts = async (req, res) => {
       select: {
         id: true,
         name: true,
+        slug: true,
         description: true,
         category: true,
         subCategory: true,
@@ -2315,15 +2346,20 @@ const getPublicProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Support both slug and ID lookup
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const where = {
+      ...(isObjectId ? { id } : { slug: id }),
+      status: 'ACTIVE',
+      approvalStatus: 'APPROVED'
+    };
+
     const product = await prisma.product.findFirst({
-      where: {
-        id,
-        status: 'ACTIVE',
-        approvalStatus: 'APPROVED'
-      },
+      where,
       select: {
         id: true,
         name: true,
+        slug: true,
         description: true,
         category: true,
         subCategory: true,

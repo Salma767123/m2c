@@ -204,10 +204,19 @@ const Header = () => {
 
     loadCounts();
 
-    // Reload counts periodically
-    const interval = setInterval(loadCounts, 5000);
+    // Listen for instant wishlist changes instead of polling
+    const wishlistHandler = (e: Event) => {
+      setWishlistCount((e as CustomEvent).detail.count);
+    };
+    window.addEventListener('wishlist-changed', wishlistHandler);
 
-    return () => clearInterval(interval);
+    // Reload cart count periodically (wishlist is event-driven now)
+    const interval = setInterval(loadCounts, 30000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('wishlist-changed', wishlistHandler);
+    };
   }, [isUserLoggedIn]);
 
   // Load Popular Searches (Subcategories)

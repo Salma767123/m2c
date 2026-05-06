@@ -88,8 +88,8 @@ export default function SharedWishlistPage() {
                   const product = item.product;
 
                   return (
-                    <div key={item.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                      <Link href={`/products/${product.id}`}>
+                    <div key={item.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
+                      <Link href={`/products/${product.slug || product.id}`}>
                         <div className="relative h-64">
                           <img
                             src={product.image || '/assets/images/placeholder.jpg'}
@@ -109,36 +109,39 @@ export default function SharedWishlistPage() {
                         </div>
                       </Link>
 
-                      <div className="p-4">
-                        <Link href={`/products/${product.id}`}>
-                          <h3 className="font-medium text-gray-900 mb-1 line-clamp-2 hover:text-gray-700">{product.name}</h3>
-                        </Link>
-                        <p className="text-xs text-gray-500 mb-2">{product.category}</p>
+                      <div className="p-4 flex flex-col flex-1">
+                        <div className="flex-1">
+                          <Link href={`/products/${product.slug || product.id}`}>
+                            <h3 className="font-medium text-gray-900 mb-1 line-clamp-2 hover:text-gray-700">{product.name}</h3>
+                          </Link>
+                          <p className="text-xs text-gray-500 mb-2">{product.category}</p>
 
-                        {product.rating && product.rating > 0 && (
-                          <div className="flex items-center gap-1 mb-2">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star key={i} className={`w-3 h-3 ${i < Math.floor(product.rating!) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
-                            ))}
-                            {product.reviews !== undefined && <span className="text-xs text-gray-500 ml-1">({product.reviews})</span>}
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-gray-900">
-                            ${(product.adminFixedPrice ?? product.basePrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                          {product.originalPrice && product.originalPrice > (product.adminFixedPrice ?? product.basePrice) && (
-                            <span className="text-sm text-gray-400 line-through">
-                              ${product.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
+                          {product.rating && product.rating > 0 && (
+                            <div className="flex items-center gap-1 mb-2">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star key={i} className={`w-3 h-3 ${i < Math.floor(product.rating!) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                              ))}
+                              {product.reviews !== undefined && <span className="text-xs text-gray-500 ml-1">({product.reviews})</span>}
+                            </div>
                           )}
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg font-bold text-gray-900">
+                              ${(product.adminFixedPrice ?? product.basePrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            {product.originalPrice && product.originalPrice > (product.adminFixedPrice ?? product.basePrice) && (
+                              <span className="text-sm text-gray-400 line-through">
+                                ${product.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <Link
-                          href={`/products/${product.id}`}
-                          className="mt-3 w-full py-2 px-3 rounded text-sm font-medium bg-gray-800 text-white hover:bg-gray-900 transition-colors text-center block"
+                          href={`/products/${product.slug || product.id}`}
+                          className="mt-3 w-full py-2 px-3 rounded-lg text-sm font-medium bg-gray-800 text-white hover:bg-gray-900 transition-colors text-center flex items-center justify-center gap-1.5"
                         >
+                          <ShoppingCart className="w-4 h-4" />
                           View Product
                         </Link>
                       </div>

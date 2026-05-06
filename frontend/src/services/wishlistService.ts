@@ -5,6 +5,7 @@ export interface WishlistItem {
   productId: string;
   product?: {
     id: string;
+    slug?: string;
     name: string;
     image: string;
     basePrice: number;
@@ -30,12 +31,56 @@ export interface WishlistResponse {
 }
 
 class WishlistService {
+  // In-memory cache of wishlisted product IDs for instant UI
+  private _cachedIds: Set<string> = new Set();
+  private _cacheLoaded = false;
+  private _loadingPromise: Promise<void> | null = null;
+
+  // Preload all wishlist IDs (single API call, cached)
+  async preloadIds(): Promise<Set<string>> {
+    if (this._cacheLoaded) return this._cachedIds;
+    if (this._loadingPromise) { await this._loadingPromise; return this._cachedIds; }
+
+    this._loadingPromise = (async () => {
+      try {
+        const res = await this.getWishlist();
+        this._cachedIds = new Set((res.data?.items || []).map(i => i.productId));
+        this._cacheLoaded = true;
+      } catch { /* ignore */ }
+    })();
+    await this._loadingPromise;
+    this._loadingPromise = null;
+    return this._cachedIds;
+  }
+
+  // Synchronous check from cache (returns false if not loaded yet)
+  isInWishlistSync(productId: string): boolean {
+    return this._cachedIds.has(productId);
+  }
+
+  // Notify all listeners (dispatches custom event)
+  private _notify() {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('wishlist-changed', { detail: { ids: Array.from(this._cachedIds), count: this._cachedIds.size } }));
+    }
+  }
+
+  // Invalidate cache
+  invalidateCache() {
+    this._cacheLoaded = false;
+    this._cachedIds = new Set();
+  }
+
   // Add item to wishlist
   async addToWishlist(productId: string): Promise<WishlistResponse> {
     try {
+      this._cachedIds.add(productId);
+      this._notify();
       const response = await axios.post('/wishlist/add', { productId });
       return response.data;
     } catch (error: any) {
+      this._cachedIds.delete(productId);
+      this._notify();
       throw new Error(error.response?.data?.error || 'Failed to add item to wishlist');
     }
   }
@@ -53,9 +98,13 @@ class WishlistService {
   // Remove item from wishlist
   async removeFromWishlist(productId: string): Promise<WishlistResponse> {
     try {
+      this._cachedIds.delete(productId);
+      this._notify();
       const response = await axios.delete(`/wishlist/${productId}`);
       return response.data;
     } catch (error: any) {
+      this._cachedIds.add(productId);
+      this._notify();
       throw new Error(error.response?.data?.error || 'Failed to remove item from wishlist');
     }
   }

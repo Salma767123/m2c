@@ -199,9 +199,9 @@ const Wishlist = () => {
             if (!item.product) return null;
 
             return (
-              <div key={item.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <div key={item.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
                 {/* Product Image */}
-                <div className="relative h-64">
+                <div className="relative h-64 shrink-0">
                   <Image
                     src={item.product.image || '/placeholder.png'}
                     alt={item.product.name}
@@ -229,13 +229,14 @@ const Wishlist = () => {
                 </div>
 
                 {/* Product Info */}
-                <div className="p-4">
-                  <div className="mb-2">
-                    <span className="text-sm text-gray-600 font-medium">{item.product.category}</span>
-                  </div>
+                <div className="p-4 flex flex-col flex-1">
+                  <div className="flex-1">
+                    <div className="mb-2">
+                      <span className="text-sm text-gray-600 font-medium">{item.product.category}</span>
+                    </div>
 
                   <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                    <Link href={`/products/${item.productId}`} className="hover:text-gray-600 transition-colors">
+                    <Link href={`/products/${item.product?.slug || item.productId}`} className="hover:text-gray-600 transition-colors">
                       {item.product.name}
                     </Link>
                   </h3>
@@ -278,6 +279,7 @@ const Wishlist = () => {
                   <p className="text-xs text-gray-500 mb-3">
                     Added on {new Date(item.createdAt).toLocaleDateString()}
                   </p>
+                  </div>
 
                   {/* Action Buttons */}
                   <div className="flex space-x-2">

@@ -8,17 +8,17 @@ import Breadcrumb from '@/components/WebSite/Navigation/Breadcrumb';
 
 interface ProductDetailPageProps {
   params: Promise<{
-    id: string
+    slug: string
   }>
 }
 
 const ProductDetailPage = ({ params }: ProductDetailPageProps) => {
-  const { id } = use(params);
+  const { slug } = use(params);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <ProductDetail productId={id} />
+      <ProductDetail productSlug={slug} />
       <Footer />
     </div>
   );

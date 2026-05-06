@@ -2,6 +2,7 @@ import axios from '@/lib/axios';
 
 export interface PublicProduct {
   id: string;
+  slug?: string;
   name: string;
   description: string;
   category: string;
