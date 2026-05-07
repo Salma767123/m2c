@@ -225,7 +225,7 @@ const createCategory = async (req, res) => {
       image,
       metaTitle,
       metaDescription,
-      sortOrder = 0,
+      sortOrder,
       subcategories = []
     } = req.body;
 
@@ -269,29 +269,63 @@ const createCategory = async (req, res) => {
       }
     }
 
-    // Create category
-    const category = await prisma.category.create({
-      data: {
-        name,
-        description,
-        slug,
-        parentId: parentId || null,
-        status: status.toUpperCase(),
-        image,
-        metaTitle,
-        metaDescription,
-        sortOrder: parseInt(sortOrder),
-        createdBy: req.user?.id
-      },
-      include: {
-        parent: {
-          select: {
-            id: true,
-            name: true,
-            slug: true
+    // Determine target parent
+    const targetParentId = parentId || null;
+    let category;
+
+    await prisma.$transaction(async (tx) => {
+      // Get max order in the target group
+      const maxSortOrderAgg = await tx.category.aggregate({
+        where: { parentId: targetParentId },
+        _max: { sortOrder: true }
+      });
+      const maxOrder = maxSortOrderAgg._max.sortOrder !== null ? maxSortOrderAgg._max.sortOrder : -1;
+      const appendOrder = maxOrder + 1;
+
+      let finalSortOrder;
+      if (sortOrder !== undefined && sortOrder !== null && sortOrder !== '') {
+        finalSortOrder = parseInt(sortOrder);
+        if (isNaN(finalSortOrder) || finalSortOrder < 0) finalSortOrder = 0;
+        if (finalSortOrder > appendOrder) finalSortOrder = appendOrder;
+      } else {
+        finalSortOrder = appendOrder;
+      }
+
+      // If inserting in the middle, shift existing categories down to make space
+      if (finalSortOrder < appendOrder) {
+        await tx.category.updateMany({
+          where: {
+            parentId: targetParentId,
+            sortOrder: { gte: finalSortOrder }
+          },
+          data: { sortOrder: { increment: 1 } }
+        });
+      }
+
+      // Create category
+      category = await tx.category.create({
+        data: {
+          name,
+          description,
+          slug,
+          parentId: targetParentId,
+          status: status.toUpperCase(),
+          image,
+          metaTitle,
+          metaDescription,
+          sortOrder: finalSortOrder,
+          createdBy: req.user?.id
+        },
+        include: {
+          parent: {
+            select: {
+              id: true,
+              name: true,
+              slug: true
+            }
           }
         }
-      }
+      });
     });
 
     // Create subcategories if provided
@@ -439,21 +473,78 @@ const updateCategory = async (req, res) => {
     if (image !== undefined) updateData.image = image;
     if (metaTitle !== undefined) updateData.metaTitle = metaTitle;
     if (metaDescription !== undefined) updateData.metaDescription = metaDescription;
-    if (sortOrder !== undefined) updateData.sortOrder = parseInt(sortOrder);
 
-    const updatedCategory = await prisma.category.update({
-      where: { id },
-      data: updateData,
-      include: {
-        parent: {
-          select: {
-            id: true,
-            name: true,
-            slug: true
-          }
-        }
+    let newSortOrder = undefined;
+    if (sortOrder !== undefined) {
+      newSortOrder = parseInt(sortOrder);
+      if (isNaN(newSortOrder) || newSortOrder < 0) {
+        newSortOrder = 0;
       }
-    });
+    }
+
+    const currentSortOrder = existingCategory.sortOrder;
+    const targetParentId = updateData.parentId !== undefined ? updateData.parentId : existingCategory.parentId;
+
+    let updatedCategory;
+
+    // Handle sort order shifting
+    if (newSortOrder !== undefined && (newSortOrder !== currentSortOrder || targetParentId !== existingCategory.parentId)) {
+      await prisma.$transaction(async (tx) => {
+        // Get max order in the target group to clamp the newSortOrder
+        const maxSortOrderAgg = await tx.category.aggregate({
+          where: { parentId: targetParentId, id: { not: id } },
+          _max: { sortOrder: true }
+        });
+        const maxOrder = maxSortOrderAgg._max.sortOrder !== null ? maxSortOrderAgg._max.sortOrder + 1 : 0;
+        
+        if (newSortOrder > maxOrder) newSortOrder = maxOrder;
+
+        if (targetParentId === existingCategory.parentId) {
+          // Same parent, just shifting
+          if (newSortOrder > currentSortOrder) {
+            await tx.category.updateMany({
+              where: {
+                parentId: targetParentId,
+                sortOrder: { gt: currentSortOrder, lte: newSortOrder },
+                id: { not: id }
+              },
+              data: { sortOrder: { decrement: 1 } }
+            });
+          } else if (newSortOrder < currentSortOrder) {
+            await tx.category.updateMany({
+              where: {
+                parentId: targetParentId,
+                sortOrder: { gte: newSortOrder, lt: currentSortOrder },
+                id: { not: id }
+              },
+              data: { sortOrder: { increment: 1 } }
+            });
+          }
+        } else {
+          // Different parent: make space in new parent
+          await tx.category.updateMany({
+            where: {
+              parentId: targetParentId,
+              sortOrder: { gte: newSortOrder }
+            },
+            data: { sortOrder: { increment: 1 } }
+          });
+        }
+
+        updateData.sortOrder = newSortOrder;
+        updatedCategory = await tx.category.update({
+          where: { id },
+          data: updateData,
+          include: { parent: { select: { id: true, name: true, slug: true } } }
+        });
+      });
+    } else {
+      updatedCategory = await prisma.category.update({
+        where: { id },
+        data: updateData,
+        include: { parent: { select: { id: true, name: true, slug: true } } }
+      });
+    }
 
     // Handle subcategories update
     if (subcategories.length >= 0) { // Allow empty array to clear subcategories
@@ -1173,6 +1264,44 @@ const bulkUpdateSubcategoryStatus = async (req, res) => {
   }
 };
 
+// Reorder root categories (drag-and-drop)
+const reorderCategories = async (req, res) => {
+  try {
+    const { categoryOrders } = req.body; // Array of { id, sortOrder }
+
+    if (!categoryOrders || !Array.isArray(categoryOrders)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Category orders array is required'
+      });
+    }
+
+    // Update sort orders in a transaction
+    await prisma.$transaction(async (tx) => {
+      for (const { id, sortOrder } of categoryOrders) {
+        await tx.category.update({
+          where: { id },
+          data: {
+            sortOrder: parseInt(sortOrder),
+            updatedBy: req.user?.id
+          }
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Categories reordered successfully'
+    });
+  } catch (error) {
+    console.error('Reorder categories error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reorder categories'
+    });
+  }
+};
+
 // Reorder subcategories
 const reorderSubcategories = async (req, res) => {
   try {
@@ -1686,6 +1815,7 @@ module.exports = {
   deleteSubcategory,
   getSubcategoryById,
   bulkUpdateSubcategoryStatus,
+  reorderCategories,
   reorderSubcategories,
   moveSubcategory,
   getCategoryBreadcrumb,

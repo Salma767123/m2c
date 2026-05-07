@@ -46,18 +46,38 @@ exports.getCustomers = async (req, res) => {
 
         // Aggregate order counts and spending per customer
         const customerIds = customers.map(c => c.id);
-        const orderAggregations = await prisma.order.groupBy({
-            by: ['customerId'],
-            where: { customerId: { in: customerIds } },
-            _count: { id: true },
-            _sum: { totalAmount: true }
-        });
+        const [orderAggregations, reviewAggregations] = await Promise.all([
+            prisma.order.groupBy({
+                by: ['customerId'],
+                where: { customerId: { in: customerIds } },
+                _count: { id: true },
+                _sum: { totalAmount: true }
+            }),
+            // Aggregate approved review stats per customer
+            prisma.review.groupBy({
+                by: ['userId'],
+                where: {
+                    userId: { in: customerIds },
+                    status: 'APPROVED'
+                },
+                _count: { id: true },
+                _avg: { rating: true }
+            })
+        ]);
 
         const orderMap = {};
         for (const agg of orderAggregations) {
             orderMap[agg.customerId] = {
                 totalOrders: agg._count.id,
                 totalSpent: agg._sum.totalAmount || 0
+            };
+        }
+
+        const reviewMap = {};
+        for (const agg of reviewAggregations) {
+            reviewMap[agg.userId] = {
+                reviewsCount: agg._count.id,
+                averageRating: Math.round((agg._avg.rating || 0) * 10) / 10
             };
         }
 
@@ -83,7 +103,7 @@ exports.getCustomers = async (req, res) => {
                 lastLogin: c.lastLogin || c.createdAt,
                 totalOrders: orderMap[c.id]?.totalOrders || 0,
                 totalSpent: orderMap[c.id]?.totalSpent || 0,
-                loyaltyTier: 'Bronze', // Mock
+                // loyaltyTier: 'Bronze', // TODO: Re-enable when loyalty system is implemented
                 avatar: c.image,
                 address: {
                     addressLine1: address.address,
@@ -93,7 +113,9 @@ exports.getCustomers = async (req, res) => {
                     country: address.country
                 },
                 isEmailVerified: c.isVerified,
-                isPhoneVerified: !!c.phoneNumber
+                isPhoneVerified: !!c.phoneNumber,
+                averageRating: reviewMap[c.id]?.averageRating || null,
+                reviewsCount: reviewMap[c.id]?.reviewsCount || 0
             };
         });
 
@@ -129,40 +151,45 @@ exports.getCustomerById = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Customer not found' });
         }
 
-        // Get order stats
-        const orderAgg = await prisma.order.aggregate({
-            where: { customerId: id },
-            _count: { id: true },
-            _sum: { totalAmount: true }
-        });
-
-        // Get recent orders
-        const recentOrders = await prisma.order.findMany({
-            where: { customerId: id },
-            orderBy: { createdAt: 'desc' },
-            take: 10,
-            select: {
-                id: true,
-                orderId: true,
-                status: true,
-                totalAmount: true,
-                createdAt: true,
-                paymentStatus: true,
-                paymentMethod: true,
-                items: {
-                    select: {
-                        id: true,
-                        productName: true,
-                        productImage: true,
-                        quantity: true,
-                        unitPrice: true,
-                        totalPrice: true,
-                        size: true,
-                        color: true
+        // Get order stats, review stats, and recent orders in parallel
+        const [orderAgg, reviewAgg, recentOrders] = await Promise.all([
+            prisma.order.aggregate({
+                where: { customerId: id },
+                _count: { id: true },
+                _sum: { totalAmount: true }
+            }),
+            prisma.review.aggregate({
+                where: { userId: id, status: 'APPROVED' },
+                _count: { id: true },
+                _avg: { rating: true }
+            }),
+            prisma.order.findMany({
+                where: { customerId: id },
+                orderBy: { createdAt: 'desc' },
+                take: 10,
+                select: {
+                    id: true,
+                    orderId: true,
+                    status: true,
+                    totalAmount: true,
+                    createdAt: true,
+                    paymentStatus: true,
+                    paymentMethod: true,
+                    items: {
+                        select: {
+                            id: true,
+                            productName: true,
+                            productImage: true,
+                            quantity: true,
+                            unitPrice: true,
+                            totalPrice: true,
+                            size: true,
+                            color: true
+                        }
                     }
                 }
-            }
-        });
+            })
+        ]);
 
         let currentStatus = 'pending';
         if (customer.isActive && customer.isVerified) currentStatus = 'active';
@@ -184,6 +211,8 @@ exports.getCustomerById = async (req, res) => {
                 addresses: customer.addresses || [],
                 totalOrders: orderAgg._count.id,
                 totalSpent: orderAgg._sum.totalAmount || 0,
+                averageRating: reviewAgg._avg.rating ? Math.round(reviewAgg._avg.rating * 10) / 10 : null,
+                reviewsCount: reviewAgg._count.id || 0,
                 recentOrders
             }
         });

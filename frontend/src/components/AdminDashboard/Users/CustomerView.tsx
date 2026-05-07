@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Clock,
   Package,
-  Eye
+  Eye,
+  Star
 } from 'lucide-react'
 
 interface CustomerViewProps {
@@ -122,7 +123,7 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
                 )}
               </div>
               <h2 className="text-xl font-bold text-gray-900">{customer.name}</h2>
-              <p className="text-sm text-gray-500 mt-1">ID: {customer.id}</p>
+              <p className="text-sm text-gray-500 mt-1">Joined {new Date(customer.joinDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
               <div className="mt-3">{getStatusBadge(customer.status)}</div>
             </div>
 
@@ -171,7 +172,7 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
         {/* Right Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <Card className="border border-gray-200">
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
@@ -195,6 +196,23 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
                   <div>
                     <p className="text-sm text-gray-500">Total Spent</p>
                     <p className="text-2xl font-bold text-gray-900">₹{customer.totalSpent?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-50 rounded-lg">
+                    <Star className="h-5 w-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Reviews</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {customer.averageRating ? `${customer.averageRating} ★` : '—'}
+                    </p>
+                    <p className="text-xs text-gray-400">{customer.reviewsCount || 0} review{customer.reviewsCount !== 1 ? 's' : ''}</p>
                   </div>
                 </div>
               </CardContent>

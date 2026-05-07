@@ -229,23 +229,21 @@ export default function BagTypeModal({ isOpen, onClose, mode, bagType, onSubmit,
           </div>
 
           {/* Sort Order + Active */}
-          <div className={`grid gap-4 ${mode === 'create' ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {mode !== 'create' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order <span className="text-xs text-gray-400 font-normal">(lower = first)</span></label>
-                {isViewMode ? (
-                  <p className="text-gray-900">{formData.sortOrder}</p>
-                ) : (
-                  <input
-                    type="number"
-                    value={formData.sortOrder}
-                    onChange={e => setFormData(prev => ({ ...prev, sortOrder: Math.max(0, parseInt(e.target.value) || 0) }))}
-                    min="0"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
-                  />
-                )}
-              </div>
-            )}
+          <div className="grid gap-4 grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order <span className="text-xs text-gray-400 font-normal">(lower = first)</span></label>
+              {isViewMode ? (
+                <p className="text-gray-900">{formData.sortOrder}</p>
+              ) : (
+                <input
+                  type="number"
+                  value={formData.sortOrder}
+                  onChange={e => setFormData(prev => ({ ...prev, sortOrder: Math.max(0, parseInt(e.target.value) || 0) }))}
+                  min="0"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
+                />
+              )}
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               {isViewMode ? (

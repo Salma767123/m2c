@@ -927,7 +927,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium text-gray-900">{product.vendor.companyName}</p>
-                <p className="text-xs text-gray-500">ID: {product.vendor.id}</p>
+                <p className="text-xs text-gray-500">{product.vendor.ownerName}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">Owner</p>

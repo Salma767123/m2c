@@ -6,6 +6,7 @@ const {
     createBagType,
     updateBagType,
     deleteBagType,
+    reorderBagTypes,
 } = require('../controllers/bagTypeController');
 const { authenticateToken, requireAdminRole } = require('../middleware/auth');
 
@@ -17,6 +18,7 @@ router.get('/active', getActiveBagTypes);
 // Admin routes
 router.post('/', authenticateToken, requireAdminRole, createBagType);
 router.get('/', authenticateToken, requireAdminRole, getBagTypes);
+router.patch('/reorder', authenticateToken, requireAdminRole, reorderBagTypes);
 router.get('/:id', authenticateToken, requireAdminRole, getBagType);
 router.put('/:id', authenticateToken, requireAdminRole, updateBagType);
 router.delete('/:id', authenticateToken, requireAdminRole, deleteBagType);

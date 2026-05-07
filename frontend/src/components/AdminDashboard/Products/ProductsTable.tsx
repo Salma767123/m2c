@@ -458,7 +458,7 @@ export default function ProductsTable() {
                     </div>
                     <div>
                       <div className="font-medium text-gray-900">{product.name}</div>
-                      <div className="text-sm text-gray-500">ID: {product.id.slice(-8)}</div>
+                      <div className="text-sm text-gray-500">{product.vendor.companyName}</div>
                     </div>
                   </div>
                 </TableCell>

@@ -21,7 +21,7 @@ export interface Customer {
     lastLogin: string;
     totalOrders: number;
     totalSpent: number;
-    loyaltyTier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+    loyaltyTier?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum'; // TODO: Re-enable when loyalty system is implemented
     avatar?: string;
     address: UserAddress;
     isEmailVerified: boolean;

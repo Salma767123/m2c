@@ -65,6 +65,12 @@ class BagTypeService {
         const response = await axios.delete(`/bag-types/${id}`);
         return response.data;
     }
+
+    // Admin: reorder bag types
+    async reorderBagTypes(bagTypeOrders: { id: string; sortOrder: number }[]): Promise<{ success: boolean; message: string }> {
+        const response = await axios.patch('/bag-types/reorder', { bagTypeOrders });
+        return response.data;
+    }
 }
 
 export const bagTypeService = new BagTypeService();

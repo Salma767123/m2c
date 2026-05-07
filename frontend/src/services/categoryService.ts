@@ -275,6 +275,12 @@ class CategoryService {
     return response.data;
   }
 
+  // Reorder root categories (drag-and-drop)
+  async reorderCategories(categoryOrders: { id: string; sortOrder: number }[]): Promise<{ message: string }> {
+    const response = await axiosInstance.patch('/categories/reorder', { categoryOrders });
+    return response.data;
+  }
+
   // Reorder subcategories
   async reorderSubcategories(parentId: string, subcategoryOrders: { id: string; sortOrder: number }[]): Promise<{ message: string }> {
     const response = await axiosInstance.patch(`/categories/${parentId}/subcategories/reorder`, { subcategoryOrders });

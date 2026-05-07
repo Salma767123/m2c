@@ -14,6 +14,7 @@ const {
   deleteSubcategory,
   getSubcategoryById,
   bulkUpdateSubcategoryStatus,
+  reorderCategories,
   reorderSubcategories,
   moveSubcategory,
   getCategoryBreadcrumb,
@@ -42,6 +43,7 @@ router.put('/:id', requireRole('admin'), requirePermission('edit_categories'), u
 router.delete('/:id', requireRole('admin'), requirePermission('delete_categories'), deleteCategory);
 router.post('/:id/duplicate', requireRole('admin'), requirePermission('create_categories'), duplicateCategory);
 router.patch('/bulk-status', requireRole('admin'), requirePermission('edit_categories'), bulkUpdateStatus);
+router.patch('/reorder', requireRole('admin'), requirePermission('edit_categories'), reorderCategories);
 
 // Subcategory management routes
 router.post('/:parentId/subcategories', requireRole('admin'), requirePermission('create_categories'), createSubcategory);
