@@ -481,6 +481,7 @@ export default function UserManagement() {
                             size="sm"
                             className="hover:bg-gray-100"
                             title="View User Details"
+                            onClick={() => router.push(`/admin/dashboard/users/view/${user.id}`)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>

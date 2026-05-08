@@ -33,12 +33,12 @@ export default function BagTypeModal({ isOpen, onClose, mode, bagType, onSubmit,
       setFormData({
         name: bagType?.name || '',
         description: bagType?.description || '',
-        price: mode === 'create' ? bagType?.price || undefined : (bagType?.price ?? 0),
+        price: bagType?.price ?? (mode === 'create' ? undefined : 0),
         priceINR: bagType?.priceINR ?? null,
         priceUSD: bagType?.priceUSD ?? null,
         image: bagType?.image || '',
         isActive: bagType?.isActive ?? true,
-        sortOrder: mode === 'create' ? undefined : (bagType?.sortOrder ?? 0),
+        sortOrder: bagType?.sortOrder ?? 0,
       });
       setImagePreview(bagType?.image || '');
     }
