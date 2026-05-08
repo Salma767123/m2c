@@ -11,7 +11,7 @@ import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
-import { formatPrice, getRegionalPrice } from '@/lib/currency';
+import { formatPrice, getRegionalPrice, getRegionalOriginalPrice } from '@/lib/currency';
 
 interface ProductCardProps {
   product: ServiceProduct | PublicProduct | MockProduct;
@@ -173,6 +173,11 @@ const ProductCard = ({ product }: ProductCardProps) => {
     displayPrice = (product as any).price;
   }
 
+  // Compute region-aware original price (e.g. originalPriceUSD for US region)
+  const regionalOriginalPrice = isServiceProduct(product)
+    ? getRegionalOriginalPrice(product as any)
+    : (product as any).originalPrice ?? null;
+
   // Derive actual stock — use totalStock, treat negative as 0
   const currentStock = isServiceProduct(product)
     ? Math.max(product.totalStock ?? 0, 0)
@@ -257,9 +262,9 @@ const ProductCard = ({ product }: ProductCardProps) => {
                 <span className="text-lg sm:text-xl font-bold text-gray-900">
                   {formatPrice(displayPrice || 0)}
                 </span>
-                {product.originalPrice ? (
+                {regionalOriginalPrice && regionalOriginalPrice > (displayPrice || 0) ? (
                   <span className="text-xs text-red-600 line-through">
-                    {formatPrice(product.originalPrice)}
+                    {formatPrice(regionalOriginalPrice)}
                   </span>
                 ) : null}
               </div>
