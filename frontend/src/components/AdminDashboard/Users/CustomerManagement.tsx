@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { userManagementService, Customer } from '@/services/userManagementService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
@@ -37,6 +37,7 @@ import {
 
 
 const PAGE_SIZE = 10;
+const REFRESH_INTERVAL_MS = 30000;
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -56,13 +57,48 @@ export default function CustomerManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [loyaltyFilter, setLoyaltyFilter] = useState<string>('all');
+  // const [loyaltyFilter, setLoyaltyFilter] = useState<string>('all'); // TODO: Re-enable when loyalty system is implemented
   const [currentPage, setCurrentPage] = useState(1);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchCustomersRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    fetchCustomersRef.current = fetchCustomers;
+  });
 
   useEffect(() => {
     setCurrentPage(1);
     fetchCustomers();
-  }, [searchTerm, statusFilter, loyaltyFilter]);
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const startPolling = () => {
+      if (timer) return;
+      timer = setInterval(() => fetchCustomersRef.current(), REFRESH_INTERVAL_MS);
+    };
+    const stopPolling = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchCustomersRef.current();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [searchTerm, statusFilter]);
 
   const fetchCustomers = async () => {
     try {
@@ -72,9 +108,10 @@ export default function CustomerManagement() {
       const data = await userManagementService.getCustomers({
         search: searchTerm,
         status: statusFilter,
-        loyalty: loyaltyFilter
+        // loyalty: loyaltyFilter // TODO: Re-enable when loyalty system is implemented
       });
       setCustomers(data);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to fetch customers', error);
     } finally {
@@ -116,20 +153,21 @@ export default function CustomerManagement() {
     }
   };
 
-  const getLoyaltyBadge = (tier: string) => {
-    switch (tier) {
-      case 'Bronze':
-        return <Badge className="bg-amber-100 text-amber-800">Bronze</Badge>;
-      case 'Silver':
-        return <Badge className="bg-gray-100 text-gray-800">Silver</Badge>;
-      case 'Gold':
-        return <Badge className="bg-yellow-100 text-yellow-800">Gold</Badge>;
-      case 'Platinum':
-        return <Badge className="bg-slate-100 text-slate-800">Platinum</Badge>;
-      default:
-        return <Badge className="bg-gray-100 text-gray-800">Bronze</Badge>;
-    }
-  };
+  // TODO: Re-enable when loyalty system is implemented
+  // const getLoyaltyBadge = (tier: string) => {
+  //   switch (tier) {
+  //     case 'Bronze':
+  //       return <Badge className="bg-amber-100 text-amber-800">Bronze</Badge>;
+  //     case 'Silver':
+  //       return <Badge className="bg-gray-100 text-gray-800">Silver</Badge>;
+  //     case 'Gold':
+  //       return <Badge className="bg-yellow-100 text-yellow-800">Gold</Badge>;
+  //     case 'Platinum':
+  //       return <Badge className="bg-slate-100 text-slate-800">Platinum</Badge>;
+  //     default:
+  //       return <Badge className="bg-gray-100 text-gray-800">Bronze</Badge>;
+  //   }
+  // };
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -238,7 +276,7 @@ export default function CustomerManagement() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 <Search className="w-4 h-4 inline mr-2" />
                 Search Customers
@@ -268,6 +306,7 @@ export default function CustomerManagement() {
               />
             </div>
 
+            {/* TODO: Re-enable when loyalty system is implemented
             <div>
               <Dropdown
                 label="Loyalty Tier"
@@ -284,7 +323,13 @@ export default function CustomerManagement() {
                 placeholder="Select loyalty tier"
               />
             </div>
+            */}
           </div>
+          {lastUpdated && (
+            <p className="text-xs text-gray-500 mt-4 text-right">
+              Auto-updates every 30s &middot; Last updated {lastUpdated.toLocaleTimeString("en-IN")}
+            </p>
+          )}
         </CardContent>
       </Card>
       {/* Customers Table */}
@@ -304,7 +349,7 @@ export default function CustomerManagement() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Loyalty Tier</TableHead>
+                {/* <TableHead>Loyalty Tier</TableHead> */}
                 <TableHead>Orders & Spending</TableHead>
                 <TableHead>Rating</TableHead>
                 <TableHead>Last Login</TableHead>
@@ -314,7 +359,7 @@ export default function CustomerManagement() {
             <TableBody>
               {filteredCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
+                  <TableCell colSpan={7} className="text-center py-12">
                     <div className="text-gray-500">
                       <p className="text-lg font-medium">No customers found</p>
                       <p className="text-sm">Try adjusting your search or filter criteria</p>
@@ -341,7 +386,7 @@ export default function CustomerManagement() {
                         </div>
                         <div>
                           <div className="font-medium">{customer.firstName} {customer.lastName}</div>
-                          <div className="text-sm text-gray-500">ID: {customer.id}</div>
+                          <div className="text-sm text-gray-500">{customer.email}</div>
                         </div>
                       </div>
                     </TableCell>
@@ -364,7 +409,7 @@ export default function CustomerManagement() {
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(customer.status)}</TableCell>
-                    <TableCell>{getLoyaltyBadge(customer.loyaltyTier)}</TableCell>
+                    {/* <TableCell>{getLoyaltyBadge(customer.loyaltyTier)}</TableCell> */}
                     <TableCell>
                       <div className="text-sm">
                         <div className="font-medium">{customer.totalOrders} orders</div>

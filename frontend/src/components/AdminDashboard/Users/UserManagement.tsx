@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { userManagementService, Staff } from '@/services/userManagementService';
 import { roleService, Role } from '@/services/roleService';
 import { hasPermission } from '@/lib/auth';
@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 
 const PAGE_SIZE = 10;
+const REFRESH_INTERVAL_MS = 30000;
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -62,11 +63,48 @@ export default function UserManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; email: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Use a ref to always call the latest fetchStaff inside setInterval without resetting the interval
+  const fetchStaffRef = useRef<() => void>(() => {});
+
+  // Update the ref to the latest fetchStaff on every render
+  useEffect(() => {
+    fetchStaffRef.current = fetchStaff;
+  });
 
   useEffect(() => {
     setCurrentPage(1);
     fetchStaff();
     fetchRoles();
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const startPolling = () => {
+      if (timer) return;
+      timer = setInterval(() => fetchStaffRef.current(), REFRESH_INTERVAL_MS);
+    };
+    const stopPolling = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchStaffRef.current();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, roleFilter, statusFilter]);
 
@@ -89,6 +127,7 @@ export default function UserManagement() {
         status: statusFilter === 'all' ? undefined : statusFilter,
       });
       setUsers(data);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to fetch staff', error);
     }
@@ -336,6 +375,11 @@ export default function UserManagement() {
               />
             </div>
           </div>
+          {lastUpdated && (
+            <p className="text-xs text-gray-500 mt-4 text-right">
+              Auto-updates every 30s &middot; Last updated {lastUpdated.toLocaleTimeString("en-IN")}
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -392,7 +436,7 @@ export default function UserManagement() {
                         </div>
                         <div>
                           <div className="font-medium">{user.firstName} {user.lastName}</div>
-                          <div className="text-sm text-gray-500">ID: {user.id}</div>
+                          <div className="text-sm text-gray-500">{user.email}</div>
                         </div>
                       </div>
                     </TableCell>
