@@ -34,7 +34,7 @@ export default function AdminRegistration() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo)
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null)
   const [emailError, setEmailError] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const [passwordStrength, setPasswordStrength] = useState("")

@@ -17,7 +17,7 @@ interface LeftSideContentProps {
 }
 
 export default function LeftSideContent({ isLogin }: LeftSideContentProps) {
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo)
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null)
 
   useEffect(() => {
     companyInfoService.getPublicCompanyInfo().then(info => {

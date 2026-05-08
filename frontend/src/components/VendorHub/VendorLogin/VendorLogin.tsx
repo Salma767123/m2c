@@ -30,7 +30,7 @@ export default function VendorLogin() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [emailError, setEmailError] = useState("")
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo)
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null)
 
   const emailInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()

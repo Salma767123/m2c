@@ -55,7 +55,7 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [emailError, setEmailError] = useState("")
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo)
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null)
   const [googleAccountEmail, setGoogleAccountEmail] = useState<string | null>(null)
   const [accessDeniedError, setAccessDeniedError] = useState(false)
 

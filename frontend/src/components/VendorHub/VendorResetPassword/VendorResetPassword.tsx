@@ -36,7 +36,7 @@ export default function VendorResetPassword() {
   
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo)
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [passwordReset, setPasswordReset] = useState(false)
   const [errors, setErrors] = useState<ValidationErrors>({})

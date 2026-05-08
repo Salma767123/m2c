@@ -194,9 +194,6 @@ const createOrder = async (req, res) => {
         // Group vendor totals for Settlements (Now calculated in the main cart loop)
 
         const datePeriod = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-        // Set due date to 7 days from now
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 7);
 
         // Use transaction to ensure data integrity
         const result = await prisma.$transaction(async (tx) => {
@@ -377,7 +374,6 @@ const createOrder = async (req, res) => {
                     billingNumber: invoiceNo || orderDisplayId,
                     period: datePeriod,
                     amount: vData.amount,
-                    dueDate: dueDate,
                     status: 'Pending'
                 });
             }

@@ -1468,7 +1468,7 @@ model Settlement {
   billingNumber    String   // e.g. same as order invoice number
   period           String   // e.g. "February 2024"
   amount           Float
-  dueDate          DateTime
+  dueDate          DateTime?
   status           String   @default("Pending") // Pending, Processing, Paid, Failed
   paymentDate      DateTime?
   transactionId    String?

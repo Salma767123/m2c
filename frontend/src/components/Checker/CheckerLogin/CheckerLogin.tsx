@@ -33,7 +33,7 @@ interface LoginPageProps {
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [checkerID, setCheckerID] = useState("");
   const [password, setPassword] = useState("");
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [checkerIDError, setCheckerIDError] = useState("");

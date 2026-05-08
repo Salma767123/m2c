@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
+import { Card, CardContent } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import {
@@ -18,6 +18,10 @@ import {
   Warehouse,
   Check,
   X,
+  Truck,
+  Info,
+  Ruler,
+  Scale,
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -32,6 +36,7 @@ export default function ViewProduct({ productId }: ViewProductProps) {
   const router = useRouter()
   const [product, setProduct] = useState<Product | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedImage, setSelectedImage] = useState(0)
 
   useEffect(() => {
     if (productId) {
@@ -49,9 +54,9 @@ export default function ViewProduct({ productId }: ViewProductProps) {
         showErrorToast('Product Not Found', 'The requested product could not be found')
         router.push('/vendor/dashboard/products')
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading product:', error)
-      showErrorToast('Load Failed', error.message || 'Unable to load product details')
+      showErrorToast('Load Failed', 'Unable to load product details')
       router.push('/vendor/dashboard/products')
     } finally {
       setIsLoading(false)
@@ -60,35 +65,35 @@ export default function ViewProduct({ productId }: ViewProductProps) {
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'active': return 'bg-green-100 text-green-800'
-      case 'inactive': return 'bg-gray-100 text-gray-800'
-      case 'out_of_stock': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'active': return 'bg-green-100 text-green-800 border-green-200'
+      case 'inactive': return 'bg-gray-100 text-gray-800 border-gray-200'
+      case 'out_of_stock': return 'bg-red-100 text-red-800 border-red-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
   const getApprovalColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'approved': return 'bg-green-100 text-green-800'
-      case 'qc_approved': return 'bg-blue-100 text-blue-800'
-      case 'pending': return 'bg-yellow-100 text-yellow-800'
-      case 'rejected': return 'bg-red-100 text-red-800'
-      case 'reinspection': return 'bg-orange-100 text-orange-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'approved': return 'bg-green-100 text-green-800 border-green-200'
+      case 'qc_approved': return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-200'
+      case 'reinspection': return 'bg-orange-100 text-orange-800 border-orange-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
+        <nav className="flex items-center space-x-2 text-sm text-gray-600">
           <Link href="/vendor/dashboard" className="hover:text-gray-900 hover:underline">Dashboard</Link>
           <span className="text-gray-400">/</span>
           <Link href="/vendor/dashboard/products" className="hover:text-gray-900 hover:underline">Products</Link>
           <span className="text-gray-400">/</span>
-          <span className="text-gray-900 font-medium">Loading...</span>
+          <span className="text-gray-400">Loading...</span>
         </nav>
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-20">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700"></div>
           <span className="ml-3 text-gray-600">Loading product details...</span>
         </div>
@@ -99,17 +104,17 @@ export default function ViewProduct({ productId }: ViewProductProps) {
   if (!product) {
     return (
       <div className="space-y-6">
-        <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
+        <nav className="flex items-center space-x-2 text-sm text-gray-600">
           <Link href="/vendor/dashboard" className="hover:text-gray-900 hover:underline">Dashboard</Link>
           <span className="text-gray-400">/</span>
           <Link href="/vendor/dashboard/products" className="hover:text-gray-900 hover:underline">Products</Link>
           <span className="text-gray-400">/</span>
-          <span className="text-gray-900 font-medium">Product Not Found</span>
+          <span className="text-gray-900 font-medium">Not Found</span>
         </nav>
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-20">
           <div className="text-center">
-            <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">Product not found</p>
+            <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 font-medium text-lg">Product not found</p>
             <Button onClick={() => router.push('/vendor/dashboard/products')} className="mt-4">
               Back to Products
             </Button>
@@ -119,50 +124,57 @@ export default function ViewProduct({ productId }: ViewProductProps) {
     )
   }
 
+  const allImages = product.images?.filter(img => img.url) || []
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
+      <nav className="flex items-center space-x-2 text-sm text-gray-600">
         <Link href="/vendor/dashboard" className="hover:text-gray-900 hover:underline">Dashboard</Link>
         <span className="text-gray-400">/</span>
         <Link href="/vendor/dashboard/products" className="hover:text-gray-900 hover:underline">Products</Link>
         <span className="text-gray-400">/</span>
-        <span className="text-gray-900 font-medium">{product.name}</span>
+        <span className="text-gray-900 font-medium truncate max-w-50">{product.name}</span>
       </nav>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/vendor/dashboard/products')}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Products
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
-            <p className="text-gray-600">Product Details</p>
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push('/vendor/dashboard/products')}
+              className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 text-gray-600" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">{product.name}</h1>
+              <div className="flex items-center gap-2 mt-1.5">
+                <Badge className={`${getStatusColor(product.status)} text-xs`}>
+                  {product.status?.replace(/_/g, ' ')}
+                </Badge>
+                <Badge className={`${getApprovalColor(product.approvalStatus || 'pending')} text-xs`}>
+                  {product.approvalStatus?.replace(/_/g, ' ') || 'Pending'}
+                </Badge>
+                {product.baseSku && (
+                  <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                    SKU: {product.baseSku}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center space-x-3">
-          <Badge className={getStatusColor(product.status)}>
-            {product.status?.toLowerCase().replace('_', ' ')}
-          </Badge>
-          <Badge className={getApprovalColor(product.approvalStatus || 'pending')}>
-            {product.approvalStatus?.toLowerCase().replace('_', ' ') || 'pending'}
-          </Badge>
-          {product.approvalStatus !== 'APPROVED' && (
+          {product.approvalStatus !== 'APPROVED' ? (
             <Link href={`/vendor/dashboard/products/${productId}/edit`}>
               <Button className="bg-gray-900 text-white hover:bg-black">
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Product
               </Button>
             </Link>
-          )}
-          {product.approvalStatus === 'APPROVED' && (
-            <span className="text-xs text-gray-500 italic">Approved — only admin can edit</span>
+          ) : (
+            <span className="text-xs text-gray-500 italic bg-gray-50 px-3 py-2 rounded-lg border">
+              Approved — only admin can edit
+            </span>
           )}
         </div>
       </div>
@@ -171,375 +183,361 @@ export default function ViewProduct({ productId }: ViewProductProps) {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Product Images */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <ImageIcon className="h-5 w-5 mr-2" />
-                Product Images (General)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {product.images && product.images.length > 0 ? (
-                  product.images.map((image, index) => (
-                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
-                      <Image
-                        src={image.url}
-                        alt={image.alt || `${product.name} - Image ${index + 1}`}
-                        fill
-                        className="object-cover"
-                      />
-                      {image.isPrimary && (
-                        <div className="absolute top-2 left-2">
-                          <Badge className="bg-blue-100 text-blue-800 text-xs">Primary</Badge>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <div className="col-span-full text-center py-8 text-gray-500">
-                    <ImageIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                    <p>No images available</p>
-                  </div>
+          {/* Product Images — Gallery */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-gray-500" />
+                Product Images
+                {allImages.length > 0 && (
+                  <span className="text-xs font-normal text-gray-500">({allImages.length})</span>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Product Variants with Images */}
-          {product.hasVariants && product.variants && product.variants.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Layers className="h-5 w-5 mr-2" />
-                  Product Variants ({product.variants.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {/* Base Variant Stock */}
-                  <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        {(product as any).singleUnitColorHex && (
-                          <div
-                            className="w-10 h-10 rounded border-2 border-blue-300 shadow-sm"
-                            style={{ backgroundColor: (product as any).singleUnitColorHex }}
-                            title={(product as any).singleUnitColor || 'Base'}
-                          />
-                        )}
-                        <div>
-                          <h4 className="font-semibold text-gray-900">
-                            Base Unit {(product as any).singleUnitSize && (product as any).singleUnitColor ? `(${(product as any).singleUnitSize} - ${(product as any).singleUnitColor})` : ''}
-                          </h4>
-                          <p className="text-xs text-blue-600 font-medium">Base / Default Variant</p>
-                        </div>
+              </h2>
+            </div>
+            <div className="p-4">
+              {allImages.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Main image */}
+                  <div className="relative aspect-4/3 rounded-lg overflow-hidden bg-gray-50 border border-gray-100">
+                    <Image
+                      src={allImages[selectedImage]?.url}
+                      alt={allImages[selectedImage]?.alt || product.name}
+                      fill
+                      className="object-contain"
+                    />
+                    {allImages[selectedImage]?.isPrimary && (
+                      <div className="absolute top-3 left-3">
+                        <Badge className="bg-blue-600 text-white text-xs shadow-sm">Primary</Badge>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">₹{product.basePrice}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div className="bg-white p-3 rounded border">
-                        <p className="text-xs text-gray-500 mb-1">Vendor Price</p>
-                        <p className="text-sm font-semibold text-gray-900">₹{product.basePrice}</p>
-                      </div>
-                      <div className="bg-white p-3 rounded border">
-                        <p className="text-xs text-gray-500 mb-1">Stock</p>
-                        <p className="text-sm font-semibold text-blue-700">{product.inventory?.baseStock ?? 0} units</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
-
-                  {/* Individual Variants */}
-                  {product.variants.map((variant, index) => (
-                    <div key={variant.id || index} className="p-4 border rounded-lg bg-gray-50">
-                      {/* Variant Details */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          {variant.colorHex && (
-                            <div
-                              className="w-10 h-10 rounded border-2 border-gray-300 shadow-sm"
-                              style={{ backgroundColor: variant.colorHex }}
-                              title={variant.color}
-                            />
-                          )}
-                          <div>
-                            <h4 className="font-semibold text-gray-900">
-                              {variant.size} - {variant.color}
-                            </h4>
-                            <p className="text-xs text-gray-500 font-mono">{variant.sku}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">₹{variant.price}</p>
-                        </div>
-                      </div>
-
-                      {/* Variant Info Grid */}
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-white p-3 rounded border">
-                          <p className="text-xs text-gray-500 mb-1">Vendor Price</p>
-                          <p className="text-sm font-semibold text-gray-900">₹{variant.price}</p>
-                        </div>
-                        <div className="bg-white p-3 rounded border">
-                          <p className="text-xs text-gray-500 mb-1">Stock</p>
-                          <p className="text-sm font-semibold text-gray-900">{variant.stock} units</p>
-                        </div>
-                      </div>
-
-                      {/* Variant Images */}
-                      {variant.images && variant.images.length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700 mb-2">Variant Images</p>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {variant.images.map((imageUrl, imgIndex) => (
-                              <div key={imgIndex} className="relative aspect-square rounded-lg overflow-hidden border bg-white">
-                                <Image
-                                  src={imageUrl}
-                                  alt={`${variant.size} - ${variant.color} - Image ${imgIndex + 1}`}
-                                  fill
-                                  className="object-cover"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                  {/* Thumbnails */}
+                  {allImages.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {allImages.map((img, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedImage(idx)}
+                          className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
+                            selectedImage === idx
+                              ? 'border-gray-900 ring-1 ring-gray-900'
+                              : 'border-gray-200 hover:border-gray-400'
+                          }`}
+                        >
+                          <Image src={img.url} alt="" fill className="object-cover" />
+                        </button>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  <ImageIcon className="h-12 w-12 mx-auto mb-2" />
+                  <p className="text-sm">No images available</p>
+                </div>
+              )}
+            </div>
+          </div>
 
-          {/* Product Description */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="h-5 w-5 mr-2" />
+          {/* Description */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-gray-500" />
                 Product Description
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 leading-relaxed">{product.description}</p>
-            </CardContent>
-          </Card>
+              </h2>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{product.description}</p>
+            </div>
+          </div>
 
-          {/* Material Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Material Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Material & Specifications */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <Info className="h-4 w-4 text-gray-500" />
+                Specifications
+              </h2>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {product.fabricType && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Fabric Type</span>
-                    <span className="text-gray-900">{product.fabricType}</span>
-                  </div>
+                  <InfoField icon={<Layers className="h-3.5 w-3.5" />} label="Fabric Type" value={product.fabricType} />
                 )}
                 {product.material && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Material</span>
-                    <span className="text-gray-900">{product.material}</span>
-                  </div>
+                  <InfoField icon={<Package className="h-3.5 w-3.5" />} label="Material" value={product.material} />
                 )}
                 {product.fabricSpecifications?.composition && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Composition</span>
-                    <span className="text-gray-900">{product.fabricSpecifications.composition}</span>
-                  </div>
+                  <InfoField label="Composition" value={product.fabricSpecifications.composition} />
                 )}
                 {product.fabricSpecifications?.weight && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Weight</span>
-                    <span className="text-gray-900">{product.fabricSpecifications.weight}</span>
-                  </div>
-                )}
-                {product.baseSku && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Base SKU</span>
-                    <span className="text-gray-900 font-mono">{product.baseSku}</span>
-                  </div>
+                  <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Fabric Weight" value={product.fabricSpecifications.weight} />
                 )}
                 {product.dimensions && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Dimensions</span>
-                    <span className="text-gray-900">{product.dimensions}</span>
-                  </div>
+                  <InfoField icon={<Ruler className="h-3.5 w-3.5" />} label="Dimensions" value={product.dimensions} />
                 )}
                 {product.weight && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Weight</span>
-                    <span className="text-gray-900">{product.weight}</span>
-                  </div>
+                  <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Weight" value={product.weight} />
+                )}
+                {product.uom && (
+                  <InfoField label="Unit of Measure" value={product.uom} />
                 )}
                 {product.dispatchTimeline && (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Dispatch Timeline</span>
-                    <span className="text-gray-900">
-                      {product.dispatchTimeline.totalDays} days
-                      ({product.dispatchTimeline.processingDays} processing + {product.dispatchTimeline.shippingDays} shipping)
-                    </span>
-                  </div>
+                  <InfoField
+                    icon={<Truck className="h-3.5 w-3.5" />}
+                    label="Dispatch Timeline"
+                    value={`${product.dispatchTimeline.totalDays} days (${product.dispatchTimeline.processingDays}P + ${product.dispatchTimeline.shippingDays}S)`}
+                  />
                 )}
               </div>
 
               {product.fabricSpecifications?.careInstructions && product.fabricSpecifications.careInstructions.length > 0 && (
-                <div className="mt-4">
-                  <span className="text-sm font-medium text-gray-500">Care Instructions</span>
-                  <ul className="mt-1 space-y-1">
-                    {product.fabricSpecifications.careInstructions.map((instruction, index) => (
-                      <li key={index} className="text-gray-900 text-sm flex items-center">
-                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-2"></span>
+                <div className="mt-5 pt-4 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Care Instructions</p>
+                  <div className="flex flex-wrap gap-2">
+                    {product.fabricSpecifications.careInstructions.map((instruction: string, idx: number) => (
+                      <span key={idx} className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-100">
                         {instruction}
-                      </li>
+                      </span>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
 
               {product.tags && product.tags.length > 0 && (
-                <div className="mt-4">
-                  <span className="text-sm font-medium text-gray-500">Tags</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {product.tags.map((tag, index) => (
-                      <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {product.tags.map((tag, idx) => (
+                      <span key={idx} className="text-xs px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full">
                         {tag}
                       </span>
                     ))}
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+
+          {/* Variants */}
+          {product.hasVariants && product.variants && product.variants.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-gray-500" />
+                  Variants
+                  <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{product.variants.length}</span>
+                </h2>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {/* Base variant */}
+                <div className="p-4 bg-blue-50/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {(product as any).singleUnitColorHex && (
+                        <div className="w-8 h-8 rounded-lg border-2 border-blue-200 shadow-sm shrink-0" style={{ backgroundColor: (product as any).singleUnitColorHex }} />
+                      )}
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          Base Unit
+                          {(product as any).singleUnitSize && (product as any).singleUnitColor
+                            ? ` — ${(product as any).singleUnitSize} / ${(product as any).singleUnitColor}`
+                            : ''}
+                        </p>
+                        <p className="text-xs text-blue-600">Default variant</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">₹{product.basePrice}</p>
+                      <p className="text-xs text-gray-500">{product.inventory?.baseStock ?? 0} in stock</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Variants */}
+                {product.variants.map((variant, idx) => (
+                  <div key={variant.id || idx} className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        {variant.colorHex && (
+                          <div className="w-8 h-8 rounded-lg border-2 border-gray-200 shadow-sm shrink-0" style={{ backgroundColor: variant.colorHex }} />
+                        )}
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{variant.size} / {variant.color}</p>
+                          <p className="text-xs text-gray-500 font-mono">{variant.sku}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-900">₹{variant.price}</p>
+                        <p className="text-xs text-gray-500">{variant.stock} in stock</p>
+                      </div>
+                    </div>
+                    {/* Variant Images */}
+                    {variant.images && variant.images.length > 0 && (
+                      <div className="flex gap-2 mt-2">
+                        {variant.images.map((imgUrl, imgIdx) => (
+                          <div key={imgIdx} className="relative w-14 h-14 rounded-lg overflow-hidden border border-gray-200 bg-white shrink-0">
+                            <Image src={imgUrl} alt={`${variant.size} ${variant.color}`} fill className="object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
 
-          {/* Product Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Created Date</p>
-                  <p className="text-sm text-gray-600">
-                    {new Date(product.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
+          {/* Pricing */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Pricing</p>
-                  <p className="text-sm text-gray-600">Vendor Price: ₹{product.basePrice}</p>
-                  {product.adminFixedPrice && (
-                    <p className="text-sm text-green-600 font-medium">Admin Price: ₹{product.adminFixedPrice}</p>
-                  )}
-                  {product.gstPercentage && (
-                    <p className="text-sm text-gray-600">GST: {product.gstPercentage}%</p>
-                  )}
-                  {product.originalPrice && product.originalPrice > product.basePrice && (
-                    <p className="text-sm text-gray-500 line-through">Original: ₹{product.originalPrice}</p>
-                  )}
-                  {product.discount && (
-                    <p className="text-sm text-green-600">{product.discount}% off</p>
-                  )}
-                </div>
+                Pricing
+              </h2>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">Vendor Price</span>
+                <span className="text-lg font-bold text-gray-900">₹{product.basePrice}</span>
               </div>
-              <div className="flex items-center space-x-3">
+              {product.adminFixedPrice ? (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Admin Price</span>
+                  <span className="text-lg font-bold text-green-700">₹{product.adminFixedPrice}</span>
+                </div>
+              ) : null}
+              {product.originalPrice && product.originalPrice > product.basePrice ? (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Original (MRP)</span>
+                  <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
+                </div>
+              ) : null}
+              {product.discount ? (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Discount</span>
+                  <span className="text-sm font-semibold text-green-600">{product.discount}% OFF</span>
+                </div>
+              ) : null}
+              {product.gstPercentage ? (
+                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                  <span className="text-sm text-gray-500">GST</span>
+                  <span className="text-sm text-gray-700">{product.gstPercentage}%</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Category & Stock */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                 <Tag className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Category</p>
-                  <p className="text-sm text-gray-600">{product.category}</p>
-                  {product.subCategory && (
-                    <p className="text-xs text-gray-500">{product.subCategory}</p>
-                  )}
-                </div>
+                Details
+              </h2>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Category</p>
+                <p className="text-sm text-gray-900 mt-0.5">{product.category}</p>
+                {product.subCategory && (
+                  <p className="text-xs text-gray-500">{product.subCategory}</p>
+                )}
               </div>
-              <div className="flex items-center space-x-3">
-                <Warehouse className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Stock & Variants</p>
-                  <p className="text-sm text-gray-600">{product.totalStock} units</p>
-                  {product.hasVariants && product.variants && (
-                    <p className="text-xs text-gray-500">
-                      Base: {product.inventory?.baseStock ?? 0} units | Variants: {product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)} units
-                    </p>
-                  )}
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Stock</p>
+                <p className="text-sm text-gray-900 mt-0.5 font-semibold">{product.totalStock} units total</p>
+                {product.hasVariants && product.variants ? (
                   <p className="text-xs text-gray-500">
-                    {product.hasVariants ? `${product.variants?.length || 0} variants` : 'No variants'}
+                    Base: {product.inventory?.baseStock ?? 0} &middot; Variants: {product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Created</p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {new Date(product.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Approval Status */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <Check className="h-4 w-4 text-gray-500" />
+                Approval Status
+              </h2>
+            </div>
+            <div className="p-4">
+              {product.approvalStatus === 'APPROVED' && product.approvedAt ? (
+                <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <p className="text-sm font-semibold text-green-900">Approved</p>
+                  </div>
+                  <p className="text-xs text-green-700">
+                    Approved on {new Date(product.approvedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 </div>
-              </div>
-
-              {/* Approval Status */}
-              {product.approvalStatus === 'APPROVED' && product.approvedAt && (
-                <div className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg">
-                  <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-green-900">Product Approved</p>
-                    <p className="text-sm text-green-700">
-                      Approved on {new Date(product.approvedAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </p>
+              ) : product.approvalStatus === 'REJECTED' && product.rejectionReason ? (
+                <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <X className="h-4 w-4 text-red-600" />
+                    <p className="text-sm font-semibold text-red-900">Rejected</p>
                   </div>
+                  <p className="text-xs text-red-700 mt-1">
+                    <span className="font-medium">Reason:</span> {product.rejectionReason}
+                  </p>
+                </div>
+              ) : product.approvalStatus === 'QC_APPROVED' ? (
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Check className="h-4 w-4 text-blue-600" />
+                    <p className="text-sm font-semibold text-blue-900">QC Approved</p>
+                  </div>
+                  <p className="text-xs text-blue-700">Waiting for admin final approval.</p>
+                </div>
+              ) : product.approvalStatus === 'REINSPECTION' ? (
+                <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Package className="h-4 w-4 text-orange-600" />
+                    <p className="text-sm font-semibold text-orange-900">Re-Inspection Required</p>
+                  </div>
+                  <p className="text-xs text-orange-700">Product needs to be re-inspected.</p>
+                </div>
+              ) : (
+                <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Package className="h-4 w-4 text-yellow-600" />
+                    <p className="text-sm font-semibold text-yellow-900">Pending Review</p>
+                  </div>
+                  <p className="text-xs text-yellow-700">Your product is under review by admin.</p>
                 </div>
               )}
-
-              {product.approvalStatus === 'REJECTED' && product.rejectionReason && (
-                <div className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg border border-red-200">
-                  <X className="h-4 w-4 text-red-500 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-red-900">Product Rejected</p>
-                    <p className="text-sm text-red-700 mt-1">
-                      <span className="font-medium">Reason:</span> {product.rejectionReason}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {product.approvalStatus === 'PENDING' && (
-                <div className="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg">
-                  <Package className="h-4 w-4 text-yellow-500 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-yellow-900">Pending Review</p>
-                    <p className="text-sm text-yellow-700">
-                      Your product is under review by admin.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {product.approvalStatus === 'QC_APPROVED' && (
-                <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
-                  <Check className="h-4 w-4 text-blue-500 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-blue-900">QC Approved</p>
-                    <p className="text-sm text-blue-700">
-                      Waiting for admin final approval.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Reusable field block for the Specifications grid */
+function InfoField({ icon, label, value }: { icon?: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+      <p className="text-xs font-medium text-gray-500 flex items-center gap-1.5 mb-1">
+        {icon ? <span className="text-gray-400">{icon}</span> : null}
+        {label}
+      </p>
+      <p className="text-sm font-medium text-gray-900">{value}</p>
     </div>
   )
 }

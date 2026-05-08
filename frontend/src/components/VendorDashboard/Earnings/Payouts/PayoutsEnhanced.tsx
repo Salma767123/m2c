@@ -67,6 +67,135 @@ export default function PayoutsEnhanced() {
     fetchBankDetails();
   }, []);
 
+  const handleDownloadReport = () => {
+    if (filteredSettlements.length === 0) return;
+
+    const headers = ['Settlement No', 'Order No', 'Period', 'Amount', 'Status', 'Due Date', 'Paid On', 'Transaction ID'];
+    const fmtDate = (d: string | undefined | null) => {
+      if (!d) return '-';
+      const date = new Date(d);
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const rows = filteredSettlements.map((s) => [
+      s.settlementNumber,
+      s.billingNumber,
+      s.period,
+      s.amount.toFixed(2),
+      s.status,
+      s.dueDate ? fmtDate(s.dueDate) : 'Not set',
+      s.paymentDate ? fmtDate(s.paymentDate) : '-',
+      s.transactionId || '-',
+    ]);
+
+    // Use ="value" formula to force Excel to treat every cell as text (prevents scientific notation and date conversion)
+    const excelText = (val: string) => `="${val.replace(/"/g, '""')}"`;
+    const escapeHeader = (val: string) => `"${val.replace(/"/g, '""')}"`;
+    const csvContent = '\uFEFF' + headers.map(escapeHeader).join(',') + '\r\n' + rows.map((row) => row.map(excelText).join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `settlements-report-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadReceipt = async (settlement: Settlement) => {
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+
+    const fmtDate = (d: string | undefined | null) => {
+      if (!d) return '-';
+      return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
+    // ── Header bar ──
+    doc.setFillColor(31, 41, 55);
+    doc.rect(0, 0, pageW, 28, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Settlement Receipt', 15, 16);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(settlement.settlementNumber, pageW - 15, 16, { align: 'right' });
+
+    // ── Payout Information section ──
+    let y = 40;
+    doc.setFillColor(243, 244, 246);
+    doc.rect(15, y - 6, pageW - 30, 10, 'F');
+    doc.setTextColor(55, 65, 81);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Payout Information', 18, y);
+
+    const rows: [string, string][] = [
+      ['Settlement Number', settlement.settlementNumber],
+      ['Billing / Order No.', settlement.billingNumber],
+      ['Vendor', settlement.vendorName],
+      ['Period', settlement.period],
+      ['Status', settlement.status],
+      ['Created', fmtDate(settlement.createdAt)],
+      ['Due Date', settlement.dueDate ? fmtDate(settlement.dueDate) : 'Not set'],
+      ['Payment Date', fmtDate(settlement.paymentDate)],
+      ['Transaction ID', settlement.transactionId || '-'],
+    ];
+
+    y += 10;
+    rows.forEach(([label, value]) => {
+      // Alternate row background
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(107, 114, 128);
+      doc.text(label, 18, y);
+      doc.setTextColor(17, 24, 39);
+      doc.setFont('helvetica', 'bold');
+      doc.text(value, pageW - 18, y, { align: 'right' });
+      // Divider line
+      doc.setDrawColor(229, 231, 235);
+      doc.line(15, y + 3, pageW - 15, y + 3);
+      y += 10;
+    });
+
+    // ── Financial Overview section ──
+    y += 5;
+    doc.setFillColor(243, 244, 246);
+    doc.rect(15, y - 6, pageW - 30, 10, 'F');
+    doc.setTextColor(55, 65, 81);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Financial Overview', 18, y);
+
+    y += 14;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(17, 24, 39);
+    doc.text('Settlement Amount', 18, y);
+    doc.setFontSize(16);
+    doc.setTextColor(5, 150, 105);
+    const amountStr = `Rs. ${settlement.amount.toLocaleString('en-IN')}`;
+    doc.text(amountStr, pageW - 18, y, { align: 'right' });
+
+    // ── Footer ──
+    y += 20;
+    doc.setDrawColor(229, 231, 235);
+    doc.line(15, y, pageW - 15, y);
+    y += 8;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(156, 163, 175);
+    doc.text(
+      `Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} | M2C MarkDowns Private Limited`,
+      pageW / 2, y, { align: 'center' }
+    );
+
+    doc.save(`receipt-${settlement.settlementNumber}.pdf`);
+  };
+
   const filteredSettlements = settlements.filter((settlement) => {
     const matchesSearch =
       (settlement.settlementNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -151,7 +280,11 @@ export default function PayoutsEnhanced() {
           <h1 className="text-2xl font-bold text-gray-900">Settlements & Payouts</h1>
           <p className="text-sm text-gray-600 mt-1">View and manage your payout history</p>
         </div>
-        <button className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200">
+        <button
+          onClick={handleDownloadReport}
+          disabled={filteredSettlements.length === 0}
+          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <Download className="w-4 h-4" />
           Download Report
         </button>
@@ -533,10 +666,14 @@ export default function PayoutsEnhanced() {
 
               {/* Download Receipt Button */}
               {selectedSettlement.status === 'Paid' && (
-                <Button className="w-full bg-gray-900 hover:bg-gray-700 text-white gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleDownloadReceipt(selectedSettlement); }}
+                  className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200"
+                >
                   <Download className="w-4 h-4" />
                   Download Receipt
-                </Button>
+                </button>
               )}
             </div>
           </div>

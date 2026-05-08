@@ -222,9 +222,44 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                             ))}
                         </div>
                         <div className="mt-6 border-t border-gray-100 pt-4 flex justify-end">
-                            <div className="space-y-1 text-right">
-                                <p className="text-sm text-gray-600">Total Amount</p>
-                                <p className="text-xl font-bold text-teal-600">${order.totalAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            <div className="w-full max-w-xs space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">Subtotal</span>
+                                    <span className="text-gray-900 font-medium">${order.subtotal?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}</span>
+                                </div>
+                                {order.shippingCost > 0 ? (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-500">Shipping</span>
+                                        <span className="text-gray-900 font-medium">${order.shippingCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-500">Shipping</span>
+                                        <span className="text-green-600 font-medium">FREE</span>
+                                    </div>
+                                )}
+                                {order.tax > 0 ? (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-500">Tax</span>
+                                        <span className="text-gray-900 font-medium">${order.tax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                ) : null}
+                                {order.discount > 0 ? (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-500">Discount</span>
+                                        <span className="text-red-600 font-medium">-${order.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                ) : null}
+                                {order.bagTypeName ? (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-500">Bag ({order.bagTypeName})</span>
+                                        <span className="text-gray-900 font-medium">${(order.bagTypePrice ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                ) : null}
+                                <div className="flex justify-between pt-2 border-t border-gray-200">
+                                    <span className="text-base font-semibold text-gray-900">Total</span>
+                                    <span className="text-xl font-bold text-teal-600">${order.totalAmount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
                             </div>
                         </div>
                     </div>

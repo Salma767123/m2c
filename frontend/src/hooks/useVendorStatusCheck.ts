@@ -19,6 +19,9 @@ export function useVendorStatusCheck(intervalMs: number = 60000) {
   useEffect(() => {
     const checkStatus = async () => {
       try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('vendorToken') : null
+        if (!token) return
+
         const { vendor } = await VendorService.getVendorProfile()
 
         // If status changed to suspended, logout immediately

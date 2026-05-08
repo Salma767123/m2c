@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Eye, CheckCircle, Clock, X, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Eye, CheckCircle, Clock, X, RefreshCw, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -41,6 +41,9 @@ export default function SettlementManagement() {
   const [transactionId, setTransactionId] = useState("");
   const [processing, setProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showDueDateModal, setShowDueDateModal] = useState(false);
+  const [dueDateSettlement, setDueDateSettlement] = useState<Settlement | null>(null);
+  const [dueDateValue, setDueDateValue] = useState("");
 
   const statusOptions = ["All", "Pending", "Processing", "Paid", "Failed"];
 
@@ -120,6 +123,42 @@ export default function SettlementManagement() {
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleSetDueDate = (settlement: Settlement) => {
+    setDueDateSettlement(settlement);
+    setDueDateValue(settlement.dueDate ? new Date(settlement.dueDate).toISOString().split('T')[0] : '');
+    setShowDueDateModal(true);
+  };
+
+  const handleConfirmDueDate = async () => {
+    if (!dueDateValue) {
+      showErrorToast("Please select a due date");
+      return;
+    }
+    if (!dueDateSettlement) return;
+
+    try {
+      setProcessing(true);
+      const res = await settlementService.updateSettlementDueDate(dueDateSettlement.id, dueDateValue);
+      if (res.success) {
+        showSuccessToast(`Due date set to ${new Date(dueDateValue).toLocaleDateString()}`);
+        setShowDueDateModal(false);
+        setDueDateSettlement(null);
+        setDueDateValue("");
+        fetchSettlements();
+      }
+    } catch (error: any) {
+      showErrorToast(error?.error || "Failed to update due date");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const setPresetDueDate = (days: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    setDueDateValue(date.toISOString().split('T')[0]);
   };
 
   const totalPending = settlements
@@ -210,14 +249,15 @@ export default function SettlementManagement() {
                 <TableHead>Period</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Due Date</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Order Status</TableHead>
+                <TableHead>Settlement</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedSettlements.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                     No settlements found
                   </TableCell>
                 </TableRow>
@@ -229,7 +269,47 @@ export default function SettlementManagement() {
                     <TableCell>{settlement.billingNumber}</TableCell>
                     <TableCell>{settlement.period}</TableCell>
                     <TableCell className="font-medium">₹{settlement.amount.toLocaleString()}</TableCell>
-                    <TableCell>{new Date(settlement.dueDate).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {settlement.dueDate ? (
+                          <>
+                            <span className={`text-sm ${new Date(settlement.dueDate) < new Date() && settlement.status !== 'Paid' ? 'text-red-600 font-medium' : ''}`}>
+                              {new Date(settlement.dueDate).toLocaleDateString()}
+                            </span>
+                            {settlement.status !== 'Paid' && hasPermission('manage_billing') && (
+                              <button onClick={() => handleSetDueDate(settlement)} className="p-1 text-gray-400 hover:text-gray-700 rounded transition-colors" title="Edit due date">
+                                <CalendarDays className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          settlement.status !== 'Paid' && hasPermission('manage_billing') ? (
+                            <button onClick={() => handleSetDueDate(settlement)} className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+                              <CalendarDays className="h-3.5 w-3.5" />
+                              Set due date
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-400">Not set</span>
+                          )
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const os = settlement.order?.status?.toUpperCase() || '';
+                        const isDelivered = os === 'DELIVERED' || os === 'COMPLETED';
+                        return (
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                            isDelivered ? 'bg-green-100 text-green-800' :
+                            os.includes('TRANSIT') || os.includes('SHIPPED') ? 'bg-blue-100 text-blue-800' :
+                            os.includes('CANCEL') ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {settlement.order?.status?.replace(/_/g, ' ') || 'Unknown'}
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
@@ -240,16 +320,30 @@ export default function SettlementManagement() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
-                        {(settlement.status === "Pending" || settlement.status === "Processing") && hasPermission('manage_billing') && (
-                          <button
-                            onClick={() => handleMarkAsPaid(settlement)}
-                            className="p-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Mark as Paid"
-                          >
-                            <CheckCircle className="h-5 w-5" />
-                          </button>
-                        )}
+                      <div className="flex gap-2 items-center">
+                        {(settlement.status === "Pending" || settlement.status === "Processing") && hasPermission('manage_billing') ? (
+                          (() => {
+                            const os = settlement.order?.status?.toUpperCase() || '';
+                            const isDelivered = os === 'DELIVERED' || os === 'COMPLETED';
+                            const hasBankDetails = !!settlement.vendor?.bankDetails;
+
+                            if (!isDelivered) {
+                              return <span className="text-xs text-gray-400 italic">Awaiting delivery</span>;
+                            }
+                            if (!hasBankDetails) {
+                              return <span className="text-xs text-red-500 italic">No bank details</span>;
+                            }
+                            return (
+                              <button
+                                onClick={() => handleMarkAsPaid(settlement)}
+                                className="p-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-colors"
+                                title="Mark as Paid"
+                              >
+                                <CheckCircle className="h-5 w-5" />
+                              </button>
+                            );
+                          })()
+                        ) : null}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -342,6 +436,77 @@ export default function SettlementManagement() {
               >
                 {processing && <RefreshCw className="h-4 w-4 animate-spin" />}
                 Confirm Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Due Date Modal */}
+      {showDueDateModal && dueDateSettlement && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
+            <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Set Due Date</h2>
+              <button onClick={() => setShowDueDateModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-gray-50 p-3 rounded-lg text-sm">
+                <p className="font-medium text-gray-900">{dueDateSettlement.settlementNumber}</p>
+                <p className="text-gray-600">{dueDateSettlement.vendorName} &middot; ₹{dueDateSettlement.amount.toLocaleString()}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Quick Presets</label>
+                <div className="flex gap-2">
+                  {[7, 14, 30].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setPresetDueDate(d)}
+                      className="flex-1 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      {d} days
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="due-date-picker" className="block text-sm font-medium text-gray-700 mb-2">
+                  Or pick a date
+                </label>
+                <input
+                  id="due-date-picker"
+                  type="date"
+                  value={dueDateValue}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setDueDateValue(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                />
+              </div>
+
+              {dueDateValue && (
+                <p className="text-sm text-gray-600">
+                  Due date will be set to <strong>{new Date(dueDateValue).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong>
+                </p>
+              )}
+            </div>
+            <div className="p-5 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowDueDateModal(false)}
+                disabled={processing}
+                className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDueDate}
+                disabled={processing || !dueDateValue}
+                className="flex items-center gap-2 px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium disabled:opacity-50"
+              >
+                {processing && <RefreshCw className="h-4 w-4 animate-spin" />}
+                Set Due Date
               </button>
             </div>
           </div>

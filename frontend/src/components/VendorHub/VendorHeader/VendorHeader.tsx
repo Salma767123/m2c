@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { companyInfoService } from '@/services/companyInfoService';
 
 const VendorHeader = () => {
-  const [companyLogo, setCompanyLogo] = useState<string | null>(() => companyInfoService.getCachedCompanyInfo().companyLogo)
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null)
 
   useEffect(() => {
     companyInfoService.getPublicCompanyInfo().then(info => {

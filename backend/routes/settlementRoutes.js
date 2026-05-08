@@ -4,6 +4,7 @@ const {
     getAllSettlements,
     getSettlementById,
     updateSettlementStatus,
+    updateSettlementDueDate,
     getVendorSettlements
 } = require('../controllers/settlementController');
 
@@ -16,6 +17,7 @@ router.use(authenticateToken);
 router.get('/admin', requireAdminRole, requirePermission(['view_billing', 'manage_billing']), getAllSettlements);
 router.get('/admin/:id', requireAdminRole, requirePermission(['view_billing', 'manage_billing']), getSettlementById);
 router.put('/admin/:id/status', requireAdminRole, requirePermission('manage_billing'), updateSettlementStatus);
+router.put('/admin/:id/due-date', requireAdminRole, requirePermission('manage_billing'), updateSettlementDueDate);
 
 // Vendor Routes
 router.get('/vendor', requireVendorRole, getVendorSettlements);
