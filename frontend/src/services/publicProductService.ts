@@ -10,6 +10,8 @@ export interface PublicProduct {
   basePrice: number;
   adminFixedPrice?: number; // Admin's fixed price (overrides basePrice for display)
   originalPrice?: number;
+  originalPriceINR?: number;
+  originalPriceUSD?: number;
   discount?: number;
   gstPercentage?: number;
   rating?: number;
@@ -36,6 +38,8 @@ export interface PublicProduct {
     sku: string;
     price: number;
     originalPrice?: number;
+    originalPriceINR?: number;
+    originalPriceUSD?: number;
     discount?: number;
     adminFixedPrice?: number;
     stock: number;
