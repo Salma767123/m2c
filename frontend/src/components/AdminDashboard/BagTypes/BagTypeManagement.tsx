@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Eye, Edit, Trash2, ShoppingBag, ChevronLeft, ChevronRight, Package, AlertCircle } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Trash2, ShoppingBag, ChevronLeft, ChevronRight, Package, AlertCircle, GripVertical } from 'lucide-react';
 import { Card, CardContent } from '@/components/UI/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
 import Dropdown from '@/components/UI/Dropdown';
@@ -9,8 +9,114 @@ import BagTypeModal from './BagTypeModal';
 import bagTypeService, { BagType } from '@/services/bagTypeService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { Breadcrumb } from '../Breadcrumb/Breadcrumb';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const PAGE_SIZE = 10;
+
+function SortableBagTypeRow({ 
+  bagType, 
+  salesMap,
+  handleView, 
+  handleEdit, 
+  handleDelete,
+  canDrag 
+}: { 
+  bagType: BagType; 
+  salesMap: Map<string, { sold: number, revenue: number }>;
+  handleView: (bt: BagType) => void; 
+  handleEdit: (bt: BagType) => void; 
+  handleDelete: (bt: BagType) => void;
+  canDrag: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ 
+    id: bagType.id,
+    disabled: !canDrag
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    ...(isDragging ? { position: 'relative' as const, zIndex: 9999, backgroundColor: '#f9fafb', boxShadow: '0 5px 15px rgba(0,0,0,0.1)' } : {})
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className={isDragging ? 'opacity-90' : ''}>
+      <TableCell className="pl-6 w-24">
+        <div className="flex items-center gap-3">
+          <div 
+            {...(canDrag ? { ...attributes, ...listeners } : {})}
+            className={`p-1.5 bg-white border border-gray-300 shadow-sm hover:bg-gray-50 rounded-md transition-colors ${canDrag ? 'cursor-grab active:cursor-grabbing text-gray-700' : 'cursor-not-allowed text-gray-300'}`}
+            title={canDrag ? "Drag to reorder" : "Clear search and filters to reorder"}
+          >
+            <GripVertical className="h-4 w-4" />
+          </div>
+          <span className="text-sm font-semibold text-gray-700 min-w-[20px] text-center">
+            {bagType.sortOrder}
+          </span>
+        </div>
+      </TableCell>
+      <TableCell>
+        {bagType.image ? (
+          <img src={bagType.image} alt={bagType.name} className="w-12 h-12 object-cover rounded-lg border border-gray-200" />
+        ) : (
+          <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+            <Package className="w-5 h-5 text-gray-400" />
+          </div>
+        )}
+      </TableCell>
+      <TableCell>
+        <div className="font-medium text-gray-900">{bagType.name}</div>
+      </TableCell>
+      <TableCell>
+        <div className="text-sm text-gray-500 max-w-[200px] truncate">{bagType.description || '—'}</div>
+      </TableCell>
+      <TableCell>
+        <span className="font-semibold text-gray-900">₹{bagType.price.toFixed(2)}</span>
+      </TableCell>
+      <TableCell>
+        <span className="text-sm font-medium text-blue-600">{salesMap.get(bagType.id)?.sold || 0}</span>
+      </TableCell>
+      <TableCell>
+        <span className="text-sm font-medium text-purple-600">₹{(salesMap.get(bagType.id)?.revenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+      </TableCell>
+
+      <TableCell>
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${bagType.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {bagType.isActive ? 'Active' : 'Inactive'}
+        </span>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <button onClick={() => handleView(bagType)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View">
+            <Eye className="h-4 w-4" />
+          </button>
+          <button onClick={() => handleEdit(bagType)} className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
+            <Edit className="h-4 w-4" />
+          </button>
+          <button onClick={() => handleDelete(bagType)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -39,6 +145,12 @@ export default function BagTypeManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, pages: 0 });
   const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0, totalBagsSold: 0, totalRevenue: 0, perBagType: [] as Array<{ bagTypeId: string; sold: number; revenue: number }> });
+
+  // DnD Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const fetchBagTypes = useCallback(async () => {
     try {
@@ -145,6 +257,43 @@ export default function BagTypeManagement() {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = bagTypes.findIndex((bt) => bt.id === active.id);
+    const newIndex = bagTypes.findIndex((bt) => bt.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      // Optimistic update
+      const newBagTypes = arrayMove(bagTypes, oldIndex, newIndex);
+      
+      // Extract the exact sort orders currently on this page, in ascending order
+      const currentSortOrders = bagTypes.map(bt => bt.sortOrder ?? 0).sort((a, b) => a - b);
+      
+      // Assign these exact sort orders back to the newly arranged items
+      const updatedBagTypes = newBagTypes.map((bt, index) => ({
+        ...bt,
+        sortOrder: currentSortOrders[index]
+      }));
+      
+      setBagTypes(updatedBagTypes);
+
+      try {
+        const orderData = updatedBagTypes.map(bt => ({
+          id: bt.id,
+          sortOrder: bt.sortOrder!
+        }));
+        await bagTypeService.reorderBagTypes(orderData);
+        showSuccessToast('Sort order updated');
+        fetchBagTypes(); // Refresh to ensure sync
+      } catch (error: any) {
+        showErrorToast('Failed to update sort order');
+        fetchBagTypes(); // Revert on failure
+      }
+    }
+  };
+
   const activeCount = stats.active;
   const inactiveCount = stats.inactive;
 
@@ -153,6 +302,8 @@ export default function BagTypeManagement() {
 
   // Per-bag sales lookup for table
   const salesMap = new Map(stats.perBagType.map(s => [s.bagTypeId, { sold: s.sold, revenue: s.revenue }]));
+
+  const canDrag = searchTerm === '' && statusFilter === 'all';
 
   return (
     <div className="p-6">
@@ -248,16 +399,17 @@ export default function BagTypeManagement() {
 
       {/* Table */}
       <Card>
-        <Table>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-24">Order</TableHead>
               <TableHead>Image</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>Sold</TableHead>
               <TableHead>Revenue</TableHead>
-              <TableHead>Order</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -272,55 +424,19 @@ export default function BagTypeManagement() {
                 </TableCell>
               </TableRow>
             ) : bagTypes.length > 0 ? (
-              bagTypes.map(bagType => (
-                <TableRow key={bagType.id}>
-                  <TableCell>
-                    {bagType.image ? (
-                      <img src={bagType.image} alt={bagType.name} className="w-12 h-12 object-cover rounded-lg border border-gray-200" />
-                    ) : (
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-                        <Package className="w-5 h-5 text-gray-400" />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium text-gray-900">{bagType.name}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-gray-500 max-w-[200px] truncate">{bagType.description || '—'}</div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-semibold text-gray-900">₹{bagType.price.toFixed(2)}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm font-medium text-blue-600">{salesMap.get(bagType.id)?.sold || 0}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm font-medium text-purple-600">₹{(salesMap.get(bagType.id)?.revenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-500">{bagType.sortOrder}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${bagType.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {bagType.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => handleView(bagType)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View">
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => handleEdit(bagType)} className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Edit">
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => handleDelete(bagType)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+              <SortableContext items={bagTypes.map(bt => bt.id)} strategy={verticalListSortingStrategy}>
+                  {bagTypes.map(bagType => (
+                    <SortableBagTypeRow
+                      key={bagType.id}
+                      bagType={bagType}
+                      salesMap={salesMap}
+                      handleView={handleView}
+                      handleEdit={handleEdit}
+                      handleDelete={handleDelete}
+                      canDrag={canDrag}
+                    />
+                  ))}
+                </SortableContext>
             ) : (
               <TableRow>
                 <TableCell colSpan={9}>
@@ -333,7 +449,8 @@ export default function BagTypeManagement() {
               </TableRow>
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </DndContext>
       </Card>
 
       {/* Pagination */}

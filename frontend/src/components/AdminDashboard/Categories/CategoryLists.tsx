@@ -6,11 +6,29 @@ import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
-import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
 import Link from 'next/link'
 import { categoryService, Category, CategoryStats } from '@/services/categoryService'
 import { hasPermission } from '@/lib/auth'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
+import { useToast } from '@/hooks/use-toast'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 const PAGE_SIZE = 10
 
@@ -36,6 +54,18 @@ export default function CategoryLists() {
   const [currentPage, setCurrentPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const { toast } = useToast()
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // Requires 5px movement before drag starts, allows clicks to pass through
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     loadCategories()
@@ -127,103 +157,158 @@ export default function CategoryLists() {
     }
   }
 
-  const renderCategoryRow = (category: Category, isSubcategory = false) => (
-    <TableRow key={category.id} className={isSubcategory ? 'bg-gray-50' : ''}>
-      <TableCell>
-        <div className="flex items-center">
-          {!isSubcategory && category.subcategories.length > 0 && (
-            <button
-              onClick={() => toggleExpanded(category.id)}
-              className="mr-2 p-1 hover:bg-gray-200 rounded"
-            >
-              <svg
-                className={`w-4 h-4 transition-transform ${
-                  expandedCategories.has(category.id) ? 'rotate-90' : ''
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          )}
-          <div className="flex items-center space-x-3">
-            {/* Category/Subcategory Image */}
-            <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0">
-              {category.image ? (
-                <img
-                  src={category.image}
-                  alt={category.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = '/assets/images/categories/cs1.jpg';
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                  <div className="w-4 h-4 bg-gray-300 rounded"></div>
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = categories.findIndex(c => c.id === active.id);
+    const newIndex = categories.findIndex(c => c.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      // Optimistic update
+      const newCategories = arrayMove(categories, oldIndex, newIndex);
+      
+      // Extract the exact sort orders currently in the list
+      const currentSortOrders = categories.map(c => c.sortOrder ?? 0).sort((a, b) => a - b);
+      
+      // Assign these exact sort orders back to the newly arranged items
+      const updatedCategories = newCategories.map((c, index) => ({
+        ...c,
+        sortOrder: currentSortOrders[index]
+      }));
+
+      setCategories(updatedCategories);
+
+      const categoryOrders = updatedCategories.map((c) => ({
+        id: c.id,
+        sortOrder: c.sortOrder
+      }));
+
+      try {
+        await categoryService.reorderCategories(categoryOrders);
+        toast({
+          title: "Categories Reordered",
+          description: "The sort order has been successfully updated.",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to reorder categories. Reverting...",
+          variant: "destructive"
+        });
+        loadCategories(); // Revert on failure
+      }
+    }
+  }
+
+  // Can only drag if no search is active and we are sorted by default (all status)
+  const canDrag = !searchTerm && statusFilter === 'all';
+
+  const renderCategoryRow = (category: Category, isSubcategory = false) => {
+    if (isSubcategory || !canDrag) {
+      return (
+        <TableRow key={category.id} className={isSubcategory ? 'bg-gray-50' : ''}>
+          <TableCell className="text-center">
+            <span className="text-sm font-medium text-gray-500">{category.sortOrder}</span>
+          </TableCell>
+          <TableCell>
+            <div className="flex items-center">
+              {!isSubcategory && category.subcategories.length > 0 && (
+                <button
+                  onClick={() => toggleExpanded(category.id)}
+                  className="mr-2 p-1 hover:bg-gray-200 rounded"
+                >
+                  <svg
+                    className={`w-4 h-4 transition-transform ${
+                      expandedCategories.has(category.id) ? 'rotate-90' : ''
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0">
+                  {category.image ? (
+                    <img
+                      src={category.image}
+                      alt={category.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/assets/images/categories/cs1.jpg';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                      <div className="w-4 h-4 bg-gray-300 rounded"></div>
+                    </div>
+                  )}
                 </div>
+                
+                <div className={isSubcategory ? 'ml-6' : ''}>
+                  <div className="text-sm font-medium text-gray-900">{category.name}</div>
+                  <div className="text-sm text-gray-500">{category.slug}</div>
+                </div>
+              </div>
+            </div>
+          </TableCell>
+          <TableCell>
+            <div className="text-sm text-gray-900 max-w-xs truncate" title={category.description}>
+              {category.description}
+            </div>
+          </TableCell>
+          <TableCell className="text-center">
+            <span className="text-sm font-medium text-gray-900">{category.productCount}</span>
+          </TableCell>
+          <TableCell>
+            <Badge 
+              variant={category.status === 'ACTIVE' ? 'default' : 'secondary'}
+              className={category.status === 'ACTIVE' ? 'bg-green-100 text-green-800 border-green-200' : ''}
+            >
+              {category.status.toLowerCase()}
+            </Badge>
+          </TableCell>
+          <TableCell className="text-sm text-gray-500">
+            {new Date(category.updatedAt).toLocaleDateString()}
+          </TableCell>
+          <TableCell className="text-right">
+            <div className="flex items-center justify-end space-x-2">
+              {hasPermission('view_categories') && (
+                <Link href={`/admin/dashboard/categories/view/${category.id}`}>
+                  <Button variant="ghost" size="sm">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
+              {hasPermission('edit_categories') && (
+                <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
+                  <Button variant="ghost" size="sm">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
+              {hasPermission('delete_categories') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteClick(category)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               )}
             </div>
-            
-            <div className={isSubcategory ? 'ml-6' : ''}>
-              <div className="text-sm font-medium text-gray-900">{category.name}</div>
-              <div className="text-sm text-gray-500">{category.slug}</div>
-            </div>
-          </div>
-        </div>
-      </TableCell>
-      <TableCell>
-        <div className="text-sm text-gray-900 max-w-xs truncate" title={category.description}>
-          {category.description}
-        </div>
-      </TableCell>
-      <TableCell className="text-center">
-        <span className="text-sm font-medium text-gray-900">{category.productCount}</span>
-      </TableCell>
-      <TableCell>
-        <Badge 
-          variant={category.status === 'ACTIVE' ? 'default' : 'secondary'}
-          className={category.status === 'ACTIVE' ? 'bg-green-100 text-green-800 border-green-200' : ''}
-        >
-          {category.status.toLowerCase()}
-        </Badge>
-      </TableCell>
-      <TableCell className="text-sm text-gray-500">
-        {new Date(category.updatedAt).toLocaleDateString()}
-      </TableCell>
-      <TableCell className="text-right">
-        <div className="flex items-center justify-end space-x-2">
-          {hasPermission('view_categories') && (
-            <Link href={`/admin/dashboard/categories/view/${category.id}`}>
-              <Button variant="ghost" size="sm">
-                <Eye className="h-4 w-4" />
-              </Button>
-            </Link>
-          )}
-          {hasPermission('edit_categories') && (
-            <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
-              <Button variant="ghost" size="sm">
-                <Edit className="h-4 w-4" />
-              </Button>
-            </Link>
-          )}
-          {hasPermission('delete_categories') && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDeleteClick(category)}
-              className="text-red-600 hover:text-red-800"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </TableCell>
-    </TableRow>
-  )
+          </TableCell>
+        </TableRow>
+      )
+    }
+
+    return <SortableCategoryRow key={category.id} category={category} toggleExpanded={toggleExpanded} expandedCategories={expandedCategories} handleDeleteClick={handleDeleteClick} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -339,40 +424,52 @@ export default function CategoryLists() {
               <span className="ml-3 text-gray-600">Loading categories...</span>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Category Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-center">Products</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCategories.length === 0 ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12">
-                      <div className="text-gray-500">
-                        <p className="text-lg font-medium">No categories found</p>
-                        <p className="text-sm">Try adjusting your search or filter criteria</p>
-                      </div>
-                    </TableCell>
+                    <TableHead className="w-[120px] pl-6">Order</TableHead>
+                    <TableHead>Category Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-center">Products</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last Updated</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  paginatedCategories.map((category) => (
-                    <React.Fragment key={category.id}>
-                      {renderCategoryRow(category)}
-                      {expandedCategories.has(category.id) &&
-                        category.subcategories.map((subcategory) =>
-                          renderCategoryRow(subcategory, true)
-                        )}
-                    </React.Fragment>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredCategories.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-12">
+                        <div className="text-gray-500">
+                          <p className="text-lg font-medium">No categories found</p>
+                          <p className="text-sm">Try adjusting your search or filter criteria</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <SortableContext
+                      items={paginatedCategories.map(c => c.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {paginatedCategories.map((category) => (
+                        <React.Fragment key={category.id}>
+                          {renderCategoryRow(category)}
+                          {expandedCategories.has(category.id) &&
+                            category.subcategories.map((subcategory) =>
+                              renderCategoryRow(subcategory, true)
+                            )}
+                        </React.Fragment>
+                      ))}
+                    </SortableContext>
+                  )}
+                </TableBody>
+              </Table>
+            </DndContext>
           )}
         </CardContent>
         {totalPages > 1 && (
@@ -395,5 +492,127 @@ export default function CategoryLists() {
         onCancel={() => setDeleteTarget(null)}
       />
     </div>
+  )
+}
+
+function SortableCategoryRow({ category, toggleExpanded, expandedCategories, handleDeleteClick }: any) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: category.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    ...(isDragging ? { position: 'relative' as any, zIndex: 9999, opacity: 0.8, boxShadow: '0 5px 15px rgba(0,0,0,0.1)', background: 'white' } : {}),
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style} className={isDragging ? 'bg-white' : ''}>
+      <TableCell className="pl-6">
+        <div className="flex items-center gap-3">
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1.5 bg-white border border-gray-300 shadow-sm hover:bg-gray-50 rounded-md text-gray-700 transition-colors" title="Drag to reorder">
+            <GripVertical size={16} />
+          </div>
+          <span className="text-sm font-semibold text-gray-700 min-w-[20px] text-center">{category.sortOrder}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center">
+          {category.subcategories && category.subcategories.length > 0 && (
+            <button
+              onClick={() => toggleExpanded(category.id)}
+              className="mr-2 p-1 hover:bg-gray-200 rounded"
+            >
+              <svg
+                className={`w-4 h-4 transition-transform ${
+                  expandedCategories.has(category.id) ? 'rotate-90' : ''
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden shrink-0">
+              {category.image ? (
+                <img
+                  src={category.image}
+                  alt={category.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/assets/images/categories/cs1.jpg';
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                  <div className="w-4 h-4 bg-gray-300 rounded"></div>
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <div className="text-sm font-medium text-gray-900">{category.name}</div>
+              <div className="text-sm text-gray-500">{category.slug}</div>
+            </div>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="text-sm text-gray-900 max-w-xs truncate" title={category.description}>
+          {category.description}
+        </div>
+      </TableCell>
+      <TableCell className="text-center">
+        <span className="text-sm font-medium text-gray-900">{category.productCount}</span>
+      </TableCell>
+      <TableCell>
+        <Badge 
+          variant={category.status === 'ACTIVE' ? 'default' : 'secondary'}
+          className={category.status === 'ACTIVE' ? 'bg-green-100 text-green-800 border-green-200' : ''}
+        >
+          {category.status.toLowerCase()}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-sm text-gray-500">
+        {new Date(category.updatedAt).toLocaleDateString()}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end space-x-2">
+          {hasPermission('view_categories') && (
+            <Link href={`/admin/dashboard/categories/view/${category.id}`}>
+              <Button variant="ghost" size="sm">
+                <Eye className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
+          {hasPermission('edit_categories') && (
+            <Link href={`/admin/dashboard/categories/edit/${category.id}`}>
+              <Button variant="ghost" size="sm">
+                <Edit className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
+          {hasPermission('delete_categories') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDeleteClick(category)}
+              className="text-red-600 hover:text-red-800"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
   )
 }

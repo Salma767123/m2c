@@ -2369,6 +2369,8 @@ const getPublicProducts = async (req, res) => {
         basePrice: true,
         adminFixedPrice: true, // Include admin fixed price
         originalPrice: true,
+        originalPriceINR: true,
+        originalPriceUSD: true,
         discount: true,
         singleUnitSize: true,
         singleUnitColor: true,
@@ -2389,6 +2391,8 @@ const getPublicProducts = async (req, res) => {
             sku: true,
             price: true,
             originalPrice: true,
+            originalPriceINR: true,
+            originalPriceUSD: true,
             discount: true,
             adminFixedPrice: true,
             priceINR: true,

@@ -148,24 +148,41 @@ const createBagType = async (req, res) => {
             return res.status(400).json({ success: false, message: 'A bag type with this name already exists' });
         }
 
-        // Auto-assign sort order if not explicitly provided
-        let finalSortOrder = Math.max(0, parseInt(sortOrder) || 0);
-        if (!sortOrder && sortOrder !== 0) {
-            const maxSort = await prisma.bagType.aggregate({ _max: { sortOrder: true } });
-            finalSortOrder = (maxSort._max?.sortOrder ?? 0) + 1;
-        }
+        // Handle transactional insert and shift
+        let bagType;
+        await prisma.$transaction(async (tx) => {
+            const maxSort = await tx.bagType.aggregate({ _max: { sortOrder: true } });
+            const maxOrder = maxSort._max?.sortOrder !== null && maxSort._max?.sortOrder !== undefined ? maxSort._max.sortOrder : -1;
+            const appendOrder = maxOrder + 1;
 
-        const bagType = await prisma.bagType.create({
-            data: {
-                name: trimmedName,
-                description: description || null,
-                price,
-                priceINR: priceINR ? parseFloat(priceINR) : null,
-                priceUSD: priceUSD ? parseFloat(priceUSD) : null,
-                image: imageUrl,
-                isActive,
-                sortOrder: finalSortOrder,
-            },
+            let finalSortOrder;
+            if (sortOrder !== undefined && sortOrder !== null && sortOrder !== '') {
+                finalSortOrder = parseInt(sortOrder);
+                if (isNaN(finalSortOrder) || finalSortOrder < 0) finalSortOrder = 0;
+                if (finalSortOrder > appendOrder) finalSortOrder = appendOrder;
+            } else {
+                finalSortOrder = appendOrder;
+            }
+
+            if (finalSortOrder < appendOrder) {
+                await tx.bagType.updateMany({
+                    where: { sortOrder: { gte: finalSortOrder } },
+                    data: { sortOrder: { increment: 1 } }
+                });
+            }
+
+            bagType = await tx.bagType.create({
+                data: {
+                    name: trimmedName,
+                    description: description || null,
+                    price,
+                    priceINR: priceINR ? parseFloat(priceINR) : null,
+                    priceUSD: priceUSD ? parseFloat(priceUSD) : null,
+                    image: imageUrl,
+                    isActive,
+                    sortOrder: finalSortOrder,
+                },
+            });
         });
 
         res.status(201).json({ success: true, data: bagType, message: 'Bag type created successfully' });
@@ -211,7 +228,12 @@ const updateBagType = async (req, res) => {
         if (priceINR !== undefined) updateData.priceINR = priceINR ? parseFloat(priceINR) : null;
         if (priceUSD !== undefined) updateData.priceUSD = priceUSD ? parseFloat(priceUSD) : null;
         if (isActive !== undefined) updateData.isActive = isActive;
-        if (sortOrder !== undefined) updateData.sortOrder = Math.max(0, parseInt(sortOrder) || 0);
+
+        let newSortOrder = undefined;
+        if (sortOrder !== undefined && sortOrder !== null && sortOrder !== '') {
+            newSortOrder = parseInt(sortOrder);
+            if (isNaN(newSortOrder) || newSortOrder < 0) newSortOrder = 0;
+        }
 
         // Validate and upload new image if base64, keep existing if not provided
         if (image !== undefined) {
@@ -229,10 +251,43 @@ const updateBagType = async (req, res) => {
             }
         }
 
-        const bagType = await prisma.bagType.update({
-            where: { id },
-            data: updateData,
-        });
+        const currentSortOrder = existing.sortOrder;
+        let bagType;
+
+        if (newSortOrder !== undefined && newSortOrder !== currentSortOrder) {
+            await prisma.$transaction(async (tx) => {
+                const maxSort = await tx.bagType.aggregate({ 
+                    where: { id: { not: id } },
+                    _max: { sortOrder: true } 
+                });
+                const maxOrder = maxSort._max?.sortOrder !== null && maxSort._max?.sortOrder !== undefined ? maxSort._max.sortOrder + 1 : 0;
+                
+                if (newSortOrder > maxOrder) newSortOrder = maxOrder;
+
+                if (newSortOrder > currentSortOrder) {
+                    await tx.bagType.updateMany({
+                        where: { sortOrder: { gt: currentSortOrder, lte: newSortOrder }, id: { not: id } },
+                        data: { sortOrder: { decrement: 1 } }
+                    });
+                } else if (newSortOrder < currentSortOrder) {
+                    await tx.bagType.updateMany({
+                        where: { sortOrder: { gte: newSortOrder, lt: currentSortOrder }, id: { not: id } },
+                        data: { sortOrder: { increment: 1 } }
+                    });
+                }
+
+                updateData.sortOrder = newSortOrder;
+                bagType = await tx.bagType.update({
+                    where: { id },
+                    data: updateData,
+                });
+            });
+        } else {
+            bagType = await prisma.bagType.update({
+                where: { id },
+                data: updateData,
+            });
+        }
 
         res.json({ success: true, data: bagType, message: 'Bag type updated successfully' });
     } catch (error) {
@@ -260,6 +315,40 @@ const deleteBagType = async (req, res) => {
     }
 };
 
+// Admin: Reorder bag types
+const reorderBagTypes = async (req, res) => {
+    try {
+        const { bagTypeOrders } = req.body;
+
+        if (!Array.isArray(bagTypeOrders) || bagTypeOrders.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid bag types order data'
+            });
+        }
+
+        await prisma.$transaction(
+            bagTypeOrders.map(({ id, sortOrder }) =>
+                prisma.bagType.update({
+                    where: { id },
+                    data: { sortOrder: parseInt(sortOrder) }
+                })
+            )
+        );
+
+        res.json({
+            success: true,
+            message: 'Bag types reordered successfully'
+        });
+    } catch (error) {
+        console.error('Reorder bag types error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reorder bag types'
+        });
+    }
+};
+
 module.exports = {
     getActiveBagTypes,
     getBagTypes,
@@ -267,4 +356,5 @@ module.exports = {
     createBagType,
     updateBagType,
     deleteBagType,
+    reorderBagTypes,
 };
