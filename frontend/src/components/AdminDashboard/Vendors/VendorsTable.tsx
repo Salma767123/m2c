@@ -60,6 +60,27 @@ const getStatusBadge = (status: string) => {
   }
 }
 
+const getInspectionBadge = (vendorStatus: string, latestInspection?: VendorProfile['latestInspection']) => {
+  if (!latestInspection) return null
+  // Don't show inspection badge if vendor already has a final status
+  if (['APPROVED', 'REJECTED', 'SUSPENDED'].includes(vendorStatus)) return null
+  const { status, result } = latestInspection
+  switch (status) {
+    case 'SUBMITTED':
+      return result === 'FAILED'
+        ? <Badge className="bg-red-50 text-red-700 border border-red-200">QC Failed - Awaiting Review</Badge>
+        : <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">QC Passed - Awaiting Approval</Badge>
+    case 'SCHEDULED':
+      return <Badge className="bg-gray-50 text-gray-600 border border-gray-200">QC Scheduled</Badge>
+    case 'IN_PROGRESS':
+      return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">QC In Progress</Badge>
+    case 'UNDER_ADMIN_REVIEW':
+      return <Badge className="bg-purple-50 text-purple-700 border border-purple-200">Under Admin Review</Badge>
+    default:
+      return null
+  }
+}
+
 const getLocationString = (vendor: VendorProfile): string => {
   const parts = [vendor.businessCity, vendor.businessState, vendor.businessCountry]
     .filter(Boolean)
@@ -360,13 +381,16 @@ export default function VendorsTable() {
                     </TableCell>
                     <TableCell>{getLocationString(vendor)}</TableCell>
                     <TableCell>
-                      {getStatusBadge(vendor.status)}
-                      {vendor.status === 'APPROVAL_PENDING' && vendor.approvalRequestedByName && (
-                        <p className="text-xs text-cyan-600 mt-1">by {vendor.approvalRequestedByName}</p>
-                      )}
-                      {vendor.status === 'REJECTION_PENDING' && vendor.rejectionRequestedByName && (
-                        <p className="text-xs text-orange-600 mt-1">by {vendor.rejectionRequestedByName}</p>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {getStatusBadge(vendor.status)}
+                        {getInspectionBadge(vendor.status, vendor.latestInspection)}
+                        {vendor.status === 'APPROVAL_PENDING' && vendor.approvalRequestedByName && (
+                          <p className="text-xs text-cyan-600">by {vendor.approvalRequestedByName}</p>
+                        )}
+                        {vendor.status === 'REJECTION_PENDING' && vendor.rejectionRequestedByName && (
+                          <p className="text-xs text-orange-600">by {vendor.rejectionRequestedByName}</p>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {(() => {

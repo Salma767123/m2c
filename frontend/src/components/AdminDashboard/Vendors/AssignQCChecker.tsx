@@ -19,6 +19,7 @@ interface Vendor {
   assignedChecker: string | null;
   assignedCheckerName: string | null;
   inspectionStatus: string | null;
+  inspectionResult: string | null;
 }
 
 interface QCChecker {
@@ -54,6 +55,7 @@ export default function AssignQCChecker() {
       assignedChecker: v.assignedQcId || null,
       assignedCheckerName: v.assignedQc?.name || null,
       inspectionStatus: v.latestInspection?.status || null,
+      inspectionResult: v.latestInspection?.result || null,
     }));
 
   const fetchVendors = useCallback(async (page: number) => {
@@ -142,8 +144,30 @@ export default function AssignQCChecker() {
     );
   };
 
+  const getInspectionStatusDisplay = (vendorStatus: string, status: string | null, result: string | null) => {
+    if (!status) return <span className="text-sm text-gray-400 italic">No Inspection</span>;
+    // If vendor is already finalized but inspection is still SUBMITTED (stale data),
+    // show the completed state instead of the misleading SUBMITTED label
+    if (['APPROVED', 'REJECTED', 'SUSPENDED'].includes(vendorStatus) && (status === 'SUBMITTED' || status === 'UNDER_ADMIN_REVIEW')) {
+      return <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Completed - {result === 'FAILED' ? 'Failed' : 'Passed'}</span>;
+    }
+    const configs: Record<string, { label: string; style: string }> = {
+      SCHEDULED: { label: "Scheduled", style: "bg-gray-100 text-gray-700" },
+      IN_PROGRESS: { label: "In Progress", style: "bg-blue-100 text-blue-800" },
+      SUBMITTED: { label: result === "FAILED" ? "Submitted - Failed" : "Submitted - Passed", style: result === "FAILED" ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800" },
+      UNDER_ADMIN_REVIEW: { label: "Under Admin Review", style: "bg-purple-100 text-purple-800" },
+      COMPLETED: { label: result === "FAILED" ? "Completed - Failed" : "Completed - Passed", style: result === "FAILED" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800" },
+      REJECTED: { label: "Rejected", style: "bg-red-100 text-red-800" },
+      REINSPECTION: { label: "Re-Inspection", style: "bg-amber-100 text-amber-800" },
+      CANCELLED: { label: "Cancelled", style: "bg-gray-100 text-gray-600" },
+    };
+    const config = configs[status] || { label: status, style: "bg-gray-100 text-gray-800" };
+    return <span className={`px-3 py-1 rounded-full text-xs font-medium ${config.style}`}>{config.label}</span>;
+  };
+
   const totalAssigned = filteredVendors.filter((v) => v.assignedChecker).length;
   const totalUnassigned = filteredVendors.filter((v) => !v.assignedChecker).length;
+  const totalAwaitingReview = filteredVendors.filter((v) => v.inspectionStatus === "SUBMITTED" || v.inspectionStatus === "UNDER_ADMIN_REVIEW").length;
 
   // Pagination helpers (matches QC Reports style)
   const getPageRange = (current: number, total: number): Array<number | '…'> => {
@@ -179,7 +203,7 @@ export default function AssignQCChecker() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-gray-600">Total Vendors</div>
@@ -196,6 +220,12 @@ export default function AssignQCChecker() {
           <CardContent className="p-4">
             <div className="text-sm text-gray-600">Unassigned</div>
             <div className="text-2xl font-bold text-orange-600">{totalUnassigned}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-gray-600">Awaiting Review</div>
+            <div className="text-2xl font-bold text-amber-600">{totalAwaitingReview}</div>
           </CardContent>
         </Card>
         <Card>
@@ -273,6 +303,7 @@ export default function AssignQCChecker() {
               <TableHead>Vendor Details</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Inspection Status</TableHead>
               <TableHead>Assigned QC Checker</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -280,7 +311,7 @@ export default function AssignQCChecker() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5}>
+                <TableCell colSpan={6}>
                   <div className="flex justify-center items-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                   </div>
@@ -316,6 +347,7 @@ export default function AssignQCChecker() {
                     </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(vendor.status)}</TableCell>
+                  <TableCell>{getInspectionStatusDisplay(vendor.status, vendor.inspectionStatus, vendor.inspectionResult)}</TableCell>
                   <TableCell>
                     {vendor.assignedCheckerName ? (
                       <div className="flex items-center gap-2">
@@ -337,30 +369,49 @@ export default function AssignQCChecker() {
                       >
                         <Eye className="h-4 w-4" />
                       </Link>
-                      {vendor.inspectionStatus === "COMPLETED" ? (
-                        <Link
-                          href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
-                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
-                        >
-                          <FileText className="h-4 w-4" />
-                          View Report
-                        </Link>
-                      ) : (
-                        <Link
-                          href={`/admin/dashboard/vendors/assign-qc-checker/add?vendorId=${vendor.id}`}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
-                        >
-                          <UserCheck className="h-4 w-4" />
-                          {vendor.assignedChecker ? "Update" : "Assign"}
-                        </Link>
-                      )}
+                      {(() => {
+                        const s = vendor.inspectionStatus;
+                        const vs = vendor.status;
+                        const vendorFinalized = ['APPROVED', 'REJECTED', 'SUSPENDED'].includes(vs);
+                        if (s === "COMPLETED" || (vendorFinalized && s)) {
+                          return (
+                            <Link
+                              href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
+                              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+                            >
+                              <FileText className="h-4 w-4" />
+                              View Report
+                            </Link>
+                          );
+                        }
+                        if (s === "SUBMITTED" || s === "UNDER_ADMIN_REVIEW") {
+                          return (
+                            <Link
+                              href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
+                              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Review Report
+                            </Link>
+                          );
+                        }
+                        return (
+                          <Link
+                            href={`/admin/dashboard/vendors/assign-qc-checker/add?vendorId=${vendor.id}`}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
+                          >
+                            <UserCheck className="h-4 w-4" />
+                            {vendor.assignedChecker ? "Update" : "Assign"}
+                          </Link>
+                        );
+                      })()}
                     </div>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5}>
+                <TableCell colSpan={6}>
                   <div className="p-12 text-center">
                     <p className="text-gray-500">No vendors found</p>
                   </div>

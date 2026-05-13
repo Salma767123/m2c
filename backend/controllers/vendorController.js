@@ -12,6 +12,68 @@ const {
   generateSecurePassword
 } = require('../utils/email/vendorEmailSender');
 
+// Finalize any pending (SUBMITTED / UNDER_ADMIN_REVIEW) inspections when admin
+// makes a direct vendor status decision (approve / reject / suspend). Without
+// this, inspections get stuck in SUBMITTED forever if admin bypasses the
+// inspection review flow.
+//
+// Accepts a Prisma transaction client (`tx`) so inspection updates are atomic
+// with the vendor-status change that wraps them.
+const finalizeInspectionsForVendor = async (tx, vendorId, { decision }) => {
+  const pendingInspections = await tx.inspection.findMany({
+    where: {
+      vendorId,
+      status: { in: ['SUBMITTED', 'UNDER_ADMIN_REVIEW'] },
+    },
+  });
+
+  if (pendingInspections.length === 0) return null;
+
+  const resultMap = { APPROVED: 'PASSED', REJECTED: 'FAILED', SUSPENDED: 'FAILED' };
+  const now = new Date();
+
+  await Promise.all(
+    pendingInspections.map((insp) =>
+      tx.inspection.update({
+        where: { id: insp.id },
+        data: {
+          status: 'COMPLETED',
+          result: resultMap[decision] || insp.result,
+          completedAt: now,
+          reviewedAt: now,
+        },
+      })
+    )
+  );
+
+  return pendingInspections;
+};
+
+// Write audit logs for finalized inspections. Called OUTSIDE the transaction
+// so a log failure never blocks the main operation (matches codebase pattern).
+const writeInspectionAuditLogs = (pendingInspections, { decision, adminId, adminName, reason }) => {
+  if (!adminId || !pendingInspections || pendingInspections.length === 0) return;
+
+  const actionMap = { APPROVED: 'ADMIN_APPROVED', REJECTED: 'ADMIN_FINAL_REJECTED', SUSPENDED: 'ADMIN_FINAL_REJECTED' };
+
+  pendingInspections.forEach((insp) => {
+    prisma.inspectionAuditLog.create({
+      data: {
+        entityType: 'FACTORY_INSPECTION',
+        entityId: insp.id,
+        action: actionMap[decision] || 'ADMIN_APPROVED',
+        fromStatus: insp.status,
+        toStatus: 'COMPLETED',
+        performedById: adminId,
+        performedByType: 'ADMIN',
+        performedByName: adminName || 'Admin',
+        rejectionReason: reason || null,
+        cycleNumber: insp.cycleNumber || 1,
+      },
+    }).catch(err => console.error('Audit log write failed:', err));
+  });
+};
+
 // Helper function to map business type to enum
 const getCompanyTypeEnum = (businessType) => {
   const mapping = {
@@ -238,96 +300,96 @@ const registerVendor = async (req, res) => {
     // Build the vendor data payload once — reused if we need to retry after a
     // unique-index collision on vendorCode (e.g. counter drift).
     const buildVendorData = (vendorCode) => ({
-        vendorCode,
-        email,
-        password: hashedPassword,
-        status: 'PENDING',
+      vendorCode,
+      email,
+      password: hashedPassword,
+      status: 'PENDING',
 
-        // Owner Profile
-        ownerName,
-        ownerEmail,
-        ownerPhone,
-        ownerAddress: ownerAddress || address,
-        ownerCity: ownerCity || city,
-        ownerState: ownerState || state,
-        ownerZipCode: ownerZipCode || zipCode,
-        ownerCountry: ownerCountry || country || 'India',
-        ownerPhoto: ownerPhotoUrl,
-        additionalOwners: additionalOwners ? (typeof additionalOwners === 'string' ? JSON.parse(additionalOwners) : additionalOwners) : null,
+      // Owner Profile
+      ownerName,
+      ownerEmail,
+      ownerPhone,
+      ownerAddress: ownerAddress || address,
+      ownerCity: ownerCity || city,
+      ownerState: ownerState || state,
+      ownerZipCode: ownerZipCode || zipCode,
+      ownerCountry: ownerCountry || country || 'India',
+      ownerPhoto: ownerPhotoUrl,
+      additionalOwners: additionalOwners ? (typeof additionalOwners === 'string' ? JSON.parse(additionalOwners) : additionalOwners) : null,
 
-        // Company Details
-        companyName,
-        companyType: getCompanyTypeEnum(businessType),
-        establishedYear: yearEstablished ? parseInt(yearEstablished) : null,
-        companyDescription: `${companyName} - ${businessType} established in ${yearEstablished}`,
-        companyLogo: logoUrl,
+      // Company Details
+      companyName,
+      companyType: getCompanyTypeEnum(businessType),
+      establishedYear: yearEstablished ? parseInt(yearEstablished) : null,
+      companyDescription: `${companyName} - ${businessType} established in ${yearEstablished}`,
+      companyLogo: logoUrl,
 
-        // Contact & Trade Information
-        businessPhone: phone,
-        landlineNumber: landlineNumber || null,
-        phoneNumber2: phoneNumber2 || null,
-        businessEmail: email,
-        businessAddress: address,
-        businessCity: city,
-        businessState: state,
-        businessZipCode: zipCode,
-        businessCountry: country || 'India',
-        website,
-        gstNumber: gstNumber || null,
+      // Contact & Trade Information
+      businessPhone: phone,
+      landlineNumber: landlineNumber || null,
+      phoneNumber2: phoneNumber2 || null,
+      businessEmail: email,
+      businessAddress: address,
+      businessCity: city,
+      businessState: state,
+      businessZipCode: zipCode,
+      businessCountry: country || 'India',
+      website,
+      gstNumber: gstNumber || null,
 
-        // Trade Information
-        annualTurnover: employeeCount, // Using employee count as proxy for now
-        exportExperience: hasImportExport === 'yes',
-        exportCountries: parsedExportCountries || [],
-        primaryMarkets: Array.isArray(parsedMarketType) ? parsedMarketType : (parsedMarketType ? [parsedMarketType] : []),
+      // Trade Information
+      annualTurnover: employeeCount, // Using employee count as proxy for now
+      exportExperience: hasImportExport === 'yes',
+      exportCountries: parsedExportCountries || [],
+      primaryMarkets: Array.isArray(parsedMarketType) ? parsedMarketType : (parsedMarketType ? [parsedMarketType] : []),
 
-        // Manufacturing Facilities
-        enabledFacilities: parsedEnabledFacilities || null,
-        facilityDetails: parsedFacilityDetails || null,
-        factoryAddress: warehouseAddress,
-        factoryCity: warehouseCity,
-        factoryState: warehouseState,
-        factoryZipCode: warehouseZip,
-        factoryCountry: warehouseCountry || 'India',
-        factorySize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
-        productionCapacity: Object.values(parsedFacilityDetails || {}).map(f => f.capacity).filter(Boolean).join(', '),
-        qualityControl: qualityControlProcess,
+      // Manufacturing Facilities
+      enabledFacilities: parsedEnabledFacilities || null,
+      facilityDetails: parsedFacilityDetails || null,
+      factoryAddress: warehouseAddress,
+      factoryCity: warehouseCity,
+      factoryState: warehouseState,
+      factoryZipCode: warehouseZip,
+      factoryCountry: warehouseCountry || 'India',
+      factorySize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
+      productionCapacity: Object.values(parsedFacilityDetails || {}).map(f => f.capacity).filter(Boolean).join(', '),
+      qualityControl: qualityControlProcess,
 
-        // Warehouse Details
-        ownershipType: ownershipType || null,
-        warehouseAddress,
-        warehouseCity,
-        warehouseState,
-        warehouseZipCode: warehouseZip,
-        warehouseCountry: warehouseCountry || 'India',
-        warehouseSize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
-        storageCapacity: warehousingCapacity,
-        mapLink: mapLink || null,
+      // Warehouse Details
+      ownershipType: ownershipType || null,
+      warehouseAddress,
+      warehouseCity,
+      warehouseState,
+      warehouseZipCode: warehouseZip,
+      warehouseCountry: warehouseCountry || 'India',
+      warehouseSize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
+      storageCapacity: warehousingCapacity,
+      mapLink: mapLink || null,
 
-        // Vendor Type & Products
-        vendorType: getVendorTypeEnum(parsedVendorType),
-        productCategories: normalizedProductCategories,
-        productTypes: normalizedProductTypes,
-        specializations: parsedSelectedCertifications || [],
-        categoryRemarks: categoryRemarks || null,
+      // Vendor Type & Products
+      vendorType: getVendorTypeEnum(parsedVendorType),
+      productCategories: normalizedProductCategories,
+      productTypes: normalizedProductTypes,
+      specializations: parsedSelectedCertifications || [],
+      categoryRemarks: categoryRemarks || null,
 
-        // Logistics Information
-        shippingMethods: parsedShippingMethods || [],
-        deliveryTime: '7-15 days', // Default
-        minimumOrderQuantity: '100 pieces', // Default
-        paymentTerms: ['30 days', 'LC'], // Default
+      // Logistics Information
+      shippingMethods: parsedShippingMethods || [],
+      deliveryTime: '7-15 days', // Default
+      minimumOrderQuantity: '100 pieces', // Default
+      paymentTerms: ['30 days', 'LC'], // Default
 
-        // Contact & Trade Information
-        mainContact: parsedMainContact || null,
-        alternateContacts: parsedAlternateContacts || [],
-        tradeLicenseNumber: tradeLicenseNumber || null,
-        businessRegistrationNumber: businessRegistrationNumber || null,
-        taxIdentificationNumber: taxIdentificationNumber || null,
+      // Contact & Trade Information
+      mainContact: parsedMainContact || null,
+      alternateContacts: parsedAlternateContacts || [],
+      tradeLicenseNumber: tradeLicenseNumber || null,
+      businessRegistrationNumber: businessRegistrationNumber || null,
+      taxIdentificationNumber: taxIdentificationNumber || null,
 
-        // System fields
-        applicationStep: 8, // Completed all steps
-        completedSteps: [1, 2, 3, 4, 5, 6, 7, 8],
-        submittedAt: new Date()
+      // System fields
+      applicationStep: 8, // Completed all steps
+      completedSteps: [1, 2, 3, 4, 5, 6, 7, 8],
+      submittedAt: new Date()
     });
 
     // Create vendor + generate code atomically. If the unique index on
@@ -443,7 +505,7 @@ const registerVendor = async (req, res) => {
       title: 'New Vendor Registration',
       message: `${vendor.companyName} has submitted a vendor registration.`,
       data: { vendorId: vendor.id }
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Send email to all admins about new registration
     sendNewVendorRegistrationEmailToAdmins({
@@ -453,7 +515,7 @@ const registerVendor = async (req, res) => {
       vendorPhone: vendor.businessPhone,
       city: vendor.businessCity,
       state: vendor.businessState
-    }).catch(() => {});
+    }).catch(() => { });
 
     res.status(201).json({
       message: 'Vendor registration submitted successfully',
@@ -1103,21 +1165,34 @@ const approveVendor = async (req, res) => {
       // Super Admin: direct approval
       const temporaryPassword = generateSecurePassword(12);
       const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
+      const adminId = req.user?.id || req.userId;
+      const adminName = req.user?.name || req.user?.email;
 
-      const vendor = await prisma.vendor.update({
-        where: { id: vendorId },
-        data: {
-          status: 'APPROVED',
-          approvedAt: new Date(),
-          rejectedAt: null,
-          rejectionReason: null,
-          rejectionRequestedBy: null,
-          rejectionRequestedAt: null,
-          approvalRequestedBy: null,
-          approvalRequestedAt: null,
-          password: hashedPassword
-        }
+      // Vendor status change + inspection finalization must be atomic
+      const { vendor, finalizedInspections } = await prisma.$transaction(async (tx) => {
+        const updatedVendor = await tx.vendor.update({
+          where: { id: vendorId },
+          data: {
+            status: 'APPROVED',
+            approvedAt: new Date(),
+            rejectedAt: null,
+            rejectionReason: null,
+            rejectionRequestedBy: null,
+            rejectionRequestedAt: null,
+            approvalRequestedBy: null,
+            approvalRequestedAt: null,
+            password: hashedPassword
+          }
+        });
+
+        const inspections = await finalizeInspectionsForVendor(tx, vendorId, { decision: 'APPROVED' });
+        return { vendor: updatedVendor, finalizedInspections: inspections };
       });
+
+      // Audit logs: fire-and-forget, outside transaction
+      if (finalizedInspections) {
+        writeInspectionAuditLogs(finalizedInspections, { decision: 'APPROVED', adminId, adminName });
+      }
 
       try {
         await sendVendorApprovalEmail({
@@ -1136,7 +1211,7 @@ const approveVendor = async (req, res) => {
         userId: vendor.id, role: 'VENDOR', type: 'VENDOR_STATUS_CHANGED',
         title: 'Vendor Application Approved',
         message: `Congratulations! Your vendor application for "${vendor.companyName}" has been approved.`,
-      }).catch(() => {});
+      }).catch(() => { });
 
       res.json({
         message: 'Vendor approved successfully and credentials sent via email',
@@ -1160,7 +1235,7 @@ const approveVendor = async (req, res) => {
         title: 'Vendor Approval Pending Confirmation',
         message: `Employee requested approval of "${vendor.companyName}". Awaiting Super Admin confirmation.`,
         data: { vendorId: vendor.id }
-      }).catch(() => {});
+      }).catch(() => { });
 
       res.json({
         message: 'Approval request submitted. Awaiting Super Admin confirmation.',
@@ -1197,19 +1272,30 @@ const confirmApproval = async (req, res) => {
 
     const temporaryPassword = generateSecurePassword(12);
     const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
+    const adminId = req.user?.id || req.userId;
+    const adminName = req.user?.name || req.user?.email;
 
-    const vendor = await prisma.vendor.update({
-      where: { id: vendorId },
-      data: {
-        status: 'APPROVED',
-        approvedAt: new Date(),
-        rejectedAt: null,
-        rejectionReason: null,
-        approvalRequestedBy: null,
-        approvalRequestedAt: null,
-        password: hashedPassword
-      }
+    const { vendor, finalizedInspections } = await prisma.$transaction(async (tx) => {
+      const updatedVendor = await tx.vendor.update({
+        where: { id: vendorId },
+        data: {
+          status: 'APPROVED',
+          approvedAt: new Date(),
+          rejectedAt: null,
+          rejectionReason: null,
+          approvalRequestedBy: null,
+          approvalRequestedAt: null,
+          password: hashedPassword
+        }
+      });
+
+      const inspections = await finalizeInspectionsForVendor(tx, vendorId, { decision: 'APPROVED' });
+      return { vendor: updatedVendor, finalizedInspections: inspections };
     });
+
+    if (finalizedInspections) {
+      writeInspectionAuditLogs(finalizedInspections, { decision: 'APPROVED', adminId, adminName });
+    }
 
     try {
       await sendVendorApprovalEmail({
@@ -1228,7 +1314,7 @@ const confirmApproval = async (req, res) => {
       userId: vendor.id, role: 'VENDOR', type: 'VENDOR_STATUS_CHANGED',
       title: 'Vendor Application Approved',
       message: `Congratulations! Your vendor application for "${vendor.companyName}" has been approved.`,
-    }).catch(() => {});
+    }).catch(() => { });
 
     if (existingVendor.approvalRequestedBy) {
       createNotification({
@@ -1238,7 +1324,7 @@ const confirmApproval = async (req, res) => {
         title: 'Vendor Approval Confirmed',
         message: `Your approval of "${vendor.companyName}" has been confirmed by Super Admin.`,
         data: { vendorId: vendor.id }
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     res.json({
@@ -1291,7 +1377,7 @@ const cancelApproval = async (req, res) => {
         title: 'Vendor Approval Cancelled',
         message: `Your approval of "${vendor.companyName}" was overturned by Super Admin. Vendor restored to Pending.`,
         data: { vendorId: vendor.id }
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     res.json({
@@ -1326,18 +1412,31 @@ const rejectVendor = async (req, res) => {
     const isSuperAdmin = (req.user.roleName || '').toLowerCase().trim() === 'super admin';
 
     if (isSuperAdmin) {
-      // Super Admin: direct rejection (same as before)
-      const vendor = await prisma.vendor.update({
-        where: { id: vendorId },
-        data: {
-          status: 'REJECTED',
-          rejectedAt: new Date(),
-          rejectionReason: reason,
-          rejectionRequestedBy: null,
-          rejectionRequestedAt: null,
-          approvedAt: null
-        }
+      // Super Admin: direct rejection with inspection finalization
+      const adminId = req.user?.id || req.userId;
+      const adminName = req.user?.name || req.user?.email;
+
+      const { vendor, finalizedInspections } = await prisma.$transaction(async (tx) => {
+        const updatedVendor = await tx.vendor.update({
+          where: { id: vendorId },
+          data: {
+            status: 'REJECTED',
+            rejectedAt: new Date(),
+            rejectionReason: reason,
+            rejectionRequestedBy: null,
+            rejectionRequestedAt: null,
+            approvedAt: null
+          }
+        });
+
+        const inspections = await finalizeInspectionsForVendor(tx, vendorId, { decision: 'REJECTED' });
+        return { vendor: updatedVendor, finalizedInspections: inspections };
       });
+
+      // Audit logs: fire-and-forget, outside transaction
+      if (finalizedInspections) {
+        writeInspectionAuditLogs(finalizedInspections, { decision: 'REJECTED', adminId, adminName, reason });
+      }
 
       try {
         await sendVendorRejectionEmail({
@@ -1411,14 +1510,26 @@ const confirmRejection = async (req, res) => {
       return res.status(400).json({ error: 'Vendor is not in rejection pending state' });
     }
 
-    const vendor = await prisma.vendor.update({
-      where: { id: vendorId },
-      data: {
-        status: 'REJECTED',
-        rejectedAt: new Date(),
-        approvedAt: null
-      }
+    const adminId = req.user?.id || req.userId;
+    const adminName = req.user?.name || req.user?.email;
+
+    const { vendor, finalizedInspections } = await prisma.$transaction(async (tx) => {
+      const updatedVendor = await tx.vendor.update({
+        where: { id: vendorId },
+        data: {
+          status: 'REJECTED',
+          rejectedAt: new Date(),
+          approvedAt: null
+        }
+      });
+
+      const inspections = await finalizeInspectionsForVendor(tx, vendorId, { decision: 'REJECTED' });
+      return { vendor: updatedVendor, finalizedInspections: inspections };
     });
+
+    if (finalizedInspections) {
+      writeInspectionAuditLogs(finalizedInspections, { decision: 'REJECTED', adminId, adminName, reason: vendor.rejectionReason });
+    }
 
     // Send rejection email to vendor
     try {
@@ -1443,7 +1554,7 @@ const confirmRejection = async (req, res) => {
         title: 'Vendor Rejection Confirmed',
         message: `Your rejection of "${vendor.companyName}" has been confirmed by Super Admin.`,
         data: { vendorId: vendor.id }
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     res.json({
@@ -1499,7 +1610,7 @@ const cancelRejection = async (req, res) => {
         title: 'Vendor Rejection Cancelled',
         message: `Your rejection of "${vendor.companyName}" was overturned by Super Admin. Vendor restored to Pending.`,
         data: { vendorId: vendor.id }
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     res.json({
@@ -1531,14 +1642,31 @@ const suspendVendor = async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    const vendor = await prisma.vendor.update({
-      where: { id: vendorId },
-      data: {
-        status: 'SUSPENDED',
-        suspendedAt: new Date(),
-        rejectionReason: reason
-      }
+    const adminId = req.user?.id || req.userId;
+    const adminName = req.user?.name || req.user?.email;
+
+    // Vendor status change + inspection finalization must be atomic
+    const { vendor, finalizedInspections } = await prisma.$transaction(async (tx) => {
+      const updatedVendor = await tx.vendor.update({
+        where: { id: vendorId },
+        data: {
+          status: 'SUSPENDED',
+          suspendedAt: new Date(),
+          rejectionReason: reason,
+        },
+      });
+
+      const inspections = await finalizeInspectionsForVendor(tx, vendorId, {
+        decision: 'SUSPENDED',
+      });
+
+      return { vendor: updatedVendor, finalizedInspections: inspections };
     });
+
+    // Audit logs: fire-and-forget, outside transaction
+    if (finalizedInspections) {
+      writeInspectionAuditLogs(finalizedInspections, { decision: 'SUSPENDED', adminId, adminName, reason });
+    }
 
     // Send suspension email
     try {
@@ -1561,7 +1689,7 @@ const suspendVendor = async (req, res) => {
       userId: vendor.id, role: 'VENDOR', type: 'VENDOR_STATUS_CHANGED',
       title: 'Account Suspended',
       message: `Your vendor account has been suspended.${reason ? ` Reason: ${reason}` : ''}`,
-    }).catch(() => {});
+    }).catch(() => { });
 
     res.json({
       message: 'Vendor suspended successfully and notification sent via email',

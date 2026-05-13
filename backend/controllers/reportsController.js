@@ -585,7 +585,6 @@ const getCustomersReport = async (req, res) => {
                 tables: {
                     topCustomers: topCustomers.map((c, i) => ({
                         rank: i + 1,
-                        id: c.customerId,
                         name: c.customerName,
                         email: c.customerEmail,
                         revenue: c._sum.totalAmount || 0,

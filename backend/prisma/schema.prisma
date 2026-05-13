@@ -197,12 +197,13 @@ model CartItem {
 model Wishlist {
   id         String         @id @default(auto()) @map("_id") @db.ObjectId
   userId     String         @unique @db.ObjectId
-  shareToken String?        @unique
+  shareToken String?
   items      WishlistItem[]
 
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
+  @@index([shareToken])
   @@map("wishlists")
 }
 
@@ -1701,6 +1702,7 @@ model ProductView {
   @@index([productId])
   @@index([createdAt])
   @@index([category])
+  @@index([productId, sessionId, createdAt])
   @@map("product_views")
 }
 

@@ -33,7 +33,6 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
   const [imageRef, setImageRef] = useState<HTMLImageElement | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [transportOverride, setTransportOverride] = useState<'AIR' | 'SHIP' | null>(null);
-
   // Reviews
   const [reviews, setReviews] = useState<{ id: string; rating: number; comment?: string; createdAt: string; user?: { name: string } }[]>([]);
   const [showReviews, setShowReviews] = useState(false);
@@ -75,12 +74,16 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
             }
           } catch {/* keep default 'direct' */}
 
-          trackProductView({
-            productId: response.data.id,
-            productName: response.data.name,
-            category: response.data.category,
-            source,
-          });
+          const viewedKey = `m2c_viewed_${response.data.id}`;
+          if (!sessionStorage.getItem(viewedKey)) {
+            sessionStorage.setItem(viewedKey, '1');
+            trackProductView({
+              productId: response.data.id,
+              productName: response.data.name,
+              category: response.data.category,
+              source,
+            });
+          }
         }
       } catch (error) {
         console.error('Failed to fetch product:', error);
@@ -462,7 +465,13 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         </span>
                         {product.reviews != null && product.reviews > 0 ? (
                           <button
-                            onClick={fetchReviews}
+                            onClick={() => {
+                              if (showReviews) {
+                                setShowReviews(false);
+                              } else {
+                                fetchReviews();
+                              }
+                            }}
                             className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
                           >
                             {showReviews ? 'Hide reviews' : 'See all reviews'}
@@ -979,7 +988,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
           {/* Customer Reviews */}
           {showReviews && (
-            <div className="mt-8 bg-white rounded-2xl shadow-lg p-8">
+            <div id="customer-reviews" ref={(el) => { if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }} className="mt-8 bg-white rounded-2xl shadow-lg p-8 scroll-mt-48">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Customer Reviews</h3>
               {loadingReviews ? (
                 <div className="flex items-center justify-center py-8">

@@ -18,7 +18,9 @@ import {
     Shield,
     Lock,
     Loader2,
-    AlertCircle
+    AlertCircle,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 
@@ -33,6 +35,7 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
 
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
     const [formData, setFormData] = useState({
         firstName: '',
@@ -121,8 +124,7 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
             }
             router.push('/admin/dashboard/users');
         } catch (error: any) {
-            console.error('Failed to save staff', error);
-            showErrorToast(error.response?.data?.error || 'Failed to save staff member');
+            showErrorToast(error.response?.data?.error || error.data?.error || error.message || 'Failed to save staff member');
         } finally {
             setIsSaving(false);
         }
@@ -248,16 +250,23 @@ export default function AddEditUser({ isEdit = false }: AddEditUserProps) {
                                         <div className="relative">
                                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                                             <input
-                                                type="password"
+                                                type={showPassword ? 'text' : 'password'}
                                                 name="password"
                                                 value={formData.password}
                                                 onChange={handleInputChange}
-                                                placeholder="Leave empty for default (Staff@123!!)"
-                                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                                                placeholder="Leave empty to auto-generate a password"
+                                                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                            >
+                                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                            </button>
                                         </div>
                                         <p className="text-xs text-gray-500 italic">
-                                            Staff will receive this password via email. It's recommended to change it after first login.
+                                            A secure password will be auto-generated and emailed to the staff member. It's recommended to change it after first login.
                                         </p>
                                     </div>
                                 )}
