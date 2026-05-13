@@ -8,6 +8,10 @@ const {
   updateVendorById,
   approveVendor,
   rejectVendor,
+  confirmRejection,
+  cancelRejection,
+  confirmApproval,
+  cancelApproval,
   suspendVendor,
   vendorLogin,
   testVendorEmail,
@@ -32,7 +36,11 @@ router.get('/all', authenticateToken, requireRole('admin'), requirePermission('v
 router.get('/:vendorId', authenticateToken, requireRole('admin'), requirePermission('view_vendors'), getVendorById);
 router.put('/:vendorId', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), vendorUploadFields, handleUploadError, updateVendorById);
 router.put('/:vendorId/approve', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), approveVendor);
+router.put('/:vendorId/confirm-approval', authenticateToken, requireRole('admin'), confirmApproval);
+router.put('/:vendorId/cancel-approval', authenticateToken, requireRole('admin'), cancelApproval);
 router.put('/:vendorId/reject', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), rejectVendor);
+router.put('/:vendorId/confirm-rejection', authenticateToken, requireRole('admin'), confirmRejection);
+router.put('/:vendorId/cancel-rejection', authenticateToken, requireRole('admin'), cancelRejection);
 router.put('/:vendorId/suspend', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), suspendVendor);
 router.put('/:vendorId/verify-bank', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), verifyVendorBankDetails);
 router.post('/assign-qc', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), assignQc);

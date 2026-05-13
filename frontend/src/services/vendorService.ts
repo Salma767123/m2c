@@ -10,6 +10,8 @@ export interface VendorRegistrationData {
   gstNumber?: string;
   email: string;
   phone: string;
+  landlineNumber?: string;
+  phoneNumber2?: string;
   website?: string;
   address: string;
   city: string;
@@ -21,6 +23,7 @@ export interface VendorRegistrationData {
   ownerName: string;
   ownerEmail: string;
   ownerPhone: string;
+  additionalOwners?: Array<{ name: string; email: string; phone: string }>;
   yearEstablished: string;
   employeeCount: string;
 
@@ -110,7 +113,10 @@ export interface VendorProfile {
   ownerName: string;
   ownerEmail: string;
   ownerPhone: string;
+  additionalOwners?: Array<{ name: string; email: string; phone: string }>;
   businessPhone: string;
+  landlineNumber?: string;
+  phoneNumber2?: string;
   businessEmail: string;
   businessAddress: string;
   businessCity: string;
@@ -157,6 +163,15 @@ export interface VendorProfile {
   rejectedAt?: string;
   suspendedAt?: string;
   rejectionReason?: string;
+  applicationStep?: number;
+  completedSteps?: number[];
+  completionPercentage?: number;
+  approvalRequestedBy?: string;
+  approvalRequestedByName?: string;
+  approvalRequestedAt?: string;
+  rejectionRequestedBy?: string;
+  rejectionRequestedByName?: string;
+  rejectionRequestedAt?: string;
   certifications: any[];
   documents: any[];
   bankDetails?: any;
@@ -480,14 +495,18 @@ class VendorService {
       // Prepare FormData for file uploads
       const formData = new FormData();
 
+      // Fields to skip (handled separately or not needed in API)
+      const skipFields = [
+        'certificationFiles', 'logoFile', 'gstFile', 'contactPhotoFile',
+        'productPhotos', 'contactPhoto', 'logo', 'gstDocument',
+        'sameAsWarehouse', 'expandedCategories'
+      ];
+
       // Add all form fields
       Object.keys(vendorData).forEach(key => {
-        const value = vendorData[key];
+        if (skipFields.includes(key)) return;
 
-        // Skip certificationFiles as we'll handle them separately
-        if (key === 'certificationFiles') {
-          return;
-        }
+        const value = vendorData[key];
 
         // Handle different data types
         if (typeof value === 'object' && value !== null && !(value instanceof File)) {
@@ -496,6 +515,17 @@ class VendorService {
           formData.append(key, value);
         }
       });
+
+      // Handle file uploads for allowed multer fields
+      if (vendorData.logoFile instanceof File) {
+        formData.append('logo', vendorData.logoFile);
+      }
+      if (vendorData.gstFile instanceof File) {
+        formData.append('gstDocument', vendorData.gstFile);
+      }
+      if (vendorData.contactPhotoFile instanceof File) {
+        formData.append('ownerPhoto', vendorData.contactPhotoFile);
+      }
 
       // Add certification files
       if (vendorData.certificationFiles) {
@@ -556,6 +586,62 @@ class VendorService {
         },
       });
 
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Super Admin: Confirm vendor approval
+  static async confirmApproval(vendorId: string) {
+    const token = this.getAdminToken();
+    if (!token) throw new Error('No admin authentication token found');
+    try {
+      const response = await axiosInstance.put(`/vendors/${vendorId}/confirm-approval`, {}, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Super Admin: Cancel vendor approval
+  static async cancelApproval(vendorId: string) {
+    const token = this.getAdminToken();
+    if (!token) throw new Error('No admin authentication token found');
+    try {
+      const response = await axiosInstance.put(`/vendors/${vendorId}/cancel-approval`, {}, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Super Admin: Confirm vendor rejection
+  static async confirmRejection(vendorId: string) {
+    const token = this.getAdminToken();
+    if (!token) throw new Error('No admin authentication token found');
+    try {
+      const response = await axiosInstance.put(`/vendors/${vendorId}/confirm-rejection`, {}, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Super Admin: Cancel vendor rejection
+  static async cancelRejection(vendorId: string) {
+    const token = this.getAdminToken();
+    if (!token) throw new Error('No admin authentication token found');
+    try {
+      const response = await axiosInstance.put(`/vendors/${vendorId}/cancel-rejection`, {}, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       return response.data;
     } catch (error) {
       throw error;

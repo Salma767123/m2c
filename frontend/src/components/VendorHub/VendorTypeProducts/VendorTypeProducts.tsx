@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
-import { Package, Globe, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { Package, Globe, ChevronDown, ChevronRight, Loader2, Upload, X, ImageIcon } from 'lucide-react';
+import Image from 'next/image';
 import { categoryService, Category } from '@/services/categoryService';
 
 interface VendorTypeProductsProps {
@@ -35,6 +36,37 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
     expandedCategories: data.expandedCategories || {},
     categoryRemarks: data.categoryRemarks || ''
   });
+
+  // Product photo uploads
+  const [productPhotos, setProductPhotos] = useState<Array<{ file: File; preview: string }>>(
+    data.productPhotos || []
+  );
+
+  const handleProductPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(f => {
+      if (f.size > 5 * 1024 * 1024) return false;
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) return false;
+      return true;
+    });
+    if (productPhotos.length + validFiles.length > 10) {
+      alert('Maximum 10 product photos allowed');
+      return;
+    }
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProductPhotos(prev => [...prev, { file, preview: reader.result as string }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  };
+
+  const removeProductPhoto = (index: number) => {
+    setProductPhotos(prev => prev.filter((_, i) => i !== index));
+  };
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -245,7 +277,7 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
       return;
     }
 
-    onUpdateData(formData);
+    onUpdateData({ ...formData, productPhotos });
     onNext();
   };
 
@@ -460,6 +492,58 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
           </div>
         </section>
       )}
+
+      {/* Product Photos */}
+      <section className="bg-white border border-gray-200 rounded-lg">
+        <div className="px-4 py-3">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+            <ImageIcon className="w-5 h-5 mr-2" />
+            Product Photos
+          </h2>
+          <p className="text-sm text-gray-600">Upload sample images of your products (max 10 photos, 5MB each)</p>
+        </div>
+        <div className="p-4">
+          {/* Photo Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
+            {productPhotos.map((photo, index) => (
+              <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200">
+                <Image
+                  src={photo.preview}
+                  alt={`Product ${index + 1}`}
+                  fill
+                  className="object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeProductPhoto(index)}
+                  className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+
+            {/* Upload Button */}
+            {productPhotos.length < 10 && (
+              <label className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                <Upload className="w-6 h-6 text-gray-400 mb-1" />
+                <span className="text-xs text-gray-500">Upload</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={handleProductPhotoUpload}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
+
+          {productPhotos.length > 0 && (
+            <p className="text-xs text-gray-500">{productPhotos.length}/10 photos uploaded</p>
+          )}
+        </div>
+      </section>
 
       {/* Category Remarks */}
       <section className="bg-white border border-gray-200 rounded-lg">

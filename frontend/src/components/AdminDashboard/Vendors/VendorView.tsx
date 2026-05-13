@@ -32,7 +32,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
@@ -227,6 +228,10 @@ export default function VendorView({ vendorId }: VendorViewProps) {
         return <Badge className="bg-red-100 text-red-800">Suspended</Badge>
       case 'REJECTED':
         return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
+      case 'APPROVAL_PENDING':
+        return <Badge className="bg-cyan-100 text-cyan-800">Approval Pending</Badge>
+      case 'REJECTION_PENDING':
+        return <Badge className="bg-orange-100 text-orange-800">Rejection Pending</Badge>
       default:
         return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>
     }
@@ -269,6 +274,24 @@ export default function VendorView({ vendorId }: VendorViewProps) {
 
             <div className="flex items-center space-x-3">
               {getStatusBadge(vendor.status)}
+
+              {/* Pending request info */}
+              {vendor.status === 'APPROVAL_PENDING' && (vendor as any).approvalRequestedByName && (
+                <span className="text-sm text-cyan-700 bg-cyan-50 px-3 py-1 rounded-full">
+                  Requested by <strong>{(vendor as any).approvalRequestedByName}</strong>
+                  {(vendor as any).approvalRequestedAt && (
+                    <> on {new Date((vendor as any).approvalRequestedAt).toLocaleDateString('en-IN')}</>
+                  )}
+                </span>
+              )}
+              {vendor.status === 'REJECTION_PENDING' && (vendor as any).rejectionRequestedByName && (
+                <span className="text-sm text-orange-700 bg-orange-50 px-3 py-1 rounded-full">
+                  Requested by <strong>{(vendor as any).rejectionRequestedByName}</strong>
+                  {(vendor as any).rejectionRequestedAt && (
+                    <> on {new Date((vendor as any).rejectionRequestedAt).toLocaleDateString('en-IN')}</>
+                  )}
+                </span>
+              )}
 
               {/* Action Buttons */}
               {vendor.status === 'PENDING' && hasPermission('edit_vendors') && (
@@ -321,6 +344,98 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                     </>
                   )}
                 </Button>
+              )}
+
+              {vendor.status === 'APPROVAL_PENDING' && (
+                <>
+                  <Button
+                    onClick={async () => {
+                      if (!confirm('Confirm approval? Credentials will be sent to the vendor.')) return;
+                      try {
+                        setActionLoading('confirm-approve');
+                        await VendorService.confirmApproval(vendor.id);
+                        toast({ title: 'Approval Confirmed', description: 'Vendor approved and credentials sent.' });
+                        setVendor({ ...vendor, status: 'APPROVED', approvedAt: new Date().toISOString() });
+                      } catch (err: any) {
+                        toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to confirm approval', variant: 'destructive' });
+                      } finally {
+                        setActionLoading(null);
+                      }
+                    }}
+                    disabled={actionLoading === 'confirm-approve'}
+                    className="bg-green-600 text-white hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirm Approval
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!confirm('Cancel this approval? Vendor will be restored to Pending.')) return;
+                      try {
+                        setActionLoading('cancel-approve');
+                        await VendorService.cancelApproval(vendor.id);
+                        toast({ title: 'Approval Cancelled', description: 'Vendor restored to Pending.' });
+                        setVendor({ ...vendor, status: 'PENDING' });
+                      } catch (err: any) {
+                        toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to cancel approval', variant: 'destructive' });
+                      } finally {
+                        setActionLoading(null);
+                      }
+                    }}
+                    disabled={actionLoading === 'cancel-approve'}
+                    variant="outline"
+                    className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Cancel Approval
+                  </Button>
+                </>
+              )}
+
+              {vendor.status === 'REJECTION_PENDING' && (
+                <>
+                  <Button
+                    onClick={async () => {
+                      if (!confirm('Confirm rejection? Rejection email will be sent to the vendor.')) return;
+                      try {
+                        setActionLoading('confirm-reject');
+                        await VendorService.confirmRejection(vendor.id);
+                        toast({ title: 'Rejection Confirmed', description: 'Vendor has been rejected and notified.' });
+                        setVendor({ ...vendor, status: 'REJECTED', rejectedAt: new Date().toISOString() });
+                      } catch (err: any) {
+                        toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to confirm rejection', variant: 'destructive' });
+                      } finally {
+                        setActionLoading(null);
+                      }
+                    }}
+                    disabled={actionLoading === 'confirm-reject'}
+                    className="bg-red-600 text-white hover:bg-red-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirm Rejection
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!confirm('Cancel this rejection? Vendor will be restored to Pending.')) return;
+                      try {
+                        setActionLoading('cancel-reject');
+                        await VendorService.cancelRejection(vendor.id);
+                        toast({ title: 'Rejection Cancelled', description: 'Vendor restored to Pending.' });
+                        setVendor({ ...vendor, status: 'PENDING', rejectionReason: undefined });
+                      } catch (err: any) {
+                        toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to cancel rejection', variant: 'destructive' });
+                      } finally {
+                        setActionLoading(null);
+                      }
+                    }}
+                    disabled={actionLoading === 'cancel-reject'}
+                    variant="outline"
+                    className="text-green-600 border-green-600 hover:bg-green-50"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Cancel Rejection
+                  </Button>
+                </>
               )}
 
               {hasPermission('edit_vendors') && (
@@ -418,6 +533,16 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
+                {(vendor as any).companyType && (
+                  <div className="flex items-center space-x-3">
+                    <Building2 className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600">Business Type</p>
+                      <p className="font-medium capitalize">{(vendor as any).companyType.replace(/_/g, ' ').toLowerCase()}</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center space-x-3">
                   <Mail className="h-4 w-4 text-gray-400" />
                   <div>
@@ -433,6 +558,26 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{vendor.businessPhone}</p>
                   </div>
                 </div>
+
+                {vendor.landlineNumber && (
+                  <div className="flex items-center space-x-3">
+                    <Phone className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600">Landline Number</p>
+                      <p className="font-medium">{vendor.landlineNumber}</p>
+                    </div>
+                  </div>
+                )}
+
+                {vendor.phoneNumber2 && (
+                  <div className="flex items-center space-x-3">
+                    <Phone className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600">Phone Number 2</p>
+                      <p className="font-medium">{vendor.phoneNumber2}</p>
+                    </div>
+                  </div>
+                )}
 
                 {vendor.gstNumber && (
                   <div className="flex items-center space-x-3">
@@ -496,24 +641,70 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-gray-600">Name</p>
-                <p className="font-medium">{vendor.ownerName}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Email</p>
-                <p className="font-medium">{vendor.ownerEmail}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Phone</p>
-                <p className="font-medium">{vendor.ownerPhone}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Vendor Type</p>
-                <p className="font-medium capitalize">{vendor.vendorType.replace('_', ' ')}</p>
+            <div className="flex gap-6">
+              {/* Owner Photo */}
+              {(vendor as any).ownerPhoto && (
+                <div className="shrink-0">
+                  <img
+                    src={(vendor as any).ownerPhoto}
+                    alt={vendor.ownerName}
+                    className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                  />
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+                <div>
+                  <p className="text-sm text-gray-600">Name</p>
+                  <p className="font-medium">{vendor.ownerName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Email</p>
+                  <p className="font-medium">{vendor.ownerEmail}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Phone</p>
+                  <p className="font-medium">{vendor.ownerPhone}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Vendor Type</p>
+                  <p className="font-medium capitalize">{vendor.vendorType.replace('_', ' ')}</p>
+                </div>
               </div>
             </div>
+
+            {/* Additional Owners */}
+            {(() => {
+              const owners = vendor.additionalOwners;
+              if (!owners || !Array.isArray(owners) || owners.length === 0) return null;
+              return (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Additional Owners</h4>
+                  <div className="space-y-3">
+                    {owners.map((owner: any, index: number) => (
+                      <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold">
+                          {index + 2}
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 flex-1 text-sm">
+                          <div>
+                            <p className="text-gray-500">Name</p>
+                            <p className="font-medium">{owner.name}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Email</p>
+                            <p className="font-medium">{owner.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Phone</p>
+                            <p className="font-medium">{owner.phone}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
@@ -637,6 +828,12 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {(vendor as any).ownershipType && (
+                <div>
+                  <p className="text-sm text-gray-600 font-semibold mb-1">Facility Ownership</p>
+                  <p className="font-medium capitalize">{(vendor as any).ownershipType}</p>
+                </div>
+              )}
               {vendor.warehouseAddress ? (
                 <div>
                   <p className="text-sm text-gray-600 font-semibold mb-1">Warehouse Address</p>
@@ -734,6 +931,22 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
         </CardContent>
       </Card>
 
+      {/* Market Type */}
+      {(vendor as any).marketType && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Market Type</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {(Array.isArray((vendor as any).marketType) ? (vendor as any).marketType : [(vendor as any).marketType]).map((type: string, index: number) => (
+                <Badge key={index} className="bg-orange-100 text-orange-800 capitalize">{type}</Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {vendor.productCategories && vendor.productCategories.length > 0 && (
         <Card>
           <CardHeader>
@@ -784,6 +997,18 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Category Remarks */}
+      {(vendor as any).categoryRemarks && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Category Remarks</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 whitespace-pre-wrap">{(vendor as any).categoryRemarks}</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
@@ -825,6 +1050,47 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                 </div>
               )}
             </div>
+
+            {/* Enabled Facilities & Details */}
+            {(() => {
+              const enabled = (vendor as any).enabledFacilities;
+              const details = (vendor as any).facilityDetails;
+              if (!enabled || typeof enabled !== 'object') return null;
+
+              const facilityLabels: Record<string, string> = {
+                spinning: 'Spinning', weaving: 'Weaving', dyeing: 'Dyeing',
+                printing: 'Printing', stitching: 'Stitching', finishing: 'Finishing'
+              };
+
+              const activeFacilities = Object.entries(enabled).filter(([, v]) => v);
+              if (activeFacilities.length === 0) return null;
+
+              return (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Active Facility Stages</h4>
+                  <div className="space-y-3">
+                    {activeFacilities.map(([id]) => {
+                      const fd = details?.[id];
+                      return (
+                        <div key={id} className="p-3 bg-gray-50 rounded-lg">
+                          <p className="font-medium text-gray-900 mb-2">{facilityLabels[id] || id}</p>
+                          {fd && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              {Object.entries(fd).filter(([, v]) => v).map(([key, val]) => (
+                                <div key={key}>
+                                  <p className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                                  <p className="font-medium">{String(val)}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
@@ -1077,7 +1343,18 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex gap-6">
+              {/* Contact Person Photo */}
+              {vendor.mainContact.photo && (
+                <div className="shrink-0">
+                  <img
+                    src={vendor.mainContact.photo}
+                    alt={vendor.mainContact.name || 'Contact'}
+                    className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                  />
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
               <div>
                 <p className="text-sm text-gray-600">Name</p>
                 <p className="font-medium">{vendor.mainContact.name || 'N/A'}</p>
@@ -1109,6 +1386,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
               <div>
                 <p className="text-sm text-gray-600">Department</p>
                 <p className="font-medium capitalize">{vendor.mainContact.department || 'N/A'}</p>
+              </div>
               </div>
             </div>
           </CardContent>

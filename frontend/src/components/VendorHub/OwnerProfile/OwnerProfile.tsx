@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
 import Dropdown from '@/components/UI/Dropdown';
-import { User, Calendar, Users, Mail, Phone } from 'lucide-react';
+import { User, Calendar, Users, Mail, Phone, Plus, Trash2 } from 'lucide-react';
 
 interface OwnerProfileProps {
   onNext: () => void;
@@ -28,6 +28,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     employeeCount: data.employeeCount || ''
   });
 
+  const [additionalOwners, setAdditionalOwners] = useState<Array<{ name: string; email: string; phone: string }>>(
+    data.additionalOwners || []
+  );
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -41,7 +45,27 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       yearEstablished: data.yearEstablished || '',
       employeeCount: data.employeeCount || ''
     })
+    setAdditionalOwners(data.additionalOwners || [])
   }, [data]);
+
+  const handleAddOwner = () => {
+    setAdditionalOwners(prev => [...prev, { name: '', email: '', phone: '' }]);
+  };
+
+  const handleRemoveOwner = (index: number) => {
+    setAdditionalOwners(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleOwnerFieldChange = (index: number, field: string, value: string) => {
+    setAdditionalOwners(prev => prev.map((owner, i) =>
+      i === index ? { ...owner, [field]: value } : owner
+    ));
+    // Clear error for this field
+    const errorKey = `additionalOwner_${index}_${field}`;
+    if (errors[errorKey]) {
+      setErrors(prev => ({ ...prev, [errorKey]: '' }));
+    }
+  };
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -75,6 +99,26 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     if (!formData.yearEstablished) newErrors.yearEstablished = 'Year Established is required';
     if (!formData.employeeCount) newErrors.employeeCount = 'Employee Count is required';
 
+    // Validate additional owners (only filled ones)
+    additionalOwners.forEach((owner, index) => {
+      if (owner.name || owner.email || owner.phone) {
+        if (!owner.name) newErrors[`additionalOwner_${index}_name`] = 'Name is required';
+        if (!owner.email) {
+          newErrors[`additionalOwner_${index}_email`] = 'Email is required';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner.email)) {
+          newErrors[`additionalOwner_${index}_email`] = 'Invalid email';
+        }
+        if (!owner.phone) {
+          newErrors[`additionalOwner_${index}_phone`] = 'Phone is required';
+        } else {
+          const cleanPhone = owner.phone.replace(/[\s\-\(\)]/g, '');
+          if (!/^(\+?[0-9]{10,15})$/.test(cleanPhone)) {
+            newErrors[`additionalOwner_${index}_phone`] = 'Invalid phone';
+          }
+        }
+      }
+    });
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       const allTouched: Record<string, boolean> = {};
@@ -91,7 +135,9 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       return;
     }
 
-    onUpdateData(formData);
+    // Filter out empty additional owners
+    const filledOwners = additionalOwners.filter(o => o.name || o.email || o.phone);
+    onUpdateData({ ...formData, additionalOwners: filledOwners.length > 0 ? filledOwners : undefined });
     onNext();
   };
 
@@ -191,6 +237,98 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               )}
             </div>
         
+        </div>
+      </section>
+
+      {/* Additional Owners */}
+      <section className="bg-white max-w-2xl border border-gray-200 rounded-lg shadow-sm">
+        <div className="px-6 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+            <Users className="w-5 h-5 mr-2" />
+            Additional Owners
+          </h2>
+          <button
+            type="button"
+            onClick={handleAddOwner}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Owner
+          </button>
+        </div>
+        <div className="px-6 pb-6 space-y-4">
+          {additionalOwners.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">No additional owners added. Click &quot;Add Owner&quot; to add more.</p>
+          ) : (
+            additionalOwners.map((owner, index) => (
+              <div key={index} className="p-4 border border-gray-200 rounded-lg bg-gray-50 relative">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold text-gray-700">Owner {index + 2}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveOwner(index)}
+                    className="flex items-center gap-1 text-sm text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Remove
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={owner.name}
+                      onChange={(e) => handleOwnerFieldChange(index, 'name', e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                        errors[`additionalOwner_${index}_name`] ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="Owner name"
+                    />
+                    {errors[`additionalOwner_${index}_name`] && (
+                      <p className="text-red-500 text-xs mt-1">{errors[`additionalOwner_${index}_name`]}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={owner.email}
+                      onChange={(e) => handleOwnerFieldChange(index, 'email', e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                        errors[`additionalOwner_${index}_email`] ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="owner@email.com"
+                    />
+                    {errors[`additionalOwner_${index}_email`] && (
+                      <p className="text-red-500 text-xs mt-1">{errors[`additionalOwner_${index}_email`]}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Phone <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={owner.phone}
+                      onChange={(e) => handleOwnerFieldChange(index, 'phone', e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                        errors[`additionalOwner_${index}_phone`] ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="+91 98765 43210"
+                    />
+                    {errors[`additionalOwner_${index}_phone`] && (
+                      <p className="text-red-500 text-xs mt-1">{errors[`additionalOwner_${index}_phone`]}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </section>
 

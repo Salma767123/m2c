@@ -46,7 +46,7 @@ export default function Settings() {
     zipCode: "10001",
   });
 
-  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo" | "banner">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo" | "banner" | "vendor-notif">("profile");
 
   // Profile form state
   const [profileData, setProfileData] = useState({
@@ -515,6 +515,16 @@ export default function Settings() {
               >
                 <ImageIcon className="h-4 w-4 inline mr-2" />
                 Banner
+              </button>
+              <button
+                onClick={() => setActiveTab("vendor-notif")}
+                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "vendor-notif"
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                <Mail className="h-4 w-4 inline mr-2" />
+                Vendor Notifications
               </button>
             </>
           )}
@@ -1513,6 +1523,143 @@ export default function Settings() {
       {activeTab === "banner" && canAccessAdminSettings && (
         <BannerSettingsTab />
       )}
+
+      {/* Vendor Notification Settings Tab */}
+      {activeTab === "vendor-notif" && canAccessAdminSettings && (
+        <VendorNotificationTab />
+      )}
+    </div>
+  );
+}
+
+// Vendor Notification Email Settings Component
+function VendorNotificationTab() {
+  const [emails, setEmails] = useState<string[]>([]);
+  const [newEmail, setNewEmail] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await companyInfoService.getVendorNotificationSettings();
+        if (res.success && res.data) {
+          setEmails(res.data.emails || []);
+        }
+      } catch {
+        // Settings may not exist yet
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const addEmail = () => {
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    if (emails.includes(trimmed)) {
+      setError('This email is already added');
+      return;
+    }
+    setEmails(prev => [...prev, trimmed]);
+    setNewEmail('');
+    setError('');
+  };
+
+  const removeEmail = (email: string) => {
+    setEmails(prev => prev.filter(e => e !== email));
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      await companyInfoService.updateVendorNotificationSettings(emails);
+      showSuccessToast('Saved', 'Vendor notification emails updated successfully');
+    } catch (err: any) {
+      showErrorToast('Error', err.message || 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-8 text-gray-500">Loading...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Mail className="h-5 w-5 text-gray-700" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Vendor Registration Mail Notification</h3>
+              <p className="text-sm text-gray-500">When a new vendor registers, notification emails will be sent only to the email addresses listed below.</p>
+            </div>
+          </div>
+
+          {/* Add Email */}
+          <div className="flex gap-3 mb-4">
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => { setNewEmail(e.target.value); setError(''); }}
+              onKeyDown={(e) => e.key === 'Enter' && addEmail()}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-transparent"
+              placeholder="Enter email address"
+            />
+            <button
+              onClick={addEmail}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-medium text-sm"
+            >
+              Add Email
+            </button>
+          </div>
+          {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+
+          {/* Email List */}
+          {emails.length === 0 ? (
+            <div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              <Mail className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No notification emails configured.</p>
+              <p className="text-xs text-gray-400">Add email addresses above to receive vendor registration notifications.</p>
+            </div>
+          ) : (
+            <div className="space-y-2 mb-4">
+              {emails.map((email, index) => (
+                <div key={index} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm font-medium text-gray-800">{email}</span>
+                  </div>
+                  <button
+                    onClick={() => removeEmail(email)}
+                    className="text-red-500 hover:text-red-700 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <p className="text-xs text-gray-500">{emails.length} email(s) will be notified on new vendor registration</p>
+            </div>
+          )}
+
+          {/* Save */}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
-import { Phone, Mail, User, Plus, Trash2, Globe, MapPin } from 'lucide-react';
+import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X } from 'lucide-react';
+import Image from 'next/image';
 import Dropdown from '@/components/UI/Dropdown';
 
 interface ContactTradeInfoProps {
@@ -98,6 +99,29 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       }
     })
   }, [data]);
+
+  // Main contact profile photo
+  const [contactPhoto, setContactPhoto] = useState<string | null>(data?.mainContact?.photo || null);
+  const [contactPhotoFile, setContactPhotoFile] = useState<File | null>(null);
+
+  const handleContactPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Photo must be less than 5MB');
+        return;
+      }
+      setContactPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setContactPhoto(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeContactPhoto = () => {
+    setContactPhoto(null);
+    setContactPhotoFile(null);
+  };
 
   const addAlternateContact = () => {
     if (formData.alternateContacts.length < 3) {
@@ -223,7 +247,14 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       return;
     }
 
-    onUpdateData(formData);
+    onUpdateData({
+      ...formData,
+      mainContact: {
+        ...formData.mainContact,
+        photo: contactPhoto,
+        photoFile: contactPhotoFile,
+      }
+    });
     onNext();
   };
 
@@ -382,6 +413,50 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                 <p className="text-red-500 text-sm mt-1">{errors['mainContact.department']}</p>
               )}
             </div>
+
+            {/* Profile Photo Upload */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Profile Photo
+              </label>
+              <div className="flex items-center gap-4">
+                {contactPhoto ? (
+                  <div className="relative">
+                    <Image
+                      src={contactPhoto}
+                      alt="Contact photo"
+                      width={80}
+                      height={80}
+                      className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeContactPhoto}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center">
+                    <Camera className="w-6 h-6 text-gray-400" />
+                  </div>
+                )}
+                <div>
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+                    <Camera className="w-4 h-4" />
+                    {contactPhoto ? 'Change Photo' : 'Upload Photo'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleContactPhotoChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">JPG, PNG or WebP. Max 5MB.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -493,26 +568,17 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                         placeholder="+1 (555) 321-0987"
                       />
                     </div>
-                    <div className="md:col-span-2">
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone Number 2 (Optional)
+                        Department
                       </label>
-                      <input
-                        type="tel"
-                        value={contact.phone2}
-                        onChange={(e) => updateAlternateContact(contact.id, 'phone2', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="+1 (555) 321-0987"
+                      <Dropdown
+                        id={`alt-contact-dept-${contact.id}`}
+                        value={contact.department}
+                        options={['Sales', 'Export', 'Business Development', 'Operations', 'Management']}
+                        onChange={(v) => updateAlternateContact(contact.id, 'department', String(v))}
+                        placeholder="Select department"
                       />
-                      <div className="mt-3">
-                        <Dropdown
-                          id={`alt-contact-dept-${contact.id}`}
-                          value={contact.department}
-                          options={['Sales', 'Export', 'Business Development', 'Operations', 'Management']}
-                          onChange={(v) => updateAlternateContact(contact.id, 'department', String(v))}
-                          placeholder="Select department"
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>

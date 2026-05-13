@@ -19,6 +19,8 @@ interface FormData {
   gstNumber: string;
   email: string;
   phone: string;
+  landlineNumber: string;
+  phoneNumber2: string;
   website: string;
   address: string;
   city: string;
@@ -64,6 +66,8 @@ export default function CompanyDetails({
     gstNumber: data.gstNumber || "",
     email: data.email || "",
     phone: data.phone || "",
+    landlineNumber: data.landlineNumber || "",
+    phoneNumber2: data.phoneNumber2 || "",
     website: data.website || "",
     address: data.address || "",
     city: data.city || "",
@@ -89,6 +93,8 @@ export default function CompanyDetails({
       gstNumber: data.gstNumber || "",
       email: data.email || "",
       phone: data.phone || "",
+      landlineNumber: data.landlineNumber || "",
+      phoneNumber2: data.phoneNumber2 || "",
       website: data.website || "",
       address: data.address || "",
       city: data.city || "",
@@ -465,12 +471,44 @@ export default function CompanyDetails({
                       ? 'border-red-500 bg-red-50'
                       : 'border-gray-300'
                   }`}
-                  placeholder="+1 (555) 000-0000"
+                  placeholder="+91 98765 43210"
                 />
               </div>
               {errors.phone && touched.phone && (
                 <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
               )}
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Landline Number
+              </label>
+              <div className="relative">
+                <input
+                  type="tel"
+                  name="landlineNumber"
+                  value={formData.landlineNumber}
+                  onChange={(e) => handleInputChange("landlineNumber", e.target.value)}
+                  className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="044-28175000"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                Phone Number 2
+              </label>
+              <div className="relative">
+                <input
+                  type="tel"
+                  name="phoneNumber2"
+                  value={formData.phoneNumber2}
+                  onChange={(e) => handleInputChange("phoneNumber2", e.target.value)}
+                  className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="+91 98765 43210"
+                />
+              </div>
             </div>
 
             <div>

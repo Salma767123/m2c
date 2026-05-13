@@ -173,5 +173,25 @@ export const companyInfoService = {
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to update company logo');
     }
+  },
+
+  // Get vendor notification email settings
+  getVendorNotificationSettings: async () => {
+    try {
+      const response = await axios.get('/company-info/vendor-notifications');
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch vendor notification settings');
+    }
+  },
+
+  // Update vendor notification email settings
+  updateVendorNotificationSettings: async (emails: string[]) => {
+    try {
+      const response = await axios.put('/company-info/vendor-notifications', { emails });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to update vendor notification settings');
+    }
   }
 };

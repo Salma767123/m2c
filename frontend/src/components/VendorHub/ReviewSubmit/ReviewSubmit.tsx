@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { SquarePen, CheckCircle2, Calendar, Home } from 'lucide-react';
 import { Button } from '@/components/UI/Button';
 import VendorService, { VendorRegistrationData, VendorFiles } from '@/services/vendorService';
+import { categoryService } from '@/services/categoryService';
 
 interface ReviewSubmitProps {
   onPrev: () => void;
@@ -35,15 +36,45 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
-  const [termsChecked, setTermsChecked] = useState(false);
+  const [termsConditions, setTermsConditions] = useState({
+    acceptanceOfTerms: false,
+    paymentTerms: false,
+    shippingDelivery: false,
+    returnsRefunds: false,
+    limitationOfLiability: false,
+    governingLaw: false,
+  });
   const [privacyChecked, setPrivacyChecked] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchCategoryNames = async () => {
+      try {
+        const response = await categoryService.getCategoryTree({ status: 'ACTIVE', includeInactive: false });
+        const map: Record<string, string> = {};
+        (response.data || []).forEach((cat: any) => {
+          map[cat.id] = cat.name;
+        });
+        setCategoryNameMap(map);
+      } catch {
+        // Silently fail — will show IDs as fallback
+      }
+    };
+    fetchCategoryNames();
+  }, []);
+
+  const allTermsAccepted = Object.values(termsConditions).every(Boolean);
+
+  const handleTermChange = (key: string, checked: boolean) => {
+    setTermsConditions(prev => ({ ...prev, [key]: checked }));
+  };
   
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
     // Require confirmation, terms and privacy agreement
-    if (!confirmChecked || !termsChecked || !privacyChecked) {
+    if (!confirmChecked || !allTermsAccepted || !privacyChecked) {
       setSubmitError('Please accept all terms and conditions');
       return;
     }
@@ -60,6 +91,8 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         gstNumber: data.gstNumber || '',
         email: data.email || '',
         phone: data.phone || '',
+        landlineNumber: data.landlineNumber || '',
+        phoneNumber2: data.phoneNumber2 || '',
         website: data.website || '',
         address: data.address || '',
         city: data.city || '',
@@ -71,6 +104,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         ownerName: data.ownerName || '',
         ownerEmail: data.ownerEmail || '',
         ownerPhone: data.ownerPhone || '',
+        additionalOwners: data.additionalOwners || undefined,
         yearEstablished: data.yearEstablished || '',
         employeeCount: data.employeeCount || '',
         
@@ -246,6 +280,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         weaving: 'Weaving', 
         dyeing: 'Dyeing',
         printing: 'Printing',
+        stitching: 'Stitching',
         finishing: 'Finishing'
       };
       return facilityLabels[id] || id;
@@ -267,23 +302,14 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
   const getSelectedCategories = () => {
     const categories = data.selectedCategories || {};
     const result: string[] = [];
-    
+
     Object.entries(categories).forEach(([categoryId, subCategories]) => {
       if (subCategories && Array.isArray(subCategories) && subCategories.length > 0) {
-        const categoryLabels: { [key: string]: string } = {
-          'bedding': 'Bedding',
-          'bath-linens': 'Bath Linens',
-          'kitchen-textiles': 'Kitchen Textiles',
-          'decor': 'Décor',
-          'window-treatments': 'Window Treatments',
-          'floor-coverings': 'Floor Coverings',
-          'living-furniture': 'Living/Furniture'
-        };
-        const categoryName = categoryLabels[categoryId] || categoryId;
+        const categoryName = categoryNameMap[categoryId] || categoryId;
         result.push(`${categoryName}: ${subCategories.join(', ')}`);
       }
     });
-    
+
     return result;
   };
 
@@ -409,6 +435,21 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
             <InfoRow label="Year Established" value={data.yearEstablished} />
             <InfoRow label="Employee Count" value={getEmployeeCountLabel(data.employeeCount)} />
             <InfoRow label="Years in Business" value={data.yearEstablished ? `${new Date().getFullYear() - parseInt(data.yearEstablished)} years` : 'N/A'} />
+            {data.additionalOwners && data.additionalOwners.length > 0 && (
+              <>
+                <div className="border-t border-gray-200 pt-2 mt-2">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">Additional Owners ({data.additionalOwners.length})</p>
+                </div>
+                {data.additionalOwners.map((owner: any, index: number) => (
+                  <div key={index} className="pl-4 border-l-2 border-blue-200 space-y-1">
+                    <p className="text-sm font-medium text-gray-800">Owner {index + 2}</p>
+                    <InfoRow label="Name" value={owner.name} />
+                    <InfoRow label="Email" value={owner.email} />
+                    <InfoRow label="Phone" value={owner.phone} />
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </FormCard>
 
@@ -576,8 +617,8 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
           <div className="space-y-1">
             <InfoRow label="Main Contact Name" value={data.mainContact?.name || 'Not provided'} />
             <InfoRow label="Main Contact Designation" value={data.mainContact?.designation || 'Not provided'} />
-            <InfoRow label="Main Contact Email" value={data.mainContact?.email || 'Not provided'} />
-            <InfoRow label="Main Contact Phone" value={data.mainContact?.phone || 'Not provided'} />
+            <InfoRow label="Main Contact Email" value={data.mainContact?.email1 || data.mainContact?.email || 'Not provided'} />
+            <InfoRow label="Main Contact Phone" value={data.mainContact?.phone1 || data.mainContact?.phone || 'Not provided'} />
             <InfoRow label="Main Contact Department" value={data.mainContact?.department || 'Not provided'} />
             <InfoRow label="Alternate Contacts" value={`${(data.alternateContacts || []).length} contact(s) added`} />
             {(data.alternateContacts || []).length > 0 && (
@@ -587,27 +628,27 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
                     <div className="font-medium text-sm text-gray-700">Contact {index + 1}:</div>
                     <InfoRow label="Name" value={contact.name || 'Not provided'} />
                     <InfoRow label="Designation" value={contact.designation || 'Not provided'} />
-                    <InfoRow label="Email" value={contact.email || 'Not provided'} />
-                    <InfoRow label="Phone" value={contact.phone || 'Not provided'} />
+                    <InfoRow label="Email" value={contact.email1 || contact.email || 'Not provided'} />
+                    <InfoRow label="Phone" value={contact.phone1 || contact.phone || 'Not provided'} />
                   </div>
                 ))}
               </div>
             )}
-            <InfoRow label="Import/Export Activities" value={data.hasImportExport === 'yes' ? 'Yes' : 'No'} />
             {data.hasImportExport === 'yes' && (
               <>
+                <InfoRow label="Import/Export Activities" value="Yes" />
                 <InfoRow label="Import Countries" value={(data.importCountries || []).join(', ') || 'None'} />
                 <InfoRow label="Export Countries" value={(data.exportCountries || []).join(', ') || 'None'} />
               </>
             )}
-            <InfoRow label="Trade License Number" value={data.tradeLicenseNumber || 'Not provided'} />
-            <InfoRow label="Business Registration Number" value={data.businessRegistrationNumber || 'Not provided'} />
-            <InfoRow label="Tax Identification Number" value={data.taxIdentificationNumber || 'Not provided'} />
-            {data.bankingDetails && (
+            {data.tradeLicenseNumber && <InfoRow label="Trade License Number" value={data.tradeLicenseNumber} />}
+            {data.businessRegistrationNumber && <InfoRow label="Business Registration Number" value={data.businessRegistrationNumber} />}
+            {data.taxIdentificationNumber && <InfoRow label="Tax Identification Number" value={data.taxIdentificationNumber} />}
+            {data.bankingDetails?.bankName && (
               <>
-                <InfoRow label="Bank Name" value={data.bankingDetails.bankName || 'Not provided'} />
-                <InfoRow label="Account Number" value={data.bankingDetails.accountNumber ? '****' + data.bankingDetails.accountNumber.slice(-4) : 'Not provided'} />
-                <InfoRow label="SWIFT Code" value={data.bankingDetails.swiftCode || 'Not provided'} />
+                <InfoRow label="Bank Name" value={data.bankingDetails.bankName} />
+                {data.bankingDetails.accountNumber && <InfoRow label="Account Number" value={'****' + data.bankingDetails.accountNumber.slice(-4)} />}
+                {data.bankingDetails.swiftCode && <InfoRow label="SWIFT Code" value={data.bankingDetails.swiftCode} />}
               </>
             )}
           </div>
@@ -619,17 +660,62 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
               <div className="text-red-800 text-sm">{submitError}</div>
             </div>
           )}
-          
+
+          {/* Accuracy Confirmation */}
           <div className="flex items-start gap-3 border border-gray-500 p-4 rounded-lg">
             <input id="confirmAccuracy" type="checkbox" checked={confirmChecked} onChange={(e) => setConfirmChecked(e.target.checked)} className="mt-1" />
             <label htmlFor="confirmAccuracy" className="text-base cursor-pointer">I Confirm that all the information provided above is accurate and complete to the best of my knowledge. I understand that providing false information may result in rejection of my vendor application.</label>
           </div>
-          <div className="flex items-start gap-3 border border-gray-500 p-4 rounded-lg">
-            <input id="agreeTerms" type="checkbox" checked={termsChecked} onChange={(e) => setTermsChecked(e.target.checked)} className="mt-1" />
-            <label htmlFor="agreeTerms" className="text-base cursor-pointer">
-              I Agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Terms &amp; Conditions</a>
-            </label>
+
+          {/* Terms & Conditions - Step by Step */}
+          <div className="border border-gray-500 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-300 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900">Terms &amp; Conditions</h3>
+              <span className="text-xs font-medium text-gray-500">
+                {Object.values(termsConditions).filter(Boolean).length}/{Object.keys(termsConditions).length} accepted
+              </span>
+            </div>
+            <div className="divide-y divide-gray-200">
+              <div className="flex items-start gap-3 p-4">
+                <input id="tc_acceptanceOfTerms" type="checkbox" checked={termsConditions.acceptanceOfTerms} onChange={(e) => handleTermChange('acceptanceOfTerms', e.target.checked)} className="mt-1" />
+                <label htmlFor="tc_acceptanceOfTerms" className="text-sm cursor-pointer">
+                  <strong>Acceptance of Terms</strong> — By accessing and using this website, I accept and agree to be bound by the terms and provision of this agreement. If I do not agree to abide by the above, I will not use this service.
+                </label>
+              </div>
+              <div className="flex items-start gap-3 p-4">
+                <input id="tc_paymentTerms" type="checkbox" checked={termsConditions.paymentTerms} onChange={(e) => handleTermChange('paymentTerms', e.target.checked)} className="mt-1" />
+                <label htmlFor="tc_paymentTerms" className="text-sm cursor-pointer">
+                  <strong>Payment Terms</strong> — I acknowledge that all prices are subject to change without notice, payment is due at the time of purchase, and all transactions are processed securely.
+                </label>
+              </div>
+              <div className="flex items-start gap-3 p-4">
+                <input id="tc_shippingDelivery" type="checkbox" checked={termsConditions.shippingDelivery} onChange={(e) => handleTermChange('shippingDelivery', e.target.checked)} className="mt-1" />
+                <label htmlFor="tc_shippingDelivery" className="text-sm cursor-pointer">
+                  <strong>Shipping and Delivery</strong> — I understand that delivery times vary by location and shipping method, risk of loss passes upon delivery to the carrier, and the platform is not responsible for delays caused by shipping carriers.
+                </label>
+              </div>
+              <div className="flex items-start gap-3 p-4">
+                <input id="tc_returnsRefunds" type="checkbox" checked={termsConditions.returnsRefunds} onChange={(e) => handleTermChange('returnsRefunds', e.target.checked)} className="mt-1" />
+                <label htmlFor="tc_returnsRefunds" className="text-sm cursor-pointer">
+                  <strong>Returns and Refunds</strong> — I agree to comply with the platform&apos;s returns policy for detailed information about returns, exchanges, and refunds.
+                </label>
+              </div>
+              <div className="flex items-start gap-3 p-4">
+                <input id="tc_limitationOfLiability" type="checkbox" checked={termsConditions.limitationOfLiability} onChange={(e) => handleTermChange('limitationOfLiability', e.target.checked)} className="mt-1" />
+                <label htmlFor="tc_limitationOfLiability" className="text-sm cursor-pointer">
+                  <strong>Limitation of Liability</strong> — I acknowledge that in no event shall the company be liable for any direct, indirect, punitive, incidental, special, or consequential damages arising out of the use or performance of the website.
+                </label>
+              </div>
+              <div className="flex items-start gap-3 p-4">
+                <input id="tc_governingLaw" type="checkbox" checked={termsConditions.governingLaw} onChange={(e) => handleTermChange('governingLaw', e.target.checked)} className="mt-1" />
+                <label htmlFor="tc_governingLaw" className="text-sm cursor-pointer">
+                  <strong>Governing Law</strong> — I agree that these terms and conditions are governed by and construed in accordance with applicable laws, and I submit to the exclusive jurisdiction of the courts as described in the full <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Terms of Service</a>.
+                </label>
+              </div>
+            </div>
           </div>
+
+          {/* Privacy Policy */}
           <div className="flex items-start gap-3 border border-gray-500 p-4 rounded-lg">
             <input id="agreePrivacy" type="checkbox" checked={privacyChecked} onChange={(e) => setPrivacyChecked(e.target.checked)} className="mt-1" />
             <label htmlFor="agreePrivacy" className="text-base cursor-pointer">
@@ -646,7 +732,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
             className="bg-green-400 text-white p-4 rounded-md" 
             type="submit" 
             size="lg" 
-            disabled={!confirmChecked || !termsChecked || !privacyChecked || isSubmitting} 
+            disabled={!confirmChecked || !allTermsAccepted || !privacyChecked || isSubmitting} 
             onClick={handleSubmit}
           >
             {isSubmitting ? 'Submitting...' : 'Submit for Approval'}

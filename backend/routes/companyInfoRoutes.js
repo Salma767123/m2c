@@ -7,7 +7,9 @@ const {
   updateLegalInfo,
   updateAddress,
   updateBankDetails,
-  updateLogo
+  updateLogo,
+  getVendorNotificationSettings,
+  updateVendorNotificationSettings
 } = require('../controllers/companyInfoController');
 const { authenticateToken, requireRole, requirePermission } = require('../middleware/auth');
 
@@ -26,5 +28,9 @@ router.put('/legal', requireRole('admin'), requirePermission('manage_settings'),
 router.put('/address', requireRole('admin'), requirePermission('manage_settings'), updateAddress);
 router.put('/bank', requireRole('admin'), requirePermission('manage_settings'), updateBankDetails);
 router.put('/logo', requireRole('admin'), requirePermission('manage_settings'), updateLogo);
+
+// Vendor notification email settings (Super Admin only — checked inside controller)
+router.get('/vendor-notifications', requireRole('admin'), requirePermission('manage_settings'), getVendorNotificationSettings);
+router.put('/vendor-notifications', requireRole('admin'), requirePermission('manage_settings'), updateVendorNotificationSettings);
 
 module.exports = router;

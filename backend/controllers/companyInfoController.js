@@ -310,6 +310,57 @@ const getPublicCompanyInfo = async (req, res) => {
   }
 };
 
+// Get vendor notification email settings
+const getVendorNotificationSettings = async (req, res) => {
+  try {
+    let settings = await prisma.vendorNotificationSettings.findFirst();
+    if (!settings) {
+      settings = await prisma.vendorNotificationSettings.create({
+        data: { emails: [] }
+      });
+    }
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    console.error('Get vendor notification settings error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch vendor notification settings' });
+  }
+};
+
+// Update vendor notification email settings (Super Admin only)
+const updateVendorNotificationSettings = async (req, res) => {
+  try {
+    const { emails } = req.body;
+
+    if (!Array.isArray(emails)) {
+      return res.status(400).json({ success: false, error: 'Emails must be an array' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = emails.filter(e => !emailRegex.test(e));
+    if (invalidEmails.length > 0) {
+      return res.status(400).json({ success: false, error: `Invalid email(s): ${invalidEmails.join(', ')}` });
+    }
+
+    let settings = await prisma.vendorNotificationSettings.findFirst();
+    if (settings) {
+      settings = await prisma.vendorNotificationSettings.update({
+        where: { id: settings.id },
+        data: { emails, updatedBy: req.user.id }
+      });
+    } else {
+      settings = await prisma.vendorNotificationSettings.create({
+        data: { emails, updatedBy: req.user.id }
+      });
+    }
+
+    res.json({ success: true, data: settings, message: 'Vendor notification emails updated successfully' });
+  } catch (error) {
+    console.error('Update vendor notification settings error:', error);
+    res.status(500).json({ success: false, error: 'Failed to update vendor notification settings' });
+  }
+};
+
 module.exports = {
   getCompanyInfo,
   getPublicCompanyInfo,
@@ -317,5 +368,7 @@ module.exports = {
   updateLegalInfo,
   updateAddress,
   updateBankDetails,
-  updateLogo
+  updateLogo,
+  getVendorNotificationSettings,
+  updateVendorNotificationSettings
 };
