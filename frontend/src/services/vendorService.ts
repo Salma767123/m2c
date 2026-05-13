@@ -163,6 +163,12 @@ export interface VendorProfile {
   references: any[];
   rating?: number | null;
   ratingCount?: number;
+  latestInspection?: {
+    id: string;
+    status: string;
+    result: string | null;
+    completedAt: string | null;
+  } | null;
   _count?: {
     certifications: number;
     documents: number;

@@ -11,6 +11,68 @@ const {
   generateSecurePassword
 } = require('../utils/email/vendorEmailSender');
 
+// Finalize any pending (SUBMITTED / UNDER_ADMIN_REVIEW) inspections when admin
+// makes a direct vendor status decision (approve / reject / suspend). Without
+// this, inspections get stuck in SUBMITTED forever if admin bypasses the
+// inspection review flow.
+//
+// Accepts a Prisma transaction client (`tx`) so inspection updates are atomic
+// with the vendor-status change that wraps them.
+const finalizeInspectionsForVendor = async (tx, vendorId, { decision }) => {
+  const pendingInspections = await tx.inspection.findMany({
+    where: {
+      vendorId,
+      status: { in: ['SUBMITTED', 'UNDER_ADMIN_REVIEW'] },
+    },
+  });
+
+  if (pendingInspections.length === 0) return null;
+
+  const resultMap = { APPROVED: 'PASSED', REJECTED: 'FAILED', SUSPENDED: 'FAILED' };
+  const now = new Date();
+
+  await Promise.all(
+    pendingInspections.map((insp) =>
+      tx.inspection.update({
+        where: { id: insp.id },
+        data: {
+          status: 'COMPLETED',
+          result: resultMap[decision] || insp.result,
+          completedAt: now,
+          reviewedAt: now,
+        },
+      })
+    )
+  );
+
+  return pendingInspections;
+};
+
+// Write audit logs for finalized inspections. Called OUTSIDE the transaction
+// so a log failure never blocks the main operation (matches codebase pattern).
+const writeInspectionAuditLogs = (pendingInspections, { decision, adminId, adminName, reason }) => {
+  if (!adminId || !pendingInspections || pendingInspections.length === 0) return;
+
+  const actionMap = { APPROVED: 'ADMIN_APPROVED', REJECTED: 'ADMIN_FINAL_REJECTED', SUSPENDED: 'ADMIN_FINAL_REJECTED' };
+
+  pendingInspections.forEach((insp) => {
+    prisma.inspectionAuditLog.create({
+      data: {
+        entityType: 'FACTORY_INSPECTION',
+        entityId: insp.id,
+        action: actionMap[decision] || 'ADMIN_APPROVED',
+        fromStatus: insp.status,
+        toStatus: 'COMPLETED',
+        performedById: adminId,
+        performedByType: 'ADMIN',
+        performedByName: adminName || 'Admin',
+        rejectionReason: reason || null,
+        cycleNumber: insp.cycleNumber || 1,
+      },
+    }).catch(err => console.error('Audit log write failed:', err));
+  });
+};
+
 // Helper function to map business type to enum
 const getCompanyTypeEnum = (businessType) => {
   const mapping = {
@@ -960,17 +1022,33 @@ const approveVendor = async (req, res) => {
     const temporaryPassword = generateSecurePassword(12);
     const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
 
-    // Update vendor status and set password
-    const vendor = await prisma.vendor.update({
-      where: { id: vendorId },
-      data: {
-        status: 'APPROVED',
-        approvedAt: new Date(),
-        rejectedAt: null,
-        rejectionReason: null,
-        password: hashedPassword // Set the hashed password
-      }
+    const adminId = req.user?.id || req.userId;
+    const adminName = req.user?.name || req.user?.email;
+
+    // Vendor status change + inspection finalization must be atomic
+    const { vendor, finalizedInspections } = await prisma.$transaction(async (tx) => {
+      const updatedVendor = await tx.vendor.update({
+        where: { id: vendorId },
+        data: {
+          status: 'APPROVED',
+          approvedAt: new Date(),
+          rejectedAt: null,
+          rejectionReason: null,
+          password: hashedPassword,
+        },
+      });
+
+      const inspections = await finalizeInspectionsForVendor(tx, vendorId, {
+        decision: 'APPROVED',
+      });
+
+      return { vendor: updatedVendor, finalizedInspections: inspections };
     });
+
+    // Audit logs: fire-and-forget, outside transaction
+    if (finalizedInspections) {
+      writeInspectionAuditLogs(finalizedInspections, { decision: 'APPROVED', adminId, adminName });
+    }
 
     // Send approval email with credentials
     try {
@@ -1029,15 +1107,32 @@ const rejectVendor = async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    const vendor = await prisma.vendor.update({
-      where: { id: vendorId },
-      data: {
-        status: 'REJECTED',
-        rejectedAt: new Date(),
-        rejectionReason: reason,
-        approvedAt: null
-      }
+    const adminId = req.user?.id || req.userId;
+    const adminName = req.user?.name || req.user?.email;
+
+    // Vendor status change + inspection finalization must be atomic
+    const { vendor, finalizedInspections } = await prisma.$transaction(async (tx) => {
+      const updatedVendor = await tx.vendor.update({
+        where: { id: vendorId },
+        data: {
+          status: 'REJECTED',
+          rejectedAt: new Date(),
+          rejectionReason: reason,
+          approvedAt: null,
+        },
+      });
+
+      const inspections = await finalizeInspectionsForVendor(tx, vendorId, {
+        decision: 'REJECTED',
+      });
+
+      return { vendor: updatedVendor, finalizedInspections: inspections };
     });
+
+    // Audit logs: fire-and-forget, outside transaction
+    if (finalizedInspections) {
+      writeInspectionAuditLogs(finalizedInspections, { decision: 'REJECTED', adminId, adminName, reason });
+    }
 
     // Send rejection email
     try {
@@ -1087,14 +1182,31 @@ const suspendVendor = async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    const vendor = await prisma.vendor.update({
-      where: { id: vendorId },
-      data: {
-        status: 'SUSPENDED',
-        suspendedAt: new Date(),
-        rejectionReason: reason
-      }
+    const adminId = req.user?.id || req.userId;
+    const adminName = req.user?.name || req.user?.email;
+
+    // Vendor status change + inspection finalization must be atomic
+    const { vendor, finalizedInspections } = await prisma.$transaction(async (tx) => {
+      const updatedVendor = await tx.vendor.update({
+        where: { id: vendorId },
+        data: {
+          status: 'SUSPENDED',
+          suspendedAt: new Date(),
+          rejectionReason: reason,
+        },
+      });
+
+      const inspections = await finalizeInspectionsForVendor(tx, vendorId, {
+        decision: 'SUSPENDED',
+      });
+
+      return { vendor: updatedVendor, finalizedInspections: inspections };
     });
+
+    // Audit logs: fire-and-forget, outside transaction
+    if (finalizedInspections) {
+      writeInspectionAuditLogs(finalizedInspections, { decision: 'SUSPENDED', adminId, adminName, reason });
+    }
 
     // Send suspension email
     try {
