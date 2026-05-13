@@ -505,7 +505,7 @@ class VendorService {
       const skipFields = [
         'certificationFiles', 'logoFile', 'gstFile', 'contactPhotoFile',
         'productPhotos', 'contactPhoto', 'logo', 'gstDocument',
-        'sameAsWarehouse', 'expandedCategories'
+        'sameAsWarehouse', 'expandedCategories', 'factoryImages'
       ];
 
       // Add all form fields
@@ -543,6 +543,21 @@ class VendorService {
             fileIndex++;
           }
         });
+      }
+
+      // Handle factory images - separate existing URLs from new file uploads
+      if (vendorData.factoryImages && vendorData.factoryImages.length > 0) {
+        const existingImageUrls: string[] = [];
+        vendorData.factoryImages.forEach((image: any) => {
+          if (image.isExisting && image.url) {
+            existingImageUrls.push(image.url);
+          } else if (image.file instanceof File) {
+            formData.append('factoryImages', image.file);
+          }
+        });
+        if (existingImageUrls.length > 0) {
+          formData.append('existingFactoryImages', JSON.stringify(existingImageUrls));
+        }
       }
 
       const response = await axiosInstance.put(`/vendors/${vendorId}`, formData, {

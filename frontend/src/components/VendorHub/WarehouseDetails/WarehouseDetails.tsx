@@ -176,15 +176,15 @@ export default function WarehouseDetails({
     ]);
   };
 
-  const removeImage = (imageId: number) => {
+  const removeImage = (imageId: string | number) => {
     const updatedImages = formData.factoryImages.filter(
       (img: any) => img.id !== imageId
     );
-    // Clean up the URL to prevent memory leaks
+    // Clean up blob URLs to prevent memory leaks (only for newly uploaded images)
     const imageToRemove = formData.factoryImages.find(
       (img: any) => img.id === imageId
     );
-    if (imageToRemove && imageToRemove.url) {
+    if (imageToRemove && imageToRemove.url && !imageToRemove.isExisting) {
       URL.revokeObjectURL(imageToRemove.url);
     }
     handleInputChange("factoryImages", updatedImages);

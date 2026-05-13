@@ -1029,6 +1029,68 @@ const updateVendorById = async (req, res) => {
       status: updateData.status?.toUpperCase() || existingVendor.status
     };
 
+    // Handle factory images update
+    // Parse existing factory image URLs the frontend wants to keep
+    const existingFactoryImages = updateData.existingFactoryImages
+      ? (typeof updateData.existingFactoryImages === 'string'
+          ? JSON.parse(updateData.existingFactoryImages)
+          : updateData.existingFactoryImages)
+      : [];
+
+    // Upload new factory images if provided
+    let newFactoryImageUrls = [];
+    if (req.files?.factoryImages) {
+      try {
+        const factoryResults = await uploadFiles(req.files.factoryImages, 'vendor-factories');
+        newFactoryImageUrls = factoryResults.map(result => result.cloudinaryUrl);
+        console.log('Uploaded new factory images:', newFactoryImageUrls);
+      } catch (uploadError) {
+        console.error('Factory image upload error:', uploadError);
+        return res.status(500).json({
+          error: 'Failed to upload factory images: ' + uploadError.message
+        });
+      }
+    }
+
+    // Delete factory image documents that are no longer in the existing list
+    const currentFactoryDocs = await prisma.vendorDocument.findMany({
+      where: {
+        vendorId,
+        type: 'OTHER',
+        name: { contains: 'Factory' }
+      }
+    });
+
+    const docsToDelete = currentFactoryDocs.filter(
+      doc => !existingFactoryImages.includes(doc.documentUrl)
+    );
+    if (docsToDelete.length > 0) {
+      // Clean up Cloudinary files (non-blocking, best-effort)
+      for (const doc of docsToDelete) {
+        try {
+          const publicId = doc.documentUrl.split('/').pop().split('.')[0];
+          await deleteFromCloudinary(`vendor-factories/${publicId}`);
+        } catch (deleteError) {
+          console.warn('Failed to delete factory image from Cloudinary:', deleteError.message);
+        }
+      }
+      await prisma.vendorDocument.deleteMany({
+        where: { id: { in: docsToDelete.map(d => d.id) } }
+      });
+    }
+
+    // Create new factory image documents
+    if (newFactoryImageUrls.length > 0) {
+      const existingCount = existingFactoryImages.length;
+      const newDocs = newFactoryImageUrls.map((url, index) => ({
+        vendorId,
+        type: 'OTHER',
+        name: `Factory Image ${existingCount + index + 1}`,
+        documentUrl: url
+      }));
+      await prisma.vendorDocument.createMany({ data: newDocs });
+    }
+
     // Update vendor
     const updatedVendor = await prisma.vendor.update({
       where: { id: vendorId },
