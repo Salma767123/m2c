@@ -35,7 +35,7 @@ class EnquiryService {
             });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to submit enquiry');
+            throw new Error(error.message || 'Failed to submit enquiry');
         }
     }
 

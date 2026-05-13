@@ -144,7 +144,7 @@ class OrderService {
             const response = await axios.post('/orders', params);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to create order');
+            throw new Error(error.message || 'Failed to create order');
         }
     }
 
@@ -154,7 +154,7 @@ class OrderService {
             const response = await axios.get('/orders');
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to fetch orders');
+            throw new Error(error.message || 'Failed to fetch orders');
         }
     }
 
@@ -164,7 +164,7 @@ class OrderService {
             const response = await axios.get(`/orders/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to fetch order');
+            throw new Error(error.message || 'Failed to fetch order');
         }
     }
 
@@ -176,7 +176,7 @@ class OrderService {
             const response = await axios.get('/orders/vendor');
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to fetch vendor orders');
+            throw new Error(error.message || 'Failed to fetch vendor orders');
         }
     }
 
@@ -185,7 +185,7 @@ class OrderService {
             const response = await axios.get(`/orders/vendor/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to fetch vendor order');
+            throw new Error(error.message || 'Failed to fetch vendor order');
         }
     }
 
@@ -203,7 +203,7 @@ class OrderService {
             const response = await axios.put(`/orders/vendor/${id}/status`, body);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to update vendor order status');
+            throw new Error(error.message || 'Failed to update vendor order status');
         }
     }
 
@@ -251,7 +251,7 @@ class OrderService {
             const response = await axios.get(`/orders/vendor/reviews${qs ? `?${qs}` : ''}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to fetch vendor reviews');
+            throw new Error(error.message || 'Failed to fetch vendor reviews');
         }
     }
 
@@ -260,7 +260,7 @@ class OrderService {
             const response = await axios.post(`/orders/vendor/${id}/reship`, {});
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to create reship');
+            throw new Error(error.message || 'Failed to create reship');
         }
     }
 
@@ -272,7 +272,7 @@ class OrderService {
             const response = await axios.get('/orders/admin');
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to fetch admin orders');
+            throw new Error(error.message || 'Failed to fetch admin orders');
         }
     }
 
@@ -281,7 +281,7 @@ class OrderService {
             const response = await axios.get(`/orders/admin/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to fetch admin order');
+            throw new Error(error.message || 'Failed to fetch admin order');
         }
     }
 
@@ -290,7 +290,7 @@ class OrderService {
             const response = await axios.put(`/orders/admin/${id}/status`, { status, assignedHubId });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to update admin order status');
+            throw new Error(error.message || 'Failed to update admin order status');
         }
     }
 
@@ -302,7 +302,7 @@ class OrderService {
             const response = await axios.get('/orders/admin/shipments');
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to fetch admin shipments');
+            throw new Error(error.message || 'Failed to fetch admin shipments');
         }
     }
 
@@ -311,7 +311,7 @@ class OrderService {
             const response = await axios.get(`/orders/admin/shipments/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to fetch admin shipment');
+            throw new Error(error.message || 'Failed to fetch admin shipment');
         }
     }
 
@@ -320,7 +320,7 @@ class OrderService {
             const response = await axios.put(`/orders/admin/shipments/${id}/status`, { status, assignedHubId });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || error.response?.data?.message || 'Failed to update admin shipment status');
+            throw new Error(error.message || 'Failed to update admin shipment status');
         }
     }
 }

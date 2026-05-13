@@ -170,7 +170,7 @@ class ProductService {
       const response = await axios.post('/products', productData);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to create product');
+      throw new Error(error.message || 'Failed to create product');
     }
   }
 
@@ -202,7 +202,7 @@ class ProductService {
       const response = await axios.get('/products', { params });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch products');
+      throw new Error(error.message || 'Failed to fetch products');
     }
   }
 
@@ -212,7 +212,7 @@ class ProductService {
       const response = await axios.get(`/products/${id}`);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch product');
+      throw new Error(error.message || 'Failed to fetch product');
     }
   }
 
@@ -222,7 +222,7 @@ class ProductService {
       const response = await axios.put(`/products/${id}`, productData);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to update product');
+      throw new Error(error.message || 'Failed to update product');
     }
   }
 
@@ -232,7 +232,7 @@ class ProductService {
       const response = await axios.delete(`/products/${id}`);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to delete product');
+      throw new Error(error.message || 'Failed to delete product');
     }
   }
 
@@ -242,7 +242,7 @@ class ProductService {
       const response = await axios.get('/products/stats');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch product statistics');
+      throw new Error(error.message || 'Failed to fetch product statistics');
     }
   }
 
@@ -252,7 +252,7 @@ class ProductService {
       const response = await axios.get('/products/available-inventory');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch available inventory items');
+      throw new Error(error.message || 'Failed to fetch available inventory items');
     }
   }
 
@@ -289,7 +289,7 @@ class ProductService {
       const response = await axios.get('/products/public', { params });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch products');
+      throw new Error(error.message || 'Failed to fetch products');
     }
   }
 
@@ -299,7 +299,7 @@ class ProductService {
       const response = await axios.get(`/products/public/${id}`);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch product');
+      throw new Error(error.message || 'Failed to fetch product');
     }
   }
 }

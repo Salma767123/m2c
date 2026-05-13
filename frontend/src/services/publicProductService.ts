@@ -109,7 +109,7 @@ class PublicProductService {
     } catch (error: any) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to fetch products'
+        message: error.message || 'Failed to fetch products'
       };
     }
   }
@@ -129,7 +129,7 @@ class PublicProductService {
     } catch (error: any) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to fetch products'
+        message: error.message || 'Failed to fetch products'
       };
     }
   }
@@ -142,7 +142,7 @@ class PublicProductService {
     } catch (error: any) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to fetch product'
+        message: error.message || 'Failed to fetch product'
       };
     }
   }

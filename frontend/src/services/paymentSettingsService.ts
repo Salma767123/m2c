@@ -39,7 +39,7 @@ class PaymentSettingsService {
       const response = await axiosInstance.get('/payment-settings/public');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to fetch payment settings');
+      throw new Error(error.message || 'Failed to fetch payment settings');
     }
   }
 
@@ -49,7 +49,7 @@ class PaymentSettingsService {
       const response = await axiosInstance.get('/payment-settings');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to fetch payment settings');
+      throw new Error(error.message || 'Failed to fetch payment settings');
     }
   }
 
@@ -59,7 +59,7 @@ class PaymentSettingsService {
       const response = await axiosInstance.put('/payment-settings/razorpay', settings);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update Razorpay settings');
+      throw new Error(error.message || 'Failed to update Razorpay settings');
     }
   }
 
@@ -69,7 +69,7 @@ class PaymentSettingsService {
       const response = await axiosInstance.put('/payment-settings/payu', settings);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update PayU settings');
+      throw new Error(error.message || 'Failed to update PayU settings');
     }
   }
 }
