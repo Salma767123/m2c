@@ -34,7 +34,7 @@ class HubService {
             const response = await axios.get('/hubs');
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to fetch hubs');
+            throw new Error(error.message || 'Failed to fetch hubs');
         }
     }
 
@@ -44,7 +44,7 @@ class HubService {
             const response = await axios.get(`/hubs/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to fetch hub');
+            throw new Error(error.message || 'Failed to fetch hub');
         }
     }
 
@@ -54,7 +54,7 @@ class HubService {
             const response = await axios.post('/hubs', data);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to create hub');
+            throw new Error(error.message || 'Failed to create hub');
         }
     }
 
@@ -64,7 +64,7 @@ class HubService {
             const response = await axios.put(`/hubs/${id}`, data);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to update hub');
+            throw new Error(error.message || 'Failed to update hub');
         }
     }
 
@@ -74,7 +74,7 @@ class HubService {
             const response = await axios.patch(`/hubs/${id}/toggle-status`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to toggle hub status');
+            throw new Error(error.message || 'Failed to toggle hub status');
         }
     }
 
@@ -84,7 +84,7 @@ class HubService {
             const response = await axios.delete(`/hubs/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to delete hub');
+            throw new Error(error.message || 'Failed to delete hub');
         }
     }
 }

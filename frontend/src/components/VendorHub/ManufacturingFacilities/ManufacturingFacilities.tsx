@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
-import { Factory, Settings, Palette, Printer, Scissors } from 'lucide-react';
+import { Factory, Settings, Palette, Printer, Scissors, Shirt } from 'lucide-react';
 
 interface ManufacturingFacilitiesProps {
   onNext: () => void;
@@ -59,6 +59,18 @@ const facilityTypes = [
       { id: 'printingMachines', label: 'Number of Machines', type: 'number' },
       { id: 'printingTypes', label: 'Printing Methods', type: 'text' },
       { id: 'description', label: 'Description', type: 'textarea' } // added
+    ]
+  },
+  {
+    id: 'stitching',
+    label: 'Stitching',
+    icon: Shirt,
+    description: 'Cutting and stitching of garments',
+    fields: [
+      { id: 'stitchingCapacity', label: 'Daily Capacity (pieces)', type: 'number' },
+      { id: 'stitchingMachines', label: 'Number of Machines', type: 'number' },
+      { id: 'stitchingTypes', label: 'Stitching Types', type: 'text' },
+      { id: 'description', label: 'Description', type: 'textarea' }
     ]
   },
   {

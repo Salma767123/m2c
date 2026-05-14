@@ -225,9 +225,9 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
   };
 
   const removeFile = (certId: string) => {
-    // Clean up the URL to prevent memory leaks
+    // Clean up blob URLs to prevent memory leaks (skip for existing Cloudinary URLs)
     const fileData = formData.certificationFiles[certId];
-    if (fileData && fileData.url) {
+    if (fileData && fileData.url && !fileData.isExisting) {
       URL.revokeObjectURL(fileData.url);
     }
 
@@ -355,12 +355,12 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                               <div className="flex items-center space-x-3">
                                 <div className="shrink-0">
                                   {formData.certificationFiles[cert.id].type === 'application/pdf' ? (
-                                    <FileText className="w-8 h-8 text-red-500" />
+                                    <FileText className="w-12 h-12 text-red-500" />
                                   ) : (
                                     <img
                                       src={formData.certificationFiles[cert.id].url}
                                       alt="Certificate preview"
-                                      className="w-8 h-8 object-cover rounded"
+                                      className="w-12 h-12 object-cover rounded"
                                     />
                                   )}
                                 </div>
@@ -369,17 +369,19 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                                     {formData.certificationFiles[cert.id].name}
                                   </p>
                                   <p className="text-sm text-gray-500">
-                                    {formatFileSize(formData.certificationFiles[cert.id].size)}
+                                    {formData.certificationFiles[cert.id].isExisting
+                                      ? 'Uploaded'
+                                      : formatFileSize(formData.certificationFiles[cert.id].size)}
                                   </p>
                                 </div>
                               </div>
                               <div className="flex items-center space-x-2">
-                                {formData.certificationFiles[cert.id].type !== 'application/pdf' && (
+                                {(formData.certificationFiles[cert.id].isExisting || formData.certificationFiles[cert.id].type !== 'application/pdf') && (
                                   <button
                                     type="button"
                                     onClick={() => window.open(formData.certificationFiles[cert.id].url, '_blank')}
                                     className="text-blue-600 hover:text-blue-800 p-1"
-                                    title="Preview"
+                                    title="View"
                                   >
                                     <Download className="w-4 h-4" />
                                   </button>
@@ -425,8 +427,8 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                           </div>
                         )}
                         
-                        {/* Upload success message */}
-                        {formData.certificationFiles[cert.id] && !uploadErrors[cert.id] && (
+                        {/* Upload success message - only show for newly uploaded files */}
+                        {formData.certificationFiles[cert.id] && !uploadErrors[cert.id] && !formData.certificationFiles[cert.id].isExisting && (
                           <div className="mt-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded p-2">
                             ✓ Certificate uploaded successfully
                           </div>

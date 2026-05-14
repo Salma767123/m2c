@@ -41,7 +41,7 @@ class VendorDashboardService {
             const response = await axiosInstance.get('/vendor-dashboard/stats');
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to fetch dashboard stats');
+            throw new Error(error.message || 'Failed to fetch dashboard stats');
         }
     }
 }

@@ -356,7 +356,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         warehouseState: vendor.warehouseState || '',
         warehouseZip: vendor.warehouseZipCode || '',
         warehouseCountry: vendor.warehouseCountry || 'India',
-        factoryImages: vendor.documents?.filter((doc: any) => doc.type === 'OTHER' && doc.name.includes('Factory')).map((doc: any) => doc.documentUrl) || [],
+        factoryImages: vendor.documents?.filter((doc: any) => doc.type === 'OTHER' && doc.name.includes('Factory')).map((doc: any, index: number) => ({
+          url: doc.documentUrl,
+          name: doc.name || `Factory Image ${index + 1}`,
+          id: doc.id || `existing-${index}`,
+          isExisting: true,
+        })) || [],
         routeMap: null,
         mapLink: vendor.mapLink || '',
 
@@ -384,7 +389,19 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           // Convert backend name (e.g., "OEKO-TEX") to frontend ID (e.g., "oeko-tex")
           return cert.name.toLowerCase();
         }) || [],
-        certificationFiles: {},
+        certificationFiles: vendor.certifications?.reduce((acc: any, cert: any) => {
+          if (cert.documentUrl) {
+            const certId = cert.name.toLowerCase();
+            acc[certId] = {
+              url: cert.documentUrl,
+              name: cert.documentUrl.split('/').pop() || `${cert.name} Certificate`,
+              size: 0,
+              type: cert.documentUrl.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg',
+              isExisting: true,
+            };
+          }
+          return acc;
+        }, {}) || {},
         certificationExpiryDates: vendor.certifications?.reduce((acc: any, cert: any) => {
           if (cert.expiryDate) {
             // Use lowercase cert name as key to match frontend IDs

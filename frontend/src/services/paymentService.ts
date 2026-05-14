@@ -29,7 +29,7 @@ class PaymentService {
       });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to create payment order');
+      throw new Error(error.message || 'Failed to create payment order');
     }
   }
 
@@ -47,7 +47,7 @@ class PaymentService {
       });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Payment verification failed');
+      throw new Error(error.message || 'Payment verification failed');
     }
   }
 
@@ -63,7 +63,7 @@ class PaymentService {
       const response = await axiosInstance.post('/payments/payu/create-hash', params);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to create payment hash');
+      throw new Error(error.message || 'Failed to create payment hash');
     }
   }
 }

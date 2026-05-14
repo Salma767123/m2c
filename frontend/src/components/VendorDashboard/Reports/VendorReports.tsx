@@ -120,8 +120,17 @@ export default function VendorReports() {
       const tables = data.tables as Record<string, any[]>;
       for (const [key, rows] of Object.entries(tables)) {
         if (Array.isArray(rows) && rows.length > 0) {
-          const ws = XLSX.utils.json_to_sheet(rows);
-          XLSX.utils.book_append_sheet(wb, ws, key.substring(0, 31));
+          const formatted = rows.map(r => {
+            const row: Record<string, any> = {};
+            for (const [h, val] of Object.entries(r)) {
+              if (typeof val === 'number' && !Number.isInteger(val)) row[h] = parseFloat(val.toFixed(2));
+              else row[h] = val;
+            }
+            return row;
+          });
+          const sheetName = key.replace(/([a-z])([A-Z])/g, '$1 $2').substring(0, 31);
+          const ws = XLSX.utils.json_to_sheet(formatted);
+          XLSX.utils.book_append_sheet(wb, ws, sheetName);
           hasData = true;
         }
       }
@@ -141,18 +150,19 @@ export default function VendorReports() {
       const tables = data.tables as Record<string, any[]>;
       let yPos = 20;
       doc.setFontSize(16);
-      doc.text(`VENDOR ${reportType.toUpperCase()} REPORT - ${period.toUpperCase()}`, 14, yPos);
+      doc.text(`VENDOR ${reportType.toUpperCase()} REPORT - ${period.replace(/(\d+)/, '$1 ').toUpperCase()}`, 14, yPos);
       yPos += 10;
       for (const [key, rows] of Object.entries(tables)) {
         if (Array.isArray(rows) && rows.length > 0) {
           doc.setFontSize(12);
-          doc.text(key.toUpperCase(), 14, yPos);
+          doc.text(key.replace(/([a-z])([A-Z])/g, '$1 $2').toUpperCase(), 14, yPos);
           yPos += 5;
           const headers = Object.keys(rows[0]);
           const dataRows = rows.map(r => headers.map(h => {
             const val = r[h];
             if (val instanceof Date) return val.toLocaleDateString();
             if (typeof val === 'object' && val !== null) return JSON.stringify(val);
+            if (typeof val === 'number' && !Number.isInteger(val)) return val.toFixed(2);
             return String(val ?? '');
           }));
           autoTable(doc, {

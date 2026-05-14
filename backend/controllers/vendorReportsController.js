@@ -142,7 +142,6 @@ const getVendorOverviewReport = async (req, res) => {
                 select: { totalStock: true, rating: true }
             });
             return {
-                id: p.productId,
                 name: p.productName,
                 sales: p._sum.quantity || 0,
                 revenue: p._sum.totalPrice || 0,

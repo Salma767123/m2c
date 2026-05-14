@@ -369,7 +369,7 @@ const getPublicWishlist = async (req, res) => {
   try {
     const { token } = req.params;
 
-    const wishlist = await prisma.wishlist.findUnique({
+    const wishlist = await prisma.wishlist.findFirst({
       where: { shareToken: token },
       include: { items: true }
     });

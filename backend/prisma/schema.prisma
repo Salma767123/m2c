@@ -197,12 +197,13 @@ model CartItem {
 model Wishlist {
   id         String         @id @default(auto()) @map("_id") @db.ObjectId
   userId     String         @unique @db.ObjectId
-  shareToken String?        @unique
+  shareToken String?
   items      WishlistItem[]
 
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
+  @@index([shareToken])
   @@map("wishlists")
 }
 
@@ -236,6 +237,10 @@ model Vendor {
   // Application Status
   status                VendorStatus @default(PENDING)
   rejectionReason       String?
+  rejectionRequestedBy  String?   // Admin/Employee ID who requested the rejection
+  rejectionRequestedAt  DateTime? // When rejection was requested
+  approvalRequestedBy   String?   // Admin/Employee ID who requested the approval
+  approvalRequestedAt   DateTime? // When approval was requested
   approvedAt            DateTime?
   rejectedAt            DateTime?
   suspendedAt           DateTime?
@@ -250,7 +255,8 @@ model Vendor {
   ownerZipCode          String
   ownerCountry          String    @default("India")
   ownerPhoto            String?   // Cloudinary URL
-  
+  additionalOwners      Json?     // Array of { name, email, phone } for multiple owners
+
   // Company Details
   companyName           String
   companyType           CompanyType
@@ -261,6 +267,8 @@ model Vendor {
   
   // Contact & Trade Information
   businessPhone         String
+  landlineNumber        String?
+  phoneNumber2          String?
   businessEmail         String
   businessAddress       String
   businessCity          String
@@ -276,6 +284,8 @@ model Vendor {
   primaryMarkets        String[]  @default([])
   
   // Manufacturing Facilities
+  enabledFacilities     Json?     // { spinning: true, weaving: false, ... }
+  facilityDetails       Json?     // { spinning: { capacity: '100', machines: '5', ... }, ... }
   factoryAddress        String?
   factoryCity           String?
   factoryState          String?
@@ -286,6 +296,7 @@ model Vendor {
   qualityControl        String?   // Quality control measures
   
   // Warehouse Details
+  ownershipType         String?   // owned, rented, lease
   warehouseAddress      String?
   warehouseCity         String?
   warehouseState        String?
@@ -435,8 +446,10 @@ model VendorReference {
 enum VendorStatus {
   PENDING
   UNDER_REVIEW
+  APPROVAL_PENDING
   APPROVED
   REJECTED
+  REJECTION_PENDING
   REINSPECTION
   SUSPENDED
 }
@@ -1181,6 +1194,20 @@ model CompanyInfo {
 }
 
 // ============================================
+// VENDOR NOTIFICATION SETTINGS
+// ============================================
+
+model VendorNotificationSettings {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  emails        String[] @default([]) // Email IDs to notify on new vendor registration
+  updatedBy     String?  @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("vendor_notification_settings")
+}
+
+// ============================================
 // GST SETTINGS
 // ============================================
 
@@ -1675,6 +1702,7 @@ model ProductView {
   @@index([productId])
   @@index([createdAt])
   @@index([category])
+  @@index([productId, sessionId, createdAt])
   @@map("product_views")
 }
 

@@ -311,6 +311,79 @@ async function sendVendorSuspensionEmail({ companyName, ownerName, email, reason
 }
 
 /**
+ * Send email to all admins when a new vendor registers
+ */
+async function sendNewVendorRegistrationEmailToAdmins({ companyName, ownerName, vendorEmail, vendorPhone, city, state }) {
+  try {
+    // Check if specific notification emails are configured
+    let adminEmails = [];
+    try {
+      const notifSettings = await prisma.vendorNotificationSettings.findFirst();
+      if (notifSettings && notifSettings.emails && notifSettings.emails.length > 0) {
+        adminEmails = notifSettings.emails;
+      }
+    } catch {
+      // Table may not exist yet — fall through to fallback
+    }
+
+    // Fallback: if no emails configured, don't send to anyone
+    if (adminEmails.length === 0) return;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: #1a1a2e; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+          <h1 style="margin: 0; font-size: 22px;">New Vendor Registration</h1>
+        </div>
+        <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+          <p style="color: #374151; font-size: 16px;">A new vendor has submitted a registration application.</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 10px 0; color: #6b7280; width: 40%;">Company Name</td>
+              <td style="padding: 10px 0; font-weight: 600; color: #111827;">${companyName}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 10px 0; color: #6b7280;">Owner Name</td>
+              <td style="padding: 10px 0; font-weight: 600; color: #111827;">${ownerName}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 10px 0; color: #6b7280;">Email</td>
+              <td style="padding: 10px 0; color: #111827;">${vendorEmail}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 10px 0; color: #6b7280;">Phone</td>
+              <td style="padding: 10px 0; color: #111827;">${vendorPhone || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; color: #6b7280;">Location</td>
+              <td style="padding: 10px 0; color: #111827;">${[city, state].filter(Boolean).join(', ') || 'N/A'}</td>
+            </tr>
+          </table>
+          <div style="text-align: center; margin-top: 24px;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/dashboard/vendors"
+               style="display: inline-block; background: #2563eb; color: white; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+              Review Application
+            </a>
+          </div>
+          <p style="color: #9ca3af; font-size: 13px; margin-top: 20px; text-align: center;">
+            Please review and take action on this vendor application.
+          </p>
+        </div>
+      </div>
+    `;
+
+    await sendVendorEmail({
+      to: adminEmails.join(', '),
+      subject: `New Vendor Registration — ${companyName}`,
+      html
+    });
+
+    console.log(`✅ New vendor registration email sent to ${adminEmails.length} admin(s)`);
+  } catch (error) {
+    console.error('❌ Failed to send new vendor registration email to admins:', error);
+  }
+}
+
+/**
  * Generate a secure random password
  */
 function generateSecurePassword(length = 12) {
@@ -326,5 +399,6 @@ module.exports = {
   sendVendorApprovalEmail,
   sendVendorRejectionEmail,
   sendVendorSuspensionEmail,
+  sendNewVendorRegistrationEmailToAdmins,
   generateSecurePassword
 };

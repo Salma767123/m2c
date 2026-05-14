@@ -46,6 +46,20 @@ const trackProductView = async (req, res) => {
 
     const userId = req.user?.id || req.body.userId || null;
 
+    // Deduplicate: skip if the same session already viewed this product within the last 30 seconds
+    if (sessionId) {
+      const recentView = await prisma.productView.findFirst({
+        where: {
+          productId,
+          sessionId,
+          createdAt: { gte: new Date(Date.now() - 30 * 1000) },
+        },
+      });
+      if (recentView) {
+        return res.json({ success: true, deduplicated: true });
+      }
+    }
+
     await prisma.productView.create({
       data: {
         productId,

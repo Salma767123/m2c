@@ -55,7 +55,7 @@ class CartService {
       const response = await axios.post('/cart/add', { productId, quantity, variantId, currency });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to add item to cart');
+      throw new Error(error.message || 'Failed to add item to cart');
     }
   }
 
@@ -65,7 +65,7 @@ class CartService {
       const response = await axios.get('/cart');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to fetch cart');
+      throw new Error(error.message || 'Failed to fetch cart');
     }
   }
 
@@ -75,7 +75,7 @@ class CartService {
       const response = await axios.put(`/cart/${itemId}`, { quantity });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update cart item');
+      throw new Error(error.message || 'Failed to update cart item');
     }
   }
 
@@ -85,7 +85,7 @@ class CartService {
       const response = await axios.delete(`/cart/${itemId}`);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to remove item from cart');
+      throw new Error(error.message || 'Failed to remove item from cart');
     }
   }
 
@@ -95,7 +95,7 @@ class CartService {
       const response = await axios.delete('/cart/clear');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to clear cart');
+      throw new Error(error.message || 'Failed to clear cart');
     }
   }
 
@@ -169,7 +169,7 @@ class CartService {
       return response.data;
     } catch (error: any) {
       console.warn('Free shipping check failed:', error);
-      return { success: false, message: error.response?.data?.message || 'Failed to check free shipping' };
+      return { success: false, message: error.message || 'Failed to check free shipping' };
     }
   }
 }

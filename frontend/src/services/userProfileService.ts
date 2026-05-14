@@ -39,7 +39,7 @@ class UserProfileService {
       const response = await axios.get('/auth/me');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to fetch profile');
+      throw new Error(error.message || 'Failed to fetch profile');
     }
   }
 
@@ -49,7 +49,7 @@ class UserProfileService {
       const response = await axios.put('/auth/profile', profileData);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update profile');
+      throw new Error(error.message || 'Failed to update profile');
     }
   }
 
@@ -59,7 +59,7 @@ class UserProfileService {
       const response = await axios.get('/auth/stats');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to fetch user stats');
+      throw new Error(error.message || 'Failed to fetch user stats');
     }
   }
 }

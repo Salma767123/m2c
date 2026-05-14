@@ -15,7 +15,7 @@ import {
 import { Badge } from '@/components/UI/Badge'
 import { LoadingSpinner } from '@/components/UI/LoadingSpinner'
 import Dropdown from '@/components/UI/Dropdown'
-import { Edit, Eye, CheckCircle, XCircle, Search, Filter, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Edit, Eye, CheckCircle, XCircle, Search, Filter, Plus, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import VendorService, { VendorProfile, VendorFilters } from '@/services/vendorService'
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
@@ -47,12 +47,37 @@ const getStatusBadge = (status: string) => {
       return <Badge className="bg-gray-100 text-gray-800">Suspended</Badge>
     case 'REJECTED':
       return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
+    case 'APPROVAL_PENDING':
+      return <Badge className="bg-cyan-100 text-cyan-800">Approval Pending</Badge>
+    case 'REJECTION_PENDING':
+      return <Badge className="bg-orange-100 text-orange-800">Rejection Pending</Badge>
     case 'REINSPECTION':
       return <Badge className="bg-amber-100 text-amber-800">Re-Inspection</Badge>
     case 'SUBMITTED':
       return <Badge className="bg-blue-100 text-blue-800">Submitted</Badge>
     default:
       return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>
+  }
+}
+
+const getInspectionBadge = (vendorStatus: string, latestInspection?: VendorProfile['latestInspection']) => {
+  if (!latestInspection) return null
+  // Don't show inspection badge if vendor already has a final status
+  if (['APPROVED', 'REJECTED', 'SUSPENDED'].includes(vendorStatus)) return null
+  const { status, result } = latestInspection
+  switch (status) {
+    case 'SUBMITTED':
+      return result === 'FAILED'
+        ? <Badge className="bg-red-50 text-red-700 border border-red-200">QC Failed - Awaiting Review</Badge>
+        : <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">QC Passed - Awaiting Approval</Badge>
+    case 'SCHEDULED':
+      return <Badge className="bg-gray-50 text-gray-600 border border-gray-200">QC Scheduled</Badge>
+    case 'IN_PROGRESS':
+      return <Badge className="bg-blue-50 text-blue-700 border border-blue-200">QC In Progress</Badge>
+    case 'UNDER_ADMIN_REVIEW':
+      return <Badge className="bg-purple-50 text-purple-700 border border-purple-200">Under Admin Review</Badge>
+    default:
+      return null
   }
 }
 
@@ -296,6 +321,8 @@ export default function VendorsTable() {
                   { value: 'UNDER_REVIEW', label: 'Under Review' },
                   { value: 'APPROVED', label: 'Approved' },
                   { value: 'REJECTED', label: 'Rejected' },
+                  { value: 'APPROVAL_PENDING', label: 'Approval Pending' },
+                  { value: 'REJECTION_PENDING', label: 'Rejection Pending' },
                   { value: 'REINSPECTION', label: 'Re-Inspection' },
                   { value: 'SUSPENDED', label: 'Suspended' }
                 ]}
@@ -336,6 +363,7 @@ export default function VendorsTable() {
                   <TableHead className="text-white">Vendor</TableHead>
                   <TableHead className="text-white">Location</TableHead>
                   <TableHead className="text-white">Status</TableHead>
+                  <TableHead className="text-white">Completion</TableHead>
                   <TableHead className="text-white">Rating</TableHead>
                   <TableHead className="text-white">Join Date</TableHead>
                   <TableHead className="text-white">Actions</TableHead>
@@ -352,7 +380,34 @@ export default function VendorsTable() {
                       </div>
                     </TableCell>
                     <TableCell>{getLocationString(vendor)}</TableCell>
-                    <TableCell>{getStatusBadge(vendor.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {getStatusBadge(vendor.status)}
+                        {getInspectionBadge(vendor.status, vendor.latestInspection)}
+                        {vendor.status === 'APPROVAL_PENDING' && vendor.approvalRequestedByName && (
+                          <p className="text-xs text-cyan-600">by {vendor.approvalRequestedByName}</p>
+                        )}
+                        {vendor.status === 'REJECTION_PENDING' && vendor.rejectionRequestedByName && (
+                          <p className="text-xs text-orange-600">by {vendor.rejectionRequestedByName}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const pct = vendor.completionPercentage ?? 0;
+                        const color = pct === 100 ? 'bg-green-500' : pct >= 50 ? 'bg-blue-500' : 'bg-orange-400';
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className={`text-xs font-semibold ${pct === 100 ? 'text-green-600' : pct >= 50 ? 'text-blue-600' : 'text-orange-500'}`}>
+                              {pct}%
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>
                       {hasRating(vendor) ? (
                         <div className="flex items-center" title={`Based on ${vendor.ratingCount} admin review${(vendor.ratingCount ?? 0) === 1 ? '' : 's'}`}>
@@ -420,6 +475,102 @@ export default function VendorsTable() {
                           >
                             <XCircle className="h-4 w-4" />
                           </Button>
+                        )}
+                        {vendor.status === 'APPROVAL_PENDING' && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-green-600 hover:bg-green-50"
+                              title="Confirm Approval"
+                              onClick={async () => {
+                                if (!confirm('Confirm approval? Credentials will be sent to the vendor.')) return;
+                                try {
+                                  setActionLoading(vendor.id);
+                                  await VendorService.confirmApproval(vendor.id);
+                                  toast({ title: 'Approval Confirmed', description: 'Vendor approved and credentials sent.' });
+                                  fetchVendors();
+                                } catch (err: any) {
+                                  toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to confirm approval', variant: 'destructive' });
+                                } finally {
+                                  setActionLoading(null);
+                                }
+                              }}
+                              disabled={actionLoading === vendor.id}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-orange-600 hover:bg-orange-50"
+                              title="Cancel Approval — Restore to Pending"
+                              onClick={async () => {
+                                if (!confirm('Cancel this approval? Vendor will be restored to Pending.')) return;
+                                try {
+                                  setActionLoading(vendor.id);
+                                  await VendorService.cancelApproval(vendor.id);
+                                  toast({ title: 'Approval Cancelled', description: 'Vendor restored to Pending.' });
+                                  fetchVendors();
+                                } catch (err: any) {
+                                  toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to cancel approval', variant: 'destructive' });
+                                } finally {
+                                  setActionLoading(null);
+                                }
+                              }}
+                              disabled={actionLoading === vendor.id}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        {vendor.status === 'REJECTION_PENDING' && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:bg-red-50"
+                              title="Confirm Rejection"
+                              onClick={async () => {
+                                if (!confirm('Confirm rejection? Rejection email will be sent to the vendor.')) return;
+                                try {
+                                  setActionLoading(vendor.id);
+                                  await VendorService.confirmRejection(vendor.id);
+                                  toast({ title: 'Rejection Confirmed', description: 'Vendor has been rejected and notified.' });
+                                  fetchVendors();
+                                } catch (err: any) {
+                                  toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to confirm rejection', variant: 'destructive' });
+                                } finally {
+                                  setActionLoading(null);
+                                }
+                              }}
+                              disabled={actionLoading === vendor.id}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-green-600 hover:bg-green-50"
+                              title="Cancel Rejection — Restore to Pending"
+                              onClick={async () => {
+                                if (!confirm('Cancel this rejection? Vendor will be restored to Pending status.')) return;
+                                try {
+                                  setActionLoading(vendor.id);
+                                  await VendorService.cancelRejection(vendor.id);
+                                  toast({ title: 'Rejection Cancelled', description: 'Vendor restored to Pending.' });
+                                  fetchVendors();
+                                } catch (err: any) {
+                                  toast({ title: 'Error', description: err?.response?.data?.error || 'Failed to cancel rejection', variant: 'destructive' });
+                                } finally {
+                                  setActionLoading(null);
+                                }
+                              }}
+                              disabled={actionLoading === vendor.id}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </TableCell>
