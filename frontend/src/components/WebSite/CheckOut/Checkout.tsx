@@ -760,6 +760,23 @@ export default function Checkout() {
     )
   }
 
+  if (!loading && cartItems.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center max-w-md mx-auto p-8">
+          <ShoppingBag className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Your cart is empty</h2>
+          <p className="text-slate-500 mb-6">Add some items to your cart before proceeding to checkout.</p>
+          <Link href="/products">
+            <button className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium">
+              Browse Products
+            </button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 py-8 font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
