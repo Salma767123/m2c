@@ -60,7 +60,7 @@ class ReviewService {
             const response = await axios.post('/reviews', data);
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || error;
+            throw error.data || error;
         }
     }
 
@@ -80,7 +80,7 @@ class ReviewService {
             const response = await axios.get(`/reviews/product/${productId}`);
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || error;
+            throw error.data || error;
         }
     }
 
@@ -98,7 +98,7 @@ class ReviewService {
             const response = await axios.get('/reviews/admin/all', { params });
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || error;
+            throw error.data || error;
         }
     }
 
@@ -107,7 +107,7 @@ class ReviewService {
             const response = await axios.patch(`/reviews/${reviewId}/status`, { isApproved });
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || error;
+            throw error.data || error;
         }
     }
 
@@ -116,7 +116,7 @@ class ReviewService {
             const response = await axios.delete(`/reviews/${reviewId}`);
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || error;
+            throw error.data || error;
         }
     }
 }

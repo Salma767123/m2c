@@ -15,7 +15,7 @@ class GSTSettingsService {
             const response = await axiosInstance.get('/gst-settings');
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to fetch GST settings');
+            throw new Error(error.message || 'Failed to fetch GST settings');
         }
     }
 
@@ -24,7 +24,7 @@ class GSTSettingsService {
             const response = await axiosInstance.post('/gst-settings', data);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to create GST setting');
+            throw new Error(error.message || 'Failed to create GST setting');
         }
     }
 
@@ -33,7 +33,7 @@ class GSTSettingsService {
             const response = await axiosInstance.put(`/gst-settings/${id}`, data);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to update GST setting');
+            throw new Error(error.message || 'Failed to update GST setting');
         }
     }
 
@@ -42,7 +42,7 @@ class GSTSettingsService {
             const response = await axiosInstance.delete(`/gst-settings/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to delete GST setting');
+            throw new Error(error.message || 'Failed to delete GST setting');
         }
     }
 }

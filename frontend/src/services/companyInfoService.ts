@@ -121,7 +121,7 @@ export const companyInfoService = {
       const response = await axios.get('/company-info');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to fetch company info');
+      throw new Error(error.message || 'Failed to fetch company info');
     }
   },
 
@@ -131,7 +131,7 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/basic', data);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update basic information');
+      throw new Error(error.message || 'Failed to update basic information');
     }
   },
 
@@ -141,7 +141,7 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/legal', data);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update legal information');
+      throw new Error(error.message || 'Failed to update legal information');
     }
   },
 
@@ -151,7 +151,7 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/address', data);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update address');
+      throw new Error(error.message || 'Failed to update address');
     }
   },
 
@@ -161,7 +161,7 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/bank', data);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update bank details');
+      throw new Error(error.message || 'Failed to update bank details');
     }
   },
 
@@ -171,7 +171,7 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/logo', { companyLogo });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update company logo');
+      throw new Error(error.message || 'Failed to update company logo');
     }
   },
 
@@ -181,7 +181,7 @@ export const companyInfoService = {
       const response = await axios.get('/company-info/vendor-notifications');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to fetch vendor notification settings');
+      throw new Error(error.message || 'Failed to fetch vendor notification settings');
     }
   },
 
@@ -191,7 +191,7 @@ export const companyInfoService = {
       const response = await axios.put('/company-info/vendor-notifications', { emails });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to update vendor notification settings');
+      throw new Error(error.message || 'Failed to update vendor notification settings');
     }
   }
 };

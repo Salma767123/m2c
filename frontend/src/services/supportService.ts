@@ -49,7 +49,7 @@ class SupportService {
             const response = await axios.post('/support', data);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to create ticket');
+            throw new Error(error.message || 'Failed to create ticket');
         }
     }
 
@@ -59,7 +59,7 @@ class SupportService {
             const response = await axios.get('/support/my-tickets');
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to fetch tickets');
+            throw new Error(error.message || 'Failed to fetch tickets');
         }
     }
 
@@ -69,7 +69,7 @@ class SupportService {
             const response = await axios.get('/support/admin');
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to fetch tickets');
+            throw new Error(error.message || 'Failed to fetch tickets');
         }
     }
 
@@ -79,7 +79,7 @@ class SupportService {
             const response = await axios.get(`/support/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to fetch ticket');
+            throw new Error(error.message || 'Failed to fetch ticket');
         }
     }
 
@@ -89,7 +89,7 @@ class SupportService {
             const response = await axios.post(`/support/${id}/messages`, data);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to reply to ticket');
+            throw new Error(error.message || 'Failed to reply to ticket');
         }
     }
 
@@ -99,7 +99,7 @@ class SupportService {
             const response = await axios.patch(`/support/${id}/status`, { status });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to update ticket status');
+            throw new Error(error.message || 'Failed to update ticket status');
         }
     }
 
@@ -109,7 +109,7 @@ class SupportService {
             const response = await axios.delete(`/support/${id}`);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.error || 'Failed to delete ticket');
+            throw new Error(error.message || 'Failed to delete ticket');
         }
     }
 }

@@ -83,7 +83,7 @@ class WishlistService {
     } catch (error: any) {
       this._cachedIds.delete(productId);
       this._notify();
-      throw new Error(error.response?.data?.error || 'Failed to add item to wishlist');
+      throw new Error(error.message || 'Failed to add item to wishlist');
     }
   }
 
@@ -93,7 +93,7 @@ class WishlistService {
       const response = await axios.get('/wishlist');
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to fetch wishlist');
+      throw new Error(error.message || 'Failed to fetch wishlist');
     }
   }
 
@@ -107,7 +107,7 @@ class WishlistService {
     } catch (error: any) {
       this._cachedIds.add(productId);
       this._notify();
-      throw new Error(error.response?.data?.error || 'Failed to remove item from wishlist');
+      throw new Error(error.message || 'Failed to remove item from wishlist');
     }
   }
 
@@ -127,7 +127,7 @@ class WishlistService {
       const response = await axios.post('/wishlist/share');
       return response.data.shareToken;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to generate share link');
+      throw new Error(error.message || 'Failed to generate share link');
     }
   }
 
@@ -137,7 +137,7 @@ class WishlistService {
       const response = await axios.get(`/wishlist/shared/${token}`);
       return response.data.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Wishlist not found');
+      throw new Error(error.message || 'Wishlist not found');
     }
   }
 

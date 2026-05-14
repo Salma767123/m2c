@@ -30,7 +30,7 @@ export const settlementService = {
             const response = await axios.get('/settlements/admin');
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || { success: false, error: 'Failed to fetch settlements' };
+            throw error.data || { success: false, error: 'Failed to fetch settlements' };
         }
     },
 
@@ -39,7 +39,7 @@ export const settlementService = {
             const response = await axios.get(`/settlements/admin/${id}`);
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || { success: false, error: 'Failed to fetch settlement details' };
+            throw error.data || { success: false, error: 'Failed to fetch settlement details' };
         }
     },
 
@@ -48,7 +48,7 @@ export const settlementService = {
             const response = await axios.put(`/settlements/admin/${id}/due-date`, { dueDate });
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || { success: false, error: 'Failed to update due date' };
+            throw error.data || { success: false, error: 'Failed to update due date' };
         }
     },
 
@@ -57,7 +57,7 @@ export const settlementService = {
             const response = await axios.put(`/settlements/admin/${id}/status`, { status, transactionId });
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || { success: false, error: 'Failed to update settlement status' };
+            throw error.data || { success: false, error: 'Failed to update settlement status' };
         }
     },
 
@@ -67,7 +67,7 @@ export const settlementService = {
             const response = await axios.get('/settlements/vendor');
             return response.data;
         } catch (error: any) {
-            throw error.response?.data || { success: false, error: 'Failed to fetch vendor settlements' };
+            throw error.data || { success: false, error: 'Failed to fetch vendor settlements' };
         }
     }
 };

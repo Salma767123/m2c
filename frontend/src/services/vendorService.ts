@@ -389,20 +389,7 @@ class VendorService {
     } catch (error: any) {
       // The axios interceptor returns a custom error object: { message, status, data }
       // Also handle standard axios error structure for backward compatibility
-      let errorMessage = 'Invalid credentials';
-
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (error?.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error?.data?.error) {
-        errorMessage = error.data.error;
-      } else if (error?.data?.message) {
-        errorMessage = error.data.message;
-      }
-
+      const errorMessage = error?.message || error?.data?.error || error?.data?.message || 'Invalid credentials';
       throw new Error(errorMessage);
     }
   }

@@ -146,7 +146,7 @@ class AdminProductService {
       const response = await axios.get('/products/admin/all', { params });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch products');
+      throw new Error(error.message || 'Failed to fetch products');
     }
   }
 
@@ -156,7 +156,7 @@ class AdminProductService {
       const response = await axios.get(`/products/admin/${id}`);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch product');
+      throw new Error(error.message || 'Failed to fetch product');
     }
   }
 
@@ -166,7 +166,7 @@ class AdminProductService {
       const response = await axios.post('/products/admin', productData);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to create product');
+      throw new Error(error.message || 'Failed to create product');
     }
   }
 
@@ -176,7 +176,7 @@ class AdminProductService {
       const response = await axios.put(`/products/admin/${id}`, productData);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to update product');
+      throw new Error(error.message || 'Failed to update product');
     }
   }
 
@@ -186,7 +186,7 @@ class AdminProductService {
       const response = await axios.delete(`/products/admin/${id}`);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to delete product');
+      throw new Error(error.message || 'Failed to delete product');
     }
   }
 
@@ -240,7 +240,7 @@ class AdminProductService {
       const response = await axios.put(`/products/${id}/approve`, payload);
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to approve product');
+      throw new Error(error.message || 'Failed to approve product');
     }
   }
 
@@ -250,7 +250,7 @@ class AdminProductService {
       const response = await axios.put(`/products/${id}/reject`, { reason: rejectionReason });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to reject product');
+      throw new Error(error.message || 'Failed to reject product');
     }
   }
 
@@ -260,7 +260,7 @@ class AdminProductService {
       const response = await axios.post(`/products/admin/${id}/assign-qc`, { qcCheckerId });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to assign QC checker');
+      throw new Error(error.message || 'Failed to assign QC checker');
     }
   }
 }
