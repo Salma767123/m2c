@@ -1,9 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, Linking, Image } from 'react-native';
 import { Instagram, Facebook, Youtube } from 'lucide-react-native';
+import { companyInfoService } from '@/services/companyInfoService';
+
+const STATIC_LOGO = require('../../../../assets/images/logo4.png');
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+
+  // Load dynamic company logo (cached first, then fresh from API)
+  useEffect(() => {
+    companyInfoService.getCachedCompanyInfo().then((info) => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    });
+    companyInfoService.getPublicCompanyInfo().then((info) => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    }).catch(() => {});
+  }, []);
 
   const openUrl = (url: string) => {
     if (url) Linking.openURL(url);
@@ -20,10 +34,10 @@ export default function Footer() {
     <View className="bg-black pt-12 pb-8 px-6">
       {/* Brand */}
       <View className="items-center mb-8">
-        <View className="bg-white rounded-lg p-3 mb-4">
+        <View className="mb-4">
           <Image
-            source={require('../../../../assets/images/logo4.png')}
-            style={{ width: 120, height: 40 }}
+            source={companyLogo ? { uri: companyLogo } : STATIC_LOGO}
+            style={{ width: 260, height: 120 }}
             resizeMode="contain"
           />
         </View>

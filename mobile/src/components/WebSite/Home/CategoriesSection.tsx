@@ -168,11 +168,7 @@ function CategoryCard({ category }: { category: Category }) {
       accessibilityRole="button"
       accessibilityLabel={`View ${category.name} category`}
       android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
-      style={({ pressed }) => ({
-        width: CARD_WIDTH,
-        opacity: pressed ? 0.9 : 1,
-        transform: [{ scale: pressed ? 0.98 : 1 }],
-      })}
+      style={{ width: CARD_WIDTH }}
     >
       <View
         style={{
@@ -290,18 +286,21 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
         onPress={onRetry}
         accessibilityRole="button"
         accessibilityLabel="Retry loading categories"
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: pressed ? '#1f2937' : '#374151',
-          paddingHorizontal: 20,
-          paddingVertical: 10,
-          borderRadius: 10,
-          minHeight: 40,
-        })}
       >
-        <RefreshCw size={14} color="#ffffff" strokeWidth={2.25} />
-        <Text className="text-white font-semibold text-sm ml-2">Try Again</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#374151',
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderRadius: 10,
+            minHeight: 40,
+          }}
+        >
+          <RefreshCw size={14} color="#ffffff" strokeWidth={2.25} />
+          <Text className="text-white font-semibold text-sm ml-2">Try Again</Text>
+        </View>
       </Pressable>
     </View>
   );

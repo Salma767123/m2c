@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { calculateLogistics, type LogisticsConfig } from '@/lib/logistics';
-import { getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
+import { getRegionalPrice, getRegionalOriginalPrice, getCurrency, formatPrice as fmtCurrency } from '@/lib/currency';
 import {
   View,
   Text,
@@ -31,6 +31,8 @@ import {
   TrendingDown,
   TrendingUp,
   Info,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -76,6 +78,22 @@ export default function Cart() {
 
   // Bag add-on
   const [selectedBag, setSelectedBag] = useState<BagType | null>(null);
+
+  // Persist bag selection so checkout can read it
+  const handleBagSelect = useCallback((bag: BagType | null) => {
+    setSelectedBag(bag);
+    if (bag) {
+      AsyncStorage.setItem('selectedBagType', JSON.stringify({
+        id: bag.id,
+        name: bag.name,
+        price: bag.price,
+        priceINR: (bag as any).priceINR,
+        priceUSD: (bag as any).priceUSD,
+      }));
+    } else {
+      AsyncStorage.removeItem('selectedBagType');
+    }
+  }, []);
 
   // Promo
   const [promoCode, setPromoCode] = useState('');
@@ -176,8 +194,8 @@ export default function Cart() {
 
               // Original price & discount: variant overrides product
               const liveOriginalPrice = hasVariant
-                ? (item.variant.originalPrice ?? item.product?.originalPrice)
-                : item.product?.originalPrice;
+                ? getRegionalOriginalPrice(item.variant as any) ?? getRegionalOriginalPrice(item.product as any)
+                : getRegionalOriginalPrice(item.product as any);
               const liveDiscount = hasVariant
                 ? (item.variant.discount ?? item.product?.discount)
                 : item.product?.discount;
@@ -205,7 +223,7 @@ export default function Cart() {
                 productId: item.productId,
                 name: item.product?.name || 'Product',
                 price: livePrice,
-                originalPrice: liveOriginalPrice,
+                originalPrice: liveOriginalPrice ?? undefined,
                 images: imgArray,
                 category: item.product?.category || '',
                 inStock: liveStock > 0 && (item.product?.inStock ?? true),
@@ -233,7 +251,7 @@ export default function Cart() {
                 productId: ci.productId,
                 name: p.name,
                 price: getRegionalPrice(p as any),
-                originalPrice: p.originalPrice,
+                originalPrice: getRegionalOriginalPrice(p as any) ?? undefined,
                 images: url ? [url] : [],
                 category: p.category || '',
                 inStock: p.inStock,
@@ -265,7 +283,7 @@ export default function Cart() {
   const pendingUpdates = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const updateQty = useCallback((id: string, qty: number) => {
-    if (qty < 1) { removeItem(id); return; }
+    if (qty < 1) return;
 
     // 1. Optimistic: update local state instantly
     setCartItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity: qty } : i)));
@@ -279,9 +297,7 @@ export default function Cart() {
         else await cartService.updateLocalCartItem(id, qty);
         refreshCart(); // sync badge count
       } catch {
-        // Rollback on failure — re-fetch real state
         showErrorToast('Error', 'Failed to update quantity');
-        fetchCart();
       }
     }, 400);
   }, [isAuthenticated, refreshCart]);
@@ -427,7 +443,7 @@ export default function Cart() {
           <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
             {"Looks like you haven't added anything yet."}
           </Text>
-          <Pressable onPress={() => router.push('/(tabs)')} accessibilityRole="button">
+          <Pressable onPress={() => router.push('/(tabs)')} accessibilityRole="button" accessibilityLabel="Start shopping, browse products">
             <View
               style={{
                 flexDirection: 'row',
@@ -454,7 +470,7 @@ export default function Cart() {
       <ScreenHeader count={cartItems.length} />
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 16, gap: 10 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 140, gap: 10 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111827" />}
       >
@@ -535,38 +551,43 @@ export default function Cart() {
               ) : null}
 
               <View style={{ flexDirection: 'row', padding: 12, gap: 12 }}>
-                {/* Image — 64px compact */}
+                {/* Image */}
                 <Pressable
                   onPress={() => router.push(`/(any)/products/${item.productId}` as any)}
                   accessibilityRole="button"
                   accessibilityLabel={`View ${item.name}`}
                 >
                   <View
-                    style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', backgroundColor: '#f3f4f6', opacity: oos ? 0.4 : 1 }}
+                    style={{ width: 88, height: 88, borderRadius: 12, overflow: 'hidden', backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#f3f4f6', opacity: oos ? 0.4 : 1 }}
                   >
                     {item.images.length > 0 ? (
-                      <Image source={{ uri: item.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={200} />
+                      <Image source={{ uri: item.images[0] }} style={{ width: '100%', height: '100%' }} contentFit="contain" transition={200} />
                     ) : (
                       <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-                        <Package size={20} color="#d1d5db" />
+                        <Package size={24} color="#d1d5db" />
                       </View>
                     )}
                   </View>
                 </Pressable>
 
-                {/* Info + controls — all in one column */}
-                <View style={{ flex: 1 }}>
+                {/* Info + controls */}
+                <View style={{ flex: 1, justifyContent: 'space-between' }}>
                   {/* Name row + trash */}
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 }}>
                     <Text
                       style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#111827', lineHeight: 17, marginRight: 8 }}
                       numberOfLines={2}
                     >
                       {item.name}
                     </Text>
-                    <Pressable onPress={() => removeItem(item.id)} accessibilityRole="button" accessibilityLabel="Remove" hitSlop={8}>
-                      <View style={{ padding: 4 }}>
-                        <Trash2 size={14} color="#9ca3af" />
+                    <Pressable
+                      onPress={() => removeItem(item.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${item.name} from cart`}
+                      hitSlop={6}
+                    >
+                      <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+                        <Trash2 size={16} color="#9ca3af" />
                       </View>
                     </Pressable>
                   </View>
@@ -598,47 +619,92 @@ export default function Cart() {
                     ) : null}
                   </View>
 
-                  {/* Price + stepper + line total */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    {/* Price */}
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>{fmt(item.price)}</Text>
-                      {item.originalPrice ? (
-                        <Text style={{ fontSize: 10, color: '#dc2626', textDecorationLine: 'line-through' }}>{fmt(item.originalPrice)}</Text>
-                      ) : null}
-                    </View>
-
-                    {/* Compact stepper */}
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: '#f3f4f6',
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: '#e5e7eb',
-                      }}
-                    >
-                      <Pressable onPress={() => updateQty(item.id, item.quantity - 1)} disabled={oos} accessibilityRole="button" hitSlop={4}>
-                        <View style={{ width: 30, height: 28, alignItems: 'center', justifyContent: 'center', opacity: oos ? 0.3 : 1 }}>
-                          <Minus size={12} color="#111827" strokeWidth={2.5} />
-                        </View>
-                      </Pressable>
-                      <Text style={{ minWidth: 22, textAlign: 'center', fontSize: 13, fontWeight: '800', color: '#111827' }}>
-                        {item.quantity}
+                  {/* Price */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{fmt(item.price)}</Text>
+                    {item.originalPrice && item.originalPrice > item.price ? (
+                      <Text style={{ fontSize: 11, color: '#6b7280', textDecorationLine: 'line-through' }}>{fmt(item.originalPrice)}</Text>
+                    ) : null}
+                    {item.discount && item.discount > 0 ? (
+                      <View style={{ backgroundColor: '#dcfce7', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#16a34a' }}>{item.discount}% off</Text>
+                      </View>
+                    ) : null}
+                    {item.quantity > 1 ? (
+                      <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                        ({fmt(item.price * item.quantity)} total)
                       </Text>
-                      <Pressable onPress={() => updateQty(item.id, item.quantity + 1)} disabled={incOff} accessibilityRole="button" hitSlop={4}>
-                        <View style={{ width: 30, height: 28, alignItems: 'center', justifyContent: 'center', opacity: incOff ? 0.3 : 1 }}>
-                          <Plus size={12} color="#111827" strokeWidth={2.5} />
-                        </View>
-                      </Pressable>
-                    </View>
-
-                    {/* Line total */}
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>
-                      {fmt(item.price * item.quantity)}
-                    </Text>
+                    ) : null}
                   </View>
+                </View>
+              </View>
+
+              {/* Stepper row — full width below card content */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderTopWidth: 1,
+                  borderTopColor: '#f3f4f6',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#6b7280' }}>Quantity</Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: '#e5e7eb',
+                  }}
+                >
+                  <Pressable
+                    onPress={() => {
+                      if (item.quantity <= 1) {
+                        removeItem(item.id);
+                      } else {
+                        updateQty(item.id, item.quantity - 1);
+                      }
+                    }}
+                    disabled={oos}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.quantity <= 1 ? `Remove ${item.name} from cart` : `Decrease quantity of ${item.name}`}
+                    android_ripple={{ color: 'rgba(0,0,0,0.08)', borderless: false, radius: 20 }}
+                  >
+                    <View style={{
+                      width: 44, height: 44,
+                      alignItems: 'center', justifyContent: 'center',
+                      opacity: oos ? 0.3 : 1,
+                    }}>
+                      {item.quantity <= 1 && !oos ? (
+                        <Trash2 size={15} color="#dc2626" strokeWidth={2.5} />
+                      ) : (
+                        <Minus size={15} color="#111827" strokeWidth={2.5} />
+                      )}
+                    </View>
+                  </Pressable>
+                  <Text style={{ minWidth: 32, textAlign: 'center', fontSize: 16, fontWeight: '800', color: '#111827' }}>
+                    {item.quantity}
+                  </Text>
+                  <Pressable
+                    onPress={() => updateQty(item.id, item.quantity + 1)}
+                    disabled={incOff}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Increase quantity of ${item.name}`}
+                    android_ripple={{ color: 'rgba(0,0,0,0.08)', borderless: false, radius: 20 }}
+                  >
+                    <View style={{
+                      width: 44, height: 44,
+                      alignItems: 'center', justifyContent: 'center',
+                      opacity: incOff ? 0.3 : 1,
+                    }}>
+                      <Plus size={15} color="#111827" strokeWidth={2.5} />
+                    </View>
+                  </Pressable>
                 </View>
               </View>
             </View>
@@ -648,22 +714,25 @@ export default function Cart() {
         {/* Bag add-on */}
         <BagSelector
           selectedBagId={selectedBag?.id ?? null}
-          onSelect={setSelectedBag}
+          onSelect={handleBagSelect}
         />
 
         {/* Promo code */}
         <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e5e7eb' }}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 10 }}>
-            <Tag size={13} color="#374151" /> Promo Code
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <Tag size={14} color="#374151" />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151' }}>Promo Code</Text>
+          </View>
           {appliedPromo ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f0fdf4', borderRadius: 10, padding: 12 }}>
               <View>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#16a34a' }}>{`"${appliedPromo}" applied!`}</Text>
                 <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>You saved {fmt(discountAmount)}</Text>
               </View>
-              <Pressable onPress={removeCoupon} accessibilityRole="button" hitSlop={8}>
-                <X size={16} color="#6b7280" />
+              <Pressable onPress={removeCoupon} accessibilityRole="button" accessibilityLabel="Remove applied coupon" hitSlop={8}>
+                <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={16} color="#6b7280" />
+                </View>
               </Pressable>
             </View>
           ) : (
@@ -688,7 +757,7 @@ export default function Cart() {
                   backgroundColor: '#f9fafb',
                 }}
               />
-              <Pressable onPress={applyCoupon} disabled={applyingCoupon} accessibilityRole="button">
+              <Pressable onPress={applyCoupon} disabled={applyingCoupon} accessibilityRole="button" accessibilityLabel="Apply promo code">
                 <View
                   style={{
                     backgroundColor: applyingCoupon ? '#6b7280' : '#111827',
@@ -793,7 +862,7 @@ function StickyCheckout({
         borderTopColor: '#e5e7eb',
         paddingHorizontal: 16,
         paddingTop: 10,
-        paddingBottom: Math.max(bottomInsets.bottom, 16) + 60,
+        paddingBottom: Math.max(bottomInsets.bottom, 16),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
         shadowOpacity: 0.08,
@@ -823,9 +892,12 @@ function StickyCheckout({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text style={{ fontSize: 13, color: '#6b7280' }}>Total</Text>
-            <Text style={{ fontSize: 11, color: '#2563eb', fontWeight: '600' }}>
-              {expanded ? '▾ Hide' : '▸ Details'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              {expanded ? <ChevronDown size={14} color="#2563eb" strokeWidth={2.5} /> : <ChevronRight size={14} color="#2563eb" strokeWidth={2.5} />}
+              <Text style={{ fontSize: 12, color: '#2563eb', fontWeight: '600' }}>
+                {expanded ? 'Hide' : 'Details'}
+              </Text>
+            </View>
           </View>
         </Pressable>
         <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827' }}>{fmt(total)}</Text>
@@ -937,9 +1009,9 @@ const cs = StyleSheet.create({
   bannerOos: { backgroundColor: '#fef2f2' },
   bannerOver: { backgroundColor: '#fffbeb' },
   bannerLow: { backgroundColor: '#fff7ed' },
-  bannerTextOos: { fontSize: 10, fontWeight: '700', color: '#dc2626' },
-  bannerTextOver: { fontSize: 10, fontWeight: '700', color: '#92400e' },
-  bannerTextLow: { fontSize: 10, fontWeight: '700', color: '#9a3412' },
+  bannerTextOos: { fontSize: 11, fontWeight: '700', color: '#dc2626' },
+  bannerTextOver: { fontSize: 11, fontWeight: '700', color: '#92400e' },
+  bannerTextLow: { fontSize: 11, fontWeight: '700', color: '#9a3412' },
 
   // Price change banner (per-item)
   priceBannerRow: {
@@ -948,8 +1020,8 @@ const cs = StyleSheet.create({
   },
   priceBannerUp: { backgroundColor: '#fef2f2' },
   priceBannerDown: { backgroundColor: '#f0fdf4' },
-  priceTextUp: { fontSize: 10, fontWeight: '700', color: '#dc2626' },
-  priceTextDown: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  priceTextUp: { fontSize: 11, fontWeight: '700', color: '#dc2626' },
+  priceTextDown: { fontSize: 11, fontWeight: '700', color: '#16a34a' },
 
   // SyncBanner component
   syncBanner: { borderRadius: 12, borderWidth: 1, padding: 12 },
@@ -971,14 +1043,14 @@ const cs = StyleSheet.create({
   colorDot: {
     width: 8, height: 8, borderRadius: 4, borderWidth: 1, borderColor: '#e5e7eb',
   },
-  variantText: { fontSize: 10, fontWeight: '600', color: '#374151' },
+  variantText: { fontSize: 11, fontWeight: '600', color: '#374151' },
 
   // Stock chips
   stockChip: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   stockChipOk: { backgroundColor: '#f0fdf4' },
   stockChipLow: { backgroundColor: '#fff7ed' },
   stockChipOos: { backgroundColor: '#fef2f2' },
-  stockText: { fontSize: 9, fontWeight: '700' },
+  stockText: { fontSize: 10, fontWeight: '700' },
   stockTextOk: { color: '#16a34a' },
   stockTextLow: { color: '#ea580c' },
   stockTextOos: { color: '#dc2626' },

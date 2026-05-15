@@ -67,6 +67,9 @@ export default function PaymentForm({
                 key={method.id}
                 onPress={() => updateFormData('paymentMethod', method.id as any)}
                 activeOpacity={0.75}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={`${method.name}: ${method.description}${isSelected ? ', selected' : ''}`}
                 className={`flex-row items-center p-4 border-2 rounded-2xl gap-3 ${
                   isSelected
                     ? 'border-[#1a1a2e] bg-[#1a1a2e]/5'

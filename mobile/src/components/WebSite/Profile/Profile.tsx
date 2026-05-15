@@ -118,14 +118,11 @@ export default function Profile() {
       setIsSaving(true);
       const name = `${editedProfile.firstName} ${editedProfile.lastName}`.trim();
       if (!name) { showErrorToast('Error', 'Name is required'); return; }
+      // Profile update only covers personal info. Addresses are managed
+      // separately in the Saved Addresses screen.
       const res = await userProfileService.updateProfile({
         name,
         phoneNumber: editedProfile.phone,
-        address: editedProfile.address.addressLine1,
-        city: editedProfile.address.city,
-        state: editedProfile.address.state,
-        zipCode: editedProfile.address.zipCode,
-        country: editedProfile.address.country,
       });
       if (res.success) {
         setUserProfile(editedProfile);
@@ -258,8 +255,8 @@ export default function Profile() {
               </Text>
               <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>{userProfile.email}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
-                <Calendar size={11} color="#9ca3af" />
-                <Text style={{ fontSize: 11, color: '#9ca3af' }}>Member since {joinDate()}</Text>
+                <Calendar size={12} color="#6b7280" />
+                <Text style={{ fontSize: 12, color: '#6b7280' }}>Member since {joinDate()}</Text>
               </View>
             </View>
           </View>
@@ -274,9 +271,10 @@ export default function Profile() {
         {/* Quick links */}
         <View style={{ marginHorizontal: 16, marginBottom: 14, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden' }}>
           <MenuItem icon={<Package size={18} color="#111827" />} label="My Orders" onPress={() => router.push('/(tabs)/orders' as any)} />
+          <MenuItem icon={<MapPin size={18} color="#111827" />} label="Saved Addresses" onPress={() => router.push('/(any)/saved-addresses' as any)} />
           <MenuItem icon={<Heart size={18} color="#111827" />} label="My Wishlist" onPress={() => router.push('/(tabs)/wishlist' as any)} />
           <MenuItem icon={<ShoppingCart size={18} color="#111827" />} label="My Cart" onPress={() => router.push('/(tabs)/cart' as any)} />
-          <MenuItem icon={<HelpCircle size={18} color="#111827" />} label="Help & Support" onPress={() => {}} last />
+          <MenuItem icon={<HelpCircle size={18} color="#111827" />} label="Help & Support" onPress={() => router.push('/(any)/contact' as any)} last />
         </View>
 
         {/* Profile form */}
@@ -346,20 +344,20 @@ function ScreenHeader({
       </View>
       {isEditing ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable onPress={onSave} disabled={isSaving} accessibilityRole="button" accessibilityLabel="Save">
-            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center', opacity: isSaving ? 0.6 : 1 }}>
+          <Pressable onPress={onSave} disabled={isSaving} accessibilityRole="button" accessibilityLabel="Save profile" accessibilityState={{ disabled: isSaving }}>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center', opacity: isSaving ? 0.6 : 1 }}>
               {isSaving ? <ActivityIndicator size={14} color="#fff" /> : <Save size={18} color="#fff" />}
             </View>
           </Pressable>
           <Pressable onPress={onCancel} disabled={isSaving} accessibilityRole="button" accessibilityLabel="Cancel editing">
-            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
               <X size={18} color="#111827" />
             </View>
           </Pressable>
         </View>
       ) : onEdit ? (
         <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel="Edit profile">
-          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}>
             <Edit3 size={18} color="#111827" />
           </View>
         </Pressable>

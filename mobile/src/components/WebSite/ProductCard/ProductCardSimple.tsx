@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Product as ServiceProduct } from '@/services/productService';
 import { PublicProduct } from '@/services/publicProductService';
-import { getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
+import { getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 
 // Type definitions matching frontend
 interface MockProduct {
@@ -99,11 +99,11 @@ export default function ProductCardSimple({ product }: ProductCardSimpleProps) {
           <Text className="text-xl font-bold text-gray-900">
             {fmtCurrency(displayPrice || 0)}
           </Text>
-          {product.originalPrice && (
+          {getRegionalOriginalPrice(product as any) ? (
             <Text className="text-sm text-red-600 line-through ml-2">
-              {fmtCurrency(product.originalPrice)}
+              {fmtCurrency(getRegionalOriginalPrice(product as any)!)}
             </Text>
-          )}
+          ) : null}
         </View>
       </View>
     </TouchableOpacity>

@@ -21,7 +21,10 @@ import {
 } from "lucide-react-native";
 import Constants from "expo-constants";
 import { userAuthService } from "@/services/userAuthService";
+import { companyInfoService } from "@/services/companyInfoService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+
+const STATIC_LOGO = require("../../../assets/images/logo4.png");
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 
@@ -66,6 +69,17 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+
+  // Load dynamic company logo (cached first, then fresh from API)
+  useEffect(() => {
+    companyInfoService.getCachedCompanyInfo().then((info) => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    });
+    companyInfoService.getPublicCompanyInfo().then((info) => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    }).catch(() => {});
+  }, []);
   const currentYear = new Date().getFullYear();
   const { refreshCart } = useCart();
   const { refreshWishlist } = useWishlist();
@@ -218,9 +232,9 @@ export default function LoginScreen() {
         <View className="px-6 py-8">
           {/* Logo Section */}
           <View className="items-center mb-8 mt-4">
-            <View className="bg-white rounded-2xl p-4 mb-4 shadow-2xl">
+            <View className="mb-4">
               <Image
-                source={require("../../../assets/images/logo4.png")}
+                source={companyLogo ? { uri: companyLogo } : STATIC_LOGO}
                 className="w-48 h-36"
                 resizeMode="contain"
               />

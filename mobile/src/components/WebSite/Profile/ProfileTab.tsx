@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, TextInput, Animated } from 'react-native';
-import { User, Mail, Phone, MapPin } from 'lucide-react-native';
+import { View, Text, TextInput, Animated, Pressable } from 'react-native';
+import { router } from 'expo-router';
+import { User, Info, ChevronRight } from 'lucide-react-native';
 import type { UserProfile } from './types';
 
 interface ProfileTabProps {
@@ -28,18 +29,8 @@ function SectionCard({
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 400,
-        delay,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 400, delay, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -51,14 +42,14 @@ function SectionCard({
         marginHorizontal: 16,
         marginTop: 16,
         backgroundColor: '#ffffff',
-        borderRadius: 20,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#f3f4f6',
-        shadowColor: '#000',
+        borderColor: '#e5e7eb',
+        shadowColor: '#0f172a',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 3,
+        shadowRadius: 8,
+        elevation: 2,
         overflow: 'hidden',
       }}
     >
@@ -70,13 +61,13 @@ function SectionCard({
           paddingHorizontal: 16,
           paddingVertical: 14,
           borderBottomWidth: 1,
-          borderBottomColor: '#f9fafb',
+          borderBottomColor: '#f3f4f6',
         }}
       >
         <View
           style={{
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
             borderRadius: 10,
             backgroundColor: '#f3f4f6',
             alignItems: 'center',
@@ -86,9 +77,7 @@ function SectionCard({
         >
           <Icon size={16} color={iconColor} />
         </View>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>
-          {title}
-        </Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>{title}</Text>
       </View>
 
       {/* Section Content */}
@@ -106,6 +95,7 @@ function FormField({
   placeholder,
   keyboardType,
   autoCapitalize,
+  accessibilityLabel,
   isLast = false,
 }: {
   label: string;
@@ -115,6 +105,7 @@ function FormField({
   placeholder: string;
   keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'numeric';
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  accessibilityLabel?: string;
   isLast?: boolean;
 }) {
   return (
@@ -139,19 +130,87 @@ function FormField({
         placeholderTextColor="#9ca3af"
         keyboardType={keyboardType || 'default'}
         autoCapitalize={autoCapitalize || 'sentences'}
+        accessibilityLabel={accessibilityLabel || label}
         style={{
           width: '100%',
           paddingHorizontal: 14,
-          paddingVertical: 12,
+          paddingVertical: 13,
+          minHeight: 48,
           borderRadius: 12,
           fontSize: 14,
           fontWeight: '600',
           color: isEditing ? '#111827' : '#4b5563',
           backgroundColor: isEditing ? '#ffffff' : '#f9fafb',
-          borderWidth: 1,
+          borderWidth: 1.5,
           borderColor: isEditing ? '#d1d5db' : '#f3f4f6',
         }}
       />
+    </View>
+  );
+}
+
+// ── Gender Selector (3-option segmented) ──
+function GenderSelector({
+  value,
+  onChange,
+  isEditing,
+}: {
+  value: string;
+  onChange: (v: 'male' | 'female' | 'other') => void;
+  isEditing: boolean;
+}) {
+  const options: { value: 'male' | 'female' | 'other'; label: string }[] = [
+    { value: 'male', label: 'Male' },
+    { value: 'female', label: 'Female' },
+    { value: 'other', label: 'Other' },
+  ];
+  return (
+    <View>
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: '700',
+          color: '#6b7280',
+          marginBottom: 6,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+        }}
+      >
+        Gender
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        {options.map((opt) => {
+          const active = value === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => { if (isEditing) onChange(opt.value); }}
+              disabled={!isEditing}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active, disabled: !isEditing }}
+              accessibilityLabel={`Gender ${opt.label}`}
+              style={{ flex: 1 }}
+            >
+              <View
+                style={{
+                  minHeight: 48,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: active ? '#111827' : isEditing ? '#d1d5db' : '#f3f4f6',
+                  backgroundColor: active ? '#111827' : isEditing ? '#fff' : '#f9fafb',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: !isEditing && !active ? 0.6 : 1,
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#fff' : '#4b5563' }}>
+                  {opt.label}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -161,22 +220,8 @@ export default function ProfileTab({
   setEditedProfile,
   isEditing,
 }: ProfileTabProps) {
-  const handleInputChange = (field: string, value: string) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setEditedProfile({
-        ...editedProfile,
-        [parent]: {
-          ...(editedProfile as any)[parent],
-          [child]: value,
-        },
-      });
-    } else {
-      setEditedProfile({
-        ...editedProfile,
-        [field]: value,
-      });
-    }
+  const handleInputChange = (field: keyof UserProfile, value: string) => {
+    setEditedProfile({ ...editedProfile, [field]: value });
   };
 
   return (
@@ -213,107 +258,48 @@ export default function ProfileTab({
           isEditing={isEditing}
           placeholder="Enter your phone number"
           keyboardType="phone-pad"
-          isLast
+        />
+        <GenderSelector
+          value={editedProfile.gender}
+          onChange={(v) => handleInputChange('gender', v)}
+          isEditing={isEditing}
         />
       </SectionCard>
 
-      {/* ── Address Information ── */}
-      <SectionCard title="Address" icon={MapPin} iconColor="#111827" delay={200}>
-        <FormField
-          label="Street Address"
-          value={editedProfile.address.addressLine1}
-          onChangeText={(v) => handleInputChange('address.addressLine1', v)}
-          isEditing={isEditing}
-          placeholder="Enter your street address"
-        />
-        <FormField
-          label="City"
-          value={editedProfile.address.city}
-          onChangeText={(v) => handleInputChange('address.city', v)}
-          isEditing={isEditing}
-          placeholder="Enter your city"
-        />
-
-        {/* State & Zip side by side */}
-        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: '700',
-                color: '#6b7280',
-                marginBottom: 6,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-              }}
-            >
-              State
-            </Text>
-            <TextInput
-              value={editedProfile.address.state}
-              onChangeText={(v) => handleInputChange('address.state', v)}
-              editable={isEditing}
-              placeholder="State"
-              placeholderTextColor="#9ca3af"
-              style={{
-                width: '100%',
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                borderRadius: 12,
-                fontSize: 14,
-                fontWeight: '600',
-                color: isEditing ? '#111827' : '#4b5563',
-                backgroundColor: isEditing ? '#ffffff' : '#f9fafb',
-                borderWidth: 1,
-                borderColor: isEditing ? '#d1d5db' : '#f3f4f6',
-              }}
-            />
+      {/* ── Saved Addresses info box (matches web) ── */}
+      <Pressable
+        onPress={() => router.push('/(any)/saved-addresses' as any)}
+        accessibilityRole="button"
+        accessibilityLabel="Manage saved addresses"
+      >
+        <View
+          style={{
+            marginHorizontal: 16,
+            marginTop: 16,
+            backgroundColor: '#eff6ff',
+            borderWidth: 1,
+            borderColor: '#bfdbfe',
+            borderRadius: 16,
+            padding: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center' }}>
+            <Info size={18} color="#2563eb" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: '700',
-                color: '#6b7280',
-                marginBottom: 6,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-              }}
-            >
-              Zip Code
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e40af' }}>
+              Looking for your shipping addresses?
             </Text>
-            <TextInput
-              value={editedProfile.address.zipCode}
-              onChangeText={(v) => handleInputChange('address.zipCode', v)}
-              editable={isEditing}
-              placeholder="Zip"
-              placeholderTextColor="#9ca3af"
-              keyboardType="numeric"
-              style={{
-                width: '100%',
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                borderRadius: 12,
-                fontSize: 14,
-                fontWeight: '600',
-                color: isEditing ? '#111827' : '#4b5563',
-                backgroundColor: isEditing ? '#ffffff' : '#f9fafb',
-                borderWidth: 1,
-                borderColor: isEditing ? '#d1d5db' : '#f3f4f6',
-              }}
-            />
+            <Text style={{ fontSize: 12, color: '#3b82f6', marginTop: 1 }}>
+              Manage your saved addresses here.
+            </Text>
           </View>
+          <ChevronRight size={18} color="#3b82f6" />
         </View>
-
-        <FormField
-          label="Country"
-          value={editedProfile.address.country}
-          onChangeText={(v) => handleInputChange('address.country', v)}
-          isEditing={isEditing}
-          placeholder="Enter your country"
-          isLast
-        />
-      </SectionCard>
+      </Pressable>
     </View>
   );
 }

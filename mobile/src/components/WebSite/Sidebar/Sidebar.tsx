@@ -27,6 +27,9 @@ import {
 import { useRouter } from 'expo-router';
 import { categoryService, type Category } from '@/services/categoryService';
 import { userAuthService } from '@/services/userAuthService';
+import { companyInfoService } from '@/services/companyInfoService';
+
+const STATIC_LOGO = require('../../../../assets/images/logo4.png');
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = Math.min(SCREEN_WIDTH * 0.78, 340);
@@ -45,7 +48,18 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [isAuth, setIsAuth] = useState(false);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const router = useRouter();
+
+  // Load dynamic company logo (cached first, then fresh from API)
+  useEffect(() => {
+    companyInfoService.getCachedCompanyInfo().then((info) => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    });
+    companyInfoService.getPublicCompanyInfo().then((info) => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!visible) return;
@@ -150,10 +164,10 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
 
           {/* Brand */}
           <View style={{ alignItems: 'center', paddingVertical: 20, paddingHorizontal: 16 }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 6, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 8 }}>
+            <View style={{ marginBottom: 8 }}>
               <Image
-                source={require('../../../../assets/images/logo4.png')}
-                style={{ width: 110, height: 40 }}
+                source={companyLogo ? { uri: companyLogo } : STATIC_LOGO}
+                style={{ width: 240, height: 110 }}
                 contentFit="contain"
               />
             </View>

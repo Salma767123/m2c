@@ -64,7 +64,6 @@ export default function TopSellingSection() {
         )}
       </View>
 
-      {state === 'ready' ? <ViewAllButton /> : null}
     </View>
   );
 }
@@ -132,39 +131,6 @@ function SectionHeader() {
   );
 }
 
-function ViewAllButton() {
-  return (
-    <View style={{ alignItems: 'center', marginTop: 24, paddingHorizontal: 16 }}>
-      <Pressable
-        onPress={() => router.push('/(any)/products' as any)}
-        accessibilityRole="button"
-        accessibilityLabel="View all products"
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: pressed ? '#1a1a1a' : '#1f2937',
-          width: '100%',
-          height: 52,
-          borderRadius: 14,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-          elevation: 2,
-        })}
-      >
-        <Text
-          style={{ color: '#ffffff', fontSize: 15, fontWeight: '700', marginRight: 8 }}
-        >
-          Discover All Top Selling
-        </Text>
-        <ChevronRight size={18} color="#ffffff" strokeWidth={2.5} />
-      </Pressable>
-    </View>
-  );
-}
-
 function Grid({ children }: { children: React.ReactNode }) {
   return (
     <View
@@ -220,17 +186,20 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
         onPress={onRetry}
         accessibilityRole="button"
         accessibilityLabel="Retry loading top selling products"
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: pressed ? '#1a1a1a' : '#1f2937',
-          paddingHorizontal: 24,
-          paddingVertical: 12,
-          borderRadius: 12,
-        })}
       >
-        <RefreshCw size={14} color="#ffffff" strokeWidth={2.25} />
-        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14, marginLeft: 8 }}>Try Again</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#1f2937',
+            paddingHorizontal: 24,
+            paddingVertical: 12,
+            borderRadius: 12,
+          }}
+        >
+          <RefreshCw size={14} color="#ffffff" strokeWidth={2.25} />
+          <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14, marginLeft: 8 }}>Try Again</Text>
+        </View>
       </Pressable>
     </View>
   );

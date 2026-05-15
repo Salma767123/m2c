@@ -78,6 +78,7 @@ export interface OrdersResponse {
 export interface CreateOrderParams {
   shippingAddress: {
     street: string;
+    addressLine2?: string;
     city: string;
     state: string;
     zipCode: string;
@@ -94,6 +95,7 @@ export interface CreateOrderParams {
   discount?: number;
   couponCode?: string;
   bagTypeId?: string;
+  currency?: string;
 }
 
 class OrderService {
