@@ -14,7 +14,7 @@ import {
   Plane, Ship as ShipIcon, AlertTriangle, Info, Box,
 } from 'lucide-react-native';
 import { calculateLogistics, formatWeight, formatDimensions, type LogisticsConfig } from '@/lib/logistics';
-import { getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
+import { getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency, isVisibleInRegion } from '@/lib/currency';
 import { PublicProduct } from '@/services/publicProductService';
 import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
@@ -394,7 +394,7 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
       </View>
 
       {/* ── Variants ────────────────────────────────────────────────────────── */}
-      {product.hasVariants && product.variants && product.variants.length > 0 ? (
+      {product.hasVariants && product.variants && product.variants.filter((v: any) => isVisibleInRegion(v.priceVisibility)).length > 0 ? (
         <View className="bg-white mt-2 px-5 py-5">
           {/* Header */}
           <View className="flex-row items-center justify-between mb-4">
@@ -439,7 +439,7 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
               />
 
               {/* Named variants */}
-              {product.variants.map((variant: any) => {
+              {product.variants.filter((v: any) => isVisibleInRegion(v.priceVisibility)).map((variant: any) => {
                 const variantPrice = getRegionalPrice(variant as any);
                 const variantOriginal = getRegionalOriginalPrice(variant as any) ?? variant.originalPrice;
                 const hasDiscount = variantOriginal != null && variantOriginal > variantPrice;

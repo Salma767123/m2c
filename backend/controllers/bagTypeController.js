@@ -171,13 +171,17 @@ const createBagType = async (req, res) => {
                 });
             }
 
+            // Auto-calculate priceINR = price, priceUSD = price / exchangeRate
+            const { getCurrentExchangeRate } = require('./exchangeRateController');
+            const bagRate = await getCurrentExchangeRate();
+
             bagType = await tx.bagType.create({
                 data: {
                     name: trimmedName,
                     description: description || null,
                     price,
-                    priceINR: priceINR ? parseFloat(priceINR) : null,
-                    priceUSD: priceUSD ? parseFloat(priceUSD) : null,
+                    priceINR: price,
+                    priceUSD: Math.round((price / bagRate) * 100) / 100,
                     image: imageUrl,
                     isActive,
                     sortOrder: finalSortOrder,
@@ -224,9 +228,14 @@ const updateBagType = async (req, res) => {
         const updateData = {};
         if (name !== undefined) updateData.name = String(name).trim() || existing.name;
         if (description !== undefined) updateData.description = description;
-        if (price !== undefined) updateData.price = price;
-        if (priceINR !== undefined) updateData.priceINR = priceINR ? parseFloat(priceINR) : null;
-        if (priceUSD !== undefined) updateData.priceUSD = priceUSD ? parseFloat(priceUSD) : null;
+        if (price !== undefined) {
+            updateData.price = price;
+            // Auto-sync priceINR = price, priceUSD = price / exchangeRate
+            const { getCurrentExchangeRate: getBagRate } = require('./exchangeRateController');
+            const bagRate = await getBagRate();
+            updateData.priceINR = price;
+            updateData.priceUSD = Math.round((price / bagRate) * 100) / 100;
+        }
         if (isActive !== undefined) updateData.isActive = isActive;
 
         let newSortOrder = undefined;

@@ -6,6 +6,7 @@ import GSTSettingsTab from "./GSTSettingsTab";
 import HubSettingsTab from "./HubSettingsTab";
 import SEOSettingsTab from "./SEOSettingsTab";
 import BannerSettingsTab from "./BannerSettingsTab";
+import ExchangeRateTab from "./ExchangeRateTab";
 import InvoiceSettings from "../Billing/Settings/InvoiceSettings";
 import { Card, CardContent } from "../../UI/Card";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
@@ -46,7 +47,7 @@ export default function Settings() {
     zipCode: "10001",
   });
 
-  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo" | "banner" | "vendor-notif">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "company" | "payment" | "gst" | "hub" | "invoice" | "seo" | "banner" | "vendor-notif" | "exchange-rate">("profile");
 
   // Profile form state
   const [profileData, setProfileData] = useState({
@@ -525,6 +526,16 @@ export default function Settings() {
               >
                 <Mail className="h-4 w-4 inline mr-2" />
                 Vendor Notifications
+              </button>
+              <button
+                onClick={() => setActiveTab("exchange-rate")}
+                className={`pb-3 px-1 font-medium text-sm border-b-2 transition-colors ${activeTab === "exchange-rate"
+                  ? "border-gray-900 text-gray-900"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                <DollarSign className="h-4 w-4 inline mr-2" />
+                Exchange Rate
               </button>
             </>
           )}
@@ -1528,6 +1539,11 @@ export default function Settings() {
       {activeTab === "vendor-notif" && canAccessAdminSettings && (
         <VendorNotificationTab />
       )}
+
+      {/* Exchange Rate Tab */}
+      {activeTab === "exchange-rate" && canAccessAdminSettings && (
+        <ExchangeRateTab />
+      )}
     </div>
   );
 }
@@ -1581,8 +1597,9 @@ function VendorNotificationTab() {
       setSaving(true);
       await companyInfoService.updateVendorNotificationSettings(emails);
       showSuccessToast('Saved', 'Vendor notification emails updated successfully');
-    } catch (err: any) {
-      showErrorToast('Error', err.message || 'Failed to save settings');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save settings';
+      showErrorToast('Error', message);
     } finally {
       setSaving(false);
     }

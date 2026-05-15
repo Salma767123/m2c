@@ -1,16 +1,17 @@
 export type Region = 'IN' | 'US'
 export type Currency = 'INR' | 'USD'
 
+// Cached exchange rate — fetched once, used for client-side fallback conversion
+let cachedExchangeRate: number | null = null
+
 export function getRegion(): Region {
-  // Env var (set per Vercel deployment) takes priority
   const envRegion = process.env.NEXT_PUBLIC_SITE_REGION
   if (envRegion === 'IN' || envRegion === 'US') return envRegion
 
-  // Fallback: check hostname
   if (typeof window !== 'undefined') {
     if (window.location.hostname.endsWith('.in')) return 'IN'
   }
-  return 'US' // default
+  return 'US'
 }
 
 export function getCurrency(): Currency {
@@ -31,8 +32,25 @@ export function formatPrice(price: number, currency?: Currency): string {
 }
 
 /**
+ * Set the cached exchange rate (called once on app load).
+ */
+export function setExchangeRate(rate: number): void {
+  cachedExchangeRate = rate
+}
+
+/**
+ * Convert INR to USD using cached exchange rate.
+ * Fallback: 83.50 if no rate loaded.
+ */
+export function convertINRtoUSD(inrPrice: number): number {
+  const rate = cachedExchangeRate || 83.50
+  return Math.round((inrPrice / rate) * 100) / 100
+}
+
+/**
  * Pick the correct price based on region.
  * Priority: priceINR/priceUSD → adminFixedPrice → basePrice
+ * For US: if priceUSD missing, auto-convert from INR using exchange rate
  */
 export function getRegionalPrice(product: {
   basePrice?: number;
@@ -41,14 +59,18 @@ export function getRegionalPrice(product: {
   priceUSD?: number | null;
 }): number {
   const region = getRegion()
-  if (region === 'IN' && product.priceINR) return product.priceINR
-  if (region === 'US' && product.priceUSD) return product.priceUSD
-  return product.adminFixedPrice ?? product.basePrice ?? 0
+  if (region === 'IN') {
+    return product.priceINR || product.adminFixedPrice || product.basePrice || 0
+  }
+  // US region: use priceUSD if set, otherwise auto-convert INR
+  if (product.priceUSD) return product.priceUSD
+  const inrPrice = product.priceINR || product.adminFixedPrice || product.basePrice || 0
+  return inrPrice > 0 ? convertINRtoUSD(inrPrice) : 0
 }
 
 /**
  * Pick the correct original price based on region.
- * Priority: originalPriceINR/originalPriceUSD → originalPrice
+ * For US: auto-convert from INR if USD not set
  */
 export function getRegionalOriginalPrice(product: {
   originalPrice?: number | null;
@@ -56,9 +78,12 @@ export function getRegionalOriginalPrice(product: {
   originalPriceUSD?: number | null;
 }): number | null {
   const region = getRegion()
-  if (region === 'IN' && product.originalPriceINR) return product.originalPriceINR
-  if (region === 'US' && product.originalPriceUSD) return product.originalPriceUSD
-  return product.originalPrice ?? null
+  if (region === 'IN') {
+    return product.originalPriceINR || product.originalPrice || null
+  }
+  if (product.originalPriceUSD) return product.originalPriceUSD
+  const inrOriginal = product.originalPriceINR || product.originalPrice
+  return inrOriginal ? convertINRtoUSD(inrOriginal) : null
 }
 
 /**

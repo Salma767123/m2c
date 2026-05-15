@@ -690,8 +690,8 @@ model Product {
   priceUSD              Float?    // Admin selling price in USD (for .com domain)
   originalPriceINR      Float?    // Original/MRP price in INR (for strikethrough)
   originalPriceUSD      Float?    // Original/MRP price in USD (for strikethrough)
-  priceVisibility       PriceVisibility @default(BOTH)
-  
+  priceVisibility       PriceVisibility @default(BOTH) // Controls which domain shows this product: IN_ONLY (.in), COM_ONLY (.com), BOTH
+
   assignedQcId          String?   @db.ObjectId
   assignedQc            QCChecker? @relation("ProductQCChecker", fields: [assignedQcId], references: [id])
   qcInspectionData      Json?     // Stores the product inspection form data
@@ -733,7 +733,7 @@ model ProductVariant {
   priceUSD        Float?    // Admin selling price in USD for this variant
   originalPriceINR Float?   // Original price in INR for this variant
   originalPriceUSD Float?   // Original price in USD for this variant
-  priceVisibility PriceVisibility @default(BOTH)
+  priceVisibility PriceVisibility @default(BOTH) // Controls which domain shows this variant
   stock           Int       @default(0)
   images          String[]  @default([]) // Array of image URLs
   
@@ -1220,6 +1220,23 @@ model GSTSetting {
   updatedAt   DateTime @updatedAt
   
   @@map("gst_settings")
+}
+
+// ============================================
+// EXCHANGE RATE SETTINGS
+// ============================================
+
+model ExchangeRate {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  baseCurrency String   @default("INR")    // Source currency (always INR)
+  currency     String   @unique            // Target currency (e.g. "USD")
+  rate         Float                       // 1 USD = X INR (e.g. 83.50)
+  isActive     Boolean  @default(true)
+  updatedBy    String?  @db.ObjectId       // Admin who last updated
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("exchange_rates")
 }
 
 // ============================================

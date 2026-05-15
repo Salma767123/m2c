@@ -1,10 +1,12 @@
 export type Region = 'IN' | 'US'
 export type Currency = 'INR' | 'USD'
 
+let cachedExchangeRate: number | null = null
+
 export function getRegion(): Region {
   const envRegion = process.env.EXPO_PUBLIC_SITE_REGION
   if (envRegion === 'IN' || envRegion === 'US') return envRegion
-  return 'US' // default
+  return 'US'
 }
 
 export function getCurrency(): Currency {
@@ -18,9 +20,18 @@ export function formatPrice(price: number, currency?: Currency): string {
     : `$${price.toFixed(2)}`
 }
 
+export function setExchangeRate(rate: number): void {
+  cachedExchangeRate = rate
+}
+
+export function convertINRtoUSD(inrPrice: number): number {
+  const rate = cachedExchangeRate || 83.50
+  return Math.round((inrPrice / rate) * 100) / 100
+}
+
 /**
  * Pick the correct price based on region.
- * Priority: priceINR/priceUSD → adminFixedPrice → basePrice/price
+ * For US: auto-convert from INR if priceUSD not set
  */
 export function getRegionalPrice(product: {
   basePrice?: number;
@@ -30,9 +41,12 @@ export function getRegionalPrice(product: {
   priceUSD?: number | null;
 }): number {
   const region = getRegion()
-  if (region === 'IN' && product.priceINR) return product.priceINR
-  if (region === 'US' && product.priceUSD) return product.priceUSD
-  return product.adminFixedPrice ?? product.basePrice ?? product.price ?? 0
+  if (region === 'IN') {
+    return product.priceINR || product.adminFixedPrice || product.basePrice || product.price || 0
+  }
+  if (product.priceUSD) return product.priceUSD
+  const inrPrice = product.priceINR || product.adminFixedPrice || product.basePrice || product.price || 0
+  return inrPrice > 0 ? convertINRtoUSD(inrPrice) : 0
 }
 
 export function getRegionalOriginalPrice(product: {
@@ -41,7 +55,21 @@ export function getRegionalOriginalPrice(product: {
   originalPriceUSD?: number | null;
 }): number | null {
   const region = getRegion()
-  if (region === 'IN' && product.originalPriceINR) return product.originalPriceINR
-  if (region === 'US' && product.originalPriceUSD) return product.originalPriceUSD
-  return product.originalPrice ?? null
+  if (region === 'IN') {
+    return product.originalPriceINR || product.originalPrice || null
+  }
+  if (product.originalPriceUSD) return product.originalPriceUSD
+  const inrOriginal = product.originalPriceINR || product.originalPrice
+  return inrOriginal ? convertINRtoUSD(inrOriginal) : null
+}
+
+/**
+ * Check if a product is visible in the current region.
+ */
+export function isVisibleInRegion(priceVisibility?: string): boolean {
+  if (!priceVisibility || priceVisibility === 'BOTH') return true
+  const region = getRegion()
+  if (region === 'IN' && priceVisibility === 'IN_ONLY') return true
+  if (region === 'US' && priceVisibility === 'COM_ONLY') return true
+  return false
 }

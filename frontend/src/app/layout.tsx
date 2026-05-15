@@ -3,6 +3,7 @@ import { Outfit, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/UI/Toaster";
 import PageTracker from "@/components/Analytics/PageTracker";
+import { ExchangeRateLoader } from "@/components/Shared/ExchangeRateLoader";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -49,6 +50,7 @@ export default function RootLayout({
         className={`${outfit.variable} ${playfair.variable} font-outfit antialiased h-full`}
       >
         <PageTracker />
+        <ExchangeRateLoader />
         {children}
         <Toaster />
       </body>

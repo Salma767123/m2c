@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { convertINRtoUSD } from '@/lib/currency';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
 import { BagType } from '@/services/bagTypeService';
 
@@ -143,46 +144,20 @@ export default function BagTypeModal({ isOpen, onClose, mode, bagType, onSubmit,
             )}
           </div>
 
-          {/* Multi-Currency Pricing */}
+          {/* Currency Preview */}
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs font-semibold text-blue-900 mb-2">Multi-Currency Pricing</p>
+            <p className="text-xs font-semibold text-blue-900 mb-2">Currency Pricing</p>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="bag-price-inr" className="block text-xs font-medium text-gray-700 mb-1">INR Price (₹)</label>
-                {isViewMode ? (
-                  <p className="text-sm text-blue-800 font-semibold">{formData.priceINR ? `₹${formData.priceINR}` : '—'}</p>
-                ) : (
-                  <input
-                    id="bag-price-inr"
-                    type="number"
-                    value={formData.priceINR ?? ''}
-                    onChange={e => setFormData(prev => ({ ...prev, priceINR: e.target.value === '' ? null : parseFloat(e.target.value) }))}
-                    min="0"
-                    step="0.01"
-                    placeholder="Price for .in"
-                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                  />
-                )}
+              <div className="bg-white rounded-md p-2.5 border border-blue-100">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Price (.in)</p>
+                <p className="text-sm font-bold text-gray-900">₹{formData.price || '—'}</p>
               </div>
-              <div>
-                <label htmlFor="bag-price-usd" className="block text-xs font-medium text-gray-700 mb-1">USD Price ($)</label>
-                {isViewMode ? (
-                  <p className="text-sm text-blue-800 font-semibold">{formData.priceUSD ? `$${formData.priceUSD.toFixed(2)}` : '—'}</p>
-                ) : (
-                  <input
-                    id="bag-price-usd"
-                    type="number"
-                    value={formData.priceUSD ?? ''}
-                    onChange={e => setFormData(prev => ({ ...prev, priceUSD: e.target.value === '' ? null : parseFloat(e.target.value) }))}
-                    min="0"
-                    step="0.01"
-                    placeholder="Price for .com"
-                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                  />
-                )}
+              <div className="bg-white rounded-md p-2.5 border border-blue-100">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Price (.com)</p>
+                <p className="text-sm font-bold text-gray-900">{formData.priceUSD ? `$${formData.priceUSD.toFixed(2)}` : formData.price ? `$${convertINRtoUSD(formData.price).toFixed(2)}` : '—'}</p>
+                <p className="text-[10px] text-green-600">Auto from exchange rate</p>
               </div>
             </div>
-            <p className="text-[10px] text-blue-600 mt-1.5">Leave blank to use the base price for that region.</p>
           </div>
 
           {/* Image */}

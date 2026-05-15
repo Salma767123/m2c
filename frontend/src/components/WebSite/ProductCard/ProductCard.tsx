@@ -11,7 +11,7 @@ import { cartService } from '@/services/cartService';
 import { wishlistService } from '@/services/wishlistService';
 import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
-import { formatPrice, getRegionalPrice, getRegionalOriginalPrice } from '@/lib/currency';
+import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, isVisibleInRegion } from '@/lib/currency';
 
 interface ProductCardProps {
   product: ServiceProduct | PublicProduct | MockProduct;
@@ -177,6 +177,9 @@ const ProductCard = ({ product }: ProductCardProps) => {
   const regionalOriginalPrice = isServiceProduct(product)
     ? getRegionalOriginalPrice(product as any)
     : (product as any).originalPrice ?? null;
+
+  // Hide product if not visible in current region
+  if (!isVisibleInRegion((product as any).priceVisibility)) return null;
 
   // Derive actual stock — use totalStock, treat negative as 0
   const currentStock = isServiceProduct(product)

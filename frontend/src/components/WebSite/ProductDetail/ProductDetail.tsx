@@ -130,6 +130,11 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
     );
   }
 
+  // Filter variants by region visibility
+  const visibleVariants = product.variants?.filter(
+    (v: any) => isVisibleInRegion(v.priceVisibility)
+  ) || [];
+
   // Get images - use variant images if variant is selected, otherwise use product images
   const displayImages = selectedVariant?.images && selectedVariant.images.length > 0
     ? selectedVariant.images.map((url: string) => ({ url, isPrimary: false }))
@@ -499,7 +504,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     {/* Variants and Purchase Options */}
                     <div className="space-y-4">
                       {/* Variants Section */}
-                      {product.hasVariants && product.variants && product.variants.length > 0 && (
+                      {product.hasVariants && visibleVariants.length > 0 && (
                         <div className="max-w-md">
                           <h3 className="text-lg font-semibold text-gray-900 mb-3">
                             Select Variant: {selectedVariant ? `${selectedVariant.size} - ${selectedVariant.color}` : 
@@ -549,8 +554,8 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                     )}
                                   </div>
                                   <div className="text-lg font-bold text-gray-900 mt-1">{formatPrice(getRegionalPrice(product))}</div>
-                                  {product.originalPrice && product.originalPrice > getRegionalPrice(product) && (
-                                    <span className="text-xs text-gray-400 line-through">{formatPrice(product.originalPrice)}</span>
+                                  {getRegionalOriginalPrice(product) && getRegionalOriginalPrice(product)! > getRegionalPrice(product) && (
+                                    <span className="text-xs text-gray-400 line-through">{formatPrice(getRegionalOriginalPrice(product)!)}</span>
                                   )}
                                   <div className="text-xs text-gray-500">
                                     {(product.inventory?.baseStock ?? product.totalStock ?? 0) > 0
@@ -560,7 +565,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 </div>
                               </div>
                             </button>
-                            {product.variants.map((variant) => (
+                            {visibleVariants.map((variant) => (
                               <button
                                 key={variant.id}
                                 onClick={() => {
@@ -603,8 +608,8 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                     </div>
                                     <div className="flex items-center gap-1 mt-1">
                                       <span className="text-lg font-bold text-gray-900">{formatPrice(getRegionalPrice(variant))}</span>
-                                      {variant.originalPrice && variant.originalPrice > getRegionalPrice(variant) && (
-                                        <span className="text-xs text-gray-400 line-through">{formatPrice(variant.originalPrice)}</span>
+                                      {getRegionalOriginalPrice(variant) && getRegionalOriginalPrice(variant)! > getRegionalPrice(variant) && (
+                                        <span className="text-xs text-gray-400 line-through">{formatPrice(getRegionalOriginalPrice(variant)!)}</span>
                                       )}
                                       {variant.discount && variant.discount > 0 && (
                                         <span className="text-xs text-green-600 font-medium">{variant.discount}% off</span>
@@ -901,7 +906,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     {product.hasVariants && (
                       <div className="flex justify-between py-3 border-b border-gray-100">
                         <span className="font-semibold text-gray-700">Available Variants</span>
-                        <span className="text-gray-600">{product.variants?.length || 0}</span>
+                        <span className="text-gray-600">{visibleVariants.length}</span>
                       </div>
                     )}
                   </>

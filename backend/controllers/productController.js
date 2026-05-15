@@ -680,24 +680,42 @@ const updateProduct = async (req, res) => {
 
         // Create new variants
         if (updateData.variants.length > 0) {
-          const variantData = updateData.variants.map(variant => ({
-            productId: id,
-            size: variant.size,
-            color: variant.color,
-            colorHex: variant.colorHex,
-            sku: variant.sku,
-            price: parseFloat(variant.price),
-            originalPrice: variant.originalPrice ? parseFloat(variant.originalPrice) : null,
-            discount: variant.discount ? parseFloat(variant.discount) : null,
-            adminFixedPrice: variant.adminFixedPrice ? parseFloat(variant.adminFixedPrice) : null,
-            priceINR: variant.priceINR ? parseFloat(variant.priceINR) : null,
-            priceUSD: variant.priceUSD ? parseFloat(variant.priceUSD) : null,
-            originalPriceINR: variant.originalPriceINR ? parseFloat(variant.originalPriceINR) : null,
-            originalPriceUSD: variant.originalPriceUSD ? parseFloat(variant.originalPriceUSD) : null,
-            priceVisibility: variant.priceVisibility || 'BOTH',
-            stock: parseInt(variant.stock) || 0,
-            images: variant.images || []
-          }));
+          // Auto-calculate variant INR/USD from adminFixedPrice using exchange rate
+          const { getCurrentExchangeRate: getVarRate } = require('./exchangeRateController');
+          const varExchangeRate = await getVarRate();
+
+          const variantData = updateData.variants.map(variant => {
+            const varPrice = parseFloat(variant.price) || 0;
+            const varAdminPrice = variant.adminFixedPrice ? parseFloat(variant.adminFixedPrice) : null;
+            const varOriginal = variant.originalPrice ? parseFloat(variant.originalPrice) : null;
+            const sellingINR = varAdminPrice || varPrice;
+            const sellingUSD = sellingINR > 0 ? Math.round((sellingINR / varExchangeRate) * 100) / 100 : null;
+            const originalUSD = varOriginal ? Math.round((varOriginal / varExchangeRate) * 100) / 100 : null;
+
+            let discount = variant.discount ? parseFloat(variant.discount) : null;
+            if (varOriginal && sellingINR && varOriginal > sellingINR) {
+              discount = Math.round(((varOriginal - sellingINR) / varOriginal) * 100);
+            }
+
+            return {
+              productId: id,
+              size: variant.size,
+              color: variant.color,
+              colorHex: variant.colorHex,
+              sku: variant.sku,
+              price: varPrice,
+              originalPrice: varOriginal,
+              discount,
+              adminFixedPrice: varAdminPrice,
+              priceINR: sellingINR,
+              priceUSD: sellingUSD,
+              originalPriceINR: varOriginal,
+              originalPriceUSD: originalUSD,
+              priceVisibility: variant.priceVisibility || 'BOTH',
+              stock: parseInt(variant.stock) || 0,
+              images: variant.images || []
+            };
+          });
 
           await tx.productVariant.createMany({
             data: variantData
@@ -1069,34 +1087,30 @@ const approveProduct = async (req, res) => {
         });
       }
 
-      // Update each variant with admin price, original price and discount
+      // Update each variant with admin price — auto-calculate INR/USD from exchange rate
       await Promise.all(
         product.variants.map(variant => {
           const adminFixed = parseFloat(variantPrices[variant.id]);
-          const variantData = { adminFixedPrice: adminFixed };
+          const variantData = {
+            adminFixedPrice: adminFixed,
+            priceINR: adminFixed,
+            priceUSD: Math.round((adminFixed / exchangeRate) * 100) / 100,
+          };
+
           if (variantOriginalPrices && variantOriginalPrices[variant.id]) {
             const origPrice = parseFloat(variantOriginalPrices[variant.id]);
             variantData.originalPrice = origPrice;
+            variantData.originalPriceINR = origPrice;
+            variantData.originalPriceUSD = Math.round((origPrice / exchangeRate) * 100) / 100;
             if (origPrice > adminFixed) {
-              variantData.discount = Math.round(((origPrice - adminFixed) / adminFixed) * 100);
+              variantData.discount = Math.round(((origPrice - adminFixed) / origPrice) * 100);
             }
           }
-          // Multi-currency pricing per variant
-          if (variantPricesINR && variantPricesINR[variant.id]) {
-            variantData.priceINR = parseFloat(variantPricesINR[variant.id]);
-          }
-          if (variantPricesUSD && variantPricesUSD[variant.id]) {
-            variantData.priceUSD = parseFloat(variantPricesUSD[variant.id]);
-          }
-          if (variantOriginalPricesINR && variantOriginalPricesINR[variant.id]) {
-            variantData.originalPriceINR = parseFloat(variantOriginalPricesINR[variant.id]);
-          }
-          if (variantOriginalPricesUSD && variantOriginalPricesUSD[variant.id]) {
-            variantData.originalPriceUSD = parseFloat(variantOriginalPricesUSD[variant.id]);
-          }
+
           if (variantVisibilities && variantVisibilities[variant.id]) {
             variantData.priceVisibility = variantVisibilities[variant.id];
           }
+
           return prisma.productVariant.update({
             where: { id: variant.id },
             data: variantData
@@ -1141,18 +1155,23 @@ const approveProduct = async (req, res) => {
       }
     }
 
-    // Multi-currency pricing for product
-    if (priceINR !== undefined && priceINR !== null && parseFloat(priceINR) > 0) {
-      updateData.priceINR = parseFloat(priceINR);
+    // Centralized pricing: adminFixedPrice IS the selling price
+    // priceINR = adminFixedPrice (synced automatically)
+    // priceUSD = adminFixedPrice / exchangeRate (auto-calculated)
+    const { getCurrentExchangeRate } = require('./exchangeRateController');
+    const exchangeRate = await getCurrentExchangeRate();
+
+    const sellingPrice = updateData.adminFixedPrice || (priceINR ? parseFloat(priceINR) : null);
+    if (sellingPrice) {
+      updateData.adminFixedPrice = sellingPrice;
+      updateData.priceINR = sellingPrice;
+      updateData.priceUSD = Math.round((sellingPrice / exchangeRate) * 100) / 100;
     }
-    if (priceUSD !== undefined && priceUSD !== null && parseFloat(priceUSD) > 0) {
-      updateData.priceUSD = parseFloat(priceUSD);
-    }
-    if (originalPriceINR !== undefined && originalPriceINR !== null && parseFloat(originalPriceINR) > 0) {
-      updateData.originalPriceINR = parseFloat(originalPriceINR);
-    }
-    if (originalPriceUSD !== undefined && originalPriceUSD !== null && parseFloat(originalPriceUSD) > 0) {
-      updateData.originalPriceUSD = parseFloat(originalPriceUSD);
+
+    const originalINR = originalPriceINR ? parseFloat(originalPriceINR) : null;
+    if (originalINR && originalINR > 0) {
+      updateData.originalPriceINR = originalINR;
+      updateData.originalPriceUSD = Math.round((originalINR / exchangeRate) * 100) / 100;
     }
     if (priceVisibility) {
       updateData.priceVisibility = priceVisibility;
@@ -1966,24 +1985,42 @@ const updateProductByAdmin = async (req, res) => {
 
         // Create new variants
         if (updateData.variants.length > 0) {
-          const variantData = updateData.variants.map(variant => ({
-            productId: id,
-            size: variant.size,
-            color: variant.color,
-            colorHex: variant.colorHex,
-            sku: variant.sku,
-            price: parseFloat(variant.price),
-            originalPrice: variant.originalPrice ? parseFloat(variant.originalPrice) : null,
-            discount: variant.discount ? parseFloat(variant.discount) : null,
-            adminFixedPrice: variant.adminFixedPrice ? parseFloat(variant.adminFixedPrice) : null,
-            priceINR: variant.priceINR ? parseFloat(variant.priceINR) : null,
-            priceUSD: variant.priceUSD ? parseFloat(variant.priceUSD) : null,
-            originalPriceINR: variant.originalPriceINR ? parseFloat(variant.originalPriceINR) : null,
-            originalPriceUSD: variant.originalPriceUSD ? parseFloat(variant.originalPriceUSD) : null,
-            priceVisibility: variant.priceVisibility || 'BOTH',
-            stock: parseInt(variant.stock) || 0,
-            images: variant.images || []
-          }));
+          // Auto-calculate variant INR/USD from adminFixedPrice using exchange rate
+          const { getCurrentExchangeRate: getVarRate } = require('./exchangeRateController');
+          const varExchangeRate = await getVarRate();
+
+          const variantData = updateData.variants.map(variant => {
+            const varPrice = parseFloat(variant.price) || 0;
+            const varAdminPrice = variant.adminFixedPrice ? parseFloat(variant.adminFixedPrice) : null;
+            const varOriginal = variant.originalPrice ? parseFloat(variant.originalPrice) : null;
+            const sellingINR = varAdminPrice || varPrice;
+            const sellingUSD = sellingINR > 0 ? Math.round((sellingINR / varExchangeRate) * 100) / 100 : null;
+            const originalUSD = varOriginal ? Math.round((varOriginal / varExchangeRate) * 100) / 100 : null;
+
+            let discount = variant.discount ? parseFloat(variant.discount) : null;
+            if (varOriginal && sellingINR && varOriginal > sellingINR) {
+              discount = Math.round(((varOriginal - sellingINR) / varOriginal) * 100);
+            }
+
+            return {
+              productId: id,
+              size: variant.size,
+              color: variant.color,
+              colorHex: variant.colorHex,
+              sku: variant.sku,
+              price: varPrice,
+              originalPrice: varOriginal,
+              discount,
+              adminFixedPrice: varAdminPrice,
+              priceINR: sellingINR,
+              priceUSD: sellingUSD,
+              originalPriceINR: varOriginal,
+              originalPriceUSD: originalUSD,
+              priceVisibility: variant.priceVisibility || 'BOTH',
+              stock: parseInt(variant.stock) || 0,
+              images: variant.images || []
+            };
+          });
 
           await tx.productVariant.createMany({
             data: variantData

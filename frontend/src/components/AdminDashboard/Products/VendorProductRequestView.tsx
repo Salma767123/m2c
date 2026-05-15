@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { convertINRtoUSD } from '@/lib/currency'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
@@ -1034,40 +1035,18 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               </div>
             </div>
 
-            {/* Multi-Currency Pricing */}
+            {/* Currency Pricing */}
             <div className="mb-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
-              <h4 className="text-sm font-semibold text-blue-900 mb-3">Multi-Currency Pricing (.in / .com)</h4>
-
-              {/* Selling Prices */}
-              <p className="text-xs font-medium text-gray-600 mb-2 border-b border-blue-200 pb-1">Selling Prices</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <div>
-                  <label htmlFor="view-price-inr" className="block text-xs font-medium text-gray-700 mb-1">INR Price (₹)</label>
-                  <input
-                    id="view-price-inr"
-                    type="number"
-                    value={priceINR}
-                    onChange={(e) => setPriceINR(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
-                    placeholder="Selling price for .in domain"
-                    step="0.01"
-                    min="0"
-                    disabled={actionLoading}
-                  />
+              <h4 className="text-sm font-semibold text-blue-900 mb-3">Currency Pricing</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-white rounded-md p-3 border border-blue-100">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Selling Price (.in)</p>
+                  <p className="text-lg font-bold text-gray-900">₹{adminPrice || '—'}</p>
                 </div>
-                <div>
-                  <label htmlFor="view-price-usd" className="block text-xs font-medium text-gray-700 mb-1">USD Price ($)</label>
-                  <input
-                    id="view-price-usd"
-                    type="number"
-                    value={priceUSD}
-                    onChange={(e) => setPriceUSD(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
-                    placeholder="Selling price for .com domain"
-                    step="0.01"
-                    min="0"
-                    disabled={actionLoading}
-                  />
+                <div className="bg-white rounded-md p-3 border border-blue-100">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Selling Price (.com)</p>
+                  <p className="text-lg font-bold text-gray-900">{adminPrice ? `$${convertINRtoUSD(parseFloat(adminPrice)).toFixed(2)}` : '—'}</p>
+                  <p className="text-[10px] text-green-600">Auto-calculated from exchange rate</p>
                 </div>
               </div>
 
@@ -1089,18 +1068,11 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   />
                 </div>
                 <div>
-                  <label htmlFor="view-original-usd" className="block text-xs font-medium text-gray-700 mb-1">Original $ (MRP)</label>
-                  <input
-                    id="view-original-usd"
-                    type="number"
-                    value={originalPriceUSD}
-                    onChange={(e) => setOriginalPriceUSD(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
-                    placeholder="MRP for .com domain"
-                    step="0.01"
-                    min="0"
-                    disabled={actionLoading}
-                  />
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Original $ (MRP)</label>
+                  <div className="w-full px-3 py-2.5 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-600">
+                    {originalPriceINR ? `$${convertINRtoUSD(parseFloat(originalPriceINR)).toFixed(2)}` : 'Auto-calculated'}
+                  </div>
+                  <p className="text-[10px] text-green-600 mt-1">Auto-calculated from exchange rate</p>
                 </div>
                 <div>
                   <label htmlFor="view-display-on" className="block text-xs font-medium text-gray-700 mb-1">Display On</label>
@@ -1190,82 +1162,18 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                           )}
                         </div>
                       </div>
-                      {/* Variant Multi-Currency */}
+                      {/* Variant Currency Preview */}
                       <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
-                        <p className="text-[10px] font-medium text-blue-600 mb-1.5">Selling Prices</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                          <div>
-                            <label htmlFor={`view-var-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">INR (₹)</label>
-                            <input
-                              id={`view-var-inr-${variant.id}`}
-                              type="number"
-                              value={variantPricesINR[variant.id] || ''}
-                              onChange={(e) => setVariantPricesINR(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                              placeholder="Selling price for .in"
-                              step="0.01"
-                              min="0"
-                              disabled={actionLoading}
-                            />
+                        <p className="text-[10px] font-medium text-blue-600 mb-1.5">Currency Pricing</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-white rounded p-2 border border-blue-100">
+                            <p className="text-[10px] text-gray-500">Price (.in)</p>
+                            <p className="text-sm font-bold">₹{variantPrices[variant.id] || variant.price || '—'}</p>
                           </div>
-                          <div>
-                            <label htmlFor={`view-var-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">USD ($)</label>
-                            <input
-                              id={`view-var-usd-${variant.id}`}
-                              type="number"
-                              value={variantPricesUSD[variant.id] || ''}
-                              onChange={(e) => setVariantPricesUSD(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                              placeholder="Selling price for .com"
-                              step="0.01"
-                              min="0"
-                              disabled={actionLoading}
-                            />
-                          </div>
-                        </div>
-                        <p className="text-[10px] font-medium text-blue-600 mb-1.5 mt-2">Original Prices (MRP)</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                          <div>
-                            <label htmlFor={`view-var-orig-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original ₹</label>
-                            <input
-                              id={`view-var-orig-inr-${variant.id}`}
-                              type="number"
-                              value={variantOriginalPricesINR[variant.id] || ''}
-                              onChange={(e) => setVariantOriginalPricesINR(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                              placeholder="MRP for .in domain"
-                              step="0.01"
-                              min="0"
-                              disabled={actionLoading}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor={`view-var-orig-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original $</label>
-                            <input
-                              id={`view-var-orig-usd-${variant.id}`}
-                              type="number"
-                              value={variantOriginalPricesUSD[variant.id] || ''}
-                              onChange={(e) => setVariantOriginalPricesUSD(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                              placeholder="MRP for .com domain"
-                              step="0.01"
-                              min="0"
-                              disabled={actionLoading}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor={`view-var-vis-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Display</label>
-                            <select
-                              id={`view-var-vis-${variant.id}`}
-                              value={variantVisibilities[variant.id] || 'BOTH'}
-                              onChange={(e) => setVariantVisibilities(prev => ({ ...prev, [variant.id]: e.target.value }))}
-                              className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                              disabled={actionLoading}
-                            >
-                              <option value="BOTH">Both</option>
-                              <option value="IN_ONLY">.in</option>
-                              <option value="COM_ONLY">.com</option>
-                            </select>
+                          <div className="bg-white rounded p-2 border border-blue-100">
+                            <p className="text-[10px] text-gray-500">Price (.com)</p>
+                            <p className="text-sm font-bold">{(variantPrices[variant.id] || variant.price) ? `$${convertINRtoUSD(parseFloat(variantPrices[variant.id] || String(variant.price))).toFixed(2)}` : '—'}</p>
+                            <p className="text-[8px] text-green-600">Auto from exchange rate</p>
                           </div>
                         </div>
                       </div>

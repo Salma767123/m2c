@@ -19,6 +19,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { productService, Product } from '@/services/productService';
 import { categoryService } from '@/services/categoryService';
+import { isVisibleInRegion } from '@/lib/currency';
 
 const Products = () => {
   const searchParams = useSearchParams();
@@ -220,7 +221,7 @@ const Products = () => {
   };
 
   // All filtering is now done server-side
-  const filteredProducts = products;
+  const filteredProducts = products.filter(p => isVisibleInRegion((p as any).priceVisibility));
 
   const activeFiltersCount = (selectedCategory !== 'All' ? 1 : 0) +
     (selectedSubcategory ? 1 : 0) +

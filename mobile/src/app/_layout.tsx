@@ -12,6 +12,7 @@ import '../../global.css';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
+import { setExchangeRate } from '@/lib/currency';
 import NotificationBanner from '@/components/General/NotificationBanner';
 
 // Conditionally import Firebase messaging — fails gracefully in Expo Go
@@ -70,6 +71,23 @@ export default function RootLayout() {
     },
     [router],
   );
+
+  // Load exchange rate on app startup
+  useEffect(() => {
+    const loadExchangeRate = async () => {
+      try {
+        const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${API_URL}/exchange-rate`);
+        const data = await res.json();
+        if (data.success && data.data?.rate) {
+          setExchangeRate(data.data.rate);
+        }
+      } catch {
+        // Use default rate
+      }
+    };
+    loadExchangeRate();
+  }, []);
 
   useEffect(() => {
     // Skip if Firebase not available (Expo Go)

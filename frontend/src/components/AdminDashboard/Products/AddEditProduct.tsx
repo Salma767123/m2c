@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { convertINRtoUSD } from '@/lib/currency'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
@@ -2265,10 +2266,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
                   </div>
 
-                  {/* Multi-Currency Pricing Section */}
+                  {/* Pricing Section */}
                   <div className="border-2 border-blue-200 rounded-lg p-6 bg-blue-50/30">
-                    <h4 className="font-semibold text-gray-900 mb-1">Multi-Currency Pricing</h4>
-                    <p className="text-xs text-gray-500 mb-4">Set regional prices for .in (India) and .com (International) domains. Leave blank to use the base price.</p>
+                    <h4 className="font-semibold text-gray-900 mb-1">Selling Price & Currency</h4>
+                    <p className="text-xs text-gray-500 mb-4">Set the admin selling price in INR. USD price is auto-calculated from the centralized exchange rate.</p>
 
                     {/* Admin Override */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
@@ -2290,42 +2291,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       </div>
                     </div>
 
-                    {/* Selling Prices */}
-                    <p className="text-xs font-medium text-gray-600 mb-2 border-b border-blue-200 pb-1">Selling Prices</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                      <div>
-                        <label htmlFor="edit-price-inr" className="block text-sm font-medium text-gray-700 mb-2">INR Price (₹)</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-gray-500">₹</span>
-                          <input
-                            id="edit-price-inr"
-                            type="number"
-                            value={formData.priceINR ?? ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceINR: e.target.value ? parseFloat(e.target.value) : null }))}
-                            className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                            placeholder="Selling price for .in"
-                            step="0.01"
-                            min="0"
-                          />
-                        </div>
-                        <p className="text-[10px] text-gray-500 mt-1">Shown on .in domain</p>
+                    {/* Currency Preview */}
+                    <p className="text-xs font-medium text-gray-600 mb-2 border-b border-blue-200 pb-1">Currency Pricing</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Price on .in</p>
+                        <p className="text-lg font-bold text-gray-900">₹{formData.adminFixedPrice || formData.priceINR || '—'}</p>
                       </div>
-                      <div>
-                        <label htmlFor="edit-price-usd" className="block text-sm font-medium text-gray-700 mb-2">USD Price ($)</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-gray-500">$</span>
-                          <input
-                            id="edit-price-usd"
-                            type="number"
-                            value={formData.priceUSD ?? ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceUSD: e.target.value ? parseFloat(e.target.value) : null }))}
-                            className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                            placeholder="Selling price for .com"
-                            step="0.01"
-                            min="0"
-                          />
-                        </div>
-                        <p className="text-[10px] text-gray-500 mt-1">Shown on .com domain</p>
+                      <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Price on .com</p>
+                        <p className="text-lg font-bold text-gray-900">{formData.priceUSD ? `$${formData.priceUSD.toFixed(2)}` : (formData.adminFixedPrice || formData.priceINR) ? `$${convertINRtoUSD(formData.adminFixedPrice || formData.priceINR || 0).toFixed(2)}` : '—'}</p>
+                        <p className="text-[10px] text-green-600">Auto-calculated from exchange rate</p>
                       </div>
                     </div>
 
@@ -2350,21 +2326,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         <p className="text-[10px] text-gray-500 mt-1">Strikethrough on .in</p>
                       </div>
                       <div>
-                        <label htmlFor="edit-original-usd" className="block text-sm font-medium text-gray-700 mb-2">Original $ (MRP)</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-gray-500">$</span>
-                          <input
-                            id="edit-original-usd"
-                            type="number"
-                            value={formData.originalPriceUSD ?? ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, originalPriceUSD: e.target.value ? parseFloat(e.target.value) : null }))}
-                            className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                            placeholder="MRP for .com domain"
-                            step="0.01"
-                            min="0"
-                          />
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Original $ (MRP)</label>
+                        <div className="w-full px-3 py-2.5 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-600">
+                          {formData.originalPriceUSD ? `$${formData.originalPriceUSD.toFixed(2)}` : formData.originalPriceINR ? `$${convertINRtoUSD(formData.originalPriceINR).toFixed(2)}` : 'Auto-calculated'}
                         </div>
-                        <p className="text-[10px] text-gray-500 mt-1">Strikethrough on .com</p>
+                        <p className="text-[10px] text-green-600 mt-1">Auto-calculated from exchange rate</p>
                       </div>
                       <div>
                         <label htmlFor="edit-visibility" className="block text-sm font-medium text-gray-700 mb-2">Visibility</label>
@@ -2384,7 +2350,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
                     <div className="mt-3 p-3 bg-blue-100/50 rounded-lg">
                       <p className="text-xs text-blue-800">
-                        <strong>Price priority:</strong> INR/USD Price → Admin Fixed Price → Base Price.
+                        <strong>Price priority:</strong> Admin Selling Price (₹) → Base Price. USD is auto-calculated from exchange rate.
                         Customers on .in see INR price, .com see USD price. If not set, falls back to admin fixed price, then base price.
                       </p>
                     </div>
@@ -2450,64 +2416,55 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                 </select>
                               </div>
                             </div>
-                            {/* Variant multi-currency */}
-                            <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
-                              <p className="text-[10px] font-medium text-blue-600 mb-1.5">Selling Prices</p>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div>
-                                  <label htmlFor={`edit-var-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">INR (₹)</label>
-                                  <input
-                                    id={`edit-var-inr-${variant.id}`}
-                                    type="number"
-                                    value={variant.priceINR ?? ''}
-                                    onChange={(e) => updateVariant(variant.id, 'priceINR', e.target.value ? parseFloat(e.target.value) : null)}
-                                    className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                                    placeholder="Selling price for .in"
-                                    step="0.01"
-                                    min="0"
-                                  />
-                                </div>
-                                <div>
-                                  <label htmlFor={`edit-var-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">USD ($)</label>
-                                  <input
-                                    id={`edit-var-usd-${variant.id}`}
-                                    type="number"
-                                    value={variant.priceUSD ?? ''}
-                                    onChange={(e) => updateVariant(variant.id, 'priceUSD', e.target.value ? parseFloat(e.target.value) : null)}
-                                    className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                                    placeholder="Selling price for .com"
-                                    step="0.01"
-                                    min="0"
-                                  />
+
+                            {/* Original Price + Discount */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Original ₹ (MRP)</label>
+                                <input
+                                  type="number"
+                                  value={variant.originalPrice ?? ''}
+                                  onChange={(e) => updateVariant(variant.id, 'originalPrice', e.target.value ? parseFloat(e.target.value) : null)}
+                                  className="w-full px-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                                  placeholder="MRP"
+                                  step="0.01"
+                                  min="0"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Original $ (MRP)</label>
+                                <div className="w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-600">
+                                  {variant.originalPriceUSD ? `$${variant.originalPriceUSD.toFixed(2)}` : variant.originalPrice ? `$${convertINRtoUSD(variant.originalPrice).toFixed(2)}` : 'Auto'}
                                 </div>
                               </div>
-                              <p className="text-[10px] font-medium text-blue-600 mb-1.5 mt-2">Original Prices (MRP)</p>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div>
-                                  <label htmlFor={`edit-var-orig-inr-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original ₹</label>
-                                  <input
-                                    id={`edit-var-orig-inr-${variant.id}`}
-                                    type="number"
-                                    value={variant.originalPriceINR ?? ''}
-                                    onChange={(e) => updateVariant(variant.id, 'originalPriceINR', e.target.value ? parseFloat(e.target.value) : null)}
-                                    className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                                    placeholder="MRP for .in domain"
-                                    step="0.01"
-                                    min="0"
-                                  />
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Discount %</label>
+                                <div className="w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-600">
+                                  {variant.originalPrice && (variant.adminFixedPrice || variant.price)
+                                    ? `${Math.round(((variant.originalPrice - (variant.adminFixedPrice || variant.price)) / variant.originalPrice) * 100)}% off`
+                                    : '—'}
                                 </div>
-                                <div>
-                                  <label htmlFor={`edit-var-orig-usd-${variant.id}`} className="block text-[10px] font-medium text-blue-700 mb-1">Original $</label>
-                                  <input
-                                    id={`edit-var-orig-usd-${variant.id}`}
-                                    type="number"
-                                    value={variant.originalPriceUSD ?? ''}
-                                    onChange={(e) => updateVariant(variant.id, 'originalPriceUSD', e.target.value ? parseFloat(e.target.value) : null)}
-                                    className="w-full px-3 py-2.5 border border-blue-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                                    placeholder="MRP for .com domain"
-                                    step="0.01"
-                                    min="0"
-                                  />
+                              </div>
+                            </div>
+
+                            {/* Variant Currency Preview */}
+                            <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                              <p className="text-[10px] font-medium text-blue-600 mb-1.5">Currency Pricing</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="bg-white rounded p-2 border border-blue-100">
+                                  <p className="text-[10px] text-gray-500">Price (.in)</p>
+                                  <p className="text-sm font-bold">₹{variant.adminFixedPrice || variant.price || '—'}</p>
+                                  {variant.originalPrice ? (
+                                    <p className="text-[10px] text-gray-400 line-through">₹{variant.originalPrice}</p>
+                                  ) : null}
+                                </div>
+                                <div className="bg-white rounded p-2 border border-blue-100">
+                                  <p className="text-[10px] text-gray-500">Price (.com)</p>
+                                  <p className="text-sm font-bold">{variant.priceUSD ? `$${variant.priceUSD.toFixed(2)}` : (variant.adminFixedPrice || variant.price) ? `$${convertINRtoUSD(variant.adminFixedPrice || variant.price).toFixed(2)}` : '—'}</p>
+                                  {variant.originalPrice ? (
+                                    <p className="text-[10px] text-gray-400 line-through">${variant.originalPriceUSD ? variant.originalPriceUSD.toFixed(2) : convertINRtoUSD(variant.originalPrice).toFixed(2)}</p>
+                                  ) : null}
+                                  <p className="text-[8px] text-green-600">Auto from exchange rate</p>
                                 </div>
                               </div>
                             </div>

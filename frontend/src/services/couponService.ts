@@ -58,9 +58,9 @@ export interface ApplyCouponResponse {
 }
 
 class CouponService {
-    async applyCoupon(code: string, cartTotal: number): Promise<ApplyCouponResponse> {
+    async applyCoupon(code: string, cartTotal: number, currency?: string): Promise<ApplyCouponResponse> {
         try {
-            const response = await axios.post('/coupons/apply', { code, cartTotal });
+            const response = await axios.post('/coupons/apply', { code, cartTotal, currency });
             return response.data;
         } catch (error: unknown) {
             // Return the error message from the backend if available

@@ -194,6 +194,10 @@ app.use("/api/banners", bannerRoutes);
 app.use("/api/bag-types", bagTypeRoutes);
 const notificationRoutes = require("./routes/notificationRoutes");
 app.use("/api/notifications", notificationRoutes);
+
+const exchangeRateRoutes = require("./routes/exchangeRateRoutes");
+app.use("/api/exchange-rate", exchangeRateRoutes);
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

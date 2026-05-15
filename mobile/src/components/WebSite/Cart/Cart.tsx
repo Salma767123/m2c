@@ -316,7 +316,7 @@ export default function Cart() {
     try {
       setApplyingCoupon(true);
       const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
-      const res = await couponService.applyCoupon(promoCode, subtotal);
+      const res = await couponService.applyCoupon(promoCode, subtotal, getCurrency());
       if (res.success && res.data) {
         setAppliedPromo(res.data.code);
         setDiscountAmount(res.data.discountAmount);

@@ -210,7 +210,16 @@ const deleteCoupon = async (req, res) => {
 // Validate and apply coupon
 const applyCoupon = async (req, res) => {
     try {
-        const { code, cartTotal, userId } = req.body;
+        const { code, cartTotal, userId, currency: rawCurrency } = req.body;
+        const currency = (rawCurrency || 'INR').toUpperCase() === 'USD' ? 'USD' : 'INR';
+        const symbol = currency === 'USD' ? '$' : '₹';
+
+        // Get exchange rate for converting INR coupon values to USD
+        let exchangeRate = 1;
+        if (currency === 'USD') {
+            const { getCurrentExchangeRate } = require('./exchangeRateController');
+            exchangeRate = await getCurrentExchangeRate();
+        }
 
         if (!code) {
             return res.status(400).json({
@@ -255,11 +264,16 @@ const applyCoupon = async (req, res) => {
             });
         }
 
+        // Convert min purchase to cart currency
+        const minPurchase = currency === 'USD' && coupon.minPurchaseAmount
+            ? Math.round((coupon.minPurchaseAmount / exchangeRate) * 100) / 100
+            : coupon.minPurchaseAmount;
+
         // Check minimum purchase amount
-        if (coupon.minPurchaseAmount && cartTotal < coupon.minPurchaseAmount) {
+        if (minPurchase && cartTotal < minPurchase) {
             return res.status(400).json({
                 success: false,
-                message: `Minimum purchase amount of ₹${coupon.minPurchaseAmount} required`
+                message: `Minimum purchase amount of ${symbol}${minPurchase} required`
             });
         }
 
@@ -295,18 +309,24 @@ const applyCoupon = async (req, res) => {
             }
         }
 
-        // Calculate discount
+        // Calculate discount — convert INR values to USD if needed
         let discountAmount = 0;
         if (coupon.discountType === 'PERCENTAGE') {
             discountAmount = (cartTotal * coupon.discountValue) / 100;
 
-            // Apply max discount cap if set
-            if (coupon.maxDiscountAmount && discountAmount > coupon.maxDiscountAmount) {
-                discountAmount = coupon.maxDiscountAmount;
+            // Convert max discount cap to cart currency
+            const maxCap = currency === 'USD' && coupon.maxDiscountAmount
+                ? Math.round((coupon.maxDiscountAmount / exchangeRate) * 100) / 100
+                : coupon.maxDiscountAmount;
+
+            if (maxCap && discountAmount > maxCap) {
+                discountAmount = maxCap;
             }
         } else {
-            // FIXED_AMOUNT
-            discountAmount = coupon.discountValue;
+            // FIXED_AMOUNT — convert to cart currency
+            discountAmount = currency === 'USD'
+                ? Math.round((coupon.discountValue / exchangeRate) * 100) / 100
+                : coupon.discountValue;
         }
 
         // Ensure discount doesn't exceed total

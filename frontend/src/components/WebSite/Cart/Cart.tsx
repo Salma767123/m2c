@@ -9,7 +9,7 @@ import { publicProductService, PublicProduct } from "@/services/publicProductSer
 import { userAuthService } from "@/services/userAuthService"
 import bagTypeService, { BagType } from "@/services/bagTypeService"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
-import { formatPrice, getRegionalPrice, getRegionalOriginalPrice } from "@/lib/currency"
+import { formatPrice, getRegionalPrice, getRegionalOriginalPrice, getCurrency } from "@/lib/currency"
 import { calculateLogistics, type LogisticsConfig } from "@/lib/logistics"
 
 /** Map BagType's `price` field to `basePrice` so getRegionalPrice() resolves correctly */
@@ -424,7 +424,7 @@ export default function Order() {
       // Calculate subtotal for validation
       const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 
-      const response = await couponService.applyCoupon(promoCode, subtotal)
+      const response = await couponService.applyCoupon(promoCode, subtotal, getCurrency())
 
       if (response.success && response.data) {
         setAppliedPromo(response.data.code)
