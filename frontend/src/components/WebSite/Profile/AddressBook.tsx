@@ -10,6 +10,7 @@ import {
   type AddressPayload,
 } from "@/services/addressService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { getCountryName, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
 
 const TYPE_META: Record<string, { label: string; icon: typeof Home; badgeCls: string }> = {
   home: { label: "Home", icon: Home, badgeCls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
@@ -233,15 +234,15 @@ function AddressCard({
 
       <div className="space-y-1 text-sm">
         <p className="font-semibold text-slate-900">{addr.name}</p>
-        <p className="text-slate-600">{addr.phone}</p>
+        <p className="text-slate-600">{formatPhoneForDisplay(addr.phone, addr.country)}</p>
         <p className="text-slate-700 pt-1">
           {addr.address}
           {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}
         </p>
         <p className="text-slate-700">
-          {addr.city}, {addr.state} {addr.zipCode}
+          {addr.city}, {getStateName(addr.state, addr.country)} {addr.zipCode}
         </p>
-        <p className="text-slate-500 text-xs">{addr.country || "United States"}</p>
+        <p className="text-slate-500 text-xs">{getCountryName(addr.country) || "—"}</p>
       </div>
 
       <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">

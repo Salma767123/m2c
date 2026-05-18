@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order, VendorShipment } from "@/services/orderService";
 import { hasPermission } from "@/lib/auth";
+import { getCountryName, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
 
 interface HubToCustomerDetailProps {
   orderId: string;
@@ -302,7 +303,7 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
           </div>
           <div>
             <p className="text-sm text-gray-600">Phone</p>
-            <p className="text-base font-medium text-gray-900 mt-1">{order.customerPhone || "N/A"}</p>
+            <p className="text-base font-medium text-gray-900 mt-1">{order.customerPhone ? formatPhoneForDisplay(order.customerPhone, order?.shippingAddress?.country) : "N/A"}</p>
           </div>
           <div className="md:col-span-2">
             <p className="text-sm text-gray-600">Delivery Address</p>
@@ -312,10 +313,10 @@ export default function HubToCustomerDetail({ orderId }: HubToCustomerDetailProp
                   <p>{order.shippingAddress.address || order.shippingAddress.street}</p>
                   {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
                   <p>
-                    {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode || order.shippingAddress.postalCode}
+                    {order.shippingAddress.city}, {getStateName(order.shippingAddress.state ?? "", order.shippingAddress.country)} {order.shippingAddress.zipCode || order.shippingAddress.postalCode}
                   </p>
                   <p className="text-slate-500 font-medium italic mt-1 text-sm">
-                    {order.shippingAddress.country}
+                    {getCountryName(order.shippingAddress.country)}
                   </p>
                 </>
               ) : "N/A"}

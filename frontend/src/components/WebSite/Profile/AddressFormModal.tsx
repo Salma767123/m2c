@@ -1,15 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X, Home, Briefcase, MapPin, Loader2 } from "lucide-react";
 import {
-  US_STATES,
-  ZIP_REGEX,
   NAME_REGEX,
-  formatUSPhone,
-  validateUSPhone,
-  formatZipCode,
+  DEFAULT_COUNTRY_ISO,
+  getCountry,
+  getStates,
+  getPostalRule,
+  validatePostalCode,
+  validatePhone,
+  formatPhoneAsYouType,
+  getPhoneExample,
+  normalizeCountryToIso,
+  toE164,
 } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
+import CountrySelect from "@/components/WebSite/CheckOut/CheckoutProcess/CountrySelect";
 import type { SavedAddress, AddressPayload, AddressType } from "@/services/addressService";
 
 interface AddressFormModalProps {
@@ -30,6 +36,7 @@ type FormState = {
   city: string;
   state: string;
   zipCode: string;
+  country: string;
   isDefault: boolean;
 };
 
@@ -51,6 +58,7 @@ const emptyForm: FormState = {
   city: "",
   state: "",
   zipCode: "",
+  country: DEFAULT_COUNTRY_ISO,
   isDefault: false,
 };
 
@@ -67,20 +75,29 @@ export default function AddressFormModal({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const countryIso = (form.country || DEFAULT_COUNTRY_ISO).toUpperCase();
+  const country = useMemo(() => getCountry(countryIso), [countryIso]);
+  const states = useMemo(() => getStates(countryIso), [countryIso]);
+  const hasStateList = states.length > 0;
+  const postalRule = useMemo(() => getPostalRule(countryIso), [countryIso]);
+  const phoneExample = useMemo(() => getPhoneExample(countryIso), [countryIso]);
+
   useEffect(() => {
     if (!open) return;
     setTouched({});
     setSubmitError(null);
     if (editing) {
+      const editIso = normalizeCountryToIso(editing.country);
       setForm({
         type: editing.type,
         name: editing.name || "",
-        phone: formatUSPhone(editing.phone || ""),
+        phone: formatPhoneAsYouType(editing.phone || "", editIso),
         address: editing.address || "",
         addressLine2: editing.addressLine2 || "",
         city: editing.city || "",
         state: editing.state || "",
         zipCode: editing.zipCode || "",
+        country: editIso,
         isDefault: editing.isDefault,
       });
     } else {
@@ -96,7 +113,8 @@ export default function AddressFormModal({
     errors.name = "Letters, spaces, hyphens and apostrophes only";
 
   if (!form.phone.trim()) errors.phone = "Phone number is required";
-  else if (!validateUSPhone(form.phone)) errors.phone = "Enter a valid US phone number";
+  else if (!validatePhone(form.phone, countryIso))
+    errors.phone = `Enter a valid phone number for ${country?.name ?? "selected country"}`;
 
   if (!form.address.trim()) errors.address = "Address is required";
   else if (form.address.trim().length < 3 || form.address.trim().length > 100)
@@ -109,11 +127,17 @@ export default function AddressFormModal({
   else if (form.city.trim().length < 2 || form.city.trim().length > 50)
     errors.city = "City must be 2-50 characters";
 
-  if (!form.state) errors.state = "Select a state";
+  if (!form.country) errors.country = "Select a country";
 
-  if (!form.zipCode.trim()) errors.zipCode = "ZIP Code is required";
-  else if (!ZIP_REGEX.test(form.zipCode.trim()))
-    errors.zipCode = "Enter a valid ZIP (12345 or 12345-6789)";
+  if (hasStateList) {
+    if (!form.state) errors.state = "Select a state / province";
+  } else if (!form.state.trim()) {
+    errors.state = "State / region is required";
+  }
+
+  if (!form.zipCode.trim()) errors.zipCode = `${postalRule.label} is required`;
+  else if (!validatePostalCode(form.zipCode, countryIso))
+    errors.zipCode = `Enter a valid ${postalRule.label.toLowerCase()} (e.g. ${postalRule.placeholder})`;
 
   const isValid = Object.keys(errors).length === 0;
 
@@ -121,11 +145,16 @@ export default function AddressFormModal({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleCountryChange = (newIso: string) => {
+    setForm((prev) => ({ ...prev, country: newIso, state: "", zipCode: "", phone: "" }));
+    setTouched((t) => ({ ...t, state: false, zipCode: false, phone: false }));
+  };
+
   const handleBlur = (field: keyof FormState) => {
     setTouched((t) => ({ ...t, [field]: true }));
     if (typeof form[field] === "string") {
       const v = form[field] as string;
-      if (field === "state") setField(field, v.trim().toUpperCase() as any);
+      if (field === "zipCode") setField(field, v.trim().toUpperCase() as any);
       else setField(field, v.trim() as any);
     }
   };
@@ -143,13 +172,13 @@ export default function AddressFormModal({
       const payload: AddressPayload = {
         type: form.type,
         name: form.name.trim(),
-        phone: form.phone.trim(),
+        phone: toE164(form.phone, countryIso),
         address: form.address.trim(),
         addressLine2: form.addressLine2.trim() || undefined,
         city: form.city.trim(),
-        state: form.state.trim().toUpperCase(),
-        zipCode: form.zipCode.trim(),
-        country: "United States",
+        state: form.state.trim(),
+        zipCode: form.zipCode.trim().toUpperCase(),
+        country: form.country,
         isDefault: form.isDefault,
       };
       await onSubmit(payload);
@@ -167,6 +196,15 @@ export default function AddressFormModal({
     `w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-gray-500 outline-none transition-colors disabled:bg-slate-100 ${
       fieldError(k) ? "border-red-500 focus:border-red-500" : "border-slate-300 focus:border-gray-500"
     }`;
+  const selectCls = (k: keyof FormState) => `${inputCls(k)} bg-white appearance-none pr-10`;
+
+  const ChevronIcon = (
+    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+      </svg>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
@@ -217,6 +255,21 @@ export default function AddressFormModal({
               </div>
             </div>
 
+            {/* Country */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Country <span className="text-red-500">*</span>
+              </label>
+              <CountrySelect
+                value={countryIso}
+                onChange={handleCountryChange}
+                onBlur={() => handleBlur("country")}
+                disabled={submitting}
+                invalid={!!fieldError("country")}
+              />
+              {fieldError("country") && <p className="text-red-500 text-xs mt-1">{fieldError("country")}</p>}
+            </div>
+
             {/* Name + Phone */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -240,14 +293,15 @@ export default function AddressFormModal({
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Phone <span className="text-red-500">*</span>
+                  {country && <span className="text-slate-400 font-normal ml-2">({country.phoneCode})</span>}
                 </label>
                 <input
                   type="tel"
                   value={form.phone}
-                  onChange={(e) => setField("phone", formatUSPhone(e.target.value))}
+                  onChange={(e) => setField("phone", formatPhoneAsYouType(e.target.value, countryIso))}
                   onBlur={() => handleBlur("phone")}
                   disabled={submitting}
-                  placeholder="(555) 123-4567"
+                  placeholder={phoneExample || "Phone number"}
                   autoComplete="tel"
                   aria-required="true"
                   aria-invalid={!!fieldError("phone")}
@@ -297,7 +351,7 @@ export default function AddressFormModal({
               )}
             </div>
 
-            {/* City / State / ZIP */}
+            {/* City / State / Postal */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -309,7 +363,7 @@ export default function AddressFormModal({
                   onChange={(e) => setField("city", e.target.value)}
                   onBlur={() => handleBlur("city")}
                   disabled={submitting}
-                  placeholder="New York"
+                  placeholder="City"
                   autoComplete="address-level2"
                   aria-required="true"
                   aria-invalid={!!fieldError("city")}
@@ -319,40 +373,55 @@ export default function AddressFormModal({
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  State <span className="text-red-500">*</span>
+                  State / Province <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={form.state}
-                  onChange={(e) => setField("state", e.target.value)}
-                  onBlur={() => handleBlur("state")}
-                  disabled={submitting}
-                  autoComplete="address-level1"
-                  aria-required="true"
-                  aria-invalid={!!fieldError("state")}
-                  className={`${inputCls("state")} bg-white`}
-                >
-                  <option value="">Select</option>
-                  {US_STATES.map((s) => (
-                    <option key={s.code} value={s.code}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
+                {hasStateList ? (
+                  <div className="relative">
+                    <select
+                      value={form.state}
+                      onChange={(e) => setField("state", e.target.value)}
+                      onBlur={() => handleBlur("state")}
+                      disabled={submitting}
+                      autoComplete="address-level1"
+                      aria-required="true"
+                      aria-invalid={!!fieldError("state")}
+                      className={selectCls("state")}
+                    >
+                      <option value="">Select</option>
+                      {states.map((s) => (
+                        <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
+                      ))}
+                    </select>
+                    {ChevronIcon}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={form.state}
+                    onChange={(e) => setField("state", e.target.value)}
+                    onBlur={() => handleBlur("state")}
+                    disabled={submitting}
+                    placeholder="State / region"
+                    autoComplete="address-level1"
+                    aria-required="true"
+                    aria-invalid={!!fieldError("state")}
+                    className={inputCls("state")}
+                  />
+                )}
                 {fieldError("state") && <p className="text-red-500 text-xs mt-1">{fieldError("state")}</p>}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  ZIP Code <span className="text-red-500">*</span>
+                  {postalRule.label} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  inputMode="numeric"
-                  maxLength={10}
+                  maxLength={12}
                   value={form.zipCode}
-                  onChange={(e) => setField("zipCode", formatZipCode(e.target.value))}
+                  onChange={(e) => setField("zipCode", e.target.value)}
                   onBlur={() => handleBlur("zipCode")}
                   disabled={submitting}
-                  placeholder="10001"
+                  placeholder={postalRule.placeholder}
                   autoComplete="postal-code"
                   aria-required="true"
                   aria-invalid={!!fieldError("zipCode")}
@@ -424,4 +493,3 @@ export default function AddressFormModal({
     </div>
   );
 }
-

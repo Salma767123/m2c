@@ -9,6 +9,59 @@
  *   const html = getOrderInvoiceHTML(order, adminSettings);
  */
 
+const { Country, State } = require('country-state-city');
+const { parsePhoneNumberFromString } = require('libphonenumber-js');
+
+// Format a stored phone (typically E.164 like "+919876543210") for human display.
+const formatPhoneForDisplay = (value, defaultCountry) => {
+  if (!value) return '';
+  const trimmed = String(value).trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = trimmed.startsWith('+')
+      ? parsePhoneNumberFromString(trimmed)
+      : parsePhoneNumberFromString(trimmed, (defaultCountry || 'IN').toUpperCase());
+    if (parsed && parsed.isValid()) return parsed.formatInternational();
+    if (parsed) return parsed.formatNational();
+    return trimmed;
+  } catch {
+    return trimmed;
+  }
+};
+
+// Resolve a country value (ISO-2 code or legacy display name) to its display name + flag.
+const resolveCountry = (value) => {
+  if (!value) return { name: '', flag: '' };
+  const trimmed = String(value).trim();
+  const upper = trimmed.toUpperCase();
+  const byIso = Country.getCountryByCode(upper);
+  if (byIso) return { name: byIso.name, flag: byIso.flag };
+  const byName = Country.getAllCountries().find(
+    (c) => c.name.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (byName) return { name: byName.name, flag: byName.flag };
+  return { name: trimmed, flag: '' };
+};
+
+// Resolve a state ISO code to its display name when possible.
+const resolveStateName = (stateValue, countryValue) => {
+  if (!stateValue) return '';
+  const trimmed = String(stateValue).trim();
+  const countryIso = (() => {
+    if (!countryValue) return null;
+    const c = String(countryValue).trim();
+    const upper = c.toUpperCase();
+    if (Country.getCountryByCode(upper)) return upper;
+    const byName = Country.getAllCountries().find(
+      (x) => x.name.toLowerCase() === c.toLowerCase()
+    );
+    return byName ? byName.isoCode : null;
+  })();
+  if (!countryIso) return trimmed;
+  const found = State.getStateByCodeAndCountry(trimmed.toUpperCase(), countryIso);
+  return found ? found.name : trimmed;
+};
+
 /**
  * Build the full invoice HTML for an order.
  *
@@ -66,13 +119,16 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
     ? JSON.parse(shippingAddress)
     : shippingAddress;
 
+  const resolvedCountry = resolveCountry(addr.country);
+  const resolvedStateName = resolveStateName(addr.state, addr.country);
+
   const shippingAddrStr = [
     addr.firstName && addr.lastName ? `${addr.firstName} ${addr.lastName}` : addr.name,
     addr.street || addr.addressLine1,
     addr.addressLine2,
-    `${addr.city || ''}, ${addr.state || ''}`,
+    `${addr.city || ''}, ${resolvedStateName || ''}`,
     addr.zipCode || addr.pincode,
-    addr.country ? `${addr.country} 🇺🇸` : '',
+    resolvedCountry.name ? `${resolvedCountry.name} ${resolvedCountry.flag}`.trim() : '',
   ].filter(Boolean).join('\n');
 
   const payStatusColor = paymentStatus === 'PAID' ? '#16a34a' : '#dc2626';
@@ -132,7 +188,7 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
         <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Bill To</div>
         <div style="font-weight:700; font-size:15px; color:#111827;">${customerName}</div>
         <div style="font-size:13px; color:#6b7280; margin-top:4px;">${customerEmail}</div>
-        <div style="font-size:13px; color:#6b7280;">${customerPhone}</div>
+        <div style="font-size:13px; color:#6b7280;">${formatPhoneForDisplay(customerPhone, addr.country)}</div>
         <div style="font-size:13px; color:#6b7280; margin-top:8px; white-space:pre-line;">${shippingAddrStr}</div>
       </div>
       <div style="flex:1; padding:24px 36px;">
