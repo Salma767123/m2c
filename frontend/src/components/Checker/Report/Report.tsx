@@ -321,11 +321,11 @@ export default function ReportsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="font-semibold">Vendor</TableHead>
-                    <TableHead className="font-semibold">Client</TableHead>
-                    <TableHead className="font-semibold">Completed On</TableHead>
-                    <TableHead className="font-semibold">Result</TableHead>
-                    <TableHead className="font-semibold">Actions</TableHead>
+                    <TableHead className="font-semibold w-[30%]">Vendor</TableHead>
+                    <TableHead className="font-semibold w-[20%]">Client</TableHead>
+                    <TableHead className="font-semibold w-[18%]">Completed On</TableHead>
+                    <TableHead className="font-semibold w-[14%]">Result</TableHead>
+                    <TableHead className="font-semibold w-[18%]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

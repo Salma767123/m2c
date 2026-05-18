@@ -113,6 +113,7 @@ export interface VendorProfile {
   ownerName: string;
   ownerEmail: string;
   ownerPhone: string;
+  ownerPhoto?: string;
   additionalOwners?: Array<{ name: string; email: string; phone: string }>;
   businessPhone: string;
   landlineNumber?: string;
@@ -125,14 +126,17 @@ export interface VendorProfile {
   businessCountry: string;
   website?: string;
   establishedYear?: number;
+  companyType?: string;
   vendorType: string;
   vendorCode?: string;
   productCategories: string[];
   productTypes: string[];
   specializations: string[];
+  categoryRemarks?: string;
   annualTurnover?: string;
   exportExperience?: boolean;
   exportCountries?: string[];
+  importCountries?: string[];
   primaryMarkets?: string[];
   factoryAddress?: string;
   factoryCity?: string;
@@ -140,6 +144,9 @@ export interface VendorProfile {
   factorySize?: string;
   productionCapacity?: string;
   qualityControl?: string;
+  enabledFacilities?: Record<string, boolean>;
+  facilityDetails?: Record<string, any>;
+  ownershipType?: string;
   warehouseAddress?: string;
   warehouseCity?: string;
   warehouseState?: string;
@@ -492,7 +499,8 @@ class VendorService {
       const skipFields = [
         'certificationFiles', 'logoFile', 'gstFile', 'contactPhotoFile',
         'productPhotos', 'contactPhoto', 'logo', 'gstDocument',
-        'sameAsWarehouse', 'expandedCategories', 'factoryImages'
+        'sameAsWarehouse', 'expandedCategories', 'factoryImages',
+        'existingProductPhotos'
       ];
 
       // Add all form fields
@@ -547,7 +555,99 @@ class VendorService {
         }
       }
 
+      // Handle product photos - separate existing URLs from new file uploads
+      if (vendorData.productPhotos && vendorData.productPhotos.length > 0) {
+        const existingProductPhotoUrls: string[] = [];
+        vendorData.productPhotos.forEach((photo: any) => {
+          if (photo.isExisting && photo.url) {
+            existingProductPhotoUrls.push(photo.url);
+          } else if (photo.file instanceof File) {
+            formData.append('productPhotos', photo.file);
+          }
+        });
+        if (existingProductPhotoUrls.length > 0) {
+          formData.append('existingProductPhotos', JSON.stringify(existingProductPhotoUrls));
+        }
+      }
+
       const response = await axiosInstance.put(`/vendors/${vendorId}`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
+  // Admin: Create new vendor
+  static async createVendorByAdmin(vendorData: any) {
+    const token = this.getAdminToken();
+    if (!token) {
+      throw new Error('No admin authentication token found');
+    }
+
+    try {
+      const formData = new FormData();
+
+      const skipFields = [
+        'certificationFiles', 'logoFile', 'gstFile', 'contactPhotoFile',
+        'productPhotos', 'contactPhoto', 'logo', 'gstDocument',
+        'sameAsWarehouse', 'expandedCategories', 'factoryImages',
+        'existingProductPhotos', 'approvalStatus'
+      ];
+
+      Object.keys(vendorData).forEach(key => {
+        if (skipFields.includes(key)) return;
+        const value = vendorData[key];
+        if (typeof value === 'object' && value !== null && !(value instanceof File)) {
+          formData.append(key, JSON.stringify(value));
+        } else if (value !== null && value !== undefined) {
+          formData.append(key, value);
+        }
+      });
+
+      if (vendorData.logoFile instanceof File) {
+        formData.append('logo', vendorData.logoFile);
+      }
+      if (vendorData.gstFile instanceof File) {
+        formData.append('gstDocument', vendorData.gstFile);
+      }
+      if (vendorData.contactPhotoFile instanceof File) {
+        formData.append('ownerPhoto', vendorData.contactPhotoFile);
+      }
+
+      if (vendorData.certificationFiles) {
+        let fileIndex = 0;
+        Object.entries(vendorData.certificationFiles).forEach(([certId, fileData]: [string, any]) => {
+          if (fileData && fileData.file) {
+            formData.append('certificationFiles', fileData.file);
+            formData.append(`certificationId_${fileIndex}`, certId);
+            fileIndex++;
+          }
+        });
+      }
+
+      if (vendorData.factoryImages && vendorData.factoryImages.length > 0) {
+        vendorData.factoryImages.forEach((image: any) => {
+          if (image.file instanceof File) {
+            formData.append('factoryImages', image.file);
+          }
+        });
+      }
+
+      if (vendorData.productPhotos && vendorData.productPhotos.length > 0) {
+        vendorData.productPhotos.forEach((photo: any) => {
+          if (photo.file instanceof File) {
+            formData.append('productPhotos', photo.file);
+          }
+        });
+      }
+
+      const response = await axiosInstance.post('/vendors/admin/create', formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',

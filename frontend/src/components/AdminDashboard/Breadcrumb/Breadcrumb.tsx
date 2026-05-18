@@ -54,6 +54,9 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
     'inspection': 'Inspection Details'
   }
 
+  // Segments that are action prefixes (not standalone pages) — they only exist as parent paths for dynamic [id] routes
+  const nonNavigableSegments = new Set(['view', 'edit', 'add', 'create', 'assign-qc-checker', 'inspection'])
+
   // Generate breadcrumb items from pathname
   const generateBreadcrumbs = (): BreadcrumbItem[] => {
     const paths = pathname.split('/').filter(Boolean)
@@ -69,13 +72,13 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
       for (let i = 2; i < paths.length; i++) {
         const segment = paths[i]
         currentPath += `/${segment}`
-        
+
         // Handle dynamic routes (like [id]) or typical database IDs (numbers, mongo object id, uuid)
         if (segment.match(/^\[.*\]$/) || /^\d+$/.test(segment) || /^[0-9a-fA-F]{24}$/.test(segment) || /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(segment)) {
           // For dynamic segments, use custom label if provided, otherwise generic
           const genericLabel = segment.match(/^\[.*\]$/) ? 'Details' : 'Details'
           const label = customLabels[segment] || genericLabel
-          
+
           // Don't add href for the last item (current page)
           if (i === paths.length - 1) {
             breadcrumbs.push({ label })
@@ -85,9 +88,9 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
         } else {
           // Use mapped label or capitalize the segment
           const label = customLabels[segment] || pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
-          
-          // Don't add href for the last item (current page)
-          if (i === paths.length - 1) {
+
+          // Don't add href for non-navigable segments or the last item (current page)
+          if (i === paths.length - 1 || nonNavigableSegments.has(segment)) {
             breadcrumbs.push({ label })
           } else {
             breadcrumbs.push({ label, href: currentPath })
@@ -103,12 +106,12 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
       for (let i = 2; i < paths.length; i++) {
         const segment = paths[i]
         currentPath += `/${segment}`
-        
+
         // Handle dynamic routes
         if (segment.match(/^\[.*\]$/) || /^\d+$/.test(segment) || /^[0-9a-fA-F]{24}$/.test(segment) || /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(segment)) {
           const genericLabel = segment.match(/^\[.*\]$/) ? 'Details' : 'Details'
           const label = customLabels[segment] || genericLabel
-          
+
           if (i === paths.length - 1) {
             breadcrumbs.push({ label })
           } else {
@@ -116,8 +119,9 @@ export function Breadcrumb({ customLabels = {} }: BreadcrumbProps = {}) {
           }
         } else {
           const label = customLabels[segment] || pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
-          
-          if (i === paths.length - 1) {
+
+          // Don't add href for non-navigable segments or the last item (current page)
+          if (i === paths.length - 1 || nonNavigableSegments.has(segment)) {
             breadcrumbs.push({ label })
           } else {
             breadcrumbs.push({ label, href: currentPath })

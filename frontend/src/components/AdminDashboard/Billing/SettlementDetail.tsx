@@ -222,7 +222,7 @@ export default function SettlementDetail({ settlementId }: SettlementDetailProps
             </div>
             <div className="flex-1 pb-4">
               <p className="text-sm font-medium text-gray-900">Payment Due</p>
-              <p className="text-xs text-gray-600 mt-1">{new Date(settlement.dueDate).toLocaleDateString()}</p>
+              <p className="text-xs text-gray-600 mt-1">{settlement.dueDate ? new Date(settlement.dueDate).toLocaleDateString() : 'Not set'}</p>
             </div>
           </div>
 

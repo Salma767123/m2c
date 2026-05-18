@@ -194,8 +194,8 @@ const Header = () => {
             console.error('Error loading wishlist count:', error);
           }
         } else {
-          // Not authenticated - set counts to 0
-          setCartCount(0);
+          // Guest users — show local cart count
+          setCartCount(cartService.getLocalCart().length);
           setWishlistCount(0);
         }
       } catch (error) {
@@ -205,17 +205,20 @@ const Header = () => {
 
     loadCounts();
 
-    // Listen for instant wishlist changes instead of polling
+    // Listen for instant cart changes (same pattern as wishlist)
+    const cartHandler = (e: Event) => {
+      setCartCount((e as CustomEvent).detail.count);
+    };
+    window.addEventListener('cart-changed', cartHandler);
+
+    // Listen for instant wishlist changes
     const wishlistHandler = (e: Event) => {
       setWishlistCount((e as CustomEvent).detail.count);
     };
     window.addEventListener('wishlist-changed', wishlistHandler);
 
-    // Reload cart count periodically (wishlist is event-driven now)
-    const interval = setInterval(loadCounts, 30000);
-
     return () => {
-      clearInterval(interval);
+      window.removeEventListener('cart-changed', cartHandler);
       window.removeEventListener('wishlist-changed', wishlistHandler);
     };
   }, [isUserLoggedIn]);

@@ -155,9 +155,20 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
     ))
   }
 
+  const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: 'Error',
+          description: `File size exceeds 5MB limit. Please upload a smaller image.`,
+          variant: 'destructive',
+        })
+        e.target.value = ''
+        return
+      }
       try {
         // Show loading state
         setCategoryData(prev => ({ ...prev, image: 'uploading...' }))
@@ -208,6 +219,15 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
   const handleSubcategoryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isNew: boolean = false) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: 'Error',
+          description: `File size exceeds 5MB limit. Please upload a smaller image.`,
+          variant: 'destructive',
+        })
+        e.target.value = ''
+        return
+      }
       try {
         // Create FormData for file upload
         const formData = new FormData()
@@ -252,6 +272,15 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
   const handleExistingSubcategoryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, subcategoryId: string) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: 'Error',
+          description: `File size exceeds 5MB limit. Please upload a smaller image.`,
+          variant: 'destructive',
+        })
+        e.target.value = ''
+        return
+      }
       try {
         // Create FormData for file upload
         const formData = new FormData()
@@ -296,17 +325,17 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
     
     // Basic validation
     if (!categoryData.name.trim()) {
-      alert('Category name is required')
+      toast({ title: 'Error', description: 'Category name is required', variant: 'destructive' })
       return
     }
-    
+
     if (!categoryData.description.trim()) {
-      alert('Category description is required')
+      toast({ title: 'Error', description: 'Category description is required', variant: 'destructive' })
       return
     }
-    
+
     if (!categoryData.slug?.trim()) {
-      alert('Category slug is required')
+      toast({ title: 'Error', description: 'Category slug is required', variant: 'destructive' })
       return
     }
     
@@ -326,9 +355,13 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
       
       // Redirect back to categories list
       router.push('/admin/dashboard/categories')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving category:', error)
-      alert(error instanceof Error ? error.message : 'Failed to save category')
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to save category',
+        variant: 'destructive',
+      })
     } finally {
       setIsLoading(false)
     }

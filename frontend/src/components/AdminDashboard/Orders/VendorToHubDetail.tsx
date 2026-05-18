@@ -8,6 +8,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { orderService, VendorShipment } from "@/services/orderService";
 import adminReviewService from "@/services/adminReviewService";
 import { hasPermission } from "@/lib/auth";
+import { getCountryName, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
 
 interface VendorToHubDetailProps {
   orderId: string;
@@ -288,7 +289,7 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
             <h3 className="text-sm font-medium text-gray-900 mb-2">Customer Info</h3>
             <p className="text-sm text-gray-600">{order?.customerName}</p>
             <p className="text-sm text-gray-600">{order?.customerEmail}</p>
-            <p className="text-sm text-gray-600">{order?.customerPhone}</p>
+            <p className="text-sm text-gray-600">{order?.customerPhone ? formatPhoneForDisplay(order.customerPhone, order?.shippingAddress?.country) : ""}</p>
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-2">Shipping Address</h3>
@@ -297,8 +298,8 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
                 <>
                   <p>{order.shippingAddress.address || order.shippingAddress.street}</p>
                   {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
-                  <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
-                  <p>{order.shippingAddress.country}</p>
+                  <p>{order.shippingAddress.city}, {getStateName(order.shippingAddress.state ?? "", order.shippingAddress.country)} {order.shippingAddress.zipCode}</p>
+                  <p>{getCountryName(order.shippingAddress.country)}</p>
                 </>
               ) : "N/A"}
             </div>

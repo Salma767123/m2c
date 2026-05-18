@@ -9,8 +9,8 @@ export interface Settlement {
     billingNumber: string;
     period: string;
     amount: number;
-    dueDate: string;
-    status: "Pending" | "Processing" | "Paid" | "Failed";
+    dueDate: string | null;
+    status: "Pending" | "Processing" | "Paid" | "Failed" | "Cancelled";
     paymentDate?: string;
     transactionId?: string;
     createdAt?: string;

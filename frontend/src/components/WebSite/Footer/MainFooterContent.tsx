@@ -61,7 +61,7 @@ const MainFooterContent = () => {
               Our Company
             </h4>
             <div className="space-y-3 sm:space-y-4 md:space-y-6">
-              <div className="bg-white p-2 sm:p-3 rounded-lg inline-block">
+              <div className="inline-block">
                 <Link href="/" className="block">
                   {companyInfo.companyLogo ? (
                     <img

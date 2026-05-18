@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { MapPin, Home, Briefcase, Star, Plus, Check, Pencil } from "lucide-react";
 import type { SavedAddress } from "@/services/addressService";
+import { getStateName, formatPhoneForDisplay } from "./constants";
 
 interface AddressSelectorProps {
   addresses: SavedAddress[];
@@ -134,10 +135,10 @@ export default function AddressSelector({
                 )}
               </div>
               <p className="text-sm font-semibold text-slate-900 truncate">{addr.name}</p>
-              <p className="text-xs text-slate-600 truncate">{addr.phone}</p>
+              <p className="text-xs text-slate-600 truncate">{formatPhoneForDisplay(addr.phone, addr.country)}</p>
               <p className="text-xs text-slate-700 mt-1 line-clamp-2">
                 {addr.address}
-                {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}, {addr.city}, {addr.state} {addr.zipCode}
+                {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}, {addr.city}, {getStateName(addr.state, addr.country)} {addr.zipCode}
               </p>
             </div>
           );

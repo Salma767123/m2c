@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { userManagementService } from '@/services/userManagementService'
+import { getCountryName, getStateName, formatPhoneForDisplay } from '@/components/WebSite/CheckOut/CheckoutProcess/constants'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import { Badge } from '@/components/UI/Badge'
 import {
@@ -235,9 +236,9 @@ export default function CustomerView({ customerId }: CustomerViewProps) {
                       {addr.name && <p className="font-medium text-gray-900 mb-1">{addr.name}</p>}
                       <p className="text-sm text-gray-600">{addr.address || addr.street}</p>
                       {addr.addressLine2 && <p className="text-sm text-gray-600">{addr.addressLine2}</p>}
-                      <p className="text-sm text-gray-600">{addr.city}, {addr.state} {addr.zipCode || addr.postalCode}</p>
-                      <p className="text-sm text-gray-600">{addr.country}</p>
-                      {addr.phone && <p className="text-sm text-gray-500 mt-1">{addr.phone}</p>}
+                      <p className="text-sm text-gray-600">{addr.city}, {getStateName(addr.state, addr.country)} {addr.zipCode || addr.postalCode}</p>
+                      <p className="text-sm text-gray-600">{getCountryName(addr.country)}</p>
+                      {addr.phone && <p className="text-sm text-gray-500 mt-1">{formatPhoneForDisplay(addr.phone, addr.country)}</p>}
                     </div>
                   ))}
                 </div>

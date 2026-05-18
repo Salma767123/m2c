@@ -190,12 +190,6 @@ export default function CustomerManagement() {
           <p className="text-gray-600">Manage customer accounts and their status</p>
         </div>
         <div className="flex items-center gap-3">
-          {hasPermission('create_users') && (
-            <Button className="bg-gray-900 hover:bg-gray-800 text-white">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add Customer
-            </Button>
-          )}
         </div>
       </div>
       {/* Stats Cards */}

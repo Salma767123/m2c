@@ -9,6 +9,7 @@ import { hubService, Hub } from "@/services/hubService";
 import { MapPin as HubIcon } from "lucide-react";
 import axiosInstance from "@/lib/axios";
 import { hasPermission } from "@/lib/auth";
+import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
 
 interface OrderDetailProps {
     orderId: string;
@@ -326,7 +327,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 uppercase">Contact</p>
-                                <p className="text-sm text-gray-900">{order.customerPhone || "N/A"}</p>
+                                <p className="text-sm text-gray-900">{order.customerPhone ? formatPhoneForDisplay(order.customerPhone, order.shippingAddress?.country) : "N/A"}</p>
                                 <p className="text-sm text-gray-600">{order.customerEmail}</p>
                             </div>
                             <div>
@@ -334,9 +335,9 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                                 <div className="text-sm text-gray-900 leading-relaxed mt-1">
                                     <p className="font-medium">{order.shippingAddress?.street}</p>
                                     {order.shippingAddress?.addressLine2 && <p>{order.shippingAddress?.addressLine2}</p>}
-                                    <p>{order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.zipCode}</p>
+                                    <p>{order.shippingAddress?.city}, {getStateName(order.shippingAddress?.state ?? "", order.shippingAddress?.country)} - {order.shippingAddress?.zipCode}</p>
                                     <p className="text-slate-500 font-medium italic mt-1 flex items-center gap-1">
-                                        {order.shippingAddress?.country || 'USA'} 🇺🇸
+                                        {getCountryName(order.shippingAddress?.country) || '—'} {getCountryFlag(order.shippingAddress?.country)}
                                     </p>
                                 </div>
                             </div>

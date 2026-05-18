@@ -32,6 +32,7 @@ router.get('/profile', authenticateToken, getVendorProfile);
 router.put('/profile', authenticateToken, updateVendorProfile);
 
 // Admin only routes
+router.post('/admin/create', authenticateToken, requireRole('admin'), requirePermission('create_vendors'), vendorUploadFields, handleUploadError, registerVendor);
 router.get('/all', authenticateToken, requireRole('admin'), requirePermission('view_vendors'), getAllVendors);
 router.get('/:vendorId', authenticateToken, requireRole('admin'), requirePermission('view_vendors'), getVendorById);
 router.put('/:vendorId', authenticateToken, requireRole('admin'), requirePermission('edit_vendors'), vendorUploadFields, handleUploadError, updateVendorById);

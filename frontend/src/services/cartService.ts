@@ -48,12 +48,23 @@ export interface CartResponse {
 }
 
 class CartService {
+  // Notify header and other listeners of cart count changes
+  private _notify(count: number) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cart-changed', { detail: { count } }));
+    }
+  }
+
   // Add item to cart
   async addToCart(productId: string, quantity: number = 1, variantId?: string): Promise<CartResponse> {
     try {
       const currency = getCurrency();
       const response = await axios.post('/cart/add', { productId, quantity, variantId, currency });
-      return response.data;
+      const result: CartResponse = response.data;
+      if (result.success && result.data) {
+        this._notify(result.data.itemCount);
+      }
+      return result;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to add item to cart');
     }
@@ -73,7 +84,11 @@ class CartService {
   async updateCartItem(itemId: string, quantity: number): Promise<CartResponse> {
     try {
       const response = await axios.put(`/cart/${itemId}`, { quantity });
-      return response.data;
+      const result: CartResponse = response.data;
+      if (result.success && result.data) {
+        this._notify(result.data.itemCount);
+      }
+      return result;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update cart item');
     }
@@ -83,7 +98,11 @@ class CartService {
   async removeFromCart(itemId: string): Promise<CartResponse> {
     try {
       const response = await axios.delete(`/cart/${itemId}`);
-      return response.data;
+      const result: CartResponse = response.data;
+      if (result.success && result.data) {
+        this._notify(result.data.itemCount);
+      }
+      return result;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to remove item from cart');
     }
@@ -93,6 +112,7 @@ class CartService {
   async clearCart(): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await axios.delete('/cart/clear');
+      this._notify(0);
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to clear cart');
@@ -135,13 +155,14 @@ class CartService {
     }
 
     this.saveLocalCart(cart);
+    this._notify(cart.length);
   }
 
   removeFromLocalCart(id: string): void {
     const cart = this.getLocalCart();
-    // Assuming we want to remove by the unique cart item 'id' to support multiple variants
     const updatedCart = cart.filter(item => item.id !== id);
     this.saveLocalCart(updatedCart);
+    this._notify(updatedCart.length);
   }
 
   updateLocalCartItem(id: string, quantity: number): void {
@@ -151,6 +172,7 @@ class CartService {
     if (existingItem) {
       existingItem.quantity = quantity;
       this.saveLocalCart(cart);
+      this._notify(cart.length);
     }
   }
 
@@ -158,7 +180,9 @@ class CartService {
     if (typeof window === 'undefined') return;
     try {
       localStorage.removeItem('guestCart');
+      this._notify(0);
     } catch (error) {
+      console.error('Failed to clear local cart:', error);
     }
   }
 

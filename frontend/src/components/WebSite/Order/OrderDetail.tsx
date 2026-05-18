@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/UI/Card"
 import orderService, { Order as APIOrder } from "@/services/orderService"
 import ReviewModal from "./ReviewModal"
 import reviewService from "@/services/reviewService"
+import { getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants"
 
 interface OrderDetailProps {
   orderId: string
@@ -226,7 +227,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             <div>
               <div className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-medium ${getStatusColorClass(orderDetails.status)}`}>
                 <Package className="w-4 h-4 mr-1" />
-                {formatStatus(orderDetails.status)}
+                {formatStatus(getNormalizedStatus(orderDetails.status))}
               </div>
             </div>
           </div>
@@ -454,8 +455,8 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                         <div className="text-sm text-slate-600 break-words">
                           {shippingAddr.firstName && <p>{shippingAddr.firstName} {shippingAddr.lastName}</p>}
                           {shippingAddr.street && <p>{shippingAddr.street}</p>}
-                          {shippingAddr.city && <p>{shippingAddr.city}, {shippingAddr.state} {shippingAddr.zipCode}</p>}
-                          {shippingAddr.phone && <p>{shippingAddr.phone}</p>}
+                          {shippingAddr.city && <p>{shippingAddr.city}, {getStateName(shippingAddr.state ?? "", shippingAddr.country)} {shippingAddr.zipCode}</p>}
+                          {shippingAddr.phone && <p>{formatPhoneForDisplay(shippingAddr.phone, shippingAddr.country)}</p>}
                         </div>
                       </div>
                     </div>

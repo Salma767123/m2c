@@ -8,6 +8,7 @@ import { showErrorToast } from "@/lib/toast-utils";
 import { orderService, Order } from "@/services/orderService";
 import axios from "@/lib/axios";
 import { hasPermission } from "@/lib/auth";
+import { getCountryName, getStateName } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
 
 interface InvoiceDetailProps {
   invoiceId: string; // can be order.id (ObjectId) or order.orderId (ORD-...) or order.invoiceNo (INV-...)
@@ -112,12 +113,14 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
     ? JSON.parse(order.shippingAddress)
     : order.shippingAddress || {};
 
+  const stateDisplay = getStateName(addr.state || "", addr.country);
+  const countryDisplay = getCountryName(addr.country);
   const addrStr = [
     addr.addressLine1,
     addr.addressLine2,
-    addr.city && addr.state ? `${addr.city}, ${addr.state}` : (addr.city || addr.state),
+    addr.city && stateDisplay ? `${addr.city}, ${stateDisplay}` : (addr.city || stateDisplay),
     addr.postalCode || addr.zipCode,
-    addr.country,
+    countryDisplay,
   ].filter(Boolean).join(", ");
 
   return (
@@ -169,7 +172,7 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
               <img
                 src={companyLogo}
                 alt={`${companyName} logo`}
-                className="h-16 w-auto object-contain rounded-lg bg-white p-1"
+                className="h-16 w-auto object-contain rounded-lg"
               />
             )}
             <div>

@@ -1511,13 +1511,87 @@ const googleAuthFailure = (req, res) => {
 
 const MAX_ADDRESSES_PER_USER = 3;
 const ADDRESS_TYPES = ["home", "work", "other"];
+const DEFAULT_COUNTRY_ISO = "IN";
 
-const VALID_US_STATES = new Set([
-  "AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA",
-  "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM",
-  "NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA",
-  "WV","WI","WY"
-]);
+const { Country, State } = require("country-state-city");
+const { isValidPhoneNumber, parsePhoneNumberFromString } = require("libphonenumber-js");
+
+// Mirror of frontend POSTAL_CODE_RULES — keep in sync with constants.ts.
+// Falls back to a generic 3-12 alphanumeric check for unlisted countries.
+const POSTAL_CODE_RULES = {
+  US: /^\d{5}(-\d{4})?$/,
+  IN: /^[1-9]\d{5}$/,
+  GB: /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i,
+  CA: /^[A-CEGHJ-NPR-TVXY]\d[A-CEGHJ-NPR-TV-Z]\s*\d[A-CEGHJ-NPR-TV-Z]\d$/i,
+  AU: /^\d{4}$/,
+  DE: /^\d{5}$/,
+  FR: /^\d{5}$/,
+  IT: /^\d{5}$/,
+  ES: /^\d{5}$/,
+  NL: /^\d{4}\s?[A-Z]{2}$/i,
+  BR: /^\d{5}-?\d{3}$/,
+  MX: /^\d{5}$/,
+  JP: /^\d{3}-?\d{4}$/,
+  CN: /^\d{6}$/,
+  SG: /^\d{6}$/,
+  AE: /^.{3,10}$/,
+  SA: /^\d{5}(-?\d{4})?$/,
+  ZA: /^\d{4}$/,
+  NZ: /^\d{4}$/,
+  CH: /^\d{4}$/,
+  SE: /^\d{3}\s?\d{2}$/,
+  NO: /^\d{4}$/,
+  DK: /^\d{4}$/,
+  FI: /^\d{5}$/,
+  IE: /^[A-Z]\d{2}\s?[A-Z\d]{4}$/i,
+  BE: /^\d{4}$/,
+  AT: /^\d{4}$/,
+  PL: /^\d{2}-\d{3}$/,
+  PT: /^\d{4}-\d{3}$/,
+  KR: /^\d{5}$/,
+  RU: /^\d{6}$/,
+};
+const FALLBACK_POSTAL_REGEX = /^[A-Za-z0-9\s\-]{3,12}$/;
+
+function normalizeCountryToIso(value) {
+  if (!value) return DEFAULT_COUNTRY_ISO;
+  const trimmed = String(value).trim();
+  if (!trimmed) return DEFAULT_COUNTRY_ISO;
+  const upper = trimmed.toUpperCase();
+  const byIso = Country.getCountryByCode(upper);
+  if (byIso) return byIso.isoCode;
+  const byName = Country.getAllCountries().find(
+    (c) => c.name.toLowerCase() === trimmed.toLowerCase()
+  );
+  return byName ? byName.isoCode : DEFAULT_COUNTRY_ISO;
+}
+
+function validatePostalCode(value, countryIso) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return false;
+  const rule = POSTAL_CODE_RULES[countryIso] || FALLBACK_POSTAL_REGEX;
+  return rule.test(trimmed);
+}
+
+function validatePhone(value, countryIso) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return false;
+  try {
+    return isValidPhoneNumber(trimmed, countryIso);
+  } catch {
+    return false;
+  }
+}
+
+function toE164(value, countryIso) {
+  const trimmed = String(value || "").trim();
+  try {
+    const parsed = parsePhoneNumberFromString(trimmed, countryIso);
+    return parsed ? parsed.number : trimmed;
+  } catch {
+    return trimmed;
+  }
+}
 
 function validateAddressPayload(body) {
   const {
@@ -1536,36 +1610,68 @@ function validateAddressPayload(body) {
     return "Address type must be home, work, or other";
   }
   if (!name || !String(name).trim()) return "Name is required";
+  if (String(name).trim().length > 80) return "Name must be 80 characters or less";
+
+  const countryIso = normalizeCountryToIso(country);
+  if (!Country.getCountryByCode(countryIso)) return "Invalid country";
+
   if (!phone || !String(phone).trim()) return "Phone is required";
-  const phoneDigits = String(phone).replace(/\D/g, "");
-  if (phoneDigits.length !== 10 && !(phoneDigits.length === 11 && phoneDigits.startsWith("1"))) {
-    return "Enter a valid US phone number";
+  if (!validatePhone(phone, countryIso)) {
+    const countryName = Country.getCountryByCode(countryIso)?.name || "selected country";
+    return `Enter a valid phone number for ${countryName}`;
   }
+
   if (!address || String(address).trim().length < 3) return "Address is required (min 3 chars)";
+  if (String(address).trim().length > 100) return "Address must be 100 characters or less";
   if (addressLine2 && String(addressLine2).length > 100) return "Address Line 2 too long";
+
   if (!city || !String(city).trim()) return "City is required";
-  if (!state) return "State is required";
-  if (!VALID_US_STATES.has(String(state).toUpperCase())) return "State must be a valid US state code";
-  if (!zipCode || !/^\d{5}(-\d{4})?$/.test(String(zipCode).trim())) {
-    return "ZIP must be 12345 or 12345-6789";
+  if (String(city).trim().length > 50) return "City must be 50 characters or less";
+
+  if (!state || !String(state).trim()) return "State / region is required";
+  const stateList = State.getStatesOfCountry(countryIso) || [];
+  if (stateList.length > 0) {
+    const stateUpper = String(state).trim().toUpperCase();
+    const validState = stateList.some(
+      (s) => s.isoCode.toUpperCase() === stateUpper || s.name.toLowerCase() === String(state).trim().toLowerCase()
+    );
+    if (!validState) return "Select a valid state / province";
+  } else if (String(state).trim().length > 50) {
+    return "State / region must be 50 characters or less";
   }
-  if (country && String(country).trim() && String(country).trim().toLowerCase() !== "united states") {
-    return "Only United States addresses are supported";
+
+  if (!zipCode || !validatePostalCode(zipCode, countryIso)) {
+    return "Enter a valid postal code";
   }
+
   return null;
 }
 
 function normalizeAddressData(body) {
+  const countryIso = normalizeCountryToIso(body.country);
+  const phoneE164 = toE164(body.phone, countryIso);
+  // Canonicalize state to its ISO code when the country has a known state list,
+  // accepting either the ISO code or full name as input. Free-text regions are
+  // preserved as-is so non-Latin / accented names (e.g. "Île-de-France") survive.
+  const stateList = State.getStatesOfCountry(countryIso) || [];
+  const stateValue = String(body.state).trim();
+  let canonicalState = stateValue;
+  if (stateList.length > 0 && stateValue) {
+    const upper = stateValue.toUpperCase();
+    const byCode = stateList.find((s) => s.isoCode.toUpperCase() === upper);
+    const byName = stateList.find((s) => s.name.toLowerCase() === stateValue.toLowerCase());
+    canonicalState = (byCode || byName)?.isoCode ?? stateValue.toUpperCase();
+  }
   return {
     type: String(body.type).toLowerCase(),
     name: String(body.name).trim(),
-    phone: String(body.phone).trim(),
+    phone: phoneE164,
     address: String(body.address).trim(),
     addressLine2: body.addressLine2 ? String(body.addressLine2).trim() : "",
     city: String(body.city).trim(),
-    state: String(body.state).toUpperCase(),
-    zipCode: String(body.zipCode).trim(),
-    country: "United States",
+    state: canonicalState,
+    zipCode: String(body.zipCode).trim().toUpperCase(),
+    country: countryIso,
   };
 }
 

@@ -56,6 +56,7 @@ const vendorUploadFields = upload.fields([
   { name: 'gstDocument', maxCount: 1 },
   { name: 'ownerPhoto', maxCount: 1 },
   { name: 'factoryImages', maxCount: 10 },
+  { name: 'productPhotos', maxCount: 10 },
   { name: 'certificationFiles', maxCount: 10 },
   { name: 'otherDocuments', maxCount: 5 }
 ]);
@@ -68,19 +69,31 @@ const singleFileUpload = (fieldName) => {
 // Error handling middleware for multer
 const handleUploadError = (error, req, res, next) => {
   if (error instanceof multer.MulterError) {
+    // Map internal field names to user-friendly labels
+    const fieldLabels = {
+      'logo': 'Company Logo',
+      'gstDocument': 'GST Certificate',
+      'ownerPhoto': 'Owner/Contact Photo',
+      'factoryImages': 'Factory Images',
+      'productPhotos': 'Product Photos',
+      'certificationFiles': 'Certification Files',
+      'otherDocuments': 'Other Documents'
+    };
+    const fieldLabel = fieldLabels[error.field] || error.field || 'Unknown';
+
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ 
-        error: 'File too large. Maximum size is 10MB per file.' 
+      return res.status(400).json({
+        error: `"${fieldLabel}" file is too large. Maximum size is 10MB per file.`
       });
     }
     if (error.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json({ 
-        error: 'Too many files. Maximum allowed files exceeded.' 
+      return res.status(400).json({
+        error: `Too many files uploaded for "${fieldLabel}". Maximum allowed files exceeded.`
       });
     }
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-      return res.status(400).json({ 
-        error: 'Unexpected file field.' 
+      return res.status(400).json({
+        error: `Unexpected file field: "${fieldLabel}".`
       });
     }
   }

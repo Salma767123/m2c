@@ -45,7 +45,7 @@ export default function SettlementManagement() {
   const [dueDateSettlement, setDueDateSettlement] = useState<Settlement | null>(null);
   const [dueDateValue, setDueDateValue] = useState("");
 
-  const statusOptions = ["All", "Pending", "Processing", "Paid", "Failed"];
+  const statusOptions = ["All", "Pending", "Processing", "Paid", "Failed", "Cancelled"];
 
   const fetchSettlements = async () => {
     try {
@@ -90,6 +90,8 @@ export default function SettlementManagement() {
         return "bg-yellow-100 text-yellow-800";
       case "Failed":
         return "bg-red-100 text-red-800";
+      case "Cancelled":
+        return "bg-gray-100 text-gray-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -283,13 +285,17 @@ export default function SettlementManagement() {
                             )}
                           </>
                         ) : (
-                          settlement.status !== 'Paid' && hasPermission('manage_billing') ? (
-                            <button onClick={() => handleSetDueDate(settlement)} className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-                              <CalendarDays className="h-3.5 w-3.5" />
-                              Set due date
-                            </button>
+                          settlement.status === 'Pending' ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-amber-600 font-medium">Awaiting Approval</span>
+                              {hasPermission('manage_billing') && (
+                                <button onClick={() => handleSetDueDate(settlement)} className="p-1 text-gray-400 hover:text-gray-700 rounded transition-colors" title="Set due date manually">
+                                  <CalendarDays className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
                           ) : (
-                            <span className="text-xs text-gray-400">Not set</span>
+                            <span className="text-xs text-gray-400">—</span>
                           )
                         )}
                       </div>

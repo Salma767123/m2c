@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Download, Search, Calendar, DollarSign, CheckCircle, Clock, AlertCircle, Eye, X, Edit, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Search, Calendar, DollarSign, CheckCircle, Clock, AlertCircle, XCircle, Eye, X, Edit, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
@@ -85,7 +85,7 @@ export default function PayoutsEnhanced() {
       s.period,
       s.amount.toFixed(2),
       s.status,
-      s.dueDate ? fmtDate(s.dueDate) : 'Not set',
+      s.dueDate ? fmtDate(s.dueDate) : s.status === 'Pending' ? 'Awaiting Approval' : '—',
       s.paymentDate ? fmtDate(s.paymentDate) : '-',
       s.transactionId || '-',
     ]);
@@ -140,7 +140,7 @@ export default function PayoutsEnhanced() {
       ['Period', settlement.period],
       ['Status', settlement.status],
       ['Created', fmtDate(settlement.createdAt)],
-      ['Due Date', settlement.dueDate ? fmtDate(settlement.dueDate) : 'Not set'],
+      ['Due Date', settlement.dueDate ? fmtDate(settlement.dueDate) : settlement.status === 'Pending' ? 'Awaiting Approval' : '—'],
       ['Payment Date', fmtDate(settlement.paymentDate)],
       ['Transaction ID', settlement.transactionId || '-'],
     ];
@@ -220,6 +220,8 @@ export default function PayoutsEnhanced() {
         return <Clock className="w-5 h-5 text-yellow-600" />;
       case 'Failed':
         return <AlertCircle className="w-5 h-5 text-red-600" />;
+      case 'Cancelled':
+        return <XCircle className="w-5 h-5 text-gray-500" />;
       default:
         return null;
     }
@@ -235,6 +237,8 @@ export default function PayoutsEnhanced() {
         return 'bg-yellow-100 text-yellow-800';
       case 'Failed':
         return 'bg-red-100 text-red-800';
+      case 'Cancelled':
+        return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -458,7 +462,7 @@ export default function PayoutsEnhanced() {
             <div className="w-full sm:w-48">
               <Dropdown
                 value={filterStatus}
-                options={["All Status", "Paid", "Processing", "Pending", "Failed"]}
+                options={["All Status", "Paid", "Processing", "Pending", "Failed", "Cancelled"]}
                 onChange={(val) => { setFilterStatus(val as string); setCurrentPage(1); }}
                 placeholder="Filter by status"
               />
@@ -543,10 +547,14 @@ export default function PayoutsEnhanced() {
                         <div className="text-sm text-gray-600">
                           Paid: {new Date(settlement.paymentDate).toLocaleDateString('en-IN')}
                         </div>
-                      ) : (
+                      ) : settlement.dueDate ? (
                         <div className="text-sm text-gray-600">
                           Due: {new Date(settlement.dueDate).toLocaleDateString('en-IN')}
                         </div>
+                      ) : settlement.status === 'Pending' ? (
+                        <div className="text-sm text-amber-600 font-medium">Awaiting Approval</div>
+                      ) : (
+                        <div className="text-sm text-gray-400">—</div>
                       )}
                     </TableCell>
                     <TableCell>
@@ -631,7 +639,7 @@ export default function PayoutsEnhanced() {
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Due Date</p>
                     <p className="font-semibold text-gray-900">
-                      {new Date(selectedSettlement.dueDate).toLocaleDateString('en-IN')}
+                      {selectedSettlement.dueDate ? new Date(selectedSettlement.dueDate).toLocaleDateString('en-IN') : selectedSettlement.status === 'Pending' ? 'Awaiting Approval' : '—'}
                     </p>
                   </div>
                   {selectedSettlement.paymentDate && (

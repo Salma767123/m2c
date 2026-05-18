@@ -983,8 +983,8 @@ const updateVendorById = async (req, res) => {
       ...(updateData.additionalOwners !== undefined && {
         additionalOwners: typeof updateData.additionalOwners === 'string' ? JSON.parse(updateData.additionalOwners) : updateData.additionalOwners
       }),
-      establishedYear: updateData.yearEstablished ? parseInt(updateData.yearEstablished) : null,
-      annualTurnover: updateData.employeeCount,
+      ...(updateData.yearEstablished && { establishedYear: parseInt(updateData.yearEstablished) }),
+      annualTurnover: updateData.employeeCount || undefined,
 
       // Warehouse Details
       ...(updateData.enabledFacilities !== undefined && {
@@ -1009,6 +1009,7 @@ const updateVendorById = async (req, res) => {
       primaryMarkets: parsedMarketType || [],
       productCategories: normalizedProductCategories,
       productTypes: normalizedProductTypes,
+      categoryRemarks: updateData.categoryRemarks || null,
 
       // Logistics
       shippingMethods: parsedShippingMethods || [],
@@ -1086,6 +1087,65 @@ const updateVendorById = async (req, res) => {
         vendorId,
         type: 'OTHER',
         name: `Factory Image ${existingCount + index + 1}`,
+        documentUrl: url
+      }));
+      await prisma.vendorDocument.createMany({ data: newDocs });
+    }
+
+    // Handle product photos update (stored as VendorDocument with type 'PRODUCT_PHOTO')
+    const existingProductPhotos = updateData.existingProductPhotos
+      ? (typeof updateData.existingProductPhotos === 'string'
+          ? JSON.parse(updateData.existingProductPhotos)
+          : updateData.existingProductPhotos)
+      : [];
+
+    let newProductPhotoUrls = [];
+    if (req.files?.productPhotos) {
+      try {
+        const productPhotoResults = await uploadFiles(req.files.productPhotos, 'vendor-product-photos');
+        newProductPhotoUrls = productPhotoResults.map(result => result.cloudinaryUrl);
+        console.log('Uploaded new product photos:', newProductPhotoUrls);
+      } catch (uploadError) {
+        console.error('Product photo upload error:', uploadError);
+        return res.status(500).json({
+          error: 'Failed to upload product photos: ' + uploadError.message
+        });
+      }
+    }
+
+    // Delete product photo documents that are no longer in the existing list
+    const currentProductDocs = await prisma.vendorDocument.findMany({
+      where: {
+        vendorId,
+        type: 'OTHER',
+        name: { startsWith: 'Product Photo' }
+      }
+    });
+
+    const productDocsToDelete = currentProductDocs.filter(
+      doc => !existingProductPhotos.includes(doc.documentUrl)
+    );
+    if (productDocsToDelete.length > 0) {
+      for (const doc of productDocsToDelete) {
+        try {
+          const publicId = doc.documentUrl.split('/').pop().split('.')[0];
+          await deleteFromCloudinary(`vendor-product-photos/${publicId}`);
+        } catch (deleteError) {
+          console.warn('Failed to delete product photo from Cloudinary:', deleteError.message);
+        }
+      }
+      await prisma.vendorDocument.deleteMany({
+        where: { id: { in: productDocsToDelete.map(d => d.id) } }
+      });
+    }
+
+    // Create new product photo documents
+    if (newProductPhotoUrls.length > 0) {
+      const existingCount = existingProductPhotos.length;
+      const newDocs = newProductPhotoUrls.map((url, index) => ({
+        vendorId,
+        type: 'OTHER',
+        name: `Product Photo ${existingCount + index + 1}`,
         documentUrl: url
       }));
       await prisma.vendorDocument.createMany({ data: newDocs });
@@ -1197,8 +1257,8 @@ const updateVendorById = async (req, res) => {
   } catch (error) {
     console.error('Update vendor by ID error:', error);
     res.status(500).json({
-      error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: 'Failed to update vendor. Please try again.',
+      details: error.message
     });
   }
 };

@@ -2,6 +2,7 @@
 
 import { Calendar } from "lucide-react"
 import { CheckoutFormData } from "../Checkout"
+import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } from "./constants"
 
 interface ReviewOrderProps {
   formData: CheckoutFormData
@@ -19,9 +20,9 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
           <div className="space-y-0.5">
             <p>{formData.address}</p>
             {formData.addressLine2 && <p>{formData.addressLine2}</p>}
-            <p>{formData.city}, {formData.state} {formData.zipCode}</p>
+            <p>{formData.city}, {getStateName(formData.state, formData.country)} {formData.zipCode}</p>
             <p className="flex items-center gap-1.5 mt-1 text-slate-500 font-medium italic">
-              Shipping to: {formData.country} 🇺🇸
+              Shipping to: {getCountryName(formData.country)} {getCountryFlag(formData.country)}
             </p>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs uppercase tracking-wider text-slate-400">
@@ -31,7 +32,7 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
             </div>
             <div>
               <p className="font-bold text-slate-500 mb-0.5">Phone</p>
-              <p className="normal-case tracking-normal text-slate-600 font-medium">{formData.phone}</p>
+              <p className="normal-case tracking-normal text-slate-600 font-medium">{formatPhoneForDisplay(formData.phone, formData.country)}</p>
             </div>
           </div>
         </div>

@@ -388,7 +388,8 @@ const createOrder = async (req, res) => {
                     billingNumber: invoiceNo || orderDisplayId,
                     period: datePeriod,
                     amount: vData.amount,
-                    status: 'Pending'
+                    status: 'Pending',
+                    dueDate: null,
                 });
             }
 

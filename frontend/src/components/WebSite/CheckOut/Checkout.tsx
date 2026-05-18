@@ -27,6 +27,7 @@ import { userProfileService } from "@/services/userProfileService"
 import { userAuthService } from "@/services/userAuthService"
 import { paymentSettingsService, PublicPaymentSettings } from "@/services/paymentSettingsService"
 import { addressService, MAX_SAVED_ADDRESSES, type SavedAddress, type AddressPayload } from "@/services/addressService"
+import { DEFAULT_COUNTRY_ISO, normalizeCountryToIso, toE164, formatPhoneAsYouType, validatePhone } from "./CheckoutProcess/constants"
 
 // Declare Razorpay type for TypeScript
 declare global {
@@ -89,7 +90,7 @@ export default function Checkout() {
     city: "",
     state: "",
     zipCode: "",
-    country: "United States",
+    country: DEFAULT_COUNTRY_ISO,
     paymentMethod: "razorpay", // Default to razorpay, will be updated based on available gateways
     cardNumber: "",
     expiryDate: "",
@@ -224,13 +225,25 @@ export default function Checkout() {
 
         // Pre-fill personal info only. Shipping address is sourced from saved addresses
         // (see fetchSavedAddresses) so it isn't overridden by legacy flat User.address fields.
-        setFormData(prev => ({
-          ...prev,
-          firstName: prev.firstName || firstName,
-          lastName: prev.lastName || lastName,
-          email: userData.email,
-          phone: prev.phone || userData.phoneNumber || '',
-        }))
+        // Only carry over the profile phone if it parses cleanly for the current country —
+        // otherwise we'd surface a "invalid phone" error on a field the user hasn't touched.
+        setFormData(prev => {
+          const incomingPhone = userData.phoneNumber || ''
+          const candidatePhone = prev.phone || incomingPhone
+          const reformatted = candidatePhone
+            ? formatPhoneAsYouType(candidatePhone, prev.country || DEFAULT_COUNTRY_ISO)
+            : ''
+          const usePhone = reformatted && validatePhone(reformatted, prev.country || DEFAULT_COUNTRY_ISO)
+            ? reformatted
+            : prev.phone
+          return {
+            ...prev,
+            firstName: prev.firstName || firstName,
+            lastName: prev.lastName || lastName,
+            email: userData.email,
+            phone: usePhone,
+          }
+        })
       }
     } catch (err: any) {
       console.error('Failed to load user profile:', err)
@@ -263,17 +276,19 @@ export default function Checkout() {
     const nameParts = (addr.name || "").trim().split(/\s+/)
     const firstName = nameParts[0] || ""
     const lastName = nameParts.slice(1).join(" ") || ""
+    const countryIso = normalizeCountryToIso(addr.country)
+    const displayPhone = addr.phone ? formatPhoneAsYouType(addr.phone, countryIso) : ""
     setFormData((prev) => ({
       ...prev,
       firstName,
       lastName,
-      phone: addr.phone || prev.phone,
+      phone: displayPhone || prev.phone,
       address: addr.address || "",
       addressLine2: addr.addressLine2 || "",
       city: addr.city || "",
       state: addr.state || "",
       zipCode: addr.zipCode || "",
-      country: addr.country || "United States",
+      country: countryIso,
     }))
   }
 
@@ -311,7 +326,7 @@ export default function Checkout() {
       city: "",
       state: "",
       zipCode: "",
-      country: "United States",
+      country: DEFAULT_COUNTRY_ISO,
     }))
   }
 
@@ -330,13 +345,13 @@ export default function Checkout() {
         const payload: AddressPayload = {
           type: existing?.type || "home",
           name: `${formData.firstName} ${formData.lastName}`.trim(),
-          phone: formData.phone,
+          phone: toE164(formData.phone, formData.country),
           address: formData.address,
           addressLine2: formData.addressLine2 || undefined,
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode,
-          country: "United States",
+          country: formData.country,
           isDefault: existing?.isDefault || false,
         }
         const updated = await addressService.update(editingAddressId, payload)
@@ -361,13 +376,13 @@ export default function Checkout() {
         const payload: AddressPayload = {
           type: "home",
           name: `${formData.firstName} ${formData.lastName}`.trim(),
-          phone: formData.phone,
+          phone: toE164(formData.phone, formData.country),
           address: formData.address,
           addressLine2: formData.addressLine2 || undefined,
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode,
-          country: "United States",
+          country: formData.country,
           isDefault: savedAddresses.length === 0,
         }
         const created = await addressService.create(payload)
@@ -497,7 +512,7 @@ export default function Checkout() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        phone: formData.phone,
+        phone: toE164(formData.phone, formData.country),
         street: formData.address,
         addressLine2: formData.addressLine2 || "",
         city: formData.city,
@@ -756,6 +771,23 @@ export default function Checkout() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="w-8 h-8 animate-spin text-gray-800" />
+      </div>
+    )
+  }
+
+  if (!loading && cartItems.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center max-w-md mx-auto p-8">
+          <ShoppingBag className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Your cart is empty</h2>
+          <p className="text-slate-500 mb-6">Add some items to your cart before proceeding to checkout.</p>
+          <Link href="/products">
+            <button className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium">
+              Browse Products
+            </button>
+          </Link>
+        </div>
       </div>
     )
   }

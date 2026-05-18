@@ -1,3 +1,5 @@
+import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants";
+
 interface CustomerOrderItem {
   id: string;
   productName: string;
@@ -223,15 +225,15 @@ export const generateInvoiceHTML = (order: CustomerOrder): string => {
             ` : ''}
             <div class="detail-row">
               <span class="detail-label">City:</span>
-              ${order.shippingAddress.city}, ${order.shippingAddress.state} ${order.shippingAddress.zipCode}
+              ${order.shippingAddress.city}, ${getStateName(order.shippingAddress.state, order.shippingAddress.country)} ${order.shippingAddress.zipCode}
             </div>
             <div class="detail-row">
               <span class="detail-label">Country:</span>
-              ${order.shippingAddress.country} 🇺🇸
+              ${getCountryName(order.shippingAddress.country)} ${getCountryFlag(order.shippingAddress.country)}
             </div>
             <div class="detail-row">
               <span class="detail-label">Phone:</span>
-              ${order.shippingAddress.phone}
+              ${formatPhoneForDisplay(order.shippingAddress.phone, order.shippingAddress.country)}
             </div>
           </div>
         </div>

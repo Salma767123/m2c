@@ -2,6 +2,8 @@ const { prisma } = require('../config/database');
 const { recomputeAndPersistOrderStatus } = require('../utils/computeOrderStatus');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 
+const SETTLEMENT_DUE_DAYS = 30;
+
 // Allowed OrderStatus values (mirrors the Prisma enum).
 const ALLOWED_ORDER_STATUSES = new Set([
     'ORDER_CREATED',
@@ -275,6 +277,42 @@ const updateShipmentStatusAdmin = async (req, res) => {
             // Recompute parent Order status
             await recomputeAndPersistOrderStatus(tx, shipment.orderId);
 
+            // Settlement due date: triggered by shipment approval/rejection/cancellation
+            if (status === 'APPROVED_BY_ADMIN_HUB') {
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + SETTLEMENT_DUE_DAYS);
+                const dueDateResult = await tx.settlement.updateMany({
+                    where: {
+                        orderId: shipment.orderId,
+                        vendorId: shipment.vendorId,
+                        status: 'Pending',
+                        dueDate: null,
+                    },
+                    data: { dueDate },
+                });
+                if (dueDateResult.count === 0) {
+                    console.warn(`[Settlement] No pending settlements found for orderId=${shipment.orderId}, vendorId=${shipment.vendorId} — dueDate not set`);
+                }
+            } else if (status === 'REJECTED_BY_ADMIN_HUB') {
+                await tx.settlement.updateMany({
+                    where: {
+                        orderId: shipment.orderId,
+                        vendorId: shipment.vendorId,
+                        status: 'Pending',
+                    },
+                    data: { status: 'Failed' },
+                });
+            } else if (status === 'CANCELLED') {
+                await tx.settlement.updateMany({
+                    where: {
+                        orderId: shipment.orderId,
+                        vendorId: shipment.vendorId,
+                        status: { in: ['Pending', 'Processing'] },
+                    },
+                    data: { status: 'Cancelled' },
+                });
+            }
+
             return updated;
         });
 
@@ -485,6 +523,61 @@ const updateAdminOrderStatus = async (req, res) => {
                             new Error('Cannot ship to customer until all vendor shipments are approved (or cancelled/returned).'),
                             { statusCode: 409 }
                         );
+                    }
+                }
+            }
+
+            // Cancel all pending settlements when order is cancelled
+            if (nextStatus === 'CANCELLED') {
+                await tx.settlement.updateMany({
+                    where: {
+                        orderId: order.id,
+                        status: { in: ['Pending', 'Processing'] },
+                    },
+                    data: { status: 'Cancelled' },
+                });
+            }
+
+            // Safety net: backfill dueDate on any Pending settlements that still
+            // have dueDate === null. The primary trigger lives in
+            // updateShipmentStatusAdmin (APPROVED_BY_ADMIN_HUB), but if it was
+            // missed (old code, race, crash) we catch it here before the order
+            // progresses past the point of no return.
+            if (nextStatus === 'SHIPPED_TO_CUSTOMER' || nextStatus === 'DELIVERED') {
+                const nullDueDateSettlements = await tx.settlement.findMany({
+                    where: {
+                        orderId: order.id,
+                        status: 'Pending',
+                        dueDate: null,
+                    },
+                    select: { id: true, vendorId: true },
+                });
+
+                if (nullDueDateSettlements.length > 0) {
+                    console.warn(`[Settlement] Backfilling dueDate for ${nullDueDateSettlements.length} settlement(s) on order ${order.id} → ${nextStatus}`);
+                    const approvedShipments = await tx.vendorShipment.findMany({
+                        where: {
+                            orderId: order.id,
+                            status: { in: ['APPROVED_BY_ADMIN_HUB', 'DELIVERED'] },
+                        },
+                        select: { vendorId: true, updatedAt: true },
+                    });
+
+                    const vendorApprovalDate = {};
+                    for (const s of approvedShipments) {
+                        if (!vendorApprovalDate[s.vendorId] || s.updatedAt > vendorApprovalDate[s.vendorId]) {
+                            vendorApprovalDate[s.vendorId] = s.updatedAt;
+                        }
+                    }
+
+                    for (const settlement of nullDueDateSettlements) {
+                        const baseDate = vendorApprovalDate[settlement.vendorId] || new Date();
+                        const dueDate = new Date(baseDate);
+                        dueDate.setDate(dueDate.getDate() + SETTLEMENT_DUE_DAYS);
+                        await tx.settlement.update({
+                            where: { id: settlement.id },
+                            data: { dueDate },
+                        });
                     }
                 }
             }

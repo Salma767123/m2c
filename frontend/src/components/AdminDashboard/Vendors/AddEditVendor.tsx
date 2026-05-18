@@ -40,6 +40,8 @@ interface VendorFormData {
   gstNumber: string
   email: string
   phone: string
+  landlineNumber: string
+  phoneNumber2: string
   website: string
   address: string
   city: string
@@ -69,6 +71,7 @@ interface VendorFormData {
   ownerPhone: string
   yearEstablished: string
   employeeCount: string
+  additionalOwners: any[]
 
   // Vendor Type & Products
   vendorType: string | string[]
@@ -76,6 +79,7 @@ interface VendorFormData {
   selectedCategories: { [key: string]: string[] }
   expandedCategories: { [key: string]: boolean }
   categoryRemarks?: string
+  productPhotos: any[]
 
   // Manufacturing Facilities (if manufacturer)
   enabledFacilities: { [key: string]: boolean }
@@ -101,6 +105,7 @@ interface VendorFormData {
     phone1: string
     phone2?: string
     department: string
+    photo?: string | null
   }
   alternateContacts: any[]
   hasImportExport: string
@@ -145,6 +150,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     gstNumber: '',
     email: '',
     phone: '',
+    landlineNumber: '',
+    phoneNumber2: '',
     website: '',
     address: '',
     city: '',
@@ -174,6 +181,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     ownerPhone: '',
     yearEstablished: '',
     employeeCount: '',
+    additionalOwners: [],
 
     // Vendor Type & Products
     vendorType: [],
@@ -181,6 +189,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     selectedCategories: {},
     expandedCategories: {},
     categoryRemarks: '',
+    productPhotos: [],
 
     // Manufacturing Facilities
     enabledFacilities: {},
@@ -205,7 +214,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       email2: '',
       phone1: '',
       phone2: '',
-      department: 'Sales'
+      department: 'Sales',
+      photo: null
     },
     alternateContacts: [],
     hasImportExport: 'no',
@@ -329,14 +339,27 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 
       console.log('Vendor data loaded:', vendor)
 
+      // Map companyType from backend enum to form value
+      const companyTypeMap: Record<string, string> = {
+        'SOLE_PROPRIETORSHIP': 'sole',
+        'PARTNERSHIP': 'partnership',
+        'CORPORATION': 'corporation',
+        'LLC': 'llc',
+      }
+
+      // Parse mainContact from backend (stored as JSON)
+      const mainContactData = vendor.mainContact || {}
+
       // Map vendor data to form structure
       setFormData({
         // Company Details
-        businessType: 'corporation', // Default since companyType is not in the interface
+        businessType: (vendor.companyType && companyTypeMap[vendor.companyType]) || 'corporation',
         companyName: vendor.companyName || '',
         gstNumber: vendor.gstNumber || '',
         email: vendor.businessEmail || vendor.email || '',
         phone: vendor.businessPhone || '',
+        landlineNumber: vendor.landlineNumber || '',
+        phoneNumber2: vendor.phoneNumber2 || '',
         website: vendor.website || '',
         address: vendor.businessAddress || '',
         city: vendor.businessCity || '',
@@ -350,7 +373,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         gstFile: null,
 
         // Warehouse Details
-        ownershipType: 'owned', // Default
+        ownershipType: vendor.ownershipType || 'owned',
         warehouseAddress: vendor.warehouseAddress || '',
         warehouseCity: vendor.warehouseCity || '',
         warehouseState: vendor.warehouseState || '',
@@ -371,22 +394,28 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         ownerPhone: vendor.ownerPhone || '',
         yearEstablished: vendor.establishedYear?.toString() || '',
         employeeCount: vendor.annualTurnover || '',
+        additionalOwners: vendor.additionalOwners || [],
 
         // Vendor Type & Products
         vendorType: vendor.vendorType === 'TEXTILE_MANUFACTURER' ? ['manufacturer'] : ['trader'],
         marketType: vendor.primaryMarkets || [],
         selectedCategories: mappedSelectedCategories,
         expandedCategories: {},
-        categoryRemarks: '', // categoryRemarks not in interface
+        categoryRemarks: vendor.categoryRemarks || '',
+        productPhotos: vendor.documents?.filter((doc: any) => doc.type === 'OTHER' && doc.name.startsWith('Product Photo')).map((doc: any, index: number) => ({
+          url: doc.documentUrl,
+          name: doc.name || `Product Photo ${index + 1}`,
+          id: doc.id || `existing-product-${index}`,
+          preview: doc.documentUrl,
+          isExisting: true,
+        })) || [],
 
         // Manufacturing Facilities
-        enabledFacilities: {},
-        facilityDetails: {},
+        enabledFacilities: vendor.enabledFacilities || {},
+        facilityDetails: vendor.facilityDetails || {},
 
         // Certifications & Logistics
-        // Map certification names from backend (UPPERCASE) to frontend IDs (lowercase)
         selectedCertifications: vendor.certifications?.map((cert: any) => {
-          // Convert backend name (e.g., "OEKO-TEX") to frontend ID (e.g., "oeko-tex")
           return cert.name.toLowerCase();
         }) || [],
         certificationFiles: vendor.certifications?.reduce((acc: any, cert: any) => {
@@ -404,7 +433,6 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         }, {}) || {},
         certificationExpiryDates: vendor.certifications?.reduce((acc: any, cert: any) => {
           if (cert.expiryDate) {
-            // Use lowercase cert name as key to match frontend IDs
             const certId = cert.name.toLowerCase();
             acc[certId] = new Date(cert.expiryDate).toISOString().split('T')[0]
           }
@@ -419,21 +447,22 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 
         // Contact & Trade Info
         mainContact: {
-          name: vendor.ownerName || '',
-          designation: 'Owner',
-          email1: vendor.ownerEmail || '',
-          email2: '',
-          phone1: vendor.ownerPhone || '',
-          phone2: '',
-          department: 'Management'
+          name: mainContactData.name || vendor.ownerName || '',
+          designation: mainContactData.designation || 'Owner',
+          email1: mainContactData.email1 || vendor.ownerEmail || '',
+          email2: mainContactData.email2 || '',
+          phone1: mainContactData.phone1 || vendor.ownerPhone || '',
+          phone2: mainContactData.phone2 || '',
+          department: mainContactData.department || 'Management',
+          photo: mainContactData.photo || vendor.ownerPhoto || null
         },
-        alternateContacts: [],
+        alternateContacts: vendor.alternateContacts || [],
         hasImportExport: vendor.exportExperience ? 'yes' : 'no',
-        importCountries: [],
+        importCountries: vendor.importCountries || [],
         exportCountries: vendor.exportCountries || [],
-        tradeLicenseNumber: '',
-        businessRegistrationNumber: '',
-        taxIdentificationNumber: '',
+        tradeLicenseNumber: vendor.tradeLicenseNumber || '',
+        businessRegistrationNumber: vendor.businessRegistrationNumber || '',
+        taxIdentificationNumber: vendor.taxIdentificationNumber || '',
         bankingDetails: vendor.bankDetails ? {
           bankName: vendor.bankDetails.bankName || '',
           accountNumber: vendor.bankDetails.accountNumber || '',
@@ -545,15 +574,19 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         // Wait a bit before redirecting so user sees the success message
         await new Promise(resolve => setTimeout(resolve, 1000))
       } else {
-        // Create new vendor - would need to implement registerVendor for admin
-        console.log('Create vendor not yet implemented for admin')
+        // Create new vendor from admin panel
+        const VendorService = (await import('@/services/vendorService')).default
+        console.log('Creating new vendor from admin panel')
+        const response = await VendorService.createVendorByAdmin(formData)
+        console.log('Create response:', response)
+
         const { toast } = await import('@/hooks/use-toast')
         toast({
-          title: 'Not Implemented',
-          description: 'Vendor creation from admin panel not yet implemented',
-          variant: 'destructive'
+          title: 'Success',
+          description: 'Vendor created successfully!',
         })
-        return // Don't redirect if not implemented
+
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
 
       router.push('/admin/dashboard/vendors')
@@ -564,7 +597,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       const { toast } = await import('@/hooks/use-toast')
       toast({
         title: 'Error',
-        description: error.response?.data?.error || error.message || 'Failed to save vendor',
+        description: error?.message || error?.response?.data?.error || 'Failed to save vendor',
         variant: 'destructive'
       })
 

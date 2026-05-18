@@ -224,7 +224,7 @@ export default function AdminLogin() {
           <div className="max-w-lg text-center text-white">
             {/* Logo Section */}
             <div className="mb-8">
-              <div className="inline-flex items-center justify-center w-44 h-36 bg-white rounded-2xl mb-6 shadow-xl">
+              <div className="inline-flex items-center justify-center w-44 h-36 mb-6">
                 {companyLogo ? (
                   <img src={companyLogo} alt="Company Logo" className="object-contain" style={{ width: 190, height: 150 }} />
                 ) : (
