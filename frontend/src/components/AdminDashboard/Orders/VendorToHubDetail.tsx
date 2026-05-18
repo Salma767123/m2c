@@ -157,7 +157,8 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
     ? (shipment.hub?.name || hubs.find(h => h.id === shipment.assignedHubId)?.name || "Assigned Hub")
     : "Not Assigned";
 
-  const shipmentAmount = shipment.items?.reduce((acc, item) => acc + item.totalPrice, 0) || 0;
+  // TODO: Uncomment when shipment amount is needed on the UI
+  // const shipmentAmount = shipment.items?.reduce((acc, item) => acc + item.totalPrice, 0) || 0;
   const order = shipment.order;
 
   return (
@@ -237,12 +238,14 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               {assignedHub}
             </p>
           </div>
+          {/* TODO: Uncomment when tracking reference feature is implemented
           <div>
             <p className="text-sm text-gray-600">Tracking Ref</p>
             <p className="text-base font-medium text-gray-900 mt-1">
               {order?.trackingReference || "N/A"}
             </p>
           </div>
+          */}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-4 border-t border-gray-200">
           <div>
@@ -277,6 +280,65 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           </div>
         </div>
       </div>
+
+      {/* Vendor Shipping Details — moved up from the bottom of the page so the
+          courier + tracking ID are visible without scrolling. Admin commonly needs
+          to share / verify the tracking number when a customer asks about delivery
+          status, so it belongs near the top with the rest of the order summary.
+          Only renders once the shipment has actually left the vendor. */}
+      {(["IN_TRANSIT_TO_ADMIN_HUB", "RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(shipment.status)) && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center gap-2 mb-4">
+            <Truck className="h-5 w-5 text-gray-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Vendor Shipping Details</h2>
+          </div>
+          {shipment.vendorCarrier && shipment.vendorTrackingId ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Courier</p>
+                <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorCarrier}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Tracking ID</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-base font-mono font-medium text-gray-900 break-all">
+                    {shipment.vendorTrackingId}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(shipment.vendorTrackingId || "");
+                        showSuccessToast("Tracking ID copied");
+                      } catch {
+                        showErrorToast("Copy failed");
+                      }
+                    }}
+                    className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors shrink-0"
+                    title="Copy tracking ID"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              {shipment.vendorShippedAt && (
+                <div>
+                  <p className="text-sm text-gray-600">Shipped On</p>
+                  <p className="text-base font-medium text-gray-900 mt-1">
+                    {new Date(shipment.vendorShippedAt).toLocaleString("en-IN")}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                Shipping details not recorded for this shipment. (Legacy order shipped before tracking was captured.)
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Customer Details */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -409,60 +471,6 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
         </div>
       </div>
 
-      {/* Vendor Shipping Details */}
-      {(["IN_TRANSIT_TO_ADMIN_HUB", "RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(shipment.status)) && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center gap-2 mb-4">
-            <Truck className="h-5 w-5 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Vendor Shipping Details</h2>
-          </div>
-          {shipment.vendorCarrier && shipment.vendorTrackingId ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Courier</p>
-                <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorCarrier}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Tracking ID</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-base font-mono font-medium text-gray-900 break-all">
-                    {shipment.vendorTrackingId}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(shipment.vendorTrackingId || "");
-                        showSuccessToast("Tracking ID copied");
-                      } catch {
-                        showErrorToast("Copy failed");
-                      }
-                    }}
-                    className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors shrink-0"
-                    title="Copy tracking ID"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              {shipment.vendorShippedAt && (
-                <div>
-                  <p className="text-sm text-gray-600">Shipped On</p>
-                  <p className="text-base font-medium text-gray-900 mt-1">
-                    {new Date(shipment.vendorShippedAt).toLocaleString("en-IN")}
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                Shipping details not recorded for this shipment. (Legacy order shipped before tracking was captured.)
-              </p>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Hub Selection Modal */}
       {showHubModal && (
