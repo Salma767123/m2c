@@ -284,6 +284,7 @@ export default function AddressFormModal({
                 </label>
                 <input
                   type="text"
+                  maxLength={80}
                   value={form.name}
                   onChange={(e) => setField("name", e.target.value)}
                   onBlur={() => handleBlur("name")}
@@ -303,6 +304,7 @@ export default function AddressFormModal({
                 </label>
                 <input
                   type="tel"
+                  maxLength={20}
                   value={form.phone}
                   onChange={(e) => setField("phone", formatPhoneAsYouType(e.target.value, countryIso))}
                   onBlur={() => handleBlur("phone")}
@@ -324,6 +326,7 @@ export default function AddressFormModal({
               </label>
               <input
                 type="text"
+                maxLength={100}
                 value={form.address}
                 onChange={(e) => setField("address", e.target.value)}
                 onBlur={() => handleBlur("address")}
@@ -344,6 +347,7 @@ export default function AddressFormModal({
               </label>
               <input
                 type="text"
+                maxLength={100}
                 value={form.addressLine2}
                 onChange={(e) => setField("addressLine2", e.target.value)}
                 onBlur={() => handleBlur("addressLine2")}
@@ -365,6 +369,7 @@ export default function AddressFormModal({
                 </label>
                 <input
                   type="text"
+                  maxLength={50}
                   value={form.city}
                   onChange={(e) => setField("city", e.target.value)}
                   onBlur={() => handleBlur("city")}
@@ -403,6 +408,7 @@ export default function AddressFormModal({
                 ) : (
                   <input
                     type="text"
+                    maxLength={50}
                     value={form.state}
                     onChange={(e) => setField("state", e.target.value)}
                     onBlur={() => handleBlur("state")}

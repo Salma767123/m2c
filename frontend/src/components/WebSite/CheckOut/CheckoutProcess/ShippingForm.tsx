@@ -213,6 +213,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           <label className="block text-sm font-semibold text-slate-700 mb-2">First Name <span className="text-red-500">*</span></label>
           <input
             type="text"
+            maxLength={50}
             value={formData.firstName}
             onChange={(e) => handleChange("firstName", e.target.value)}
             onBlur={() => handleBlur("firstName")}
@@ -230,6 +231,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name <span className="text-red-500">*</span></label>
           <input
             type="text"
+            maxLength={50}
             value={formData.lastName}
             onChange={(e) => handleChange("lastName", e.target.value)}
             onBlur={() => handleBlur("lastName")}
@@ -249,6 +251,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
         <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address <span className="text-red-500">*</span></label>
         <input
           type="email"
+          maxLength={254}
           value={formData.email}
           onChange={(e) => handleChange("email", e.target.value)}
           onBlur={() => handleBlur("email")}
@@ -270,6 +273,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
         </label>
         <input
           type="tel"
+          maxLength={20}
           value={formData.phone}
           onChange={(e) => handleChange("phone", e.target.value)}
           onBlur={() => handleBlur("phone")}
@@ -288,6 +292,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
         <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 1 <span className="text-red-500">*</span></label>
         <input
           type="text"
+          maxLength={100}
           value={formData.address}
           onChange={(e) => handleChange("address", e.target.value)}
           onBlur={() => handleBlur("address")}
@@ -306,6 +311,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
         <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 2 (Optional)</label>
         <input
           type="text"
+          maxLength={100}
           value={formData.addressLine2 || ""}
           onChange={(e) => handleChange("addressLine2", e.target.value)}
           onBlur={() => handleBlur("addressLine2")}
@@ -324,6 +330,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           <label className="block text-sm font-semibold text-slate-700 mb-2">City <span className="text-red-500">*</span></label>
           <input
             type="text"
+            maxLength={50}
             value={formData.city}
             onChange={(e) => handleChange("city", e.target.value)}
             onBlur={() => handleBlur("city")}
@@ -364,6 +371,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
           ) : (
             <input
               type="text"
+              maxLength={50}
               value={formData.state}
               onChange={(e) => handleChange("state", e.target.value)}
               onBlur={() => handleBlur("state")}
