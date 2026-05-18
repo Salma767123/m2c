@@ -16,19 +16,46 @@ const getInspectionsForAdminReview = async (req, res) => {
         const results = { factory: [], product: [], pagination: {} };
 
         // Factory inspections (Inspection model)
+        //
+        // Re-inspection page shows items that need admin attention re: re-inspection:
+        //   • SUBMITTED + result=FAILED  — checker rejected; admin decides finalize or re-inspect
+        //   • UNDER_ADMIN_REVIEW         — admin started reviewing
+        //   • REJECTED                   — previously rejected by admin, awaiting re-inspection
+        //
+        // SUBMITTED + result=PASSED is intentionally excluded: a PASSED submission
+        // doesn't need re-inspection. Admin finalizes those via the "Approve Vendor"
+        // button on the vendor detail page (see VendorInspectionDetail.tsx).
         if (type === 'all' || type === 'factory') {
             const REVIEW_STATUSES = ['SUBMITTED', 'UNDER_ADMIN_REVIEW', 'REJECTED'];
-            const factoryWhere = {
-                status: status && REVIEW_STATUSES.includes(status)
-                    ? status
-                    : { in: REVIEW_STATUSES },
-            };
-            if (search) {
-                factoryWhere.OR = [
-                    { vendor: { companyName: { contains: search, mode: 'insensitive' } } },
-                    { clientName: { contains: search, mode: 'insensitive' } },
-                ];
-            }
+
+            const baseStatusFilter = (() => {
+                if (status && REVIEW_STATUSES.includes(status)) {
+                    return status === 'SUBMITTED'
+                        ? { status: 'SUBMITTED', result: 'FAILED' }
+                        : { status };
+                }
+                return {
+                    OR: [
+                        { status: 'SUBMITTED', result: 'FAILED' },
+                        { status: 'UNDER_ADMIN_REVIEW' },
+                        { status: 'REJECTED' },
+                    ],
+                };
+            })();
+
+            const factoryWhere = search
+                ? {
+                    AND: [
+                        baseStatusFilter,
+                        {
+                            OR: [
+                                { vendor: { companyName: { contains: search, mode: 'insensitive' } } },
+                                { clientName: { contains: search, mode: 'insensitive' } },
+                            ],
+                        },
+                    ],
+                }
+                : baseStatusFilter;
 
             const [factoryInspections, factoryTotal] = await Promise.all([
                 prisma.inspection.findMany({
@@ -127,7 +154,10 @@ const getAdminReviewDashboardStats = async (req, res) => {
             productRejected,
             productReinspection,
         ] = await Promise.all([
-            prisma.inspection.count({ where: { status: 'SUBMITTED' } }),
+            // Only count FAILED submissions — PASSED ones aren't shown on the
+            // re-inspection page (they go through the vendor approval gate instead).
+            // Keeps this stat consistent with the table count.
+            prisma.inspection.count({ where: { status: 'SUBMITTED', result: 'FAILED' } }),
             prisma.inspection.count({ where: { status: 'UNDER_ADMIN_REVIEW' } }),
             prisma.inspection.count({ where: { status: 'REJECTED' } }),
             prisma.inspection.count({ where: { status: 'REINSPECTION' } }),
