@@ -484,22 +484,16 @@ export default function Checkout() {
       if (message.type === 'success') {
         // Payment successful
         const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = message.data;
-        
+
         try {
-          // Verify payment with backend
-          const verifyResponse = await paymentService.verifyRazorpayPayment(
-            razorpay_order_id,
+          // Signature verification now happens inline inside createOrder
+          // (one round trip instead of two — saves a Vercel cold-start hop).
+          await createOrderAfterPayment(
+            currentShippingAddress,
             razorpay_payment_id,
-            razorpay_signature
+            razorpay_order_id,
+            razorpay_signature,
           );
-
-
-          if (verifyResponse.success) {
-            // Create order after successful payment verification
-            await createOrderAfterPayment(currentShippingAddress, razorpay_payment_id);
-          } else {
-            throw new Error('Payment verification failed');
-          }
         } catch (error: any) {
           console.error('Payment verification error:', error);
           setError(error.message || 'Payment verification failed');
@@ -533,13 +527,20 @@ export default function Checkout() {
     setPlacingOrder(false);
   };
 
-  const createOrderAfterPayment = async (shippingAddress: any, paymentId: string) => {
+  const createOrderAfterPayment = async (
+    shippingAddress: CreateOrderParams['shippingAddress'],
+    paymentId: string,
+    razorpayOrderId?: string,
+    razorpaySignature?: string,
+  ) => {
     try {
-      
+
       const orderParams: CreateOrderParams = {
         shippingAddress,
         paymentMethod: formData.paymentMethod,
         paymentId,
+        razorpayOrderId,
+        razorpaySignature,
         shippingCost: orderSummary.shipping,
         tax: orderSummary.tax,
         discount: orderSummary.discount,

@@ -21,7 +21,7 @@ import PaymentForm from "./CheckoutProcess/PaymentForm"
 import ReviewOrder from "./CheckoutProcess/ReviewOrder"
 import AddressSelector from "./CheckoutProcess/AddressSelector"
 import cartService, { CartItem } from "@/services/cartService"
-import orderService from "@/services/orderService"
+import orderService, { CreateOrderParams } from "@/services/orderService"
 import paymentService from "@/services/paymentService"
 import { userProfileService } from "@/services/userProfileService"
 import { userAuthService } from "@/services/userAuthService"
@@ -578,19 +578,15 @@ export default function Checkout() {
         },
         handler: async function (response: any) {
           try {
-            // Verify payment
-            const verifyResponse = await paymentService.verifyRazorpayPayment(
-              response.razorpay_order_id,
+            // Signature verification now happens inline inside createOrder
+            // (one round trip instead of two — saves a Vercel cold-start
+            // hop after the Razorpay handler fires).
+            await createOrderAfterPayment(
+              shippingAddress,
               response.razorpay_payment_id,
-              response.razorpay_signature
+              response.razorpay_order_id,
+              response.razorpay_signature,
             )
-
-            if (verifyResponse.success) {
-              // Create order after successful payment
-              await createOrderAfterPayment(shippingAddress, response.razorpay_payment_id)
-            } else {
-              throw new Error('Payment verification failed')
-            }
           } catch (error: any) {
             setError(error.message || 'Payment verification failed')
             setPlacingOrder(false)
@@ -618,12 +614,19 @@ export default function Checkout() {
     setPlacingOrder(false)
   }
 
-  const createOrderAfterPayment = async (shippingAddress: any, paymentId: string) => {
+  const createOrderAfterPayment = async (
+    shippingAddress: CreateOrderParams['shippingAddress'],
+    paymentId: string,
+    razorpayOrderId?: string,
+    razorpaySignature?: string,
+  ) => {
     try {
       const response = await orderService.createOrder({
         shippingAddress,
         paymentMethod: formData.paymentMethod,
         paymentId,
+        razorpayOrderId,
+        razorpaySignature,
         shippingCost: orderSummary.shipping,
         tax: orderSummary.tax,
         discount: orderSummary.discount,

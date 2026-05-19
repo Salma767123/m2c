@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { prisma } = require('../config/database');
 const { generateInvoiceNo } = require('../utils/invoiceGenerator');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
@@ -11,6 +12,11 @@ const createOrder = async (req, res) => {
             shippingAddress,
             paymentMethod,
             paymentId, // from payment gateway (e.g., Stripe, Razorpay)
+            // Razorpay signature payload. When present, signature verification
+            // happens inline here so the client can replace its prior two-step
+            // (verify → createOrder) flow with a single round trip.
+            razorpayOrderId = null,
+            razorpaySignature = null,
             shippingCost = 0,
             tax = 0,
             discount = 0,
@@ -27,13 +33,45 @@ const createOrder = async (req, res) => {
             });
         }
 
-        // 2. Get User's Cart
-        const cart = await prisma.cart.findFirst({
-            where: { userId },
-            include: {
-                items: true
+        // 2. Parallel pre-flight: cart, user, bag type, and payment settings
+        // (when Razorpay verification is required). These reads are independent
+        // of each other, so running them concurrently removes ~3 sequential
+        // round trips from the critical path on Vercel.
+        //
+        // generateInvoiceNo is intentionally NOT included here — it mutates the
+        // invoice-sequence counter, so we only call it after all validation
+        // passes (otherwise a rejected request would burn an invoice number).
+        const needsRazorpayVerification = Boolean(razorpayOrderId && razorpaySignature && paymentId);
+
+        const [cart, user, bagType, paymentSettings] = await Promise.all([
+            prisma.cart.findFirst({ where: { userId }, include: { items: true } }),
+            prisma.user.findUnique({ where: { id: userId } }),
+            bagTypeId ? prisma.bagType.findUnique({ where: { id: bagTypeId } }) : Promise.resolve(null),
+            needsRazorpayVerification
+                ? prisma.paymentSettings.findFirst({ select: { razorpayKeySecret: true } })
+                : Promise.resolve(null),
+        ]);
+
+        // Verify Razorpay signature inline (server-side check is mandatory —
+        // we never trust a payment id that has not been HMAC-verified).
+        if (needsRazorpayVerification) {
+            if (!paymentSettings || !paymentSettings.razorpayKeySecret) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Payment verification failed - configuration error'
+                });
             }
-        });
+            const expectedSignature = crypto
+                .createHmac('sha256', paymentSettings.razorpayKeySecret)
+                .update(`${razorpayOrderId}|${paymentId}`)
+                .digest('hex');
+            if (expectedSignature !== razorpaySignature) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Payment verification failed - invalid signature'
+                });
+            }
+        }
 
         if (!cart || cart.items.length === 0) {
             return res.status(400).json({
@@ -42,11 +80,6 @@ const createOrder = async (req, res) => {
             });
         }
 
-        // 3. Fetch User Details
-        const user = await prisma.user.findUnique({
-            where: { id: userId }
-        });
-
         if (!user) {
             return res.status(404).json({
                 success: false,
@@ -54,7 +87,14 @@ const createOrder = async (req, res) => {
             });
         }
 
-        // 4. Validate Stock and Calculate Totals
+        if (bagTypeId && (!bagType || !bagType.isActive)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Selected bag type is not available'
+            });
+        }
+
+        // 3. Validate Stock and Calculate Totals
         let subtotal = 0;
         const orderItemsData = [];
         const stockUpdates = [];
@@ -63,18 +103,23 @@ const createOrder = async (req, res) => {
 
         // Fetch all products in parallel — sequential awaits add latency that
         // pushes the downstream transaction past its 5s default on cold starts.
-        const productsForItems = await Promise.all(
-            cart.items.map((item) =>
-                prisma.product.findUnique({
-                    where: { id: item.productId },
-                    include: {
-                        vendor: true,
-                        variants: item.variantId ? { where: { id: item.variantId } } : false,
-                        images: { where: { isPrimary: true }, take: 1 }
-                    }
-                })
-            )
-        );
+        // Invoice-no generation runs alongside the product fetches because it
+        // is independent of cart contents (saves one more round trip).
+        const [productsForItems, invoiceNo] = await Promise.all([
+            Promise.all(
+                cart.items.map((item) =>
+                    prisma.product.findUnique({
+                        where: { id: item.productId },
+                        include: {
+                            vendor: true,
+                            variants: item.variantId ? { where: { id: item.variantId } } : false,
+                            images: { where: { isPrimary: true }, take: 1 }
+                        }
+                    })
+                )
+            ),
+            generateInvoiceNo(prisma),
+        ]);
 
         for (let i = 0; i < cart.items.length; i++) {
             const item = cart.items[i];
@@ -164,32 +209,21 @@ const createOrder = async (req, res) => {
             }
         }
 
-        // 5. Resolve bag type selection (if any)
-        let bagTypeName = null;
-        let bagTypePrice = 0;
-
-        if (bagTypeId) {
-            const bagType = await prisma.bagType.findUnique({ where: { id: bagTypeId } });
-            if (!bagType || !bagType.isActive) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Selected bag type is not available'
-                });
-            }
-            bagTypeName = bagType.name;
-            bagTypePrice = currency === 'USD'
+        // 4. Resolve bag type pricing (bag was already fetched + validated in
+        // the parallel pre-flight above).
+        const bagTypeName = bagType ? bagType.name : null;
+        const bagTypePrice = bagType
+            ? (currency === 'USD'
                 ? (bagType.priceUSD || bagType.price)
-                : (bagType.priceINR || bagType.price);
-        }
+                : (bagType.priceINR || bagType.price))
+            : 0;
 
-        // 6. Create Order
-        // Generate unique Order ID
+        // 5. Create Order
+        // Generate unique Order ID (invoiceNo was already generated in parallel
+        // pre-flight, so no extra round trip here).
         const timestamp = Date.now().toString().slice(-6);
         const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
         const orderDisplayId = `ORD-${new Date().getFullYear()}-${timestamp}${random}`;
-
-        // Generate invoice number from InvoiceSettings
-        const invoiceNo = await generateInvoiceNo(prisma);
 
         const totalAmount = subtotal + shippingCost + tax - discount + bagTypePrice;
 

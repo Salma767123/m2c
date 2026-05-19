@@ -129,6 +129,11 @@ export interface CreateOrderParams {
     };
     paymentMethod: string;
     paymentId?: string;
+    // Razorpay signature payload — when present, the server verifies the
+    // HMAC signature inline during order creation (lets the client skip
+    // the separate /payments/razorpay/verify round trip).
+    razorpayOrderId?: string;
+    razorpaySignature?: string;
     shippingCost?: number;
     tax?: number;
     discount?: number;
