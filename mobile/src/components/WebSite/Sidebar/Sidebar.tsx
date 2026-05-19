@@ -25,6 +25,7 @@ import {
   LogIn,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { categoryService, type Category } from '@/services/categoryService';
 import { userAuthService } from '@/services/userAuthService';
 import { companyInfoService } from '@/services/companyInfoService';
@@ -50,6 +51,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   const [isAuth, setIsAuth] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Load dynamic company logo (cached first, then fresh from API)
   useEffect(() => {
@@ -160,7 +162,10 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
           </View>
         </Pressable>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        >
 
           {/* Brand */}
           <View style={{ alignItems: 'center', paddingVertical: 20, paddingHorizontal: 16 }}>
@@ -288,18 +293,23 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
               ))}
 
               <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
-                <Pressable onPress={() => go('/(tabs)/categories')} accessibilityRole="button">
+                <Pressable
+                  onPress={() => go('/(tabs)/categories')}
+                  accessibilityRole="button"
+                  accessibilityLabel="View all categories"
+                  android_ripple={{ color: 'rgba(0,0,0,0.05)' }}
+                >
                   <View
                     style={{
-                      height: 40,
-                      borderRadius: 10,
+                      height: 48,
+                      borderRadius: 12,
                       borderWidth: 1,
                       borderColor: '#e5e7eb',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>View All Categories</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>View All Categories</Text>
                   </View>
                 </Pressable>
               </View>

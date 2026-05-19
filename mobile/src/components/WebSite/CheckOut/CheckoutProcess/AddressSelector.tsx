@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { MapPin, Home, Briefcase, Star, Plus, Check, Pencil } from 'lucide-react-native';
 import type { SavedAddress } from '@/services/addressService';
+import { getStateName, formatPhoneForDisplay } from './constants';
 
 interface AddressSelectorProps {
   addresses: SavedAddress[];
@@ -99,11 +100,19 @@ export default function AddressSelector({
 
               {/* Name + Phone */}
               <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }} numberOfLines={1}>{addr.name}</Text>
-              <Text style={{ fontSize: 12, color: '#475569', marginTop: 1 }}>{addr.phone}</Text>
+              <Text style={{ fontSize: 12, color: '#475569', marginTop: 1 }}>
+                {formatPhoneForDisplay(addr.phone, addr.country)}
+              </Text>
 
               {/* Address */}
               <Text style={{ fontSize: 12, color: '#334155', marginTop: 4, lineHeight: 17 }} numberOfLines={2}>
-                {addr.address}{addr.addressLine2 ? `, ${addr.addressLine2}` : ''}, {addr.city}, {addr.state} {addr.zipCode}
+                {[
+                  addr.address,
+                  addr.addressLine2,
+                  addr.city,
+                  getStateName(addr.state, addr.country),
+                  addr.zipCode,
+                ].filter(Boolean).join(', ')}
               </Text>
             </View>
           </Pressable>

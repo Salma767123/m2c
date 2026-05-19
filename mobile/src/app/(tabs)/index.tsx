@@ -22,10 +22,11 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1" style={{ backgroundColor: '#eceef1' }}>
       <Header />
       <ScrollView
         className="flex-1"
+        style={{ backgroundColor: '#eceef1' }}
         contentContainerStyle={{ paddingBottom: 0 }}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"

@@ -1,25 +1,23 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Dimensions,
-  ScrollView,
-} from 'react-native';
-import { Package, RefreshCw, ChevronRight } from 'lucide-react-native';
+import { View, Text, Pressable, Dimensions } from 'react-native';
+import { Package, RefreshCw, ArrowRight } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { categoryService, Category } from '@/services/categoryService';
 
-const HOMEPAGE_LIMIT = 6;
-const H_PADDING = 16;
-const GAP = 14;
+// 2×2 grid → show 4 categories
+const GRID_LIMIT = 4;
+const SCREEN_W = Dimensions.get('window').width;
+const CARD_MARGIN = 12;        // section card horizontal margin
+const CARD_PADDING = 14;       // inner padding of the tinted card
+const TILE_GAP = 12;           // gap between the 4 tiles
 
-// Carousel sizing: ~2.4 cards visible so next one peeks, hinting at scroll.
-const screenWidth = Dimensions.get('window').width;
-const CARD_WIDTH = Math.max(148, Math.round((screenWidth - H_PADDING * 2) / 2.4));
-const SNAP_INTERVAL = CARD_WIDTH + GAP;
+// Section card — uses the project brand color (#111827) so it's on-brand
+const SECTION_BG = '#111827';  // brand dark slate
+
+const cardInnerW = SCREEN_W - CARD_MARGIN * 2 - CARD_PADDING * 2;
+const TILE_W = Math.floor((cardInnerW - TILE_GAP) / 2);
 
 type LoadState = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -37,7 +35,7 @@ export default function CategoriesSection() {
         sortOrder: 'asc',
       });
       if (signal?.aborted) return;
-      const list = (res.success && res.data ? res.data : []).slice(0, HOMEPAGE_LIMIT);
+      const list = (res.success && res.data ? res.data : []).slice(0, GRID_LIMIT);
       setCategories(list);
       setState(list.length === 0 ? 'empty' : 'ready');
     } catch (err) {
@@ -56,250 +54,190 @@ export default function CategoriesSection() {
   if (state === 'empty') return null;
 
   return (
-    <View style={{ backgroundColor: '#ffffff', paddingTop: 32, paddingBottom: 40 }}>
-      <SectionHeader />
+    <View
+      style={{
+        marginTop: 10,
+        marginHorizontal: CARD_MARGIN,
+        backgroundColor: SECTION_BG,
+        borderRadius: 24,
+        padding: CARD_PADDING,
+      }}
+    >
+      {/* Header — title + arrow pill */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 4,
+          marginBottom: 14,
+        }}
+      >
+        <Text style={{ flex: 1, color: '#ffffff', fontSize: 20, fontWeight: '800', letterSpacing: -0.3 }}>
+          Shop by Category
+        </Text>
+        <Pressable
+          onPress={() => router.push('/(tabs)/categories' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="View all categories"
+          hitSlop={6}
+        >
+          <View
+            style={{
+              width: 56,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: '#ffffff',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ArrowRight size={20} color="#111827" strokeWidth={2.5} />
+          </View>
+        </Pressable>
+      </View>
 
+      {/* Body */}
       {state === 'loading' ? (
-        <Carousel>
-          {Array.from({ length: HOMEPAGE_LIMIT }).map((_, i) => (
-            <CategoryCardSkeleton key={i} />
+        <Grid>
+          {Array.from({ length: GRID_LIMIT }).map((_, i) => (
+            <TileSkeleton key={i} />
           ))}
-        </Carousel>
+        </Grid>
       ) : state === 'error' ? (
-        <View style={{ paddingHorizontal: H_PADDING }}>
-          <ErrorState onRetry={() => fetchCategories()} />
-        </View>
+        <ErrorState onRetry={() => fetchCategories()} />
       ) : (
-        <Carousel>
+        <Grid>
           {categories.map((c) => (
-            <CategoryCard key={c.id} category={c} />
+            <CategoryTile key={c.id} category={c} />
           ))}
-        </Carousel>
+        </Grid>
       )}
     </View>
   );
 }
 
-function SectionHeader() {
+// ─── 2×2 Grid ───────────────────────────────────────────────────────────────
+function Grid({ children }: { children: React.ReactNode }) {
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        marginBottom: 20,
-      }}
-    >
-      <View style={{ flex: 1, paddingRight: 12 }}>
-        <Text
-          numberOfLines={1}
-          style={{
-            color: '#1a1a1a',
-            fontSize: 22,
-            fontWeight: '700',
-            lineHeight: 28,
-          }}
-        >
-          Shop by Category
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            color: '#6b7280',
-            fontSize: 13,
-            lineHeight: 18,
-            marginTop: 2,
-          }}
-        >
-          Explore our carefully curated collection
-        </Text>
-      </View>
-      <Pressable
-        onPress={() => router.push('/(tabs)/categories' as any)}
-        accessibilityRole="button"
-        accessibilityLabel="View all categories"
-        hitSlop={6}
-      >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#111827',
-            paddingHorizontal: 14,
-            height: 36,
-            minWidth: 96,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600', marginRight: 4 }}>
-            View All
-          </Text>
-          <ChevronRight size={14} color="#ffffff" strokeWidth={2.5} />
-        </View>
-      </Pressable>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: TILE_GAP }}>
+      {children}
     </View>
   );
 }
 
-function Carousel({ children }: { children: React.ReactNode }) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      decelerationRate="fast"
-      snapToInterval={SNAP_INTERVAL}
-      snapToAlignment="start"
-      contentContainerStyle={{
-        paddingHorizontal: H_PADDING,
-        gap: GAP,
-      }}
-    >
-      {children}
-    </ScrollView>
-  );
-}
+// ─── Category Tile (white card · image · name · meta) ───────────────────────
+function CategoryTile({ category }: { category: Category }) {
+  const subCount = (category as any).subcategoryCount as number | undefined;
+  const meta = subCount && subCount > 0 ? `${subCount} subcategories` : 'Explore collection';
 
-function CategoryCard({ category }: { category: Category }) {
   return (
     <Pressable
       onPress={() => router.push(`/(tabs)/categories/${category.slug}` as any)}
       accessibilityRole="button"
       accessibilityLabel={`View ${category.name} category`}
       android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
-      style={{ width: CARD_WIDTH }}
+      style={{ width: TILE_W }}
     >
-      <View
-        style={{
-          width: CARD_WIDTH,
-          height: CARD_WIDTH,
-          borderRadius: 14,
-          overflow: 'hidden',
-          backgroundColor: '#f3f4f6',
-          marginBottom: 10,
-          shadowColor: '#0f172a',
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-          elevation: 2,
-        }}
-      >
-        {category.image ? (
-          <Image
-            source={{ uri: category.image }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            transition={250}
-            accessibilityIgnoresInvertColors
-          />
-        ) : (
-          <LinearGradient
-            colors={['#f3f4f6', '#e5e7eb']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              width: '100%',
-              height: '100%',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Package size={40} color="#9ca3af" strokeWidth={1.5} />
-          </LinearGradient>
-        )}
-      </View>
+      <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 8 }}>
+        {/* Image */}
+        <View
+          style={{
+            width: '100%',
+            aspectRatio: 1,
+            borderRadius: 12,
+            overflow: 'hidden',
+            backgroundColor: '#f3f4f6',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {category.image ? (
+            <Image
+              source={{ uri: category.image }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              transition={250}
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <LinearGradient
+              colors={['#f3f4f6', '#e5e7eb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Package size={36} color="#9ca3af" strokeWidth={1.5} />
+            </LinearGradient>
+          )}
+        </View>
 
-      <Text
-        style={{
-          color: '#374151',
-          fontSize: 15,
-          fontWeight: '600',
-          textAlign: 'center',
-          lineHeight: 20,
-        }}
-        numberOfLines={2}
-      >
-        {category.name}
-      </Text>
+        {/* Name + meta */}
+        <Text
+          style={{ color: '#1f2937', fontSize: 14, fontWeight: '700', marginTop: 8 }}
+          numberOfLines={1}
+        >
+          {category.name}
+        </Text>
+        <Text style={{ color: '#475569', fontSize: 12, fontWeight: '600', marginTop: 2 }} numberOfLines={1}>
+          {meta}
+        </Text>
+      </View>
     </Pressable>
   );
 }
 
-function CategoryCardSkeleton() {
+// ─── Skeleton ───────────────────────────────────────────────────────────────
+function TileSkeleton() {
   return (
-    <View style={{ width: CARD_WIDTH }}>
+    <View style={{ width: TILE_W, backgroundColor: '#ffffff', borderRadius: 16, padding: 8 }}>
       <View
         className="bg-slate-200"
-        style={{
-          width: CARD_WIDTH,
-          height: CARD_WIDTH,
-          borderRadius: 14,
-          marginBottom: 10,
-        }}
+        style={{ width: '100%', aspectRatio: 1, borderRadius: 12 }}
       />
-      <View
-        className="bg-slate-200 self-center"
-        style={{ height: 12, width: '60%', borderRadius: 4 }}
-      />
+      <View className="bg-slate-200" style={{ height: 12, width: '75%', borderRadius: 4, marginTop: 10 }} />
+      <View className="bg-slate-200" style={{ height: 10, width: '50%', borderRadius: 4, marginTop: 6 }} />
     </View>
   );
 }
 
+// ─── Error ──────────────────────────────────────────────────────────────────
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+    <View style={{ paddingVertical: 28, alignItems: 'center' }}>
       <View
         style={{
-          width: 56,
-          height: 56,
-          borderRadius: 28,
+          width: 52,
+          height: 52,
+          borderRadius: 26,
           backgroundColor: '#fef2f2',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: 12,
+          marginBottom: 10,
         }}
       >
-        <Package size={24} color="#dc2626" strokeWidth={1.75} />
+        <Package size={22} color="#dc2626" strokeWidth={1.75} />
       </View>
-      <Text
-        style={{
-          fontSize: 15,
-          fontWeight: '600',
-          color: '#111827',
-          marginBottom: 4,
-        }}
-      >
+      <Text style={{ fontSize: 14, fontWeight: '700', color: '#ffffff', marginBottom: 2 }}>
         {"Couldn't load categories"}
       </Text>
-      <Text
-        style={{
-          fontSize: 13,
-          color: '#6b7280',
-          marginBottom: 16,
-          textAlign: 'center',
-        }}
-      >
+      <Text style={{ fontSize: 12, color: '#cbd5e1', marginBottom: 14, textAlign: 'center' }}>
         Check your connection and try again.
       </Text>
-      <Pressable
-        onPress={onRetry}
-        accessibilityRole="button"
-        accessibilityLabel="Retry loading categories"
-      >
+      <Pressable onPress={onRetry} accessibilityRole="button" accessibilityLabel="Retry loading categories">
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: '#374151',
-            paddingHorizontal: 20,
-            paddingVertical: 10,
-            borderRadius: 10,
+            backgroundColor: '#ffffff',
+            paddingHorizontal: 18,
             minHeight: 40,
+            borderRadius: 10,
+            gap: 6,
           }}
         >
-          <RefreshCw size={14} color="#ffffff" strokeWidth={2.25} />
-          <Text className="text-white font-semibold text-sm ml-2">Try Again</Text>
+          <RefreshCw size={14} color="#111827" strokeWidth={2.25} />
+          <Text style={{ color: '#111827', fontWeight: '700', fontSize: 13 }}>Try Again</Text>
         </View>
       </Pressable>
     </View>

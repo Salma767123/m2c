@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   AlertCircle,
   ChevronRight,
+  Layers,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { categoryService, Category } from '@/services/categoryService';
@@ -396,47 +397,40 @@ const SubCategoryCard = memo(function SubCategoryCard({
 }) {
   const tap = useCallback(() => onPress(subcategory), [onPress, subcategory]);
   const count = subcategory.productCount ?? 0;
+  const meta = count > 0 ? `${count} ${count === 1 ? 'product' : 'products'}` : 'View products';
 
   return (
     <Pressable
       onPress={tap}
       accessibilityRole="button"
-      accessibilityLabel={`Browse ${subcategory.name}, ${count} products`}
+      accessibilityLabel={`Browse ${subcategory.name}, ${meta}`}
       accessibilityHint="Opens subcategory products"
       android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
       style={{ width: cardWidth }}
     >
       <View style={card.container}>
-        {/* Image — square for compact grid */}
+        {/* Image — square, padded so the full image shows */}
         <View style={card.imageWrap}>
           {subcategory.image ? (
             <Image
               source={{ uri: subcategory.image }}
               style={card.image}
-              contentFit="cover"
+              contentFit="contain"
               transition={250}
             />
           ) : (
             <View style={card.imagePlaceholder}>
-              <Package size={36} color="#d1d5db" strokeWidth={1.5} />
+              <Package size={34} color="#cbd5e1" strokeWidth={1.5} />
             </View>
           )}
-          {count > 0 ? (
-            <View style={card.countBadge}>
-              <Text style={card.countText}>{count}</Text>
-            </View>
-          ) : null}
         </View>
 
         {/* Info */}
         <View style={card.info}>
-          <Text style={card.name} numberOfLines={2}>{subcategory.name}</Text>
-          {subcategory.description ? (
-            <Text style={card.desc} numberOfLines={1}>{subcategory.description}</Text>
-          ) : null}
-          <View style={card.exploreRow}>
-            <Text style={card.exploreText}>Explore</Text>
-            <ChevronRight size={12} color="#6b7280" strokeWidth={2.5} />
+          <Text style={card.name} numberOfLines={1}>{subcategory.name}</Text>
+          <View style={card.metaRow}>
+            <Layers size={12} color="#6b7280" strokeWidth={2.25} />
+            <Text style={card.metaText} numberOfLines={1}>{meta}</Text>
           </View>
         </View>
       </View>
@@ -585,20 +579,21 @@ const scr = StyleSheet.create({
 const card = StyleSheet.create({
   container: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: '#eceef1',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
   imageWrap: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f7f8fa',
+    padding: 10,
   },
   image: {
     width: '100%',
@@ -609,23 +604,6 @@ const card = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  countBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: '#111827',
-    minWidth: 24,
-    height: 24,
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#ffffff',
   },
   info: {
     paddingHorizontal: 12,
@@ -638,20 +616,14 @@ const card = StyleSheet.create({
     color: '#111827',
     lineHeight: 18,
   },
-  desc: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginTop: 2,
-    lineHeight: 15,
-  },
-  exploreRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    gap: 2,
+    marginTop: 5,
+    gap: 4,
   },
-  exploreText: {
-    fontSize: 11,
+  metaText: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#6b7280',
   },

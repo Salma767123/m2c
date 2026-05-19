@@ -1,14 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { X, Home, Briefcase, MapPin, ChevronDown, Check, Search } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import CountrySelect from '../CheckOut/CheckoutProcess/CountrySelect';
 import {
-  US_STATES,
-  ZIP_REGEX,
   NAME_REGEX,
-  formatUSPhone,
-  validateUSPhone,
-  formatZipCode,
+  DEFAULT_COUNTRY_ISO,
+  getCountry,
+  getStates,
+  getPostalRule,
+  validatePostalCode,
+  validatePhone,
+  formatPhoneAsYouType,
+  getPhoneExample,
+  normalizeCountryToIso,
+  toE164,
 } from '../CheckOut/CheckoutProcess/constants';
 import type { SavedAddress, AddressPayload, AddressType } from '@/services/addressService';
 
@@ -26,6 +32,7 @@ type FormState = {
   phone: string;
   address: string;
   addressLine2: string;
+  country: string;
   city: string;
   state: string;
   zipCode: string;
@@ -46,6 +53,7 @@ const emptyForm: FormState = {
   phone: '',
   address: '',
   addressLine2: '',
+  country: DEFAULT_COUNTRY_ISO,
   city: '',
   state: '',
   zipCode: '',
@@ -67,17 +75,27 @@ export default function AddressFormModal({
   const [statePickerVisible, setStatePickerVisible] = useState(false);
   const [stateSearch, setStateSearch] = useState('');
 
+  // ── Country-derived values ───────────────────────────────────────────────
+  const countryIso = (form.country || DEFAULT_COUNTRY_ISO).toUpperCase();
+  const country = useMemo(() => getCountry(countryIso), [countryIso]);
+  const states = useMemo(() => getStates(countryIso), [countryIso]);
+  const hasStateList = states.length > 0;
+  const postalRule = useMemo(() => getPostalRule(countryIso), [countryIso]);
+  const phoneExample = useMemo(() => getPhoneExample(countryIso), [countryIso]);
+
   useEffect(() => {
     if (!open) return;
     setTouched({});
     setSubmitError(null);
     if (editing) {
+      const iso = normalizeCountryToIso(editing.country);
       setForm({
         type: editing.type,
         name: editing.name || '',
-        phone: formatUSPhone(editing.phone || ''),
+        phone: editing.phone ? formatPhoneAsYouType(editing.phone, iso) : '',
         address: editing.address || '',
         addressLine2: editing.addressLine2 || '',
+        country: iso,
         city: editing.city || '',
         state: editing.state || '',
         zipCode: editing.zipCode || '',
@@ -88,6 +106,15 @@ export default function AddressFormModal({
     }
   }, [open, editing, hasNoAddressesYet]);
 
+  // When country changes, clear a state that's no longer valid for the new country
+  useEffect(() => {
+    if (!form.state) return;
+    if (hasStateList && !states.some((s) => s.isoCode === form.state)) {
+      setForm((prev) => ({ ...prev, state: '' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countryIso]);
+
   // ── Validation ──
   const errors: Partial<Record<keyof FormState, string>> = {};
   if (!form.name.trim()) errors.name = 'Full name is required';
@@ -95,20 +122,30 @@ export default function AddressFormModal({
   else if (!NAME_REGEX.test(form.name.trim())) errors.name = 'Letters, spaces, hyphens only';
 
   if (!form.phone.trim()) errors.phone = 'Phone number is required';
-  else if (!validateUSPhone(form.phone)) errors.phone = 'Enter a valid US phone number';
+  else if (!validatePhone(form.phone, countryIso)) {
+    errors.phone = `Enter a valid phone number for ${country?.name ?? 'the selected country'}`;
+  }
 
   if (!form.address.trim()) errors.address = 'Address is required';
   else if (form.address.trim().length < 3 || form.address.trim().length > 100) errors.address = 'Address must be 3-100 characters';
 
   if (form.addressLine2 && form.addressLine2.length > 100) errors.addressLine2 = 'Must be 100 characters or less';
 
+  if (!form.country) errors.country = 'Select a country';
+
   if (!form.city.trim()) errors.city = 'City is required';
   else if (form.city.trim().length < 2 || form.city.trim().length > 50) errors.city = 'City must be 2-50 characters';
 
-  if (!form.state) errors.state = 'Select a state';
+  if (hasStateList) {
+    if (!form.state) errors.state = 'Select a state / province';
+  } else if (!form.state.trim()) {
+    errors.state = 'State / region is required';
+  }
 
-  if (!form.zipCode.trim()) errors.zipCode = 'ZIP Code is required';
-  else if (!ZIP_REGEX.test(form.zipCode.trim())) errors.zipCode = 'Enter a valid ZIP (12345 or 12345-6789)';
+  if (!form.zipCode.trim()) errors.zipCode = `${postalRule.label} is required`;
+  else if (!validatePostalCode(form.zipCode, countryIso)) {
+    errors.zipCode = `Enter a valid ${postalRule.label.toLowerCase()} (e.g. ${postalRule.placeholder})`;
+  }
 
   const isValid = Object.keys(errors).length === 0;
 
@@ -120,8 +157,7 @@ export default function AddressFormModal({
     setTouched((t) => ({ ...t, [field]: true }));
     const v = form[field];
     if (typeof v === 'string') {
-      if (field === 'state') setField(field, v.trim().toUpperCase() as any);
-      else setField(field, v.trim() as any);
+      setField(field, v.trim() as any);
     }
   };
 
@@ -137,13 +173,13 @@ export default function AddressFormModal({
       await onSubmit({
         type: form.type,
         name: form.name.trim(),
-        phone: form.phone.trim(),
+        phone: toE164(form.phone, form.country),
         address: form.address.trim(),
         addressLine2: form.addressLine2.trim() || undefined,
         city: form.city.trim(),
-        state: form.state.trim().toUpperCase(),
+        state: form.state.trim(),
         zipCode: form.zipCode.trim(),
-        country: 'United States',
+        country: form.country,
         isDefault: form.isDefault,
       });
     } catch (err: any) {
@@ -158,10 +194,14 @@ export default function AddressFormModal({
   const editingCurrentDefault = !!editing && editing.isDefault;
   const lockedDefault = hasNoAddressesYet || editingCurrentDefault;
 
-  const selectedStateName = US_STATES.find((s) => s.code === form.state)?.name || '';
+  const selectedStateName = states.find((s) => s.isoCode === form.state)?.name || '';
   const filteredStates = stateSearch
-    ? US_STATES.filter((s) => s.name.toLowerCase().includes(stateSearch.toLowerCase()) || s.code.toLowerCase().includes(stateSearch.toLowerCase()))
-    : US_STATES;
+    ? states.filter(
+        (s) =>
+          s.name.toLowerCase().includes(stateSearch.toLowerCase()) ||
+          s.isoCode.toLowerCase().includes(stateSearch.toLowerCase()),
+      )
+    : states;
 
   return (
     <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -228,6 +268,20 @@ export default function AddressFormModal({
             </View>
           </View>
 
+          {/* Country */}
+          <View>
+            <FieldLabel label="Country" required />
+            <CountrySelect
+              value={countryIso}
+              onChange={(iso) => { setField('country', iso); setTouched((t) => ({ ...t, country: true })); }}
+              onBlur={() => setTouched((t) => ({ ...t, country: true }))}
+              invalid={!!fieldError('country')}
+              disabled={submitting}
+              accessibilityLabel="Country, required"
+            />
+            <ErrorText text={fieldError('country')} />
+          </View>
+
           {/* Full Name */}
           <View>
             <FieldLabel label="Full Name" required />
@@ -248,9 +302,9 @@ export default function AddressFormModal({
             <FieldLabel label="Phone" required />
             <FormInput
               value={form.phone}
-              onChangeText={(t) => setField('phone', formatUSPhone(t))}
+              onChangeText={(t) => setField('phone', formatPhoneAsYouType(t, countryIso))}
               onBlur={() => handleBlur('phone')}
-              placeholder="(555) 123-4567"
+              placeholder={phoneExample || 'Phone number'}
               keyboardType="phone-pad"
               accessibilityLabel="Phone number, required"
               hasError={!!fieldError('phone')}
@@ -293,51 +347,62 @@ export default function AddressFormModal({
               value={form.city}
               onChangeText={(t) => setField('city', t)}
               onBlur={() => handleBlur('city')}
-              placeholder="New York"
+              placeholder="City"
               accessibilityLabel="City, required"
               hasError={!!fieldError('city')}
             />
             <ErrorText text={fieldError('city')} />
           </View>
 
-          {/* State + ZIP */}
+          {/* State + Postal */}
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1 }}>
-              <FieldLabel label="State" required />
-              <Pressable
-                onPress={() => { setStatePickerVisible(true); setStateSearch(''); }}
-                accessibilityRole="button"
-                accessibilityLabel="Select state"
-              >
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 14,
-                  paddingVertical: 14,
-                  minHeight: 48,
-                  borderWidth: 1.5,
-                  borderColor: fieldError('state') ? '#ef4444' : '#e2e8f0',
-                  borderRadius: 12,
-                  backgroundColor: '#f8fafc',
-                }}>
-                  <Text style={{ flex: 1, fontSize: 14, color: form.state ? '#111827' : '#9ca3af', fontWeight: form.state ? '600' : '400' }}>
-                    {form.state ? `${selectedStateName} (${form.state})` : 'Select State'}
-                  </Text>
-                  <ChevronDown size={16} color="#6b7280" />
-                </View>
-              </Pressable>
+              <FieldLabel label={hasStateList ? 'State / Province' : 'State / Region'} required />
+              {hasStateList ? (
+                <Pressable
+                  onPress={() => { setStatePickerVisible(true); setStateSearch(''); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select state or province"
+                >
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 14,
+                    paddingVertical: 14,
+                    minHeight: 48,
+                    borderWidth: 1.5,
+                    borderColor: fieldError('state') ? '#ef4444' : '#e2e8f0',
+                    borderRadius: 12,
+                    backgroundColor: '#f8fafc',
+                  }}>
+                    <Text style={{ flex: 1, fontSize: 14, color: form.state ? '#111827' : '#9ca3af', fontWeight: form.state ? '600' : '400' }}>
+                      {form.state ? selectedStateName || form.state : 'Select State'}
+                    </Text>
+                    <ChevronDown size={16} color="#6b7280" />
+                  </View>
+                </Pressable>
+              ) : (
+                <FormInput
+                  value={form.state}
+                  onChangeText={(t) => setField('state', t)}
+                  onBlur={() => handleBlur('state')}
+                  placeholder="State / Region"
+                  accessibilityLabel="State or region, required"
+                  hasError={!!fieldError('state')}
+                />
+              )}
               <ErrorText text={fieldError('state')} />
             </View>
             <View style={{ flex: 1 }}>
-              <FieldLabel label="ZIP Code" required />
+              <FieldLabel label={postalRule.label} required />
               <FormInput
                 value={form.zipCode}
-                onChangeText={(t) => setField('zipCode', formatZipCode(t))}
+                onChangeText={(t) => setField('zipCode', t)}
                 onBlur={() => handleBlur('zipCode')}
-                placeholder="10001"
-                keyboardType="number-pad"
-                maxLength={10}
-                accessibilityLabel="ZIP code, required"
+                placeholder={postalRule.placeholder}
+                autoCapitalize="characters"
+                maxLength={12}
+                accessibilityLabel={`${postalRule.label}, required`}
                 hasError={!!fieldError('zipCode')}
               />
               <ErrorText text={fieldError('zipCode')} />
@@ -414,7 +479,9 @@ export default function AddressFormModal({
         <Modal visible={statePickerVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={{ flex: 1, backgroundColor: '#fff' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: insets.top + 8, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
-              <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827' }}>Select State</Text>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827' }}>
+                Select State {country ? `· ${country.name}` : ''}
+              </Text>
               <Pressable onPress={() => setStatePickerVisible(false)} accessibilityRole="button" accessibilityLabel="Close state picker" hitSlop={4}>
                 <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
                   <X size={20} color="#6b7280" />
@@ -436,17 +503,17 @@ export default function AddressFormModal({
             </View>
             <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
               {filteredStates.map((state) => {
-                const isSelected = form.state === state.code;
+                const isSelected = form.state === state.isoCode;
                 return (
                   <Pressable
-                    key={state.code}
+                    key={state.isoCode}
                     onPress={() => {
-                      setField('state', state.code);
+                      setField('state', state.isoCode);
                       setTouched((t) => ({ ...t, state: true }));
                       setStatePickerVisible(false);
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel={`${state.name} (${state.code})`}
+                    accessibilityLabel={`${state.name} (${state.isoCode})`}
                     accessibilityState={{ selected: isSelected }}
                   >
                     <View style={{
@@ -461,7 +528,7 @@ export default function AddressFormModal({
                     }}>
                       <View>
                         <Text style={{ fontSize: 15, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#0369a1' : '#111827' }}>{state.name}</Text>
-                        <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>{state.code}</Text>
+                        <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>{state.isoCode}</Text>
                       </View>
                       {isSelected ? <Check size={18} color="#0369a1" strokeWidth={2.5} /> : null}
                     </View>

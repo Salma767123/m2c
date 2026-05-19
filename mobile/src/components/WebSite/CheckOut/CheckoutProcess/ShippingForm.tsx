@@ -1,15 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, Modal, type TextInputProps } from 'react-native';
 import { ChevronDown, Check, Search, X } from 'lucide-react-native';
 import { CheckoutFormData } from '../Checkout';
+import CountrySelect from './CountrySelect';
 import {
-  US_STATES,
   EMAIL_REGEX,
-  ZIP_REGEX,
   NAME_REGEX,
-  formatUSPhone,
-  validateUSPhone,
-  formatZipCode,
+  DEFAULT_COUNTRY_ISO,
+  getCountry,
+  getStates,
+  getPostalRule,
+  validatePostalCode,
+  validatePhone,
+  formatPhoneAsYouType,
+  getPhoneExample,
 } from './constants';
 
 interface ShippingFormProps {
@@ -24,16 +28,24 @@ type Errors = Partial<Record<keyof CheckoutFormData, string>>;
 type Touched = Partial<Record<keyof CheckoutFormData, boolean>>;
 
 const ALL_SHIPPING_FIELDS: (keyof CheckoutFormData)[] = [
-  'firstName', 'lastName', 'email', 'phone', 'address', 'addressLine2', 'city', 'state', 'zipCode',
+  'firstName', 'lastName', 'email', 'phone', 'address', 'addressLine2', 'country', 'city', 'state', 'zipCode',
 ];
 
-export default function ShippingForm({ formData, updateFormData, onValidityChange, showAllErrors, submitAttempt = 0 }: ShippingFormProps) {
+export default function ShippingForm({ formData, updateFormData, onValidityChange, submitAttempt = 0 }: ShippingFormProps) {
   const [errors, setErrors] = useState<Errors>({});
   const [touched, setTouched] = useState<Touched>({});
   const [statePickerVisible, setStatePickerVisible] = useState(false);
   const [stateSearch, setStateSearch] = useState('');
 
-  // When parent signals submit attempt (user tapped Continue), mark all fields touched to show errors
+  // ── Country-derived values ───────────────────────────────────────────────
+  const countryIso = (formData.country || DEFAULT_COUNTRY_ISO).toUpperCase();
+  const country = useMemo(() => getCountry(countryIso), [countryIso]);
+  const states = useMemo(() => getStates(countryIso), [countryIso]);
+  const hasStateList = states.length > 0;
+  const postalRule = useMemo(() => getPostalRule(countryIso), [countryIso]);
+  const phoneExample = useMemo(() => getPhoneExample(countryIso), [countryIso]);
+
+  // When parent signals submit attempt (user tapped Continue), mark all fields touched
   useEffect(() => {
     if (submitAttempt > 0) {
       const allTouched: Touched = {};
@@ -42,45 +54,67 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
     }
   }, [submitAttempt]);
 
+  // When country changes, clear a state that's no longer valid for the new country
+  useEffect(() => {
+    if (!formData.state) return;
+    if (hasStateList && !states.some((s) => s.isoCode === formData.state)) {
+      updateFormData('state', '' as any);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countryIso]);
+
   const preFilledFields: string[] = [];
   if (formData.firstName || formData.lastName) preFilledFields.push('name');
   if (formData.email) preFilledFields.push('email');
   if (formData.phone) preFilledFields.push('phone');
   if (formData.address) preFilledFields.push('address');
-  if (formData.addressLine2) preFilledFields.push('address line 2');
   if (formData.city) preFilledFields.push('city');
   if (formData.state) preFilledFields.push('state');
-  if (formData.zipCode) preFilledFields.push('ZIP');
+  if (formData.zipCode) preFilledFields.push(postalRule.label.toLowerCase());
   const isPreFilled = preFilledFields.length > 0;
 
   const validate = useCallback((data: CheckoutFormData): Errors => {
     const e: Errors = {};
+    const iso = (data.country || DEFAULT_COUNTRY_ISO).toUpperCase();
+    const rule = getPostalRule(iso);
+    const stateList = getStates(iso);
+
     if (!data.firstName.trim()) e.firstName = 'First name is required';
     else if (data.firstName.trim().length < 2 || data.firstName.trim().length > 50) e.firstName = 'Must be 2-50 characters';
-    else if (!NAME_REGEX.test(data.firstName)) e.firstName = 'Letters, spaces, hyphens only';
+    else if (!NAME_REGEX.test(data.firstName.trim())) e.firstName = 'Letters, spaces, hyphens only';
 
     if (!data.lastName.trim()) e.lastName = 'Last name is required';
     else if (data.lastName.trim().length < 2 || data.lastName.trim().length > 50) e.lastName = 'Must be 2-50 characters';
-    else if (!NAME_REGEX.test(data.lastName)) e.lastName = 'Letters, spaces, hyphens only';
+    else if (!NAME_REGEX.test(data.lastName.trim())) e.lastName = 'Letters, spaces, hyphens only';
 
     if (!data.email.trim()) e.email = 'Email is required';
     else if (!EMAIL_REGEX.test(data.email.trim())) e.email = 'Enter a valid email';
 
     if (!data.phone.trim()) e.phone = 'Phone number is required';
-    else if (!validateUSPhone(data.phone)) e.phone = 'Enter a valid US phone number';
+    else if (!validatePhone(data.phone, iso)) {
+      e.phone = `Enter a valid phone number for ${getCountry(iso)?.name ?? 'the selected country'}`;
+    }
 
     if (!data.address.trim()) e.address = 'Address is required';
     else if (data.address.trim().length < 3 || data.address.trim().length > 100) e.address = 'Must be 3-100 characters';
 
     if (data.addressLine2 && data.addressLine2.trim().length > 100) e.addressLine2 = 'Must be 100 characters or less';
 
+    if (!data.country) e.country = 'Select a country';
+
     if (!data.city.trim()) e.city = 'City is required';
     else if (data.city.trim().length < 2 || data.city.trim().length > 50) e.city = 'Must be 2-50 characters';
 
-    if (!data.state) e.state = 'Select a state';
+    if (stateList.length > 0) {
+      if (!data.state) e.state = 'Select a state / province';
+    } else if (!data.state.trim()) {
+      e.state = 'State / region is required';
+    }
 
-    if (!data.zipCode.trim()) e.zipCode = 'ZIP Code is required';
-    else if (!ZIP_REGEX.test(data.zipCode.trim())) e.zipCode = 'Enter a valid ZIP (12345 or 12345-6789)';
+    if (!data.zipCode.trim()) e.zipCode = `${rule.label} is required`;
+    else if (!validatePostalCode(data.zipCode, iso)) {
+      e.zipCode = `Enter a valid ${rule.label.toLowerCase()} (e.g. ${rule.placeholder})`;
+    }
 
     return e;
   }, []);
@@ -98,21 +132,28 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
     const val = formData[field];
     if (typeof val === 'string') {
       if (field === 'email') updateFormData(field, val.trim().toLowerCase() as any);
-      else if (field === 'state') updateFormData(field, val.trim().toUpperCase() as any);
       else updateFormData(field, val.trim() as any);
     }
   };
 
   const handleChange = (field: keyof CheckoutFormData, value: string) => {
-    if (field === 'phone') updateFormData(field, formatUSPhone(value) as any);
-    else if (field === 'zipCode') updateFormData(field, formatZipCode(value) as any);
+    if (field === 'phone') updateFormData(field, formatPhoneAsYouType(value, countryIso) as any);
     else updateFormData(field, value as any);
   };
 
-  const selectedStateName = US_STATES.find((s) => s.code === formData.state)?.name || '';
+  const handleCountryChange = (iso: string) => {
+    updateFormData('country', iso as any);
+    setTouched((prev) => ({ ...prev, country: true }));
+  };
+
+  const selectedStateName = states.find((s) => s.isoCode === formData.state)?.name || '';
   const filteredStates = stateSearch
-    ? US_STATES.filter((s) => s.name.toLowerCase().includes(stateSearch.toLowerCase()) || s.code.toLowerCase().includes(stateSearch.toLowerCase()))
-    : US_STATES;
+    ? states.filter(
+        (s) =>
+          s.name.toLowerCase().includes(stateSearch.toLowerCase()) ||
+          s.isoCode.toLowerCase().includes(stateSearch.toLowerCase()),
+      )
+    : states;
 
   return (
     <View style={{ gap: 20 }}>
@@ -129,10 +170,17 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
         </View>
       ) : null}
 
-      {/* Country banner */}
-      <View style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: '#64748b' }}>Shipping to:</Text>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0f172a' }}>United States</Text>
+      {/* Country */}
+      <View>
+        <FieldLabel label="Country" required />
+        <CountrySelect
+          value={countryIso}
+          onChange={handleCountryChange}
+          onBlur={() => setTouched((prev) => ({ ...prev, country: true }))}
+          invalid={touched.country && !!errors.country}
+          accessibilityLabel="Country, required"
+        />
+        <ErrorText text={touched.country ? errors.country : undefined} />
       </View>
 
       {/* First Name + Last Name */}
@@ -194,7 +242,7 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
           value={formData.phone}
           onChangeText={(t) => handleChange('phone', t)}
           onBlur={() => handleBlur('phone')}
-          placeholder="(555) 123-4567"
+          placeholder={phoneExample || 'Phone number'}
           placeholderTextColor="#9ca3af"
           keyboardType="phone-pad"
           autoComplete="tel"
@@ -244,7 +292,7 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
             value={formData.city}
             onChangeText={(t) => handleChange('city', t)}
             onBlur={() => handleBlur('city')}
-            placeholder="New York"
+            placeholder="City"
             placeholderTextColor="#9ca3af"
             autoComplete="postal-address-locality"
             accessibilityLabel="City, required"
@@ -253,42 +301,54 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
           <ErrorText text={touched.city ? errors.city : undefined} />
         </View>
 
-        {/* State + ZIP row */}
+        {/* State + Postal row */}
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          {/* State Picker */}
+          {/* State — dropdown when the country has a state list, free-text otherwise */}
           <View style={{ flex: 1 }}>
-            <FieldLabel label="State" required />
-            <Pressable
-              onPress={() => { setStatePickerVisible(true); setStateSearch(''); }}
-              accessibilityRole="button"
-              accessibilityLabel="Select state"
-            >
-              <View style={[
-                pickerStyle,
-                touched.state && errors.state ? { borderColor: '#ef4444' } : {},
-              ]}>
-                <Text style={{ flex: 1, fontSize: 14, color: formData.state ? '#111827' : '#9ca3af', fontWeight: formData.state ? '600' : '400' }}>
-                  {formData.state ? `${selectedStateName} (${formData.state})` : 'Select State'}
-                </Text>
-                <ChevronDown size={16} color="#6b7280" />
-              </View>
-            </Pressable>
+            <FieldLabel label={hasStateList ? 'State / Province' : 'State / Region'} required />
+            {hasStateList ? (
+              <Pressable
+                onPress={() => { setStatePickerVisible(true); setStateSearch(''); }}
+                accessibilityRole="button"
+                accessibilityLabel="Select state or province"
+              >
+                <View style={[
+                  pickerStyle,
+                  touched.state && errors.state ? { borderColor: '#ef4444' } : {},
+                ]}>
+                  <Text style={{ flex: 1, fontSize: 14, color: formData.state ? '#111827' : '#9ca3af', fontWeight: formData.state ? '600' : '400' }}>
+                    {formData.state ? selectedStateName || formData.state : 'Select State'}
+                  </Text>
+                  <ChevronDown size={16} color="#6b7280" />
+                </View>
+              </Pressable>
+            ) : (
+              <FormInput
+                value={formData.state}
+                onChangeText={(t) => handleChange('state', t)}
+                onBlur={() => handleBlur('state')}
+                placeholder="State / Region"
+                placeholderTextColor="#9ca3af"
+                accessibilityLabel="State or region, required"
+                hasError={touched.state && !!errors.state}
+              />
+            )}
             <ErrorText text={touched.state ? errors.state : undefined} />
           </View>
 
-          {/* ZIP */}
+          {/* Postal code */}
           <View style={{ flex: 1 }}>
-            <FieldLabel label="ZIP Code" required />
+            <FieldLabel label={postalRule.label} required />
             <FormInput
               value={formData.zipCode}
               onChangeText={(t) => handleChange('zipCode', t)}
               onBlur={() => handleBlur('zipCode')}
-              placeholder="10001"
+              placeholder={postalRule.placeholder}
               placeholderTextColor="#9ca3af"
-              keyboardType="number-pad"
-              maxLength={10}
+              autoCapitalize="characters"
+              maxLength={12}
               autoComplete="postal-code"
-              accessibilityLabel="ZIP code, required"
+              accessibilityLabel={`${postalRule.label}, required`}
               hasError={touched.zipCode && !!errors.zipCode}
             />
             <ErrorText text={touched.zipCode ? errors.zipCode : undefined} />
@@ -301,7 +361,9 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
           {/* Modal Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
-            <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827' }}>Select State</Text>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827' }}>
+              Select State {country ? `· ${country.name}` : ''}
+            </Text>
             <Pressable onPress={() => setStatePickerVisible(false)} accessibilityRole="button" accessibilityLabel="Close state picker" hitSlop={4}>
               <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
                 <X size={20} color="#6b7280" />
@@ -327,17 +389,17 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
           {/* State List */}
           <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
             {filteredStates.map((state) => {
-              const isSelected = formData.state === state.code;
+              const isSelected = formData.state === state.isoCode;
               return (
                 <Pressable
-                  key={state.code}
+                  key={state.isoCode}
                   onPress={() => {
-                    updateFormData('state', state.code as any);
+                    updateFormData('state', state.isoCode as any);
                     setTouched((prev) => ({ ...prev, state: true }));
                     setStatePickerVisible(false);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`${state.name} (${state.code})`}
+                  accessibilityLabel={`${state.name} (${state.isoCode})`}
                   accessibilityState={{ selected: isSelected }}
                 >
                   <View style={{
@@ -354,7 +416,7 @@ export default function ShippingForm({ formData, updateFormData, onValidityChang
                       <Text style={{ fontSize: 15, fontWeight: isSelected ? '700' : '500', color: isSelected ? '#0369a1' : '#111827' }}>
                         {state.name}
                       </Text>
-                      <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>{state.code}</Text>
+                      <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>{state.isoCode}</Text>
                     </View>
                     {isSelected ? <Check size={18} color="#0369a1" strokeWidth={2.5} /> : null}
                   </View>

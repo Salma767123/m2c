@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { MapPin, CreditCard, Wallet, CalendarDays, Mail, Phone } from 'lucide-react-native';
 import { CheckoutFormData } from '../Checkout';
+import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } from './constants';
 
 interface ReviewOrderProps {
   formData: CheckoutFormData;
@@ -72,13 +73,6 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
   const paymentIcon = formData.paymentMethod === 'razorpay' ? CreditCard : Wallet;
   const paymentName = formData.paymentMethod === 'razorpay' ? 'Razorpay' : 'PayU';
 
-  const fullAddress = [
-    formData.address,
-    formData.addressLine2,
-    `${formData.city}, ${formData.state} ${formData.zipCode}`,
-    formData.country,
-  ].filter(Boolean).join('\n');
-
   return (
     <View style={{ gap: 14 }}>
       {/* Shipping summary */}
@@ -105,10 +99,12 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
             </Text>
           ) : null}
           <Text style={{ fontSize: 13, color: '#374151', lineHeight: 20 }}>
-            {formData.city}, {formData.state} {formData.zipCode}
+            {[formData.city, getStateName(formData.state, formData.country), formData.zipCode]
+              .filter(Boolean)
+              .join(', ')}
           </Text>
           <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 4, fontWeight: '600' }}>
-            {formData.country}
+            {getCountryName(formData.country)} {getCountryFlag(formData.country)}
           </Text>
         </View>
 
@@ -129,7 +125,9 @@ export default function ReviewOrder({ formData }: ReviewOrderProps) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 10, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>Phone</Text>
-              <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>{formData.phone}</Text>
+              <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>
+                {formatPhoneForDisplay(formData.phone, formData.country)}
+              </Text>
             </View>
           </View>
         </View>

@@ -446,15 +446,16 @@ const adminReviewFactoryInspection = async (req, res) => {
                 },
             });
 
-            // Notify the checker
-            notifications.reinspectionRaised(
-                reCheckerId,
-                inspection.vendor.companyName,
-                'factory'
-            ).catch(console.error);
+            // Notify the checker — in-app feed + FCM push
+            const { createNotification: createReinspNotif } = require('./notificationController');
+            createReinspNotif({
+                userId: reCheckerId, role: 'QC_CHECKER', type: 'REINSPECTION_RAISED',
+                title: 'Re-Inspection Assigned',
+                message: `Re-inspection raised for factory "${inspection.vendor.companyName}". Please schedule your visit.`,
+                data: { screen: 'vendors', vendorId: inspection.vendorId }
+            }).catch(() => {});
 
             // Notify vendor about re-inspection
-            const { createNotification: createReinspNotif } = require('./notificationController');
             createReinspNotif({
                 userId: inspection.vendorId, role: 'VENDOR', type: 'REINSPECTION_REQUIRED',
                 title: 'Re-inspection Required',
@@ -632,13 +633,18 @@ const adminReviewProductInspection = async (req, res) => {
                 },
             });
 
-            // Notify the checker
+            // Notify the checker — in-app feed + FCM push
+            const { createNotification: createProdReinspNotif } = require('./notificationController');
             if (reCheckerId) {
-                notifications.reinspectionRaised(reCheckerId, product.name, 'product').catch(console.error);
+                createProdReinspNotif({
+                    userId: reCheckerId, role: 'QC_CHECKER', type: 'REINSPECTION_RAISED',
+                    title: 'Re-Inspection Assigned',
+                    message: `Re-inspection raised for product "${product.name}". Please schedule your visit.`,
+                    data: { screen: 'products', productId: product.id }
+                }).catch(() => {});
             }
 
             // Notify vendor about product re-inspection
-            const { createNotification: createProdReinspNotif } = require('./notificationController');
             createProdReinspNotif({
                 userId: product.vendorId, role: 'VENDOR', type: 'REINSPECTION_REQUIRED',
                 title: 'Product Re-inspection Required',

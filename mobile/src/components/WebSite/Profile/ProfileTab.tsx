@@ -1,13 +1,22 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, TextInput, Animated, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import { User, Info, ChevronRight } from 'lucide-react-native';
+import {
+  User,
+  Info,
+  ChevronRight,
+  Mail,
+  Phone,
+  Lock,
+  AlertCircle,
+} from 'lucide-react-native';
 import type { UserProfile } from './types';
 
 interface ProfileTabProps {
   editedProfile: UserProfile;
   setEditedProfile: (profile: UserProfile) => void;
   isEditing: boolean;
+  errors?: Partial<Record<'firstName' | 'phone', string>>;
 }
 
 // ── Reusable Section Card ──
@@ -87,17 +96,7 @@ function SectionCard({
 }
 
 // ── Reusable Form Field ──
-function FormField({
-  label,
-  value,
-  onChangeText,
-  isEditing,
-  placeholder,
-  keyboardType,
-  autoCapitalize,
-  accessibilityLabel,
-  isLast = false,
-}: {
+const FormField = React.forwardRef<TextInput, {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
@@ -107,7 +106,38 @@ function FormField({
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   accessibilityLabel?: string;
   isLast?: boolean;
-}) {
+  /** Never editable, regardless of isEditing — e.g. account email. */
+  readOnly?: boolean;
+  readOnlyHint?: string;
+  leadingIcon?: any;
+  error?: string;
+  returnKeyType?: 'next' | 'done';
+  onSubmitEditing?: () => void;
+  textContentType?: 'none' | 'emailAddress' | 'telephoneNumber' | 'givenName' | 'familyName';
+}>(function FormField(
+  {
+    label,
+    value,
+    onChangeText,
+    isEditing,
+    placeholder,
+    keyboardType,
+    autoCapitalize,
+    accessibilityLabel,
+    isLast = false,
+    readOnly = false,
+    readOnlyHint,
+    leadingIcon: LeadingIcon,
+    error,
+    returnKeyType,
+    onSubmitEditing,
+    textContentType,
+  },
+  ref,
+) {
+  const canEdit = isEditing && !readOnly;
+  const hasError = !!error;
+
   return (
     <View style={{ marginBottom: isLast ? 0 : 16 }}>
       <Text
@@ -122,32 +152,65 @@ function FormField({
       >
         {label}
       </Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        editable={isEditing}
-        placeholder={placeholder}
-        placeholderTextColor="#9ca3af"
-        keyboardType={keyboardType || 'default'}
-        autoCapitalize={autoCapitalize || 'sentences'}
-        accessibilityLabel={accessibilityLabel || label}
+
+      <View
         style={{
-          width: '100%',
-          paddingHorizontal: 14,
-          paddingVertical: 13,
-          minHeight: 48,
+          flexDirection: 'row',
+          alignItems: 'center',
+          minHeight: 50,
           borderRadius: 12,
-          fontSize: 14,
-          fontWeight: '600',
-          color: isEditing ? '#111827' : '#4b5563',
-          backgroundColor: isEditing ? '#ffffff' : '#f9fafb',
           borderWidth: 1.5,
-          borderColor: isEditing ? '#d1d5db' : '#f3f4f6',
+          borderColor: hasError
+            ? '#ef4444'
+            : canEdit
+              ? '#d1d5db'
+              : '#f3f4f6',
+          backgroundColor: canEdit ? '#ffffff' : '#f9fafb',
+          paddingHorizontal: 12,
         }}
-      />
+      >
+        {LeadingIcon ? (
+          <LeadingIcon size={16} color={hasError ? '#ef4444' : '#9ca3af'} style={{ marginRight: 8 }} />
+        ) : null}
+
+        <TextInput
+          ref={ref}
+          value={value}
+          onChangeText={onChangeText}
+          editable={canEdit}
+          placeholder={placeholder}
+          placeholderTextColor="#9ca3af"
+          keyboardType={keyboardType || 'default'}
+          autoCapitalize={autoCapitalize || 'sentences'}
+          accessibilityLabel={accessibilityLabel || label}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
+          blurOnSubmit={returnKeyType === 'done'}
+          textContentType={textContentType}
+          style={{
+            flex: 1,
+            paddingVertical: 13,
+            fontSize: 14,
+            fontWeight: '600',
+            color: canEdit ? '#111827' : '#4b5563',
+          }}
+        />
+
+        {readOnly ? <Lock size={14} color="#9ca3af" /> : null}
+      </View>
+
+      {/* Inline error OR read-only hint */}
+      {hasError ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}>
+          <AlertCircle size={12} color="#ef4444" />
+          <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600', flex: 1 }}>{error}</Text>
+        </View>
+      ) : readOnly && readOnlyHint ? (
+        <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 5 }}>{readOnlyHint}</Text>
+      ) : null}
     </View>
   );
-}
+});
 
 // ── Gender Selector (3-option segmented) ──
 function GenderSelector({
@@ -193,7 +256,7 @@ function GenderSelector({
             >
               <View
                 style={{
-                  minHeight: 48,
+                  minHeight: 50,
                   borderRadius: 12,
                   borderWidth: 1.5,
                   borderColor: active ? '#111827' : isEditing ? '#d1d5db' : '#f3f4f6',
@@ -219,7 +282,13 @@ export default function ProfileTab({
   editedProfile,
   setEditedProfile,
   isEditing,
+  errors = {},
 }: ProfileTabProps) {
+  // Refs for "next field" keyboard chaining
+  const firstNameRef = useRef<TextInput>(null);
+  const lastNameRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+
   const handleInputChange = (field: keyof UserProfile, value: string) => {
     setEditedProfile({ ...editedProfile, [field]: value });
   };
@@ -229,18 +298,29 @@ export default function ProfileTab({
       {/* ── Personal Information ── */}
       <SectionCard title="Personal Information" icon={User} iconColor="#111827" delay={100}>
         <FormField
+          ref={firstNameRef}
           label="First Name"
           value={editedProfile.firstName}
           onChangeText={(v) => handleInputChange('firstName', v)}
           isEditing={isEditing}
           placeholder="Enter your first name"
+          autoCapitalize="words"
+          textContentType="givenName"
+          error={errors.firstName}
+          returnKeyType="next"
+          onSubmitEditing={() => lastNameRef.current?.focus()}
         />
         <FormField
+          ref={lastNameRef}
           label="Last Name"
           value={editedProfile.lastName}
           onChangeText={(v) => handleInputChange('lastName', v)}
           isEditing={isEditing}
           placeholder="Enter your last name"
+          autoCapitalize="words"
+          textContentType="familyName"
+          returnKeyType="next"
+          onSubmitEditing={() => phoneRef.current?.focus()}
         />
         <FormField
           label="Email Address"
@@ -250,14 +330,22 @@ export default function ProfileTab({
           placeholder="Enter your email address"
           keyboardType="email-address"
           autoCapitalize="none"
+          leadingIcon={Mail}
+          readOnly
+          readOnlyHint="Your email is used to sign in and can't be changed here."
         />
         <FormField
+          ref={phoneRef}
           label="Phone Number"
           value={editedProfile.phone}
           onChangeText={(v) => handleInputChange('phone', v)}
           isEditing={isEditing}
           placeholder="Enter your phone number"
           keyboardType="phone-pad"
+          leadingIcon={Phone}
+          textContentType="telephoneNumber"
+          error={errors.phone}
+          returnKeyType="done"
         />
         <GenderSelector
           value={editedProfile.gender}

@@ -40,6 +40,18 @@ import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { CheckoutSkeleton } from '@/components/ui/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  DEFAULT_COUNTRY_ISO,
+  EMAIL_REGEX,
+  NAME_REGEX,
+  normalizeCountryToIso,
+  toE164,
+  validatePhone,
+  validatePostalCode,
+  getPostalRule,
+  getCountry,
+  getStates,
+} from './CheckoutProcess/constants';
 
 export interface CheckoutFormData {
   firstName: string;
@@ -81,7 +93,7 @@ export default function Checkout() {
     city: '',
     state: '',
     zipCode: '',
-    country: 'United States',
+    country: DEFAULT_COUNTRY_ISO,
     paymentMethod: 'razorpay',
     saveInfo: false,
     sameAsBilling: true,
@@ -171,7 +183,7 @@ export default function Checkout() {
           city: userData.city || '',
           state: userData.state || '',
           zipCode: userData.zipCode || '',
-          country: userData.country || 'United States',
+          country: normalizeCountryToIso(userData.country),
         }));
       }
     } catch (err: any) {
@@ -203,6 +215,7 @@ export default function Checkout() {
     const nameParts = (addr.name || '').trim().split(/\s+/);
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
+    const countryIso = normalizeCountryToIso(addr.country);
     setFormData((prev) => ({
       ...prev,
       firstName,
@@ -213,7 +226,7 @@ export default function Checkout() {
       city: addr.city || '',
       state: addr.state || '',
       zipCode: addr.zipCode || '',
-      country: addr.country || 'United States',
+      country: countryIso,
     }));
   };
 
@@ -250,7 +263,7 @@ export default function Checkout() {
       city: '',
       state: '',
       zipCode: '',
-      country: 'United States',
+      country: DEFAULT_COUNTRY_ISO,
     }));
   };
 
@@ -328,9 +341,9 @@ export default function Checkout() {
     // If a saved address is selected (not using new address), skip field validation
     if (!useNewAddress && selectedAddressId) return true;
 
-    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
-    const ZIP_REGEX = /^\d{5}(-\d{4})?$/;
-    const NAME_REGEX = /^[a-zA-Z\s\-']+$/;
+    const iso = (formData.country || DEFAULT_COUNTRY_ISO).toUpperCase();
+    const postalRule = getPostalRule(iso);
+    const stateList = getStates(iso);
 
     if (!formData.firstName?.trim()) {
       showErrorToast('Required Field', 'Please enter your first name');
@@ -371,9 +384,8 @@ export default function Checkout() {
       showErrorToast('Required Field', 'Please enter your phone number');
       return false;
     }
-    const phoneDigits = formData.phone.replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
-      showErrorToast('Invalid Phone', 'Please enter a valid US phone number');
+    if (!validatePhone(formData.phone, iso)) {
+      showErrorToast('Invalid Phone', `Enter a valid phone number for ${getCountry(iso)?.name ?? 'the selected country'}`);
       return false;
     }
 
@@ -391,6 +403,11 @@ export default function Checkout() {
       return false;
     }
 
+    if (!formData.country) {
+      showErrorToast('Required Field', 'Please select your country');
+      return false;
+    }
+
     if (!formData.city?.trim()) {
       showErrorToast('Required Field', 'Please enter your city');
       return false;
@@ -401,16 +418,16 @@ export default function Checkout() {
     }
 
     if (!formData.state?.trim()) {
-      showErrorToast('Required Field', 'Please select your state');
+      showErrorToast('Required Field', stateList.length > 0 ? 'Please select your state' : 'Please enter your state / region');
       return false;
     }
 
     if (!formData.zipCode?.trim()) {
-      showErrorToast('Required Field', 'Please enter your ZIP code');
+      showErrorToast('Required Field', `Please enter your ${postalRule.label.toLowerCase()}`);
       return false;
     }
-    if (!ZIP_REGEX.test(formData.zipCode.trim())) {
-      showErrorToast('Invalid ZIP', 'Enter a valid ZIP code (12345 or 12345-6789)');
+    if (!validatePostalCode(formData.zipCode, iso)) {
+      showErrorToast('Invalid ' + postalRule.label, `Enter a valid ${postalRule.label.toLowerCase()} (e.g. ${postalRule.placeholder})`);
       return false;
     }
 
@@ -511,7 +528,7 @@ export default function Checkout() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        phone: formData.phone,
+        phone: toE164(formData.phone, formData.country),
         street: formData.address,
         addressLine2: formData.addressLine2,
         city: formData.city,

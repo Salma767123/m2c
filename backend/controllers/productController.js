@@ -1348,12 +1348,16 @@ const assignQCCheckerToProduct = async (req, res) => {
       }
     });
 
-    // Notify the QC checker on mobile
-    const { notifications } = require('../utils/notificationService');
-    notifications.productAssigned(qcCheckerId, product.name).catch(console.error);
+    // Notify the QC checker — in-app feed + FCM push
+    const { createNotification: createQcNotif } = require('./notificationController');
+    createQcNotif({
+      userId: qcCheckerId, role: 'QC_CHECKER', type: 'PRODUCT_ASSIGNED',
+      title: 'New Product Assigned',
+      message: `"${product.name}" has been assigned to you for inspection.`,
+      data: { screen: 'products', productId: product.id }
+    }).catch(() => {});
 
     // Notify vendor that QC checker has been assigned
-    const { createNotification: createQcNotif } = require('./notificationController');
     createQcNotif({
       userId: product.vendorId, role: 'VENDOR', type: 'QC_ASSIGNED',
       title: 'QC Checker Assigned',

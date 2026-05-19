@@ -1111,6 +1111,8 @@ function FilterModal({
     (draft.minRating > 0 ? 1 : 0) +
     (minPriceInput || maxPriceInput ? 1 : 0);
 
+  const insets = useSafeAreaInsets();
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
@@ -1384,7 +1386,8 @@ function FilterModal({
                   gap: 12,
                   paddingHorizontal: 20,
                   paddingTop: 14,
-                  paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+                  // Clear the device's bottom safe area (home indicator / Android nav bar)
+                  paddingBottom: Math.max(insets.bottom, 16) + 6,
                   backgroundColor: '#ffffff',
                   borderTopWidth: 1,
                   borderTopColor: '#f3f4f6',

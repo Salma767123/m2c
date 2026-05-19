@@ -23,6 +23,12 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { orderService, Order } from '@/services/orderService';
 import { useCart } from '@/context/CartContext';
+import {
+  getCountryName,
+  getCountryFlag,
+  getStateName,
+  formatPhoneForDisplay,
+} from '@/components/WebSite/CheckOut/CheckoutProcess/constants';
 
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 
@@ -178,12 +184,18 @@ export default function OrderConfirmationScreen() {
               {addr.addressLine1}{addr.addressLine2 ? `, ${addr.addressLine2}` : ''}
             </Text>
             <Text style={{ fontSize: 13, color: '#6b7280' }}>
-              {addr.city}, {addr.state} {addr.zipCode}
+              {[addr.city, getStateName(addr.state, addr.country), addr.zipCode].filter(Boolean).join(', ')}
             </Text>
-            {addr.country ? <Text style={{ fontSize: 13, color: '#6b7280' }}>{addr.country}</Text> : null}
+            {addr.country ? (
+              <Text style={{ fontSize: 13, color: '#6b7280' }}>
+                {getCountryName(addr.country)} {getCountryFlag(addr.country)}
+              </Text>
+            ) : null}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
               <MapPin size={12} color="#6b7280" />
-              <Text style={{ fontSize: 12, color: '#6b7280' }}>{addr.phone}</Text>
+              <Text style={{ fontSize: 12, color: '#6b7280' }}>
+                {formatPhoneForDisplay(addr.phone, addr.country)}
+              </Text>
             </View>
           </Section>
 

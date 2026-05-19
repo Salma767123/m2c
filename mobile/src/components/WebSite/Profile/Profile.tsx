@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {
   User,
@@ -66,6 +68,14 @@ export default function Profile() {
     preferences: { newsletter: false, smsNotifications: false, emailNotifications: false },
   });
   const [editedProfile, setEditedProfile] = useState<UserProfile>(userProfile);
+  const [errors, setErrors] = useState<Partial<Record<'firstName' | 'phone', string>>>({});
+
+  const scrollRef = useRef<ScrollView>(null);
+  const formYRef = useRef(0);
+
+  const scrollToForm = () => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, formYRef.current - 12), animated: true });
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -113,16 +123,57 @@ export default function Profile() {
     }
   };
 
+  // Inline validation — returns a map of field → error message
+  const validate = (): Partial<Record<'firstName' | 'phone', string>> => {
+    const e: Partial<Record<'firstName' | 'phone', string>> = {};
+    if (!editedProfile.firstName.trim()) {
+      e.firstName = 'First name is required';
+    }
+    const phoneDigits = editedProfile.phone.replace(/\D/g, '');
+    if (phoneDigits && phoneDigits.length < 7) {
+      e.phone = 'Enter a valid phone number';
+    }
+    return e;
+  };
+
+  const handleEdit = () => {
+    setErrors({});
+    setIsEditing(true);
+    // Bring the form into view so the user isn't left staring at the header
+    setTimeout(scrollToForm, 220);
+  };
+
+  const handleCancel = () => {
+    const isDirty = JSON.stringify(editedProfile) !== JSON.stringify(userProfile);
+    const discard = () => {
+      setEditedProfile(userProfile);
+      setErrors({});
+      setIsEditing(false);
+    };
+    if (!isDirty) { discard(); return; }
+    Alert.alert('Discard changes?', 'Your unsaved changes will be lost.', [
+      { text: 'Keep Editing', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: discard },
+    ]);
+  };
+
   const handleSave = async () => {
+    const v = validate();
+    if (Object.keys(v).length > 0) {
+      setErrors(v);
+      scrollToForm();
+      showErrorToast('Check the form', 'Please fix the highlighted fields');
+      return;
+    }
+    setErrors({});
     try {
       setIsSaving(true);
       const name = `${editedProfile.firstName} ${editedProfile.lastName}`.trim();
-      if (!name) { showErrorToast('Error', 'Name is required'); return; }
       // Profile update only covers personal info. Addresses are managed
       // separately in the Saved Addresses screen.
       const res = await userProfileService.updateProfile({
         name,
-        phoneNumber: editedProfile.phone,
+        phoneNumber: editedProfile.phone.trim(),
       });
       if (res.success) {
         setUserProfile(editedProfile);
@@ -206,18 +257,24 @@ export default function Profile() {
 
   // ── Main ────────────────────────────────────────────────────────────────
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#f8fafc' }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScreenHeader
         isEditing={isEditing}
         isSaving={isSaving}
-        onEdit={() => setIsEditing(true)}
+        onEdit={handleEdit}
         onSave={handleSave}
-        onCancel={() => { setEditedProfile(userProfile); setIsEditing(false); }}
+        onCancel={handleCancel}
       />
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {/* Profile card */}
         <View
@@ -278,11 +335,17 @@ export default function Profile() {
         </View>
 
         {/* Profile form */}
-        <ProfileTab
-          editedProfile={editedProfile}
-          setEditedProfile={setEditedProfile}
-          isEditing={isEditing}
-        />
+        <View onLayout={(e) => { formYRef.current = e.nativeEvent.layout.y; }}>
+          <ProfileTab
+            editedProfile={editedProfile}
+            setEditedProfile={(p) => {
+              setEditedProfile(p);
+              if (Object.keys(errors).length > 0) setErrors({});
+            }}
+            isEditing={isEditing}
+            errors={errors}
+          />
+        </View>
 
         {/* Sign out */}
         <View style={{ marginHorizontal: 16, marginTop: 14 }}>
@@ -306,7 +369,7 @@ export default function Profile() {
           </Pressable>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

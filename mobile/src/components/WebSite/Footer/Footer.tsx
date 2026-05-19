@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, Linking, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Instagram, Facebook, Youtube } from 'lucide-react-native';
 import { companyInfoService } from '@/services/companyInfoService';
 
@@ -7,6 +8,7 @@ const STATIC_LOGO = require('../../../../assets/images/logo4.png');
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const insets = useSafeAreaInsets();
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
   // Load dynamic company logo (cached first, then fresh from API)
@@ -31,7 +33,7 @@ export default function Footer() {
   ];
 
   return (
-    <View className="bg-black pt-12 pb-8 px-6">
+    <View className="bg-black pt-12 px-6" style={{ paddingBottom: insets.bottom + 24 }}>
       {/* Brand */}
       <View className="items-center mb-8">
         <View className="mb-4">
@@ -76,12 +78,20 @@ export default function Footer() {
             onPress={() => openUrl(social.url)}
             accessibilityRole="button"
             accessibilityLabel={social.label}
-            className="w-10 h-10 rounded-full items-center justify-center"
-            style={({ pressed }) => ({
-              backgroundColor: pressed ? '#525252' : '#3d3d3d',
-            })}
+            android_ripple={{ color: 'rgba(255,255,255,0.15)', borderless: true, radius: 22 }}
           >
-            <social.icon size={18} color="#ffffff" />
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: '#3d3d3d',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <social.icon size={18} color="#ffffff" />
+            </View>
           </Pressable>
         ))}
       </View>

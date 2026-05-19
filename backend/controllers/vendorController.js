@@ -2009,6 +2009,15 @@ const assignQc = async (req, res) => {
       }
     });
 
+    // Notify the QC checker — in-app feed + FCM push
+    const { createNotification: createAssignNotif } = require('./notificationController');
+    createAssignNotif({
+      userId: checkerId, role: 'QC_CHECKER', type: 'VENDOR_ASSIGNED',
+      title: 'New Vendor Assigned',
+      message: `"${vendor.companyName}" has been assigned to you for inspection.`,
+      data: { screen: 'vendors', vendorId }
+    }).catch(() => {});
+
     res.json({
       message: 'QC Checker assigned successfully',
       vendor: updatedVendor
