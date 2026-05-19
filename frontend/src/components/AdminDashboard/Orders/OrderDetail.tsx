@@ -314,31 +314,46 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
 
                 {/* Right Column - Stakeholders */}
                 <div className="space-y-6">
-                    {/* Customer Info */}
+                    {/* Customer Details — same semantic structure as VendorToHubDetail and
+                        HubToCustomerDetail. Stacked instead of 2-column because this card
+                        lives in a narrow right rail; the sub-section headings keep the
+                        Customer Info / Shipping Address split visually consistent. */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                         <div className="flex items-center gap-2 mb-4">
                             <User className="h-5 w-5 text-gray-600" />
-                            <h2 className="text-lg font-semibold text-gray-900">Customer</h2>
+                            <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
                         </div>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             <div>
-                                <p className="text-xs text-gray-500 uppercase">Name</p>
-                                <p className="text-sm font-medium text-gray-900">{order.customerName}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 uppercase">Contact</p>
-                                <p className="text-sm text-gray-900">{order.customerPhone ? formatPhoneForDisplay(order.customerPhone, order.shippingAddress?.country) : "N/A"}</p>
+                                <h3 className="text-sm font-medium text-gray-900 mb-2">Customer Info</h3>
+                                <p className="text-sm text-gray-600">{order.customerName}</p>
                                 <p className="text-sm text-gray-600">{order.customerEmail}</p>
+                                {order.customerPhone && (
+                                    <p className="text-sm text-gray-600">{formatPhoneForDisplay(order.customerPhone, order.shippingAddress?.country)}</p>
+                                )}
                             </div>
                             <div>
-                                <p className="text-xs text-gray-500 uppercase">Address</p>
-                                <div className="text-sm text-gray-900 leading-relaxed mt-1">
-                                    <p className="font-medium">{order.shippingAddress?.street}</p>
-                                    {order.shippingAddress?.addressLine2 && <p>{order.shippingAddress?.addressLine2}</p>}
-                                    <p>{order.shippingAddress?.city}, {getStateName(order.shippingAddress?.state ?? "", order.shippingAddress?.country)} - {order.shippingAddress?.zipCode}</p>
-                                    <p className="text-slate-500 font-medium italic mt-1 flex items-center gap-1">
-                                        {getCountryName(order.shippingAddress?.country) || '—'} {getCountryFlag(order.shippingAddress?.country)}
-                                    </p>
+                                <h3 className="text-sm font-medium text-gray-900 mb-2">Shipping Address</h3>
+                                <div className="text-sm text-gray-600">
+                                    {order.shippingAddress ? (
+                                        <>
+                                            {(() => {
+                                                const a = order.shippingAddress;
+                                                const recipient = a.firstName && a.lastName
+                                                    ? `${a.firstName} ${a.lastName}`
+                                                    : a.firstName || a.name || "";
+                                                return recipient ? (
+                                                    <p className="font-medium text-gray-900">{recipient}</p>
+                                                ) : null;
+                                            })()}
+                                            <p>{order.shippingAddress.street}</p>
+                                            {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
+                                            <p>{order.shippingAddress.city}, {getStateName(order.shippingAddress.state ?? "", order.shippingAddress.country)} {order.shippingAddress.zipCode}</p>
+                                            <p className="flex items-center gap-1">
+                                                {getCountryName(order.shippingAddress.country) || '—'} {getCountryFlag(order.shippingAddress.country)}
+                                            </p>
+                                        </>
+                                    ) : "N/A"}
                                 </div>
                             </div>
                         </div>

@@ -101,8 +101,13 @@ export const generateInvoiceHTML = (order: CustomerOrder): string => {
             justify-content: space-between; 
             margin-bottom: 30px;
           }
-          .order-details, .shipping-details { 
-            width: 48%;
+          .order-details, .billing-details, .shipping-details {
+            width: 32%;
+            box-sizing: border-box;
+          }
+          .detail-row .recipient-name {
+            font-weight: 700;
+            color: #111827;
           }
           .section-title { 
             font-size: 16px; 
@@ -201,40 +206,32 @@ export const generateInvoiceHTML = (order: CustomerOrder): string => {
             </div>
           </div>
 
+          <div class="billing-details">
+            <div class="section-title">Bill To</div>
+            <div class="detail-row"><span class="recipient-name">${order.customer.name || '—'}</span></div>
+            ${order.customer.email ? `<div class="detail-row">${order.customer.email}</div>` : ''}
+            ${order.customer.phone ? `<div class="detail-row">${formatPhoneForDisplay(order.customer.phone, order.shippingAddress.country)}</div>` : ''}
+          </div>
+
           <div class="shipping-details">
-            <div class="section-title">Shipping Address</div>
-            <div class="detail-row">
-              <span class="detail-label">Name:</span>
-              ${order.shippingAddress.firstName} ${order.shippingAddress.lastName}
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Address:</span>
-              ${order.shippingAddress.street}
-            </div>
-            ${order.shippingAddress.addressLine2 ? `
-            <div class="detail-row">
-              <span class="detail-label">Address Line 2:</span>
-              ${order.shippingAddress.addressLine2}
-            </div>
-            ` : ''}
-            ${order.shippingAddress.landmark ? `
-            <div class="detail-row">
-              <span class="detail-label">Landmark:</span>
-              ${order.shippingAddress.landmark}
-            </div>
-            ` : ''}
-            <div class="detail-row">
-              <span class="detail-label">City:</span>
-              ${order.shippingAddress.city}, ${getStateName(order.shippingAddress.state, order.shippingAddress.country)} ${order.shippingAddress.zipCode}
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Country:</span>
-              ${getCountryName(order.shippingAddress.country)} ${getCountryFlag(order.shippingAddress.country)}
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Phone:</span>
-              ${formatPhoneForDisplay(order.shippingAddress.phone, order.shippingAddress.country)}
-            </div>
+            <div class="section-title">Ship To</div>
+            ${(() => {
+              const a = order.shippingAddress as ShippingAddress & { name?: string; addressLine1?: string; address?: string };
+              const recipient = a.firstName && a.lastName
+                ? `${a.firstName} ${a.lastName}`
+                : a.firstName || a.name || '';
+              const streetLine = a.street || a.addressLine1 || a.address || '';
+              const cityLine = [a.city, getStateName(a.state, a.country)].filter(Boolean).join(', ');
+              return `
+                ${recipient ? `<div class="detail-row"><span class="recipient-name">${recipient}</span></div>` : ''}
+                ${streetLine ? `<div class="detail-row">${streetLine}</div>` : ''}
+                ${a.addressLine2 ? `<div class="detail-row">${a.addressLine2}</div>` : ''}
+                ${a.landmark ? `<div class="detail-row">${a.landmark}</div>` : ''}
+                ${(cityLine || a.zipCode) ? `<div class="detail-row">${cityLine}${cityLine && a.zipCode ? ' ' : ''}${a.zipCode || ''}</div>` : ''}
+                <div class="detail-row">${getCountryName(a.country)} ${getCountryFlag(a.country)}</div>
+                ${a.phone ? `<div class="detail-row">${formatPhoneForDisplay(a.phone, a.country)}</div>` : ''}
+              `;
+            })()}
           </div>
         </div>
 

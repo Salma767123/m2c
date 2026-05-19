@@ -12,6 +12,21 @@
 const { Country, State } = require('country-state-city');
 const { parsePhoneNumberFromString } = require('libphonenumber-js');
 
+// Escape user-supplied strings before interpolating into the invoice HTML.
+// Defense-in-depth: customerName / recipient / address / item fields all flow from
+// DB writes which are validated, but an XSS payload that ever slipped past validation
+// (or a future API endpoint with weaker checks) would otherwise render as live HTML
+// in customers' inboxes. Numbers/booleans pass through unchanged.
+const escapeHtml = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
 // Format a stored phone (typically E.164 like "+919876543210") for human display.
 const formatPhoneForDisplay = (value, defaultCountry) => {
   if (!value) return '';
@@ -122,13 +137,22 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
   const resolvedCountry = resolveCountry(addr.country);
   const resolvedStateName = resolveStateName(addr.state, addr.country);
 
+  // Recipient (= the person physically receiving the package).
+  // Distinct from customerName (the account holder / payer).
+  const recipientName = addr.firstName && addr.lastName
+    ? `${addr.firstName} ${addr.lastName}`
+    : addr.firstName || addr.name || '';
+
+  const cityStateLine = [addr.city, resolvedStateName].filter(Boolean).join(', ');
+  const countryLine = resolvedCountry.name ? `${resolvedCountry.name} ${resolvedCountry.flag}`.trim() : '';
+
+  // Address-only block (recipient is rendered separately as the heading line).
   const shippingAddrStr = [
-    addr.firstName && addr.lastName ? `${addr.firstName} ${addr.lastName}` : addr.name,
     addr.street || addr.addressLine1,
     addr.addressLine2,
-    `${addr.city || ''}, ${resolvedStateName || ''}`,
+    cityStateLine,
     addr.zipCode || addr.pincode,
-    resolvedCountry.name ? `${resolvedCountry.name} ${resolvedCountry.flag}`.trim() : '',
+    countryLine,
   ].filter(Boolean).join('\n');
 
   const payStatusColor = paymentStatus === 'PAID' ? '#16a34a' : '#dc2626';
@@ -138,10 +162,10 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
         <tr>
             <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:center; color:#6b7280;">${i + 1}</td>
             <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb;">
-                <div style="font-weight:600; color:#111827;">${item.productName}</div>
-                ${item.sku ? `<div style="font-size:11px; color:#9ca3af;">SKU: ${item.sku}</div>` : ''}
-                ${item.size ? `<div style="font-size:11px; color:#9ca3af;">Size: ${item.size}</div>` : ''}
-                ${item.color ? `<div style="font-size:11px; color:#9ca3af;">Color: ${item.color}</div>` : ''}
+                <div style="font-weight:600; color:#111827;">${escapeHtml(item.productName)}</div>
+                ${item.sku ? `<div style="font-size:11px; color:#9ca3af;">SKU: ${escapeHtml(item.sku)}</div>` : ''}
+                ${item.size ? `<div style="font-size:11px; color:#9ca3af;">Size: ${escapeHtml(item.size)}</div>` : ''}
+                ${item.color ? `<div style="font-size:11px; color:#9ca3af;">Color: ${escapeHtml(item.color)}</div>` : ''}
             </td>
             <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:center;">${item.quantity}</td>
             <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:right;">${sym}${fmt(item.unitPrice)}</td>
@@ -154,7 +178,7 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invoice ${invoiceNo || orderId}</title>
+  <title>Invoice ${escapeHtml(invoiceNo || orderId)}</title>
 </head>
 <body style="margin:0; padding:0; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#f3f4f6; color:#374151;">
   <div style="max-width:800px; margin:24px auto; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08);">
@@ -165,42 +189,50 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
         ${companyLogo ? `
         <img
           src="${companyLogo}"
-          alt="${companyName} logo"
+          alt="${escapeHtml(companyName)} logo"
           style="height:64px; width:auto; object-fit:contain; border-radius:8px;"
         />` : ''}
         <div>
-          ${(companyName !== 'M2C Store' && companyName !== 'M2C Marketplace Pvt Ltd') ? `<div style="font-size:26px; font-weight:800; color:#fff; letter-spacing:-0.5px; margin-bottom:4px;">${companyName}</div>` : ''}
-          ${gstNumber ? `<div style="font-size:12px; color:#9ca3af; margin-top:2px;">GSTIN: ${gstNumber}</div>` : ''}
-          ${address ? `<div style="font-size:12px; color:#9ca3af; margin-top:2px;">${address}</div>` : ''}
+          ${(companyName !== 'M2C Store' && companyName !== 'M2C Marketplace Pvt Ltd') ? `<div style="font-size:26px; font-weight:800; color:#fff; letter-spacing:-0.5px; margin-bottom:4px;">${escapeHtml(companyName)}</div>` : ''}
+          ${gstNumber ? `<div style="font-size:12px; color:#9ca3af; margin-top:2px;">GSTIN: ${escapeHtml(gstNumber)}</div>` : ''}
+          ${address ? `<div style="font-size:12px; color:#9ca3af; margin-top:2px;">${escapeHtml(address)}</div>` : ''}
         </div>
       </div>
       <div style="text-align:right;">
         <div style="font-size:22px; font-weight:700; color:#fff;">INVOICE</div>
-        <div style="font-size:18px; font-weight:600; color:#6366f1; margin-top:4px; letter-spacing:1px;">${invoiceNo || orderId}</div>
+        <div style="font-size:18px; font-weight:600; color:#6366f1; margin-top:4px; letter-spacing:1px;">${escapeHtml(invoiceNo || orderId)}</div>
         <div style="font-size:12px; color:#9ca3af; margin-top:6px;">Date: ${fmtDate(orderDate)}</div>
-        <div style="display:inline-block; margin-top:8px; padding:4px 12px; background:${payStatusColor}; color:#fff; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.5px;">${payStatusLabel}</div>
+        <div style="display:inline-block; margin-top:8px; padding:4px 12px; background:${payStatusColor}; color:#fff; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.5px;">${escapeHtml(payStatusLabel)}</div>
       </div>
     </div>
 
-    <!-- ── Bill To / Order Info ── -->
+    <!-- ── Bill To / Ship To / Order Info — standard 3-section invoice header ── -->
     <div style="display:flex; gap:0; border-bottom:1px solid #e5e7eb;">
       <div style="flex:1; padding:24px 36px; border-right:1px solid #e5e7eb;">
         <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Bill To</div>
-        <div style="font-weight:700; font-size:15px; color:#111827;">${customerName}</div>
-        <div style="font-size:13px; color:#6b7280; margin-top:4px;">${customerEmail}</div>
-        <div style="font-size:13px; color:#6b7280;">${formatPhoneForDisplay(customerPhone, addr.country)}</div>
-        <div style="font-size:13px; color:#6b7280; margin-top:8px; white-space:pre-line;">${shippingAddrStr}</div>
+        <div style="font-weight:700; font-size:15px; color:#111827;">${escapeHtml(customerName)}</div>
+        <div style="font-size:13px; color:#6b7280; margin-top:4px;">${escapeHtml(customerEmail)}</div>
+        <div style="font-size:13px; color:#6b7280;">${escapeHtml(formatPhoneForDisplay(customerPhone, addr.country))}</div>
+      </div>
+      <div style="flex:1; padding:24px 36px; border-right:1px solid #e5e7eb;">
+        <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Ship To</div>
+        ${recipientName
+          ? `<div style="font-weight:700; font-size:15px; color:#111827;">${escapeHtml(recipientName)}</div>`
+          : '<div style="font-size:13px; color:#9ca3af; font-style:italic;">Same as billing</div>'}
+        ${shippingAddrStr
+          ? `<div style="font-size:13px; color:#6b7280; margin-top:4px; white-space:pre-line;">${escapeHtml(shippingAddrStr)}</div>`
+          : ''}
       </div>
       <div style="flex:1; padding:24px 36px;">
         <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Order Details</div>
         <table style="width:100%; font-size:13px; border-collapse:collapse;">
           <tr>
             <td style="padding:3px 0; color:#6b7280;">Order ID</td>
-            <td style="padding:3px 0; text-align:right; font-weight:600; color:#111827;">${orderId}</td>
+            <td style="padding:3px 0; text-align:right; font-weight:600; color:#111827;">${escapeHtml(orderId)}</td>
           </tr>
           <tr>
             <td style="padding:3px 0; color:#6b7280;">Invoice No</td>
-            <td style="padding:3px 0; text-align:right; font-weight:700; color:#6366f1;">${invoiceNo || '—'}</td>
+            <td style="padding:3px 0; text-align:right; font-weight:700; color:#6366f1;">${escapeHtml(invoiceNo || '—')}</td>
           </tr>
           <tr>
             <td style="padding:3px 0; color:#6b7280;">Order Date</td>
@@ -208,7 +240,7 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
           </tr>
           <tr>
             <td style="padding:3px 0; color:#6b7280;">Payment</td>
-            <td style="padding:3px 0; text-align:right; font-weight:600; color:#111827;">${paymentMethod || '—'}</td>
+            <td style="padding:3px 0; text-align:right; font-weight:600; color:#111827;">${escapeHtml(paymentMethod || '—')}</td>
           </tr>
         </table>
       </div>
@@ -256,7 +288,7 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
         </tr>` : ''}
         ${bagTypePrice > 0 ? `
         <tr>
-          <td style="padding:6px 0; color:#6b7280;">Bag (${bagTypeName || 'Add-on'})</td>
+          <td style="padding:6px 0; color:#6b7280;">Bag (${escapeHtml(bagTypeName || 'Add-on')})</td>
           <td style="padding:6px 0; text-align:right; font-weight:600;">${sym}${fmt(bagTypePrice)}</td>
         </tr>` : ''}
         <tr style="border-top:2px solid #111827;">
@@ -268,9 +300,9 @@ const getOrderInvoiceHTML = (order, adminSettings = {}, isForPDF = false) => {
 
     <!-- ── Footer ── -->
     <div style="background:#f9fafb; border-top:1px solid #e5e7eb; padding:20px 36px; text-align:center;">
-      <div style="font-size:13px; font-weight:600; color:#111827; margin-bottom:4px;">Thank you for shopping with ${companyName}!</div>
+      <div style="font-size:13px; font-weight:600; color:#111827; margin-bottom:4px;">Thank you for shopping with ${escapeHtml(companyName)}!</div>
       <div style="font-size:11px; color:#9ca3af;">This is a computer generated invoice and does not require a signature.</div>
-      ${gstNumber ? `<div style="font-size:11px; color:#9ca3af; margin-top:2px;">GSTIN: ${gstNumber} | ${state}, ${country}</div>` : ''}
+      ${gstNumber ? `<div style="font-size:11px; color:#9ca3af; margin-top:2px;">GSTIN: ${escapeHtml(gstNumber)} | ${escapeHtml(state)}, ${escapeHtml(country)}</div>` : ''}
     </div>
   </div>
 </body>

@@ -115,8 +115,14 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
 
   const stateDisplay = getStateName(addr.state || "", addr.country);
   const countryDisplay = getCountryName(addr.country);
+  // Distinct from order.customerName (account holder) — this is the shipping
+  // recipient (who actually receives the package), e.g. when the customer
+  // ships a gift to someone else. Falls back to legacy addr.name.
+  const recipientName = addr.firstName && addr.lastName
+    ? `${addr.firstName} ${addr.lastName}`
+    : addr.firstName || addr.name || "";
   const addrStr = [
-    addr.addressLine1,
+    addr.addressLine1 || addr.street || addr.address,
     addr.addressLine2,
     addr.city && stateDisplay ? `${addr.city}, ${stateDisplay}` : (addr.city || stateDisplay),
     addr.postalCode || addr.zipCode,
@@ -195,14 +201,27 @@ export default function InvoiceDetail({ invoiceId }: InvoiceDetailProps) {
         </div>
 
         <div className="p-8">
-          {/* Bill To + Order Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 pb-8 border-b border-gray-100">
+          {/* Bill To + Ship To + Order Info — standard 3-column invoice header.
+              BILL TO = account holder (payer). SHIP TO = recipient + address. */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 pb-8 border-b border-gray-100">
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Bill To</p>
               <p className="font-bold text-gray-900 text-base">{order.customerName || "—"}</p>
-              <p className="text-sm text-gray-600 mt-1">{order.customerEmail}</p>
+              <p className="text-sm text-gray-600 mt-1 break-words">{order.customerEmail}</p>
               <p className="text-sm text-gray-600">{order.customerPhone || "—"}</p>
-              {addrStr && <p className="text-sm text-gray-600 mt-2 leading-relaxed">{addrStr}</p>}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Ship To</p>
+              {(recipientName || addrStr) ? (
+                <div className="leading-relaxed">
+                  {recipientName && (
+                    <p className="font-bold text-gray-900 text-base">{recipientName}</p>
+                  )}
+                  {addrStr && <p className="text-sm text-gray-600 mt-1">{addrStr}</p>}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">Same as billing</p>
+              )}
             </div>
             <div className="md:text-right">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Order Info</p>
