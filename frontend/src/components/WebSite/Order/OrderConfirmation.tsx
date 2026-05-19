@@ -5,6 +5,7 @@ import Image from "next/image"
 import { CheckCircle, Package, Truck, Mail, Download, ArrowRight, Clock, AlertCircle, CreditCard, MapPin, Phone, Loader2, ShoppingBag } from "lucide-react"
 import { useState, useEffect } from "react"
 import orderService, { Order } from "@/services/orderService"
+import { popRecentOrder } from "@/lib/recentOrder"
 import { useSearchParams } from "next/navigation"
 import { getCountryName, getCountryFlag, getStateName, formatPhoneForDisplay } from "@/components/WebSite/CheckOut/CheckoutProcess/constants"
 
@@ -22,9 +23,18 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!order && orderId) {
-      fetchOrder(orderId)
+    if (order || !orderId) return
+    // The checkout page stashes the just-created order in sessionStorage so we
+    // can render immediately instead of refetching. Only the original tab that
+    // placed the order sees this; refreshes / shared links fall through to the
+    // network fetch.
+    const cached = popRecentOrder(orderId)
+    if (cached) {
+      setOrder(cached)
+      setLoading(false)
+      return
     }
+    fetchOrder(orderId)
   }, [orderId])
 
   const fetchOrder = async (id: string) => {

@@ -22,6 +22,7 @@ import ReviewOrder from "./CheckoutProcess/ReviewOrder"
 import AddressSelector from "./CheckoutProcess/AddressSelector"
 import cartService, { CartItem } from "@/services/cartService"
 import orderService, { CreateOrderParams } from "@/services/orderService"
+import { stashRecentOrder } from "@/lib/recentOrder"
 import paymentService from "@/services/paymentService"
 import { userProfileService } from "@/services/userProfileService"
 import { userAuthService } from "@/services/userAuthService"
@@ -636,6 +637,9 @@ export default function Checkout() {
       })
 
       if (response.success && response.data) {
+        // Hand the order off via sessionStorage so the confirmation page can
+        // render immediately without re-fetching what we already have.
+        stashRecentOrder(response.data)
         localStorage.removeItem('appliedCoupon')
         localStorage.removeItem('selectedBagType')
         router.push(`/order-confirmation?id=${response.data.id}`)

@@ -31,6 +31,7 @@ import PaymentForm from './CheckoutProcess/PaymentForm';
 import ReviewOrder from './CheckoutProcess/ReviewOrder';
 import { cartService, CartItem } from '@/services/cartService';
 import orderService, { CreateOrderParams } from '@/services/orderService';
+import { stashRecentOrder } from '@/lib/recentOrder';
 import paymentService from '@/services/paymentService';
 import { paymentSettingsService, PublicPaymentSettings } from '@/services/paymentSettingsService';
 import { userProfileService } from '@/services/userProfileService';
@@ -552,6 +553,9 @@ export default function Checkout() {
 
 
       if (response.success && response.data) {
+        // Hand the order off via AsyncStorage so the confirmation screen can
+        // render immediately without re-fetching what we already have.
+        await stashRecentOrder(response.data);
         await AsyncStorage.removeItem('appliedCoupon');
         showSuccessToast('Order Placed!', 'Your order has been placed successfully');
         router.replace(`/(any)/order-confirmation?id=${response.data.id}` as any);

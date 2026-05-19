@@ -22,6 +22,7 @@ import {
 } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { orderService, Order } from '@/services/orderService';
+import { popRecentOrder } from '@/lib/recentOrder';
 import { useCart } from '@/context/CartContext';
 
 const fmt = (n: number) => `$${n.toFixed(2)}`;
@@ -43,11 +44,21 @@ export default function OrderConfirmationScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (id) fetchOrder();
+    if (id) loadOrder();
     refreshCart(); // Clear cart badge after successful order
   }, [id]);
 
-  const fetchOrder = async () => {
+  const loadOrder = async () => {
+    // The checkout screen stashes the just-created order in AsyncStorage so we
+    // can render immediately instead of refetching. Only the original screen
+    // that placed the order sees this; navigating back here later falls
+    // through to the network fetch (right behavior — fresh data).
+    const cached = await popRecentOrder(id);
+    if (cached) {
+      setOrder(cached);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await orderService.getOrderById(id);
       if (res.success && res.data) setOrder(res.data);
