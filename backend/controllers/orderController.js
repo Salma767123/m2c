@@ -200,6 +200,12 @@ const createOrder = async (req, res) => {
         // Track low stock alerts (populated inside transaction, sent after)
         const lowStockAlerts = [];
 
+        // Collected during the transaction but written AFTER it commits.
+        // These are pure audit log entries; persisting them outside the
+        // transaction keeps the critical-path write count smaller without
+        // affecting order correctness.
+        const stockHistoryRecords = [];
+
         // Use transaction to ensure data integrity
         const result = await prisma.$transaction(async (tx) => {
             // Create Order
@@ -237,30 +243,24 @@ const createOrder = async (req, res) => {
 
             // Re-validate stock inside transaction to prevent concurrent overselling.
             // The outer check (pre-transaction) is a fast-path guard; this is the
-            // authoritative check under transactional isolation.
-            for (const update of stockUpdates) {
-                if (update.variantId) {
-                    const freshVariant = await tx.productVariant.findUnique({
-                        where: { id: update.variantId },
-                        select: { stock: true },
-                    });
-                    if (!freshVariant || freshVariant.stock < update.quantity) {
-                        throw Object.assign(
-                            new Error(`Insufficient stock for one of the products. Please refresh and try again.`),
-                            { statusCode: 409 }
-                        );
-                    }
-                } else {
-                    const freshProduct = await tx.product.findUnique({
-                        where: { id: update.id },
-                        select: { totalStock: true },
-                    });
-                    if (!freshProduct || freshProduct.totalStock < update.quantity) {
-                        throw Object.assign(
-                            new Error(`Insufficient stock for one of the products. Please refresh and try again.`),
-                            { statusCode: 409 }
-                        );
-                    }
+            // authoritative check under transactional isolation. Reads run in
+            // parallel — each round trip would otherwise stack serially.
+            const freshStockChecks = await Promise.all(
+                stockUpdates.map((update) =>
+                    update.variantId
+                        ? tx.productVariant.findUnique({ where: { id: update.variantId }, select: { stock: true } })
+                        : tx.product.findUnique({ where: { id: update.id }, select: { totalStock: true } })
+                )
+            );
+            for (let i = 0; i < stockUpdates.length; i++) {
+                const update = stockUpdates[i];
+                const fresh = freshStockChecks[i];
+                const available = update.variantId ? fresh?.stock : fresh?.totalStock;
+                if (!fresh || available < update.quantity) {
+                    throw Object.assign(
+                        new Error(`Insufficient stock for one of the products. Please refresh and try again.`),
+                        { statusCode: 409 }
+                    );
                 }
             }
 
@@ -286,90 +286,81 @@ const createOrder = async (req, res) => {
                 productTotalDeductions[update.id].totalQuantity += update.quantity;
             }
 
+            // Decrement stock sequentially. MongoDB transactions only allow one
+            // operation per session at a time and Prisma serializes parallel
+            // writes onto the same tx client anyway, so Promise.all would add
+            // risk without any actual parallelism.
             for (const update of stockUpdates) {
-                // Decrement the specific variant's stock if applicable
                 if (update.variantId) {
                     await tx.productVariant.update({
                         where: { id: update.variantId },
-                        data: {
-                            stock: { decrement: update.quantity }
-                        }
+                        data: { stock: { decrement: update.quantity } }
                     });
-                }
-
-                // Decrement inventory baseStock for base product items (no variant)
-                if (!update.variantId && update.inventoryItemId) {
+                } else if (update.inventoryItemId) {
                     await tx.inventory.update({
                         where: { id: update.inventoryItemId },
-                        data: {
-                            baseStock: { decrement: update.quantity }
-                        }
+                        data: { baseStock: { decrement: update.quantity } }
                     });
                 }
             }
 
-            // Recalculate product totalStock and inventory currentStock from source-of-truth values
+            // Recalculate product totalStock and inventory currentStock from
+            // source-of-truth values. Reads inside each iteration run in
+            // parallel (safe — read-only, distinct documents). The outer loop
+            // and writes stay sequential because MongoDB transactions only
+            // allow one operation per session at a time.
             for (const [productId, agg] of Object.entries(productTotalDeductions)) {
-                // Re-read fresh variant stocks after Step 2 decrements
-                const freshProduct = await tx.product.findUnique({
-                    where: { id: productId },
-                    include: { variants: true }
-                });
+                const [freshProduct, freshInventory] = await Promise.all([
+                    tx.product.findUnique({
+                        where: { id: productId },
+                        include: { variants: true },
+                    }),
+                    agg.inventoryItemId
+                        ? tx.inventory.findUnique({ where: { id: agg.inventoryItemId } })
+                        : Promise.resolve(null),
+                ]);
 
-                const variantSum = freshProduct.variants
+                const variantSum = freshProduct?.variants
                     ? freshProduct.variants.reduce((sum, v) => sum + v.stock, 0)
                     : 0;
 
                 let newTotalStock;
 
-                if (agg.inventoryItemId) {
-                    // Re-read fresh baseStock after Step 2 decrement
-                    const freshInventory = await tx.inventory.findUnique({
-                        where: { id: agg.inventoryItemId }
-                    });
+                if (agg.inventoryItemId && freshInventory) {
                     newTotalStock = freshInventory.baseStock + variantSum;
-
                     await tx.inventory.update({
                         where: { id: agg.inventoryItemId },
-                        data: {
-                            currentStock: newTotalStock
-                        }
+                        data: { currentStock: newTotalStock },
                     });
-
-                    // Log stock change history accurately reflecting the order deductions
-                    await tx.stockChangeHistory.create({
-                        data: {
-                            inventoryId: agg.inventoryItemId,
-                            previousStock: newTotalStock + agg.totalQuantity,
-                            newStock: newTotalStock,
-                            changeAmount: -agg.totalQuantity,
-                            reason: `Order placed: ${orderDisplayId}`,
-                            changedBy: userId,
-                            changedByType: 'system',
-                            changedByName: user.name
-                        }
+                    // Audit log entry — persisted in a single createMany after the
+                    // transaction commits to keep the critical path shorter.
+                    stockHistoryRecords.push({
+                        inventoryId: agg.inventoryItemId,
+                        previousStock: newTotalStock + agg.totalQuantity,
+                        newStock: newTotalStock,
+                        changeAmount: -agg.totalQuantity,
+                        reason: `Order placed: ${orderDisplayId}`,
+                        changedBy: userId,
+                        changedByType: 'system',
+                        changedByName: user.name,
                     });
                 } else {
-                    // No inventory link — just decrement totalStock
                     newTotalStock = Math.max(0, agg.currentTotalStock - agg.totalQuantity);
                 }
 
                 await tx.product.update({
                     where: { id: productId },
-                    data: {
-                        totalStock: newTotalStock,
-                        inStock: newTotalStock > 0
-                    }
+                    data: { totalStock: newTotalStock, inStock: newTotalStock > 0 },
                 });
 
-                // Collect low stock data for post-transaction notifications
+                // Low-stock notification metadata. Use the already-fetched product
+                // name instead of issuing a second findUnique.
                 if (newTotalStock <= 10 || newTotalStock === 0) {
-                    const prodInfo = await tx.product.findUnique({ where: { id: productId }, select: { name: true, lowStockThreshold: true } });
                     lowStockAlerts.push({
                         productId,
-                        productName: prodInfo?.name || 'Unknown Product',
+                        productName: freshProduct?.name || 'Unknown Product',
                         newStock: newTotalStock,
-                        threshold: prodInfo?.lowStockThreshold || 10,
+                        threshold: freshProduct?.lowStockThreshold || 10,
                     });
                 }
             }
@@ -414,6 +405,9 @@ const createOrder = async (req, res) => {
                 vendorItemGroups[item.vendorId].itemIds.push(item.id);
             }
 
+            // Create per-vendor shipments sequentially — MongoDB transactions
+            // serialize writes on the same session, so parallelism here would
+            // add risk without speed-up.
             let shipmentIdx = 0;
             for (const [vid, group] of Object.entries(vendorItemGroups)) {
                 shipmentIdx++;
@@ -427,7 +421,6 @@ const createOrder = async (req, res) => {
                         status: 'ORDER_CREATED',
                     },
                 });
-                // Link items to their shipment
                 await tx.orderItem.updateMany({
                     where: { id: { in: group.itemIds } },
                     data: { shipmentId: shipment.id },
@@ -448,6 +441,14 @@ const createOrder = async (req, res) => {
             maxWait: 10000,
             timeout: 30000,
         });
+
+        // Persist audit log entries collected during the transaction. Fire-and-
+        // forget — the order is already committed, so a log-write failure must
+        // not block (or fail) the response to the customer.
+        if (stockHistoryRecords.length > 0) {
+            prisma.stockChangeHistory.createMany({ data: stockHistoryRecords })
+                .catch((err) => console.error('stockChangeHistory backfill failed:', err));
+        }
 
         // Send low stock / out of stock alerts (outside transaction)
         const { createNotification, createNotificationForRole: notifyStockAlert } = require('./notificationController');
