@@ -9,6 +9,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+import { dispatchAuthChange } from '@/lib/authEvents'
 
 interface LoginFormData {
   email: string
@@ -126,6 +127,7 @@ export default function LoginForm({ onGoogleAuth }: LoginFormProps) {
             sessionStorage.setItem('adminToken', response.data.token)
             sessionStorage.setItem('adminUser', JSON.stringify(response.data.user))
           }
+          dispatchAuthChange()
 
           showSuccessToast('Login Successful', `Welcome back, ${response.data.user.name}!`)
 

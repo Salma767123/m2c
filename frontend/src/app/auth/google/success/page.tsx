@@ -4,6 +4,7 @@ import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { userAuthService } from '@/services/userAuthService'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
+import { dispatchAuthChange } from '@/lib/authEvents'
 
 function GoogleAuthSuccessContent() {
   const router = useRouter()
@@ -25,6 +26,7 @@ function GoogleAuthSuccessContent() {
           // Admin users should go to admin dashboard
           localStorage.setItem('adminToken', token)
           localStorage.setItem('adminUser', JSON.stringify(user))
+          dispatchAuthChange()
 
           // Register FCM push token (fire-and-forget)
           import('@/services/webNotificationService').then(m => m.registerWebPushToken()).catch(() => {})

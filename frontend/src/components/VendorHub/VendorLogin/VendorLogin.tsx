@@ -19,6 +19,7 @@ import {
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { useVendorAuth } from '@/hooks/useVendorAuth'
 import { companyInfoService } from '@/services/companyInfoService'
+import { dispatchAuthChange } from '@/lib/authEvents'
 
 interface LoginFormData {
   email: string
@@ -113,6 +114,7 @@ export default function VendorLogin() {
         sessionStorage.setItem('vendorUser', JSON.stringify(result.vendor))
         console.log('Stored in sessionStorage')
       }
+      dispatchAuthChange()
 
       // Show success toast
       showSuccessToast('Login Successful', `Welcome back, ${result.vendor.companyName}!`)

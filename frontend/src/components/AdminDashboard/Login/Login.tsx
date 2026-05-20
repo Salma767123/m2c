@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import axiosInstance from '@/lib/axios'
+import { dispatchAuthChange } from '@/lib/authEvents'
 import {
   Eye,
   EyeOff,
@@ -175,6 +176,7 @@ export default function AdminLogin() {
       // (httpOnly cookie also set by backend for 7-day persistence)
       localStorage.setItem('adminToken', loginResponse.token)
       localStorage.setItem('adminUser', JSON.stringify(loginResponse.user))
+      dispatchAuthChange()
       console.log('Stored in localStorage (permanent for admin sessions)')
 
 

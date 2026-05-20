@@ -1,4 +1,5 @@
 import axios from '@/lib/axios';
+import { dispatchAuthChange } from '@/lib/authEvents';
 
 export interface UserRegisterData {
   email: string;
@@ -125,6 +126,7 @@ class UserAuthService {
       const storage = rememberMe ? localStorage : sessionStorage;
       storage.setItem('userToken', token);
       storage.setItem('userData', JSON.stringify(user));
+      dispatchAuthChange();
     } catch (error) {
     }
   }
@@ -158,6 +160,7 @@ class UserAuthService {
       localStorage.removeItem('userData');
       sessionStorage.removeItem('userToken');
       sessionStorage.removeItem('userData');
+      dispatchAuthChange();
     } catch (error) {
     }
   }

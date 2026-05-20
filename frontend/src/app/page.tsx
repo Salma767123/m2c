@@ -13,40 +13,20 @@ import ValueSection from '@/components/WebSite/Footer/ValueSection';
 import SEOHead from '@/components/SEO/SEOHead';
 import { isAuthenticated } from '@/lib/auth';
 import VendorService from '@/services/vendorService';
+import { subscribeToAuthChange } from '@/lib/authEvents';
 
 export default function Home() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false)
   const [isVendorLoggedIn, setIsVendorLoggedIn] = useState(false)
 
-  // Check authentication status
+  // Check authentication status — event-driven, no polling.
   useEffect(() => {
     const checkAuth = () => {
-      // Check admin authentication
-      const adminLoggedIn = isAuthenticated()
-      setIsAdminLoggedIn(adminLoggedIn)
-      
-      // Check vendor authentication
-      const vendorLoggedIn = VendorService.isLoggedIn()
-      setIsVendorLoggedIn(vendorLoggedIn)
+      setIsAdminLoggedIn(isAuthenticated())
+      setIsVendorLoggedIn(VendorService.isLoggedIn())
     }
-    
-    // Check immediately and also on storage changes
     checkAuth()
-    
-    // Listen for storage changes (in case user logs in/out in another tab)
-    const handleStorageChange = () => {
-      checkAuth()
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    
-    // Also check periodically in case of same-tab changes
-    const interval = setInterval(checkAuth, 1000)
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
-    }
+    return subscribeToAuthChange(checkAuth)
   }, [])
 
   return (

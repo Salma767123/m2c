@@ -1,5 +1,6 @@
 import { getStoredAuth, authenticatedFetch } from '@/lib/auth'
 import axiosInstance from '@/lib/axios'
+import { dispatchAuthChange } from '@/lib/authEvents'
 
 // Vendor Service for API integration
 
@@ -383,6 +384,7 @@ class VendorService {
       if (typeof window !== 'undefined') {
         localStorage.setItem('vendorToken', data.token);
         localStorage.setItem('vendorData', JSON.stringify(data.vendor));
+        dispatchAuthChange();
       }
 
       return data;
@@ -916,6 +918,7 @@ class VendorService {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('vendorToken');
       localStorage.removeItem('vendorData');
+      dispatchAuthChange();
     }
   }
 
