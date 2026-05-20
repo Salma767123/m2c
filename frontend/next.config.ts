@@ -12,9 +12,6 @@ const nextConfig: NextConfig = {
     ],
   },
   images: {
-    // Serve modern formats first; Next falls back to the original on browsers
-    // that don't accept them.
-    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
         protocol: 'https',
