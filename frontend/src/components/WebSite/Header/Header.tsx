@@ -22,7 +22,6 @@ import { cartService } from "@/services/cartService";
 import { wishlistService } from "@/services/wishlistService";
 import { userAuthService } from "@/services/userAuthService";
 import { categoryService } from "@/services/categoryService";
-import { couponService } from "@/services/couponService";
 import { companyInfoService } from "@/services/companyInfoService";
 import NotificationDropdown from "@/components/Shared/NotificationDropdown";
 import { subscribeToAuthChange, dispatchAuthChange } from "@/lib/authEvents";
@@ -45,7 +44,6 @@ const Header = () => {
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
-  const [promotionalOffers, setPromotionalOffers] = useState<string[]>([]);
   const [popularSearches, setPopularSearches] = useState<string[]>([
     "Towels",
     "Bath Linen",
@@ -236,27 +234,6 @@ const Header = () => {
 
     fetchPopularSearches();
   }, [])
-
-  // Load Promotional Offers (data ready for future UI)
-  useEffect(() => {
-    const loadPromotionalOffers = async () => {
-      try {
-        const response = await couponService.getPromotionalCoupons();
-        if (response.success && response.data.length > 0) {
-          const validOffers = response.data.filter((offer: string) => offer?.trim().length > 0);
-          if (validOffers.length > 0) { setPromotionalOffers(validOffers); return; }
-        }
-      } catch { /* silent */ }
-      setPromotionalOffers([
-        'Free shipping on orders above $99',
-        'Premium Cotton Towels - Buy 2 Get 1 Free',
-        'Special discount on Table Linen - Up to 40% off',
-      ]);
-    };
-    loadPromotionalOffers();
-    const interval = setInterval(loadPromotionalOffers, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const isActiveLink = (href: string) => {
     if (href === "/") return pathname === "/";

@@ -75,37 +75,6 @@ class CouponService {
         }
     }
 
-    // Public method to get active promotional coupons
-    async getPromotionalCoupons(): Promise<{ success: boolean; data: string[] }> {
-        try {
-            // Use the public promotional endpoint
-            const response = await axios.get('/coupons/promotional', {
-                params: { limit: 10 },
-                timeout: 5000 // 5 second timeout
-            });
-            
-            if (response.data && response.data.success && Array.isArray(response.data.data)) {
-                return {
-                    success: true,
-                    data: response.data.data
-                };
-            }
-            
-            return {
-                success: false,
-                data: []
-            };
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.warn('Failed to fetch promotional coupons:', errorMessage);
-            // Return empty array on error for promotional display
-            return {
-                success: false,
-                data: []
-            };
-        }
-    }
-
     async getPopupCoupon(category: string): Promise<PopupCoupon | null> {
         try {
             const response = await axios.get('/coupons/popup', { params: { category }, timeout: 5000 });
