@@ -4,6 +4,7 @@ const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudina
 const { prisma } = require('../config/database');
 const { normalizeCategoryValues } = require('../utils/categoryResolver');
 const { generateVendorCode, reconcileAndGenerate } = require('../utils/vendorCodeGenerator');
+const { parseMapLinkCoordinates } = require('../utils/locationUtils');
 const {
   sendVendorApprovalEmail,
   sendVendorRejectionEmail,
@@ -365,6 +366,12 @@ const registerVendor = async (req, res) => {
       warehouseSize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
       storageCapacity: warehousingCapacity,
       mapLink: mapLink || null,
+      ...(() => {
+        const coords = parseMapLinkCoordinates(mapLink);
+        return coords
+          ? { factoryLatitude: coords.latitude, factoryLongitude: coords.longitude }
+          : {};
+      })(),
 
       // Vendor Type & Products
       vendorType: getVendorTypeEnum(parsedVendorType),
@@ -999,8 +1006,24 @@ const updateVendorById = async (req, res) => {
       warehouseState: updateData.warehouseState,
       warehouseZipCode: updateData.warehouseZip || null,
       warehouseCountry: updateData.warehouseCountry || 'India',
+      // Mirror to the `factory*` columns the checker app reads from —
+      // the CREATE flow mirrors these, the UPDATE flow used to forget,
+      // so changing a vendor's address in admin left the checker app
+      // showing the old one.
+      factoryAddress: updateData.warehouseAddress,
+      factoryCity: updateData.warehouseCity,
+      factoryState: updateData.warehouseState,
+      factoryZipCode: updateData.warehouseZip || null,
       storageCapacity: updateData.warehousingCapacity,
       mapLink: updateData.mapLink || null,
+      ...(() => {
+        const coords = parseMapLinkCoordinates(updateData.mapLink);
+        console.log('[DEBUG] mapLink received:', updateData.mapLink);
+        console.log('[DEBUG] coords extracted:', coords);
+        return coords
+          ? { factoryLatitude: coords.latitude, factoryLongitude: coords.longitude }
+          : {};
+      })(),
 
       // Vendor Type & Products
       vendorType: Array.isArray(parsedVendorType) && parsedVendorType.includes('manufacturer')

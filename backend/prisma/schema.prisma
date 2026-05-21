@@ -305,6 +305,8 @@ model Vendor {
   warehouseSize         String?
   storageCapacity       String?
   mapLink               String?   // Google Maps embed link
+  factoryLatitude       Float?    // Auto-extracted from mapLink
+  factoryLongitude      Float?    // Auto-extracted from mapLink
   
   // Vendor Type & Products
   vendorType            VendorType
@@ -1570,6 +1572,14 @@ model Inspection {
   rejectionNotes      String?
   locationDetails     String?
   rejectionAttachments String[] @default([])
+
+  // Location verification (QC checker GPS vs vendor factory)
+  checkerLatitude       Float?
+  checkerLongitude      Float?
+  vendorLatitude        Float?    // Snapshot of vendor factory lat at inspection time
+  vendorLongitude       Float?    // Snapshot of vendor factory lng at inspection time
+  locationVerified      Boolean   @default(false)
+  locationDistanceM     Float?    // Distance in meters between checker and vendor
 
   // Review tracking
   submittedAt         DateTime?

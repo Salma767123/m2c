@@ -101,6 +101,7 @@ export default function FactoryInspectionScreen() {
   const [beforeSelfie, setBeforeSelfie] = useState<SelfieResult | null>(null);
   const [showAfterSelfie, setShowAfterSelfie] = useState(false);
   const [afterSelfie, setAfterSelfie] = useState<SelfieResult | null>(null);
+  const [locationStarting, setLocationStarting] = useState(false);
 
   // Captures vendor-supplied fields at load time so we can lock them readonly
   const [autofillSnapshot, setAutofillSnapshot] = useState<Record<string, string>>({});
@@ -189,13 +190,17 @@ export default function FactoryInspectionScreen() {
           setFormData((prev) => ({
             ...prev,
             categoryToInspect: prev.categoryToInspect || (prevForm?.categoryToInspect) || assignedCategories,
-            factoryName: prev.factoryName || (prevForm?.factoryName) || v.companyName || '',
-            contactPersonName: prev.contactPersonName || (prevForm?.contactPersonName) || v.ownerName || '',
-            contactPhoneNumber: prev.contactPhoneNumber || (prevForm?.contactPhoneNumber) || v.businessPhone || '',
-            factoryAddress: prev.factoryAddress || (prevForm?.factoryAddress) || factoryAddressFull,
-            gstTaxId: prev.gstTaxId || (prevForm?.gstTaxId) || v.gstNumber || '',
-            businessRegistrationNumber: prev.businessRegistrationNumber || (prevForm?.businessRegistrationNumber) || v.businessRegistrationNumber || '',
-            factoryLicenseNumber: prev.factoryLicenseNumber || (prevForm?.factoryLicenseNumber) || v.tradeLicenseNumber || '',
+            // Identity fields — these come from the vendor record, not the
+            // checker. Prefer the CURRENT vendor data so admin edits to the
+            // vendor's name/address/mapLink propagate into the next inspection
+            // open, instead of being shadowed by a stale draft snapshot.
+            factoryName: v.companyName || prev.factoryName || prevForm?.factoryName || '',
+            contactPersonName: v.ownerName || prev.contactPersonName || prevForm?.contactPersonName || '',
+            contactPhoneNumber: v.businessPhone || prev.contactPhoneNumber || prevForm?.contactPhoneNumber || '',
+            factoryAddress: factoryAddressFull || prev.factoryAddress || prevForm?.factoryAddress || '',
+            gstTaxId: v.gstNumber || prev.gstTaxId || prevForm?.gstTaxId || '',
+            businessRegistrationNumber: v.businessRegistrationNumber || prev.businessRegistrationNumber || prevForm?.businessRegistrationNumber || '',
+            factoryLicenseNumber: v.tradeLicenseNumber || prev.factoryLicenseNumber || prevForm?.factoryLicenseNumber || '',
             // Production Info
             productsManufactured: prev.productsManufactured || (prevForm?.productsManufactured) || '',
             monthlyProductionCapacity: prev.monthlyProductionCapacity || (prevForm?.monthlyProductionCapacity) || '',
@@ -213,25 +218,21 @@ export default function FactoryInspectionScreen() {
 
           // Lock-state snapshot
           const has = (s?: string | null) => typeof s === 'string' && s.trim() !== '';
+          // Lock snapshot mirrors the same precedence — current vendor data
+          // wins, draft is fallback only when the vendor record is missing.
           setAutofillSnapshot({
-            factoryName: has(prevForm?.factoryName || v.companyName) ? (prevForm?.factoryName || v.companyName) : '',
-            contactPersonName: has(prevForm?.contactPersonName || v.ownerName) ? (prevForm?.contactPersonName || v.ownerName) : '',
-            contactPhoneNumber: has(prevForm?.contactPhoneNumber || v.businessPhone) ? (prevForm?.contactPhoneNumber || v.businessPhone) : '',
-            factoryAddress: has(prevForm?.factoryAddress || factoryAddressFull) ? (prevForm?.factoryAddress || factoryAddressFull) : '',
-            gstTaxId: has(prevForm?.gstTaxId || v.gstNumber) ? (prevForm?.gstTaxId || v.gstNumber) : '',
-            businessRegistrationNumber: has(prevForm?.businessRegistrationNumber || v.businessRegistrationNumber) ? (prevForm?.businessRegistrationNumber || v.businessRegistrationNumber) : '',
-            factoryLicenseNumber: has(prevForm?.factoryLicenseNumber || v.tradeLicenseNumber) ? (prevForm?.factoryLicenseNumber || v.tradeLicenseNumber) : '',
+            factoryName: has(v.companyName) ? v.companyName : (prevForm?.factoryName || ''),
+            contactPersonName: has(v.ownerName) ? v.ownerName : (prevForm?.contactPersonName || ''),
+            contactPhoneNumber: has(v.businessPhone) ? v.businessPhone : (prevForm?.contactPhoneNumber || ''),
+            factoryAddress: has(factoryAddressFull) ? factoryAddressFull : (prevForm?.factoryAddress || ''),
+            gstTaxId: has(v.gstNumber) ? v.gstNumber : (prevForm?.gstTaxId || ''),
+            businessRegistrationNumber: has(v.businessRegistrationNumber) ? v.businessRegistrationNumber : (prevForm?.businessRegistrationNumber || ''),
+            factoryLicenseNumber: has(v.tradeLicenseNumber) ? v.tradeLicenseNumber : (prevForm?.factoryLicenseNumber || ''),
             categoryToInspect: has(prevForm?.categoryToInspect || assignedCategories) ? (prevForm?.categoryToInspect || assignedCategories) : '',
           });
 
-          // Fire-and-forget auto-start
-          if (inspection.status === 'SCHEDULED') {
-            qcCheckerService.startInspection(inspection.id).catch((startErr: any) => {
-              if (!cancelled && startErr?.status !== 400) {
-                console.error('Auto-start failed:', startErr);
-              }
-            });
-          }
+          // NOTE: Inspection start moved to before-selfie confirmation handler
+          // (needs GPS coordinates from the selfie capture).
         } else {
           setError('No active inspection found for this vendor.');
         }
@@ -422,7 +423,13 @@ export default function FactoryInspectionScreen() {
         afterSelfieTakenAt: resolvedAfterSelfie.takenAt,
         afterSelfiePhoto: { name: 'after-selfie.jpg', data: resolvedAfterSelfie.dataUri },
       };
-      const res = await qcCheckerService.completeInspection(inspectionId, payload);
+      // The after-selfie was taken seconds before submit, so its GPS is the
+      // freshest reading we have for the submit-time geofence.
+      const submitLoc =
+        resolvedAfterSelfie.latitude != null && resolvedAfterSelfie.longitude != null
+          ? { latitude: resolvedAfterSelfie.latitude, longitude: resolvedAfterSelfie.longitude }
+          : null;
+      const res = await qcCheckerService.completeInspection(inspectionId, payload, submitLoc);
       if (res.success) {
         Alert.alert('Submitted', 'Factory inspection report submitted.', [
           { text: 'OK', onPress: () => router.back() },
@@ -431,6 +438,20 @@ export default function FactoryInspectionScreen() {
         Alert.alert('Submission Failed', 'Could not submit the inspection.');
       }
     } catch (err: any) {
+      // Surface the three geofence errors with the same UX as start.
+      const code = err?.data?.error;
+      if (
+        code === 'Location mismatch' ||
+        code === 'Location required' ||
+        code === 'Vendor location not set'
+      ) {
+        Alert.alert(
+          code === 'Location mismatch' ? '📍 Location Mismatch' : '📍 Location Error',
+          err?.data?.message || 'Location verification failed.',
+          [{ text: 'OK' }],
+        );
+        return;
+      }
       // Surface backend field errors so the user can fix them
       const fieldErrors = err?.data?.fieldErrors;
       if (fieldErrors && typeof fieldErrors === 'object') {
@@ -478,10 +499,37 @@ export default function FactoryInspectionScreen() {
       <SelfieCaptureModal
         visible={showBeforeSelfie}
         title="Before Inspection Selfie"
-        description="Take a selfie to verify your presence before starting the inspection. This is mandatory."
-        onConfirm={(result) => {
+        description="Take a selfie to verify your presence before starting the inspection. Your GPS location will be verified against the vendor's factory."
+        onConfirm={async (result) => {
           setBeforeSelfie(result);
           setShowBeforeSelfie(false);
+
+          // Start the inspection with GPS — blocks if location mismatch
+          if (inspectionId) {
+            setLocationStarting(true);
+            try {
+              const loc = (result.latitude != null && result.longitude != null)
+                ? { latitude: result.latitude, longitude: result.longitude }
+                : null;
+              await qcCheckerService.startInspection(inspectionId, loc);
+            } catch (startErr: any) {
+              const errData = startErr?.data;
+              if (errData?.error === 'Location mismatch' || errData?.error === 'Location required' || errData?.error === 'Vendor location not set') {
+                Alert.alert(
+                  errData.error === 'Location mismatch' ? '📍 Location Mismatch' : '📍 Location Error',
+                  errData.message || 'Location verification failed.',
+                  [{ text: 'Go Back', onPress: () => router.back() }],
+                );
+                return;
+              }
+              // Non-location errors — log but don't block (the inspection might already be IN_PROGRESS)
+              if (startErr?.status !== 400) {
+                console.error('Auto-start failed:', startErr);
+              }
+            } finally {
+              setLocationStarting(false);
+            }
+          }
         }}
         onCancel={() => router.back()}
       />
@@ -498,6 +546,34 @@ export default function FactoryInspectionScreen() {
           handleComplete(result);
         }}
       />
+
+      {/* Location verification loading overlay */}
+      {locationStarting && (
+        <View className="absolute inset-0 bg-black/60 items-center justify-center" style={{ zIndex: 100 }}>
+          <View className="bg-white rounded-2xl p-8 mx-8 items-center">
+            <ActivityIndicator size="large" color="#2563eb" />
+            <Text className="text-base font-bold text-slate-900 mt-4">Verifying Location…</Text>
+            <Text className="text-sm text-slate-500 mt-1 text-center">
+              Checking your proximity to the vendor's factory
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Location verified banner */}
+      {beforeSelfie && !locationStarting && !showBeforeSelfie && (
+        <View className="mx-4 mt-2 mb-1 bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex-row items-center" style={{ columnGap: 8 }}>
+          <View className="w-6 h-6 rounded-full bg-emerald-500 items-center justify-center">
+            <Check size={14} color="#ffffff" strokeWidth={3} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-xs font-bold text-emerald-800">Location Verified ✓</Text>
+            <Text className="text-[11px] text-emerald-600 mt-0.5">
+              Your location has been confirmed near the vendor's factory
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* Re-inspection banner */}
       {cycleNumber > 1 && (

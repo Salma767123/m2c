@@ -1,16 +1,45 @@
 import { View, Text, Image, TouchableOpacity, Modal } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, User, LogOut, UserCircle, ChevronDown } from "lucide-react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { ViewProfile } from './ViewProfile';
+import {
+  unregisterPushNotifications,
+  fetchUnreadCount,
+  onNotificationReceived,
+} from '@/services/notificationService';
+import NotificationsModal from './NotificationsModal';
+
+const UNREAD_POLL_MS = 15000;
 
 export default function Header() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      const count = await fetchUnreadCount();
+      if (active) setUnreadCount(count);
+    };
+    refresh();
+    const timer = setInterval(refresh, UNREAD_POLL_MS);
+    // Refresh instantly when a push arrives in the foreground
+    const unsub = onNotificationReceived(refresh);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      unsub();
+    };
+  }, []);
 
   const handleSignOut = async () => {
     try {
+      // Stop this device from receiving the checker's pushes before clearing auth
+      await unregisterPushNotifications();
       await AsyncStorage.removeItem('checkerID');
       setShowProfileMenu(false);
       router.replace('/Login');
@@ -45,8 +74,31 @@ export default function Header() {
 
           {/* Right Actions */}
           <View className="flex-row items-center gap-2">
+            {/* Notification Bell */}
+            <TouchableOpacity
+              onPress={() => setShowNotifications(true)}
+              accessibilityRole="button"
+              accessibilityLabel={
+                unreadCount > 0
+                  ? `Notifications, ${unreadCount} unread`
+                  : 'Notifications'
+              }
+              className="bg-white rounded-full w-10 h-10 items-center justify-center border border-gray-300"
+            >
+              <Bell size={18} color="#111827" strokeWidth={2.2} />
+              {unreadCount > 0 && (
+                <View
+                  className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[18px] h-[18px] items-center justify-center px-1 border-2 border-black"
+                >
+                  <Text className="text-white text-[10px] font-bold">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
             {/* Profile Menu */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setShowProfileMenu(!showProfileMenu)}
               className="flex-row items-center bg-white rounded-full pl-2 pr-3 py-2 border border-gray-300"
             >
@@ -122,6 +174,13 @@ export default function Header() {
       >
         <ViewProfile onClose={() => setShowProfileModal(false)} />
       </Modal>
+
+      {/* Notifications Modal */}
+      <NotificationsModal
+        visible={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        onUnreadChange={setUnreadCount}
+      />
     </>
   );
 }

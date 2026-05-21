@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react-native';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import qcCheckerService from '@/services/qcCheckerService';
 import SelfieCaptureModal, { SelfieResult } from '@/components/General/SelfieCaptureModal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DEFAULT_TESTS = [
   { id: 'dropTestResult', label: 'Carton Drop Test', detail: 'Action and result views' },
@@ -58,6 +59,7 @@ export default function ProductInspectionForm({
   onComplete,
   onCancel,
 }: ProductInspectionFormProps) {
+  const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState<Step>('generalInformation');
   const [submitting, setSubmitting] = useState(false);
 
@@ -397,15 +399,43 @@ export default function ProductInspectionForm({
                 afterSelfiePhoto: { name: 'after-selfie.jpg', data: resolvedAfterSelfie.dataUri },
               };
 
+              // The after-selfie was taken moments before submit, so its GPS
+              // is the freshest checker location for the factory geofence.
+              const location =
+                resolvedAfterSelfie.latitude != null && resolvedAfterSelfie.longitude != null
+                  ? { latitude: resolvedAfterSelfie.latitude, longitude: resolvedAfterSelfie.longitude }
+                  : null;
+
               if (formData.finalDecision === 'Approved') {
-                await qcCheckerService.approveProduct(productId, cleanedData);
+                await qcCheckerService.approveProduct(productId, cleanedData, location);
               } else {
-                await qcCheckerService.rejectProduct(productId, formData.reviewerRemarks, cleanedData);
+                await qcCheckerService.rejectProduct(
+                  productId,
+                  formData.reviewerRemarks,
+                  cleanedData,
+                  location,
+                );
               }
               showSuccessToast('Success', 'Product inspection completed and submitted successfully.');
               onComplete();
             } catch (error: any) {
-              showErrorToast('Submission Failed', error.message || 'Unable to submit inspection.');
+              // Surface the three geofence errors clearly — the vendor-inspection
+              // flow uses the same shapes, so users get a consistent experience.
+              const errData = error?.data;
+              const code = errData?.error;
+              if (
+                code === 'Location mismatch' ||
+                code === 'Location required' ||
+                code === 'Vendor location not set'
+              ) {
+                Alert.alert(
+                  code === 'Location mismatch' ? '📍 Location Mismatch' : '📍 Location Error',
+                  errData.message || 'Location verification failed.',
+                  [{ text: 'OK' }],
+                );
+              } else {
+                showErrorToast('Submission Failed', error.message || 'Unable to submit inspection.');
+              }
             } finally {
               setSubmitting(false);
             }
@@ -448,7 +478,35 @@ export default function ProductInspectionForm({
         visible={showBeforeSelfie}
         title="Before Inspection Selfie"
         description="Take a selfie to verify your presence before starting the product inspection. This is mandatory."
-        onConfirm={(result) => {
+        onConfirm={async (result) => {
+          // Pre-flight geofence — mirrors factory startInspection so the
+          // backend logs both sides of the comparison at the moment the
+          // checker begins. Blocks the form from opening when the checker
+          // is not at the vendor's factory.
+          const loc =
+            result.latitude != null && result.longitude != null
+              ? { latitude: result.latitude, longitude: result.longitude }
+              : null;
+          try {
+            await qcCheckerService.startProductInspection(productId, loc);
+          } catch (startErr: any) {
+            const errData = startErr?.data;
+            const code = errData?.error;
+            if (
+              code === 'Location mismatch' ||
+              code === 'Location required' ||
+              code === 'Vendor location not set'
+            ) {
+              Alert.alert(
+                code === 'Location mismatch' ? '📍 Location Mismatch' : '📍 Location Error',
+                errData.message || 'Location verification failed.',
+                [{ text: 'Go Back', onPress: onCancel }],
+              );
+              return;
+            }
+            // Non-location errors — log but don't block the inspection
+            console.warn('startProductInspection failed:', startErr?.message);
+          }
           setBeforeSelfie(result);
           setShowBeforeSelfie(false);
         }}
@@ -606,8 +664,13 @@ export default function ProductInspectionForm({
       {/* Form Content */}
       <View className="flex-1 px-4 pt-2">{renderStepContent()}</View>
 
-      {/* Bottom Navigation */}
-      <View className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex-row items-center justify-between">
+      {/* Bottom Navigation — safe-area aware (same compact formula the
+          vendor inspection form uses, so the buttons sit close to the
+          edge without leaving a big gap below). */}
+      <View
+        className="px-4 pt-3 border-t border-gray-200 bg-gray-50 flex-row items-center justify-between"
+        style={{ paddingBottom: Math.max(insets.bottom, 12) + 4 }}
+      >
         <TouchableOpacity
           className="px-4 py-2.5 rounded-xl"
           onPress={onCancel}

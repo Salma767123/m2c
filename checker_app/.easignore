@@ -1,9 +1,13 @@
-# Other apps / services
-backend/
-frontend/
-mobile/
-docs/
-.agents/
+# Sibling apps / services in the monorepo — `../` is required because
+# .easignore patterns resolve relative to the file's own directory (same
+# convention `mobile/.easignore` uses). Without the `../` these were silent
+# no-ops and the EAS archive ended up containing siblings instead of
+# checker_app/.
+../backend/
+../frontend/
+../mobile/
+../docs/
+../.agents/
 
 # Editor / OS
 .vscode/
@@ -12,24 +16,24 @@ docs/
 Thumbs.db
 
 # Dependencies — EAS installs fresh
-**/node_modules/
+node_modules/
 
 # Native folders — EAS runs expo prebuild
-**/android/
-**/ios/
+android/
+ios/
 
 # Dev caches
-**/.expo/
-**/.expo-shared/
-**/dist/
-**/web-build/
-**/.cache/
-**/.next/
+.expo/
+.expo-shared/
+dist/
+web-build/
+.cache/
+.next/
 
 # Env files — use EAS environment variables
-**/.env
-**/.env.*
-!**/.env.example
+.env
+.env.*
+!.env.example
 
 # Logs & binaries
 *.log

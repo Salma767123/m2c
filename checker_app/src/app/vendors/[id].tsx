@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -30,6 +31,7 @@ import {
   FileText,
   AlertCircle,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react-native';
 import qcCheckerService, { AuditLogEntry } from '../../services/qcCheckerService';
 import AuditTimeline from '../../components/General/AuditTimeline';
@@ -112,9 +114,42 @@ export default function VendorDetailScreen() {
       if (res.success) {
         setFullVendor(res.data.vendor);
         setStats(res.data.stats);
-        setRecentInspections(res.data.recentInspections || []);
+        const inspections = res.data.recentInspections || [];
+        setRecentInspections(inspections);
         setUpcomingList(res.data.upcomingInspections || []);
         if (res.data.recentInspectionsMeta) setHistoryMeta(res.data.recentInspectionsMeta);
+
+        // Fetch audit trails for all of this vendor's inspections
+        // (the API expects inspection IDs, not vendor IDs)
+        if (inspections.length > 0) {
+          const allLogs: AuditLogEntry[] = [];
+          const seenIds = new Set<string>();
+          await Promise.all(
+            inspections.map(async (insp: any) => {
+              try {
+                const auditRes = await qcCheckerService.getAuditTrail(
+                  'FACTORY_INSPECTION',
+                  insp.id,
+                );
+                for (const log of auditRes.logs || []) {
+                  if (!seenIds.has(log.id)) {
+                    seenIds.add(log.id);
+                    allLogs.push(log);
+                  }
+                }
+              } catch {
+                // Silently skip failed audit fetches
+              }
+            }),
+          );
+          // Sort chronologically (newest first for vendor-level view)
+          allLogs.sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          );
+          setAuditLogs(allLogs);
+        } else {
+          setAuditLogs([]);
+        }
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to load vendor details');
@@ -124,17 +159,14 @@ export default function VendorDetailScreen() {
     }
   }, [id, historyLimit, fullVendor]);
 
-  useEffect(() => {
-    loadAll();
-    // Fetch audit trail for this vendor's inspections
-    if (id) {
-      // Try to find the latest inspection and get its audit trail
-      qcCheckerService.getAuditTrail('FACTORY_INSPECTION', id)
-        .then(res => setAuditLogs(res.logs || []))
-        .catch(() => {}); // Non-critical
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  // Refetch vendor + audit trail every time this screen is focused, so the
+  // status / history reflects any inspection action the checker just took.
+  useFocusEffect(
+    useCallback(() => {
+      loadAll();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -518,123 +550,266 @@ export default function VendorDetailScreen() {
         ) : null}
 
         {activeTab === 'history' ? (
-          <View className="mx-4">
-            <View className="flex-row items-center justify-between mb-3 px-1">
-              <Text className="text-base font-extrabold text-slate-900">Inspection History</Text>
-              {historyMeta && historyMeta.total > 0 ? (
-                <Text className="text-xs font-semibold text-slate-500">
-                  Showing {historyMeta.returned} of {historyMeta.total}
-                </Text>
-              ) : null}
-            </View>
-
-            {recentInspections.length > 0 ? (
-              <View style={{ rowGap: 10 }}>
-                {recentInspections.map((insp: any) => {
-                  const r = statusStyle(insp.result || '');
-                  const scoreNum = typeof insp.score === 'number' ? insp.score : null;
-                  const scoreColor =
-                    scoreNum === null
-                      ? '#64748b'
-                      : scoreNum >= 8
-                        ? '#10b981'
-                        : scoreNum >= 6
-                          ? '#f59e0b'
-                          : '#ef4444';
-                  return (
-                    <View key={insp.id} className="bg-white rounded-2xl overflow-hidden flex-row border border-slate-200">
-                      <View style={{ width: 4, backgroundColor: r.dot }} />
-                      <View className="flex-1 p-4">
-                        <View className="flex-row items-center justify-between mb-2">
-                          <View className="rounded-lg px-2.5 py-1" style={{ backgroundColor: '#dbeafe' }}>
-                            <Text className="text-xs font-mono font-extrabold text-blue-700">
-                              {insp.poNumber}
-                            </Text>
-                          </View>
-                          {insp.result ? (
-                            <View
-                              className="rounded-full px-2.5 py-1 flex-row items-center"
-                              style={{ backgroundColor: r.bg }}
-                            >
-                              <View className="w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: r.dot }} />
-                              <Text className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: r.text }}>
-                                {insp.result.replace(/_/g, ' ')}
-                              </Text>
-                            </View>
-                          ) : null}
-                        </View>
-                        <Text className="text-base font-extrabold text-slate-900 mb-3" numberOfLines={1}>
-                          {insp.clientName}
-                        </Text>
-                        <View className="flex-row items-center flex-wrap" style={{ columnGap: 14, rowGap: 6 }}>
-                          <View className="flex-row items-center">
-                            <Calendar size={13} color="#64748b" />
-                            <Text className="text-xs text-slate-600 ml-1.5 font-medium">
-                              {insp.scheduledDate}
-                            </Text>
-                          </View>
-                          {insp.completedAt ? (
-                            <View className="flex-row items-center">
-                              <CheckCircle size={13} color="#10b981" />
-                              <Text className="text-xs text-slate-600 ml-1.5 font-medium">
-                                {formatDate(insp.completedAt)}
-                              </Text>
-                            </View>
-                          ) : null}
-                        </View>
-                        {scoreNum !== null ? (
-                          <View className="mt-3 pt-3 border-t border-slate-100">
-                            <View className="flex-row items-center justify-between mb-1.5">
-                              <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                Score
-                              </Text>
-                              <Text className="text-sm font-extrabold" style={{ color: scoreColor }}>
-                                {scoreNum}/10
-                              </Text>
-                            </View>
-                            <View className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                              <View
-                                className="h-full rounded-full"
-                                style={{ width: `${(scoreNum / 10) * 100}%`, backgroundColor: scoreColor }}
-                              />
-                            </View>
-                          </View>
-                        ) : null}
-                      </View>
-                    </View>
-                  );
-                })}
+          <View className="mx-4" style={{ rowGap: 16 }}>
+            {/* ── Inspection History ────────────────────────────────────── */}
+            <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              {/* Section header */}
+              <View
+                className="flex-row items-center justify-between px-4 py-3 border-b border-slate-100"
+                style={{ backgroundColor: '#F8FAFC' }}
+              >
+                <View className="flex-row items-center" style={{ gap: 10 }}>
+                  <View
+                    className="w-8 h-8 rounded-lg items-center justify-center"
+                    style={{ backgroundColor: '#EEF2FF' }}
+                  >
+                    <FileText size={16} color="#4F46E5" />
+                  </View>
+                  <View>
+                    <Text className="text-sm font-bold text-slate-900">Inspection History</Text>
+                    <Text className="text-[10px] text-slate-500">
+                      {recentInspections.length === 0
+                        ? 'Completed reports will appear here'
+                        : historyMeta && historyMeta.total > 0
+                          ? `Showing ${historyMeta.returned} of ${historyMeta.total}`
+                          : `${recentInspections.length} completed`}
+                    </Text>
+                  </View>
+                </View>
+                {recentInspections.length > 0 && (
+                  <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: '#E2E8F0' }}>
+                    <Text className="text-[10px] font-bold text-slate-600">
+                      {historyMeta?.total ?? recentInspections.length}
+                    </Text>
+                  </View>
+                )}
               </View>
-            ) : (
-              <EmptyCard icon={<FileText size={28} color="#94a3b8" />} title="No inspection history" sub="Completed reports will appear here." />
-            )}
 
-            {/* Load more */}
-            {historyMeta?.hasMore ? (
-              <View className="mt-5 items-center">
+              {/* Inspection cards */}
+              {recentInspections.length > 0 ? (
+                <View className="p-3" style={{ gap: 10 }}>
+                  {recentInspections.map((insp: any) => {
+                    const r = statusStyle(insp.result || '');
+                    const scoreNum = typeof insp.score === 'number' ? insp.score : null;
+                    const scoreColor =
+                      scoreNum === null
+                        ? '#94A3B8'
+                        : scoreNum >= 8
+                          ? '#059669'
+                          : scoreNum >= 6
+                            ? '#D97706'
+                            : '#DC2626';
+                    const scoreBg =
+                      scoreNum === null
+                        ? '#F1F5F9'
+                        : scoreNum >= 8
+                          ? '#ECFDF5'
+                          : scoreNum >= 6
+                            ? '#FFFBEB'
+                            : '#FEF2F2';
+                    const resultText = insp.result
+                      ? insp.result.replace(/_/g, ' ')
+                      : 'Pending';
+                    const isPassed = ['passed', 'approved', 'completed'].includes(
+                      (insp.result || '').toLowerCase(),
+                    );
+                    const isFailed = ['failed', 'rejected'].includes(
+                      (insp.result || '').toLowerCase(),
+                    );
+                    const dateLabel =
+                      formatDate(insp.scheduledDate) || insp.scheduledDate || '';
+
+                    return (
+                      <TouchableOpacity
+                        key={insp.id}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Inspection ${insp.poNumber}, ${insp.clientName}, ${resultText}`}
+                        className="rounded-xl overflow-hidden"
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                        }}
+                      >
+                        {/* Card content */}
+                        <View className="flex-row">
+                          {/* Left accent bar */}
+                          <View
+                            style={{
+                              width: 4,
+                              backgroundColor: r.dot,
+                              borderTopLeftRadius: 12,
+                              borderBottomLeftRadius: 12,
+                            }}
+                          />
+
+                          {/* Main content */}
+                          <View className="flex-1 p-3.5" style={{ gap: 10 }}>
+                            {/* Top row: PO + Date */}
+                            <View className="flex-row items-center justify-between">
+                              <View
+                                className="rounded-md px-2 py-0.5"
+                                style={{ backgroundColor: '#F1F5F9' }}
+                              >
+                                <Text className="text-[11px] font-bold font-mono text-slate-600">
+                                  {insp.poNumber || '—'}
+                                </Text>
+                              </View>
+                              <View className="flex-row items-center" style={{ gap: 4 }}>
+                                <Calendar size={11} color="#94A3B8" />
+                                <Text className="text-[11px] text-slate-400 font-medium">
+                                  {dateLabel}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Client name */}
+                            <Text
+                              className="text-sm font-bold text-slate-900"
+                              numberOfLines={1}
+                              style={{ lineHeight: 20 }}
+                            >
+                              {insp.clientName}
+                            </Text>
+
+                            {/* Bottom row: Status badge + Score */}
+                            <View className="flex-row items-center justify-between">
+                              {/* Status badge */}
+                              <View
+                                className="flex-row items-center rounded-full px-2.5 py-1"
+                                style={{ backgroundColor: r.bg, gap: 4 }}
+                              >
+                                {isPassed ? (
+                                  <CheckCircle size={12} color={r.text} />
+                                ) : isFailed ? (
+                                  <AlertCircle size={12} color={r.text} />
+                                ) : (
+                                  <Clock size={12} color={r.text} />
+                                )}
+                                <Text
+                                  className="text-[10px] font-bold uppercase"
+                                  style={{ color: r.text }}
+                                >
+                                  {resultText}
+                                </Text>
+                              </View>
+
+                              {/* Score chip */}
+                              {scoreNum !== null ? (
+                                <View
+                                  className="flex-row items-center rounded-lg px-2.5 py-1"
+                                  style={{ backgroundColor: scoreBg, gap: 6 }}
+                                >
+                                  {/* Mini score ring */}
+                                  <View
+                                    className="w-5 h-5 rounded-full items-center justify-center"
+                                    style={{
+                                      borderWidth: 2,
+                                      borderColor: scoreColor,
+                                    }}
+                                  >
+                                    <Text
+                                      className="font-extrabold"
+                                      style={{
+                                        color: scoreColor,
+                                        fontSize: 8,
+                                        lineHeight: 10,
+                                      }}
+                                    >
+                                      {scoreNum}
+                                    </Text>
+                                  </View>
+                                  <Text
+                                    className="text-[11px] font-bold"
+                                    style={{ color: scoreColor }}
+                                  >
+                                    / 10
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+
+                            {/* Completion date — if applicable */}
+                            {insp.completedAt && (
+                              <Text className="text-[10px] text-slate-400">
+                                Completed {formatDate(insp.completedAt)}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                /* Empty state */
+                <View className="items-center py-12" style={{ gap: 8 }}>
+                  <View
+                    className="w-14 h-14 rounded-2xl items-center justify-center"
+                    style={{ backgroundColor: '#F1F5F9' }}
+                  >
+                    <FileText size={24} color="#94A3B8" />
+                  </View>
+                  <Text className="text-sm font-bold text-slate-900">No inspections yet</Text>
+                  <Text className="text-xs text-slate-500 text-center px-8">
+                    Completed inspections will appear here once they are submitted.
+                  </Text>
+                </View>
+              )}
+
+              {/* Load more */}
+              {historyMeta?.hasMore && (
                 <TouchableOpacity
                   onPress={handleLoadMoreHistory}
                   disabled={loading || historyLimit >= 50}
-                  activeOpacity={0.85}
-                  className="flex-row items-center bg-slate-100 rounded-lg px-5 py-2.5"
-                  style={{ opacity: loading || historyLimit >= 50 ? 0.5 : 1 }}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Load more inspections"
+                  className="border-t border-slate-100 flex-row items-center justify-center"
+                  style={{
+                    paddingVertical: 14,
+                    opacity: loading || historyLimit >= 50 ? 0.5 : 1,
+                  }}
                 >
-                  <FileText size={14} color="#475569" />
-                  <Text className="text-sm font-semibold text-slate-700 ml-2">
-                    {historyLimit >= 50 ? 'Showing max 50' : 'Load more'}
+                  <RefreshCw size={14} color="#2563EB" />
+                  <Text className="text-sm font-semibold text-blue-600 ml-2">
+                    {historyLimit >= 50 ? 'Showing max 50' : 'Load older inspections'}
                   </Text>
                 </TouchableOpacity>
-              </View>
-            ) : null}
+              )}
+            </View>
 
             {/* Audit Trail */}
             {auditLogs.length > 0 && (
-              <View className="mt-5 bg-white rounded-2xl border border-slate-200 p-4">
-                <View className="flex-row items-center mb-3">
-                  <Clock size={16} color="#475569" />
-                  <Text className="text-sm font-extrabold text-slate-900 ml-2">Audit Trail</Text>
+              <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                {/* Section header */}
+                <View
+                  className="flex-row items-center justify-between px-4 py-3 border-b border-slate-100"
+                  style={{ backgroundColor: '#F8FAFC' }}
+                >
+                  <View className="flex-row items-center" style={{ gap: 10 }}>
+                    <View
+                      className="w-8 h-8 rounded-lg items-center justify-center"
+                      style={{ backgroundColor: '#EFF6FF' }}
+                    >
+                      <ShieldCheck size={16} color="#2563EB" />
+                    </View>
+                    <View>
+                      <Text className="text-sm font-bold text-slate-900">Audit Trail</Text>
+                      <Text className="text-[10px] text-slate-500">All actions and status changes</Text>
+                    </View>
+                  </View>
+                  <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: '#E2E8F0' }}>
+                    <Text className="text-[10px] font-bold text-slate-600">
+                      {auditLogs.length} {auditLogs.length === 1 ? 'entry' : 'entries'}
+                    </Text>
+                  </View>
                 </View>
-                <AuditTimeline logs={auditLogs} />
+                {/* Timeline content */}
+                <View className="p-4">
+                  <AuditTimeline logs={auditLogs} />
+                </View>
               </View>
             )}
           </View>

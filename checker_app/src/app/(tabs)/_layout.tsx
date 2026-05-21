@@ -38,20 +38,25 @@ export default function TabLayout() {
       {/* Header */}
       <Header />
       
-      {/* Stack Navigator */}
+      {/* Stack Navigator — reserves 60px for the tab bar on regular tab
+          screens, but drops it on form sub-screens (where the tab bar is
+          hidden) so the form's bottom nav sits flush against the safe
+          area instead of floating above 60px of empty space. */}
       <Stack
         initialRouteName="index"
         screenOptions={{
           headerShown: false,
-          contentStyle: { 
-            paddingBottom: 60,
+          contentStyle: {
+            paddingBottom: pathname.includes('product-inspection') ? 0 : 60,
           },
           animation: "none"
         }}
       />
 
-      {/* Custom Bottom Navigation — hidden when keyboard is open */}
-      {!keyboardVisible && (
+      {/* Custom Bottom Navigation — hidden when keyboard is open,
+          AND hidden on inspection-form sub-screens so the form's own
+          Previous/Next/Submit buttons aren't covered. */}
+      {!keyboardVisible && !pathname.includes('product-inspection') && (
       <View
         className="absolute left-0 right-0 bg-white border-t border-gray-200 shadow-2xl"
         style={{

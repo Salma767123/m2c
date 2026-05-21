@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -135,9 +136,13 @@ export default function ProductsTab() {
     }
   }, [page, debouncedSearch, status, sortBy, sortOrder, refreshing]);
 
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+  // Refetch whenever the screen comes into focus (e.g. user returns from
+  // a product inspection submit) so the list never shows stale status.
+  useFocusEffect(
+    useCallback(() => {
+      loadProducts();
+    }, [loadProducts]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

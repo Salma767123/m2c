@@ -43,6 +43,7 @@ import { toast } from '@/hooks/use-toast'
 import RejectionModal from './RejectionModal'
 import SuspensionModal from './SuspensionModal'
 import { hasPermission } from '@/lib/auth'
+import { isEmbeddableMapUrl, sanitizeEmbedSrc } from '@/lib/mapLink'
 
 interface VendorViewProps {
   vendorId: string
@@ -868,10 +869,10 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               {vendor.mapLink && (
                 <div className="mt-6">
                   <p className="text-sm text-gray-600 mb-3 font-semibold">Location Map</p>
-                  {vendor.mapLink.includes('google.com/maps/embed') || vendor.mapLink.includes('maps.google.com/maps/embed') ? (
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  {isEmbeddableMapUrl(vendor.mapLink) ? (
+                    <div className="relative border border-gray-200 rounded-lg overflow-hidden">
                       <iframe
-                        src={vendor.mapLink}
+                        src={sanitizeEmbedSrc(vendor.mapLink)}
                         width="100%"
                         height="400"
                         style={{ border: 0 }}
@@ -881,6 +882,34 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                         title="Warehouse Location"
                         className="w-full"
                       />
+                      {/* Pin overlay — required when the URL uses our `ll=`/`q=`
+                          coords format (no native Google marker). The `pb=`
+                          embed-share URLs already render their own pin, so we
+                          skip the overlay for those to avoid a double marker. */}
+                      {/maps\.google\.com\/maps\?(?:ll|q)=/.test(vendor.mapLink) && (
+                        <div
+                          className="absolute pointer-events-none"
+                          style={{
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -100%)',
+                          }}
+                        >
+                          <svg
+                            width="32"
+                            height="42"
+                            viewBox="0 0 32 42"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M16 0C7.164 0 0 7.164 0 16c0 12 16 26 16 26s16-14 16-26C32 7.164 24.836 0 16 0z"
+                              fill="#EA4335"
+                            />
+                            <circle cx="16" cy="16" r="6" fill="white" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="p-8 border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center bg-gray-50">

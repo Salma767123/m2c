@@ -1,6 +1,9 @@
 backend/
 frontend/
-checker_app/
+
+<!-- checker_app/ -->
+
+mobile/
 docs/
 .agents/
 .vscode/
@@ -11,9 +14,9 @@ docs/
 **/ios/
 **/.expo/
 **/.env
-**/.env.*
-*.log
-*.apk
-*.aab
+**/.env.\*
+_.log
+_.apk
+\*.aab
 COMMIT_MESSAGE.txt
 WORK_REPORT.md

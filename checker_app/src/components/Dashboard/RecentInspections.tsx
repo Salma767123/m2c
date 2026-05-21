@@ -47,7 +47,7 @@ const recentInspections: RecentInspection[] = [
 export function RecentInspections() {
   const handleViewRecentDetail = (inspectionId: string) => {
     // Navigate to the report view page with the inspection ID as query parameter
-    router.push(`/(tabs)/report/view?id=${inspectionId}`);
+    router.push({ pathname: '/factory-report/[id]' as any, params: { id: inspectionId } });
   };
 
   const renderStatusBadge = (status: Status) => {

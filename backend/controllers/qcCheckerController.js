@@ -932,6 +932,9 @@ const getActiveInspectionForVendor = async (req, res) => {
                     factoryZipCode: true,
                     businessRegistrationNumber: true,
                     tradeLicenseNumber: true,
+                    factoryLatitude: true,
+                    factoryLongitude: true,
+                    mapLink: true,
                 },
             },
         };
@@ -1363,6 +1366,75 @@ const getProductDetails = async (req, res) => {
 };
 
 // ============================
+// QC Checker: Start Product Inspection
+//   Pre-flight geofence check before the checker fills the form. Mirrors
+//   the factory `startInspection` endpoint so the backend logs both sides
+//   of the comparison at the moment the checker begins. No state change
+//   on the product — it's a verification ping only.
+// ============================
+const startProductInspectionByQc = async (req, res) => {
+    try {
+        if (req.user.role !== 'QC_CHECKER') {
+            return res.status(403).json({ success: false, message: 'Access denied: QC Checker role required' });
+        }
+
+        const { productId } = req.params;
+        const { checkerLatitude, checkerLongitude } = req.body;
+        const qcCheckerId = req.user.id;
+
+        const product = await prisma.product.findFirst({
+            where: { id: productId, assignedQcId: qcCheckerId },
+            include: {
+                vendor: {
+                    select: {
+                        id: true,
+                        factoryLatitude: true,
+                        factoryLongitude: true,
+                        mapLink: true,
+                        companyName: true,
+                    },
+                },
+            },
+        });
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: 'Product not found or not assigned to you',
+            });
+        }
+
+        const { verifyCheckerAtVendor, LOCATION_THRESHOLD_METERS } = require('../utils/locationUtils');
+        const geo = await verifyCheckerAtVendor({
+            vendor: product.vendor,
+            checkerLatitude,
+            checkerLongitude,
+            prisma,
+            label: `startProductInspection ${productId}`,
+        });
+        if (!geo.ok) {
+            return res.status(geo.status).json(geo.body);
+        }
+
+        return res.json({
+            success: true,
+            message: 'Location verified — you may begin the product inspection.',
+            locationVerification: {
+                verified: true,
+                distanceMeters: Math.round(geo.distanceM),
+                thresholdMeters: LOCATION_THRESHOLD_METERS,
+            },
+        });
+    } catch (error) {
+        console.error('Error starting product inspection:', error);
+        res.status(500).json({
+            success: false,
+            message: 'An error occurred while verifying location',
+        });
+    }
+};
+
+// ============================
 // QC Checker: Approve Product
 // ============================
 const approveProductByQc = async (req, res) => {
@@ -1372,14 +1444,25 @@ const approveProductByQc = async (req, res) => {
         }
 
         const { productId } = req.params;
-        const { formData } = req.body;
+        const { formData, checkerLatitude, checkerLongitude } = req.body;
         const qcCheckerId = req.user.id;
 
         const product = await prisma.product.findFirst({
             where: {
                 id: productId,
                 assignedQcId: qcCheckerId
-            }
+            },
+            include: {
+                vendor: {
+                    select: {
+                        id: true,
+                        factoryLatitude: true,
+                        factoryLongitude: true,
+                        mapLink: true,
+                        companyName: true,
+                    },
+                },
+            },
         });
 
         if (!product) {
@@ -1395,6 +1478,19 @@ const approveProductByQc = async (req, res) => {
                 success: false,
                 message: `Product inspection already completed with status: ${product.approvalStatus}`
             });
+        }
+
+        // ── Location verification — checker must be at the vendor factory ──
+        const { verifyCheckerAtVendor } = require('../utils/locationUtils');
+        const geo = await verifyCheckerAtVendor({
+            vendor: product.vendor,
+            checkerLatitude,
+            checkerLongitude,
+            prisma,
+            label: `approveProduct ${productId}`,
+        });
+        if (!geo.ok) {
+            return res.status(geo.status).json(geo.body);
         }
 
         // Calculate the inspection result from formData
@@ -1453,7 +1549,8 @@ const approveProductByQc = async (req, res) => {
             }
         });
 
-        // Write audit log
+        // Write audit log (with the verified-location snapshot)
+        const locationStamp = `Verified at factory — ${Math.round(geo.distanceM)}m from vendor (checker ${Number(checkerLatitude).toFixed(6)},${Number(checkerLongitude).toFixed(6)})`;
         await prisma.inspectionAuditLog.create({
             data: {
                 entityType: 'PRODUCT_INSPECTION',
@@ -1464,6 +1561,7 @@ const approveProductByQc = async (req, res) => {
                 performedById: qcCheckerId,
                 performedByType: 'QC_CHECKER',
                 performedByName: req.user.name || req.user.email || 'QC Checker',
+                locationDetails: locationStamp,
                 inspectionData: cleanFormData,
                 cycleNumber: product.inspectionCycleNumber || 1,
             },
@@ -1509,7 +1607,7 @@ const rejectProductByQc = async (req, res) => {
         }
 
         const { productId } = req.params;
-        const { reason, formData } = req.body;
+        const { reason, formData, checkerLatitude, checkerLongitude } = req.body;
         const qcCheckerId = req.user.id;
 
         if (!reason) {
@@ -1520,7 +1618,18 @@ const rejectProductByQc = async (req, res) => {
             where: {
                 id: productId,
                 assignedQcId: qcCheckerId
-            }
+            },
+            include: {
+                vendor: {
+                    select: {
+                        id: true,
+                        factoryLatitude: true,
+                        factoryLongitude: true,
+                        mapLink: true,
+                        companyName: true,
+                    },
+                },
+            },
         });
 
         if (!product) {
@@ -1538,12 +1647,26 @@ const rejectProductByQc = async (req, res) => {
             });
         }
 
+        // ── Location verification — checker must be at the vendor factory ──
+        const { verifyCheckerAtVendor } = require('../utils/locationUtils');
+        const geo = await verifyCheckerAtVendor({
+            vendor: product.vendor,
+            checkerLatitude,
+            checkerLongitude,
+            prisma,
+            label: `rejectProduct ${productId}`,
+        });
+        if (!geo.ok) {
+            return res.status(geo.status).json(geo.body);
+        }
+
         const cleanFormData = formData
             ? await resolveBase64InValue(formData, { folder: 'qc-inspections' })
             : null;
 
         const fromStatus = product.approvalStatus;
-        const { remarks, notes, locationDetails } = req.body;
+        const { remarks, notes } = req.body;
+        const locationStamp = `Verified at factory — ${Math.round(geo.distanceM)}m from vendor (checker ${Number(checkerLatitude).toFixed(6)},${Number(checkerLongitude).toFixed(6)})`;
 
         const updatedProduct = await prisma.product.update({
             where: { id: productId },
@@ -1571,7 +1694,7 @@ const rejectProductByQc = async (req, res) => {
                 rejectionReason: reason,
                 remarks: remarks || null,
                 notes: notes || null,
-                locationDetails: locationDetails || null,
+                locationDetails: locationStamp,
                 inspectionData: cleanFormData,
                 cycleNumber: product.inspectionCycleNumber || 1,
             },
@@ -1612,6 +1735,7 @@ module.exports = {
     getAssignedProducts,
     getProductReports,
     getProductDetails,
+    startProductInspectionByQc,
     approveProductByQc,
     rejectProductByQc,
     updateCheckerProfile

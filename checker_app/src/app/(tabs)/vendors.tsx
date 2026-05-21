@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -166,9 +167,13 @@ export default function VendorsTab() {
     }
   }, [page, debouncedSearch, status, sortBy, sortOrder, refreshing]);
 
-  useEffect(() => {
-    loadVendors();
-  }, [loadVendors]);
+  // Refetch on focus so a returning checker (e.g. after a factory inspection
+  // submit) always sees the latest vendor status.
+  useFocusEffect(
+    useCallback(() => {
+      loadVendors();
+    }, [loadVendors]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

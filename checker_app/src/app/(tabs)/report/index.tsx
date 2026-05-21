@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -156,7 +157,8 @@ function FactoryReportsTab() {
     }
   }, [page, debouncedSearch, resultFilter, sortBy, sortOrder, refreshing]);
 
-  useEffect(() => { loadReports(); }, [loadReports]);
+  // Refetch on focus so freshly-submitted inspections appear immediately.
+  useFocusEffect(useCallback(() => { loadReports(); }, [loadReports]));
 
   const hasActiveFilters = Boolean(debouncedSearch || resultFilter || sort !== DEFAULT_SORT || page !== 1);
   const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
@@ -287,7 +289,7 @@ function FactoryReportsTab() {
                   </View>
                 </View>
                 <TouchableOpacity
-                  onPress={() => router.push(`/(tabs)/report/view?id=${insp.id}`)}
+                  onPress={() => router.push({ pathname: '/factory-report/[id]' as any, params: { id: insp.id } })}
                   activeOpacity={0.8}
                   className="flex-row items-center justify-center bg-slate-100 rounded-lg py-2.5"
                 >
@@ -383,7 +385,7 @@ function ProductReportsTab() {
     }
   }, [page, debouncedSearch, sortBy, sortOrder]);
 
-  useEffect(() => { loadProducts(); }, [loadProducts]);
+  useFocusEffect(useCallback(() => { loadProducts(); }, [loadProducts]));
 
   const hasActiveFilters = Boolean(debouncedSearch || sort !== 'updatedAt:desc' || page !== 1);
   const clearFilters = () => { setSearchInput(''); setSort('updatedAt:desc'); setPage(1); };

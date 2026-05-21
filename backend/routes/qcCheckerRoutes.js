@@ -16,6 +16,7 @@ const {
     getAssignedProducts,
     getProductReports,
     getProductDetails,
+    startProductInspectionByQc,
     approveProductByQc,
     rejectProductByQc,
     updateCheckerProfile
@@ -45,6 +46,7 @@ router.post('/vendors/:vendorId/reject', authenticateToken, rejectVendorByQc);
 router.get('/products', authenticateToken, getAssignedProducts);
 router.get('/products/reports', authenticateToken, getProductReports);
 router.get('/products/:productId/details', authenticateToken, getProductDetails);
+router.post('/products/:productId/start', authenticateToken, startProductInspectionByQc);
 router.post('/products/:productId/approve', authenticateToken, approveProductByQc);
 router.post('/products/:productId/reject', authenticateToken, rejectProductByQc);
 

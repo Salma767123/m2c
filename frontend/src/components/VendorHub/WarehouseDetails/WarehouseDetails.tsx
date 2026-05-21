@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 
 import { Button } from "@/components/UI/Button";
+import LocationPicker from "@/components/UI/LocationPicker";
 import {
   Warehouse,
   Upload,
   MapPin,
   Camera,
   Map,
-  ExternalLink,
   X,
   ShieldUser,
 } from "lucide-react";
@@ -99,28 +99,6 @@ export default function WarehouseDetails({
     setTouched(prev => ({ ...prev, [field]: true }));
   };
 
-  // Helper function to check if URL is a valid Google Maps embed link
-  const isValidEmbedUrl = (url: string) => {
-    return (
-      url &&
-      (url.includes("google.com/maps/embed") ||
-        url.includes("maps.google.com/maps/embed") ||
-        url.includes("/embed?"))
-    );
-  };
-
-  const isValidMapUrl = (url: string) => {
-    return (
-      url &&
-      (url.includes("google.com/maps") ||
-        url.includes("maps.google.com") ||
-        url.includes("maps.app.goo.gl") ||
-        url.includes("goo.gl/maps") ||
-        url.includes("embed") ||
-        url.startsWith("http"))
-    );
-  };
-
   const handleNext = () => {
     // Validate required fields
     const newErrors: Record<string, string> = {};
@@ -132,9 +110,7 @@ export default function WarehouseDetails({
     if (!formData.warehouseZip) newErrors.warehouseZip = 'ZIP Code is required';
     if (!formData.warehouseCountry) newErrors.warehouseCountry = 'Country is required';
     if (!formData.mapLink) {
-      newErrors.mapLink = 'Map Embed Link is required';
-    } else if (!isValidMapUrl(formData.mapLink)) {
-      newErrors.mapLink = 'Please enter a valid Google Maps link';
+      newErrors.mapLink = 'Please paste your Google Maps embed link';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -148,7 +124,9 @@ export default function WarehouseDetails({
 
       // Scroll to first error
       const firstErrorField = Object.keys(newErrors)[0];
-      const element = document.querySelector(`[name="${firstErrorField}"]`);
+      const element = document.querySelector(
+        `[name="${firstErrorField}"], [data-field-name="${firstErrorField}"]`,
+      );
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
@@ -482,169 +460,26 @@ export default function WarehouseDetails({
             Location Map
           </h2>
         </div>
-        <div className="px-6 pb-6 space-y-6">
-          {/* Map Link Input */}
-          <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
-              Map Embed Link <span className="text-red-500 text-lg">*</span>
-            </label>
-            <div className="relative">
-              <ExternalLink className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="url"
-                name="mapLink"
-                value={formData.mapLink}
-                onChange={(e) => handleInputChange("mapLink", e.target.value)}
-                onBlur={() => handleBlur("mapLink")}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.mapLink && touched.mapLink
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-gray-300'
-                  }`}
-                placeholder="https://www.google.com/maps/embed?pb=1!1m18!1m12..."
-              />
-            </div>
-            {errors.mapLink && touched.mapLink && (
-              <p className="text-red-500 text-sm mt-1">{errors.mapLink}</p>
-            )}
-            <div className="text-sm max-w-sm text-amber-700 mt-2 space-y-1 border border-amber-700 bg-amber-400/20 rounded-md p-3">
-              <p>
-                <strong>How to get embed link:</strong>
-              </p>
-              <p>1. Go to Google Maps → Find your location</p>
-              <p>2. Click "Share" → "Embed a map" → Copy HTML</p>
-              <p>3. Paste only the URL from src="..." here</p>
-            </div>
+        <div className="px-6 pb-6">
+          <p className="text-gray-600 mb-4">
+            Search for your warehouse address or drop a pin on the map — the
+            embeddable map link is generated automatically.
+          </p>
+          <div data-field-name="mapLink">
+            <LocationPicker
+              label="Warehouse Location"
+              required
+              value={formData.mapLink}
+              onChange={(link) => {
+                handleInputChange("mapLink", link);
+                // Live-sync mapLink to parent — unlike text inputs (which sync
+                // on "Continue" click), mapLink is set programmatically and the
+                // user may jump to Review via the sidebar without clicking Continue.
+                onUpdateData({ mapLink: link });
+              }}
+              error={errors.mapLink && touched.mapLink ? errors.mapLink : undefined}
+            />
           </div>
-
-          {/* Map Preview */}
-          {formData.mapLink && (
-            <div className={`border rounded-lg overflow-hidden ${isValidEmbedUrl(formData.mapLink) ? 'border-gray-200' : 'border-amber-200 bg-amber-50'}`}>
-              <div className="bg-gray-50 px-4 py-2 border-b flex items-center justify-between">
-                <h4 className="text-sm font-medium text-gray-700">
-                  {isValidEmbedUrl(formData.mapLink) ? 'Map Preview' : 'Location Link Provided'}
-                </h4>
-                {!isValidEmbedUrl(formData.mapLink) && (
-                  <span className="text-[10px] bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full font-bold uppercase">
-                    Not Embeddable
-                  </span>
-                )}
-              </div>
-
-              <div className="relative">
-                {isValidEmbedUrl(formData.mapLink) ? (
-                  <iframe
-                    src={formData.mapLink}
-                    width="100%"
-                    height="300"
-                    style={{ border: 0 }}
-                    allowFullScreen
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    className="w-full"
-                    title="Location Map"
-                  />
-                ) : (
-                  <div className="h-[200px] flex flex-col items-center justify-center p-6 text-center">
-                    <Map className="w-12 h-12 text-amber-400 mb-2" />
-                    <p className="text-sm text-gray-600 mb-4">
-                      The link provided is not a direct embed link, so we cannot show a preview here.
-                    </p>
-                    <Button asChild variant="outline" size="sm">
-                      <a href={formData.mapLink} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Test Link in New Tab
-                      </a>
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-gray-50 px-4 py-2 border-t flex justify-between items-center">
-                <span className="text-xs text-gray-500">
-                  {isValidEmbedUrl(formData.mapLink) ? 'Directly embedded Google Map' : 'External map link'}
-                </span>
-                <a
-                  href={formData.mapLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center font-medium"
-                >
-                  <ExternalLink className="w-4 h-4 mr-1" />
-                  Open in Maps
-                </a>
-              </div>
-            </div>
-          )}
-
-          {/* Help Message for Non-Embed URLs */}
-          {formData.mapLink && !isValidEmbedUrl(formData.mapLink) && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start">
-                <div className="shrink-0">
-                  <svg
-                    className="h-5 w-5 text-blue-400"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-blue-800">
-                    Pro Tip: Use the Embed Link for a Live Preview
-                  </h3>
-                  <div className="mt-2 text-sm text-blue-700">
-                    <p>
-                      To show a live map preview on your profile, use the Google Maps <strong>Embed link</strong>:
-                    </p>
-                    <ol className="list-decimal list-inside mt-1 space-y-1">
-                      <li>Find your location on Google Maps</li>
-                      <li>Click "Share" → "Embed a map"</li>
-                      <li>Copy only the URL (the text inside <code>src="..."</code>)</li>
-                    </ol>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* File Upload Option */}
-          {/* <div className="border-t pt-6">
-            <h4 className="text-base font-medium text-gray-700 mb-3">Or upload a location image</h4>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
-              <Map className="w-8 h-8 text-gray-400 mx-auto mb-3" />
-              <div className="mb-3">
-                <label htmlFor="route-map" className="cursor-pointer">
-                  <span className="text-blue-600 hover:text-blue-500 font-medium">
-                    Upload route map or location image
-                  </span>
-                </label>
-                <input
-                  id="route-map"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleInputChange('routeMap', file.name);
-                  }}
-                  className="hidden"
-                />
-              </div>
-              <p className="text-sm text-gray-500">PNG, JPG up to 5MB</p>
-            </div>
-
-            {formData.routeMap && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800">
-                  Route map uploaded: {formData.routeMap}
-                </p>
-              </div>
-            )}
-          </div> */}
         </div>
       </section>
 
