@@ -358,6 +358,7 @@ export default function OrderList() {
                                     src={item.image}
                                     alt={item.name}
                                     fill
+                                    sizes="64px"
                                     className="object-cover"
                                   />
                                 ) : (
@@ -523,6 +524,7 @@ export default function OrderList() {
                                     src={item.image}
                                     alt={item.name}
                                     fill
+                                    sizes="64px"
                                     className="object-cover"
                                   />
                                 ) : (
@@ -662,7 +664,7 @@ export default function OrderList() {
                       <div className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer group">
                         <div className="relative w-12 h-12 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
                           {item.images?.[0] ? (
-                            <Image src={item.images[0].url || item.images[0]} alt={item.name} fill className="object-cover" />
+                            <Image src={item.images[0].url || item.images[0]} alt={item.name} fill sizes="48px" className="object-cover" />
                           ) : (
                             <Package className="w-6 h-6 text-slate-400 m-auto" />
                           )}
@@ -703,7 +705,7 @@ export default function OrderList() {
                       <div className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer group">
                         <div className="relative w-12 h-12 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
                           {item.images?.[0] ? (
-                            <Image src={item.images[0].url || item.images[0]} alt={item.name} fill className="object-cover" />
+                            <Image src={item.images[0].url || item.images[0]} alt={item.name} fill sizes="48px" className="object-cover" />
                           ) : (
                             <Package className="w-6 h-6 text-slate-400 m-auto" />
                           )}

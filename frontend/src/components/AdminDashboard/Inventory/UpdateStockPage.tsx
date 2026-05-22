@@ -328,6 +328,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                   src={primaryImage}
                   alt={inventoryItem.name}
                   fill
+                  sizes="(max-width: 1024px) 100vw, 384px"
                   className="object-cover"
                 />
               </div>
@@ -410,6 +411,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                               src={variant.images[0]}
                               alt={`${variant.size} - ${variant.color}`}
                               fill
+                              sizes="64px"
                               className="object-cover"
                             />
                           </div>

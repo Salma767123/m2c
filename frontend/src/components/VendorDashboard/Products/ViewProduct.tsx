@@ -203,6 +203,7 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                       src={allImages[selectedImage]?.url}
                       alt={allImages[selectedImage]?.alt || product.name}
                       fill
+                      sizes="(max-width: 1024px) 100vw, 50vw"
                       className="object-contain"
                     />
                     {allImages[selectedImage]?.isPrimary && (
@@ -224,7 +225,7 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                               : 'border-gray-200 hover:border-gray-400'
                           }`}
                         >
-                          <Image src={img.url} alt="" fill className="object-cover" />
+                          <Image src={img.url} alt="" fill sizes="64px" className="object-cover" />
                         </button>
                       ))}
                     </div>
@@ -378,7 +379,7 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                       <div className="flex gap-2 mt-2">
                         {variant.images.map((imgUrl, imgIdx) => (
                           <div key={imgIdx} className="relative w-14 h-14 rounded-lg overflow-hidden border border-gray-200 bg-white shrink-0">
-                            <Image src={imgUrl} alt={`${variant.size} ${variant.color}`} fill className="object-cover" />
+                            <Image src={imgUrl} alt={`${variant.size} ${variant.color}`} fill sizes="56px" className="object-cover" />
                           </div>
                         ))}
                       </div>

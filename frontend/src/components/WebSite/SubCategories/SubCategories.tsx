@@ -122,6 +122,7 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
             src={category.image}
             alt={`${category.name} Banner`}
             fill
+            sizes="100vw"
             className="object-cover"
             priority
           />
@@ -173,6 +174,7 @@ export default function SubCategories({ categorySlug }: { categorySlug: string }
                       src={subcategory.image}
                       alt={subcategory.name}
                       fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
                       className="object-cover group-hover:scale-110 transition-transform duration-700"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;

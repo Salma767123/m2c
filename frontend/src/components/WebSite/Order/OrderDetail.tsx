@@ -307,6 +307,7 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                             src={item.productImage}
                             alt={item.productName}
                             fill
+                            sizes="80px"
                             className="object-cover"
                           />
                         ) : (

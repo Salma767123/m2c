@@ -91,6 +91,7 @@ const About = () => {
                 src={missionStatement.image}
                 alt={missionStatement.title}
                 fill
+                sizes="100vw"
                 className="object-cover grayscale"
                 priority
               />
@@ -222,6 +223,7 @@ const About = () => {
                       src={section.image}
                       alt={section.title}
                       fill
+                      sizes="(max-width: 1024px) 100vw, 50vw"
                       className="object-cover grayscale hover:grayscale-0 transition-all duration-700 ease-in-out"
                     />
                   </div>

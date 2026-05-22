@@ -511,6 +511,7 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
                   src={photo.preview}
                   alt={`Product ${index + 1}`}
                   fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 20vw"
                   className="object-cover"
                 />
                 <button

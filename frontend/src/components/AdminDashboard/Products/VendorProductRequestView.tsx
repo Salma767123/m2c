@@ -441,6 +441,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                         src={image.url}
                         alt={image.alt || `${product.name} - Image ${index + 1}`}
                         fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         className="object-cover"
                       />
                       {image.isPrimary && (
@@ -641,6 +642,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                                   src={imageUrl}
                                   alt={`${variant.size} - ${variant.color} - Image ${imgIndex + 1}`}
                                   fill
+                                  sizes="(max-width: 768px) 50vw, 25vw"
                                   className="object-cover"
                                 />
                               </div>

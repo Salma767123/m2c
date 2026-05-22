@@ -144,6 +144,7 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
                                                             src={(item.image || item.productImage)!}
                                                             alt={item.name || item.productName || 'Product'}
                                                             fill
+                                                            sizes="44px"
                                                             className="object-cover"
                                                         />
                                                     ) : (
