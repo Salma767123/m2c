@@ -4,7 +4,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  ActivityIndicator,
   RefreshControl,
   StatusBar,
 } from 'react-native';
@@ -15,7 +14,6 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  AlertCircle,
   ChevronRight,
   ShoppingCart,
 } from 'lucide-react-native';
@@ -27,20 +25,28 @@ import { OrdersSkeleton } from '@/components/ui/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── Status styling ───────────────────────────────────────────────────────────
-type StatusInfo = { icon: any; label: string; bg: string; fg: string };
+type CustomerStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
+type StatusInfo = { icon: any; label: string; bg: string; fg: string; dot: string };
 
-const STATUS_MAP: Record<string, StatusInfo> = {
-  delivered:        { icon: CheckCircle, label: 'Delivered',    bg: '#f0fdf4', fg: '#16a34a' },
-  shipped:          { icon: Truck,       label: 'Shipped',      bg: '#eff6ff', fg: '#2563eb' },
-  processing:       { icon: Clock,       label: 'Processing',   bg: '#fffbeb', fg: '#d97706' },
-  confirmed:        { icon: Clock,       label: 'Confirmed',    bg: '#fffbeb', fg: '#d97706' },
-  order_created:    { icon: Package,     label: 'Order Placed', bg: '#f3f4f6', fg: '#374151' },
-  packed_by_vendor: { icon: Package,     label: 'Packed',       bg: '#eff6ff', fg: '#2563eb' },
-  cancelled:        { icon: XCircle,     label: 'Cancelled',    bg: '#fef2f2', fg: '#dc2626' },
+// Collapse internal/admin statuses → 4 customer-facing statuses (matches web Order.tsx).
+// Customers never see internal states like order_created, packed_by_vendor,
+// in_transit_to_admin_hub, approved_by_admin_hub, etc.
+const normalizeStatus = (s: string): CustomerStatus => {
+  const n = (s || '').toLowerCase();
+  if (['dispatched', 'shipped', 'shipped_to_customer'].includes(n)) return 'shipped';
+  if (['completed', 'delivered', 'received', 'returned'].includes(n)) return 'delivered';
+  if (['cancelled', 'failed', 'rejected', 'rejected_by_admin_hub'].includes(n)) return 'cancelled';
+  return 'processing';
 };
 
-const getStatus = (s: string): StatusInfo =>
-  STATUS_MAP[s.toLowerCase()] ?? { icon: AlertCircle, label: s, bg: '#f3f4f6', fg: '#374151' };
+const STATUS_MAP: Record<CustomerStatus, StatusInfo> = {
+  processing: { icon: Clock,       label: 'Processing', bg: '#fffbeb', fg: '#b45309', dot: '#f59e0b' },
+  shipped:    { icon: Truck,       label: 'Shipped',    bg: '#eff6ff', fg: '#1d4ed8', dot: '#3b82f6' },
+  delivered:  { icon: CheckCircle, label: 'Delivered',  bg: '#ecfdf5', fg: '#047857', dot: '#10b981' },
+  cancelled:  { icon: XCircle,     label: 'Cancelled',  bg: '#fef2f2', fg: '#b91c1c', dot: '#ef4444' },
+};
+
+const getStatus = (s: string): StatusInfo => STATUS_MAP[normalizeStatus(s)];
 
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 
@@ -79,15 +85,15 @@ export default function OrdersScreen() {
     fetchOrders();
   }, []);
 
-  const active = orders.filter((o) => !['DELIVERED', 'CANCELLED'].includes(o.status));
-  const history = orders.filter((o) => ['DELIVERED', 'CANCELLED'].includes(o.status));
+  const active = orders.filter((o) => !['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
+  const history = orders.filter((o) => ['delivered', 'cancelled'].includes(normalizeStatus(o.status)));
   const display = tab === 'active' ? active : history;
 
   // ── Loading ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <ScreenHeader activeCount={0} historyCount={0} />
+      <View style={{ flex: 1, backgroundColor: '#f4f5f7' }}>
+        <ScreenHeader total={0} />
         <OrdersSkeleton />
       </View>
     );
@@ -96,59 +102,54 @@ export default function OrdersScreen() {
   // ── Auth required ───────────────────────────────────────────────────────
   if (!isAuth) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <ScreenHeader activeCount={0} historyCount={0} />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-            <Package size={40} color="#d1d5db" />
-          </View>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 6 }}>Login Required</Text>
-          <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 }}>
-            Sign in to view and track your orders.
-          </Text>
-          <Pressable onPress={() => router.push('/(auth)/Login')} accessibilityRole="button">
-            <View style={{ backgroundColor: '#111827', paddingHorizontal: 28, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Login to Continue</Text>
-            </View>
-          </Pressable>
-        </View>
+      <View style={{ flex: 1, backgroundColor: '#f4f5f7' }}>
+        <ScreenHeader total={0} />
+        <EmptyState
+          icon={<Package size={40} color="#cbd5e1" />}
+          title="Login Required"
+          subtitle="Sign in to view and track your orders."
+          ctaLabel="Login to Continue"
+          onPress={() => router.push('/(auth)/Login')}
+        />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <ScreenHeader activeCount={active.length} historyCount={history.length} />
+    <View style={{ flex: 1, backgroundColor: '#f4f5f7' }}>
+      <ScreenHeader total={orders.length} />
 
-      {/* Tab bar */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#f8fafc', gap: 8 }}>
-        <TabButton label="Active" count={active.length} active={tab === 'active'} onPress={() => setTab('active')} />
-        <TabButton label="History" count={history.length} active={tab === 'history'} onPress={() => setTab('history')} />
+      {/* Segmented tab control */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            backgroundColor: '#e9eaee',
+            borderRadius: 12,
+            padding: 4,
+          }}
+        >
+          <SegTab label="Active" count={active.length} active={tab === 'active'} onPress={() => setTab('active')} />
+          <SegTab label="History" count={history.length} active={tab === 'history'} onPress={() => setTab('history')} />
+        </View>
       </View>
 
       {display.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-            <ShoppingCart size={40} color="#d1d5db" />
-          </View>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 4 }}>
-            {tab === 'active' ? 'No Active Orders' : 'No Order History'}
-          </Text>
-          <Text style={{ fontSize: 13, color: '#6b7280', textAlign: 'center', marginBottom: 20 }}>
-            {tab === 'active'
-              ? "Your active orders will appear here."
-              : "Completed and cancelled orders appear here."}
-          </Text>
-          <Pressable onPress={() => router.push('/(tabs)' as any)} accessibilityRole="button">
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', paddingHorizontal: 24, height: 48, borderRadius: 12, gap: 8 }}>
-              <ShoppingCart size={16} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Start Shopping</Text>
-            </View>
-          </Pressable>
-        </View>
+        <EmptyState
+          icon={<ShoppingCart size={40} color="#cbd5e1" />}
+          title={tab === 'active' ? 'No Active Orders' : 'No Order History'}
+          subtitle={
+            tab === 'active'
+              ? 'Your active orders will appear here once you place one.'
+              : 'Completed and cancelled orders will appear here.'
+          }
+          ctaLabel="Start Shopping"
+          ctaIcon={<ShoppingCart size={16} color="#fff" />}
+          onPress={() => router.push('/(tabs)' as any)}
+        />
       ) : (
         <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}
+          contentContainerStyle={{ padding: 16, paddingTop: 12, paddingBottom: 40, gap: 12 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#111827" />}
         >
@@ -162,32 +163,32 @@ export default function OrdersScreen() {
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
-function ScreenHeader({ activeCount, historyCount }: { activeCount: number; historyCount: number }) {
+function ScreenHeader({ total }: { total: number }) {
   const insets = useSafeAreaInsets();
   return (
     <View
       style={{
         backgroundColor: '#fff',
         paddingHorizontal: 16,
-        paddingTop: insets.top + 12,
-        paddingBottom: 14,
+        paddingTop: insets.top + 14,
+        paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
+        borderBottomColor: '#eceef1',
       }}
     >
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <Text style={{ fontSize: 24, fontWeight: '800', color: '#111827' }}>My Orders</Text>
-      <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
-        {activeCount + historyCount > 0
-          ? `${activeCount + historyCount} total · ${activeCount} active`
-          : 'Track and manage your purchases'}
+      <Text style={{ fontSize: 26, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 }}>
+        My Orders
+      </Text>
+      <Text style={{ fontSize: 13, color: '#64748b', marginTop: 3 }}>
+        {total > 0 ? `${total} ${total === 1 ? 'order' : 'orders'} in total` : 'Track and manage your purchases'}
       </Text>
     </View>
   );
 }
 
-// ─── Tab Button ───────────────────────────────────────────────────────────────
-function TabButton({
+// ─── Segmented Tab ──────────────────────────────────────────────────────────────
+function SegTab({
   label,
   count,
   active,
@@ -199,35 +200,44 @@ function TabButton({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected: active }} style={{ flex: 1 }}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={`${label}, ${count} orders`}
+      style={{ flex: 1 }}
+    >
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           height: 40,
-          borderRadius: 10,
-          backgroundColor: active ? '#111827' : '#ffffff',
-          borderWidth: active ? 0 : 1,
-          borderColor: '#e5e7eb',
+          borderRadius: 9,
+          backgroundColor: active ? '#fff' : 'transparent',
           gap: 6,
+          shadowColor: active ? '#0f172a' : 'transparent',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: active ? 0.1 : 0,
+          shadowRadius: 3,
+          elevation: active ? 2 : 0,
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#fff' : '#6b7280' }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#0f172a' : '#64748b' }}>
           {label}
         </Text>
         <View
           style={{
-            minWidth: 20,
-            height: 18,
-            borderRadius: 9,
-            paddingHorizontal: 5,
-            backgroundColor: active ? 'rgba(255,255,255,0.2)' : '#f3f4f6',
+            minWidth: 22,
+            height: 20,
+            borderRadius: 10,
+            paddingHorizontal: 6,
+            backgroundColor: active ? '#111827' : '#d6d8dd',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 10, fontWeight: '800', color: active ? '#fff' : '#6b7280' }}>
+          <Text style={{ fontSize: 11, fontWeight: '800', color: active ? '#fff' : '#475569' }}>
             {count}
           </Text>
         </View>
@@ -240,151 +250,216 @@ function TabButton({
 function OrderCard({ order }: { order: Order }) {
   const status = getStatus(order.status);
   const Icon = status.icon;
-  const preview = order.items.slice(0, 3);
-  const extra = order.items.length - 3;
+  const firstItem: any = order.items[0];
+  const extraCount = order.items.length - 1;
 
   return (
     <Pressable
       onPress={() => router.push(`/(tabs)/orders/${order.id}` as any)}
       accessibilityRole="button"
-      accessibilityLabel={`Order ${order.orderId}, ${status.label}`}
-      android_ripple={{ color: 'rgba(15,23,42,0.05)' }}
+      accessibilityLabel={`Order ${order.orderId}, ${status.label}, total ${fmt(order.totalAmount)}`}
+      android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
+      style={({ pressed }) => ({
+        opacity: pressed ? 0.9 : 1,
+        transform: [{ scale: pressed ? 0.985 : 1 }],
+      })}
     >
       <View
         style={{
           backgroundColor: '#fff',
-          borderRadius: 16,
-          overflow: 'hidden',
+          borderRadius: 18,
           borderWidth: 1,
-          borderColor: '#e5e7eb',
+          borderColor: '#eceef1',
           shadowColor: '#0f172a',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.06,
+          shadowRadius: 10,
           elevation: 2,
+          overflow: 'hidden',
         }}
       >
-        <View style={{ padding: 16 }}>
-          {/* Row 1: Order ID + Status */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>
-                #{order.orderId}
-              </Text>
-              <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
-                {orderService.formatDate(order.createdAt)}
-              </Text>
-            </View>
+        {/* ── Header: order id + date / status ── */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: 14,
+            paddingBottom: 12,
+          }}
+        >
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: '#0f172a', letterSpacing: -0.2 }}>
+              #{order.orderId}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+              {orderService.formatDate(order.createdAt)}
+            </Text>
+          </View>
+          {/* Status pill with dot */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 5,
+              backgroundColor: status.bg,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 20,
+            }}
+          >
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: status.dot }} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: status.fg }}>{status.label}</Text>
+          </View>
+        </View>
+
+        {/* ── Item preview ── */}
+        {firstItem ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginHorizontal: 16,
+              backgroundColor: '#f7f8fa',
+              borderRadius: 14,
+              padding: 10,
+            }}
+          >
             <View
               style={{
-                flexDirection: 'row',
+                width: 56,
+                height: 56,
+                borderRadius: 12,
+                overflow: 'hidden',
+                backgroundColor: '#ffffff',
+                borderWidth: 1,
+                borderColor: '#eceef1',
                 alignItems: 'center',
-                gap: 5,
-                backgroundColor: status.bg,
-                paddingHorizontal: 10,
-                paddingVertical: 5,
-                borderRadius: 8,
+                justifyContent: 'center',
               }}
             >
-              <Icon size={12} color={status.fg} />
-              <Text style={{ fontSize: 11, fontWeight: '700', color: status.fg }}>
-                {status.label}
+              {firstItem.productImage ? (
+                <Image
+                  source={{ uri: firstItem.productImage }}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="contain"
+                />
+              ) : (
+                <Package size={22} color="#94a3b8" />
+              )}
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }} numberOfLines={1}>
+                {firstItem.productName}
+              </Text>
+              <Text style={{ fontSize: 12, color: '#64748b', marginTop: 3 }}>
+                Qty: {firstItem.quantity}
+                {extraCount > 0 ? `  ·  +${extraCount} more ${extraCount === 1 ? 'item' : 'items'}` : ''}
               </Text>
             </View>
           </View>
+        ) : null}
 
-          {/* Row 2: Item thumbnails + name */}
-          {preview.length > 0 ? (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: '#f9fafb',
-                borderRadius: 12,
-                padding: 10,
-                marginBottom: 12,
-              }}
-            >
-              <View style={{ flexDirection: 'row', marginRight: 10 }}>
-                {preview.map((item: any, i: number) => (
-                  <View
-                    key={item.id}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 8,
-                      overflow: 'hidden',
-                      backgroundColor: '#e5e7eb',
-                      borderWidth: 2,
-                      borderColor: '#fff',
-                      marginLeft: i === 0 ? 0 : -10,
-                    }}
-                  >
-                    {item.productImage ? (
-                      <Image source={{ uri: item.productImage }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-                    ) : (
-                      <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-                        <Package size={14} color="#9ca3af" />
-                      </View>
-                    )}
-                  </View>
-                ))}
-                {extra > 0 ? (
-                  <View
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 8,
-                      backgroundColor: '#111827',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginLeft: -10,
-                      borderWidth: 2,
-                      borderColor: '#fff',
-                    }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>+{extra}</Text>
-                  </View>
-                ) : null}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: '#111827' }} numberOfLines={1}>
-                  {preview[0].productName}
-                </Text>
-                {order.items.length > 1 ? (
-                  <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>
-                    +{order.items.length - 1} more
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          ) : null}
-
-          {/* Row 3: Total + View Details */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View>
-              <Text style={{ fontSize: 11, color: '#9ca3af', fontWeight: '600' }}>Total</Text>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>
-                {fmt(order.totalAmount)}
-              </Text>
-            </View>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: '#111827',
-                paddingHorizontal: 16,
-                height: 38,
-                borderRadius: 10,
-                gap: 4,
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>View Details</Text>
-              <ChevronRight size={14} color="#fff" strokeWidth={2.5} />
-            </View>
+        {/* ── Footer: total + view details ── */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: 14,
+            paddingBottom: 14,
+            marginTop: 12,
+            borderTopWidth: 1,
+            borderTopColor: '#f1f3f5',
+          }}
+        >
+          <View>
+            <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Total
+            </Text>
+            <Text style={{ fontSize: 19, fontWeight: '800', color: '#0f172a', marginTop: 1, letterSpacing: -0.3 }}>
+              {fmt(order.totalAmount)}
+            </Text>
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#111827',
+              paddingLeft: 16,
+              paddingRight: 12,
+              height: 40,
+              borderRadius: 11,
+              gap: 3,
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>View Details</Text>
+            <ChevronRight size={16} color="#fff" strokeWidth={2.5} />
           </View>
         </View>
       </View>
     </Pressable>
+  );
+}
+
+// ─── Empty / Auth State ─────────────────────────────────────────────────────────
+function EmptyState({
+  icon,
+  title,
+  subtitle,
+  ctaLabel,
+  ctaIcon,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  ctaLabel: string;
+  ctaIcon?: React.ReactNode;
+  onPress: () => void;
+}) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <View
+        style={{
+          width: 96,
+          height: 96,
+          borderRadius: 28,
+          backgroundColor: '#fff',
+          borderWidth: 1,
+          borderColor: '#eceef1',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 20,
+        }}
+      >
+        {icon}
+      </View>
+      <Text style={{ fontSize: 19, fontWeight: '800', color: '#0f172a', marginBottom: 6, textAlign: 'center' }}>
+        {title}
+      </Text>
+      <Text style={{ fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 21, marginBottom: 24 }}>
+        {subtitle}
+      </Text>
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={ctaLabel}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#111827',
+            paddingHorizontal: 28,
+            height: 52,
+            borderRadius: 14,
+            gap: 8,
+          }}
+        >
+          {ctaIcon}
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{ctaLabel}</Text>
+        </View>
+      </Pressable>
+    </View>
   );
 }

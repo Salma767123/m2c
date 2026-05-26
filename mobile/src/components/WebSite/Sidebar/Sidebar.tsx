@@ -25,8 +25,12 @@ import {
   LogIn,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { categoryService, type Category } from '@/services/categoryService';
 import { userAuthService } from '@/services/userAuthService';
+import { companyInfoService } from '@/services/companyInfoService';
+
+const STATIC_LOGO = require('../../../../assets/images/logo4.png');
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIDEBAR_WIDTH = Math.min(SCREEN_WIDTH * 0.78, 340);
@@ -45,7 +49,19 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [isAuth, setIsAuth] = useState(false);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  // Load dynamic company logo (cached first, then fresh from API)
+  useEffect(() => {
+    companyInfoService.getCachedCompanyInfo().then((info) => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    });
+    companyInfoService.getPublicCompanyInfo().then((info) => {
+      if (info.companyLogo) setCompanyLogo(info.companyLogo);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!visible) return;
@@ -146,14 +162,17 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
           </View>
         </Pressable>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        >
 
           {/* Brand */}
           <View style={{ alignItems: 'center', paddingVertical: 20, paddingHorizontal: 16 }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 6, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 8 }}>
+            <View style={{ marginBottom: 8 }}>
               <Image
-                source={require('../../../../assets/images/logo4.png')}
-                style={{ width: 110, height: 40 }}
+                source={companyLogo ? { uri: companyLogo } : STATIC_LOGO}
+                style={{ width: 240, height: 110 }}
                 contentFit="contain"
               />
             </View>
@@ -274,18 +293,23 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
               ))}
 
               <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
-                <Pressable onPress={() => go('/(tabs)/categories')} accessibilityRole="button">
+                <Pressable
+                  onPress={() => go('/(tabs)/categories')}
+                  accessibilityRole="button"
+                  accessibilityLabel="View all categories"
+                  android_ripple={{ color: 'rgba(0,0,0,0.05)' }}
+                >
                   <View
                     style={{
-                      height: 40,
-                      borderRadius: 10,
+                      height: 48,
+                      borderRadius: 12,
                       borderWidth: 1,
                       borderColor: '#e5e7eb',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>View All Categories</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>View All Categories</Text>
                   </View>
                 </Pressable>
               </View>

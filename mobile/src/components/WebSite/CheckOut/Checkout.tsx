@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getCurrency, formatPrice as fmtCurrency } from '@/lib/currency';
+import { getCurrency, getRegionalPrice, formatPrice as fmtCurrency } from '@/lib/currency';
 import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
   Pressable,
   ActivityIndicator,
   Image,
@@ -17,6 +16,7 @@ import {
   CreditCard,
   ArrowLeft,
   CheckCircle,
+  Check,
   Truck,
   Lock,
   Shield,
@@ -29,15 +29,30 @@ import { WebView } from 'react-native-webview';
 import ShippingForm from './CheckoutProcess/ShippingForm';
 import PaymentForm from './CheckoutProcess/PaymentForm';
 import ReviewOrder from './CheckoutProcess/ReviewOrder';
+import AddressSelector from './CheckoutProcess/AddressSelector';
 import { cartService, CartItem } from '@/services/cartService';
 import orderService, { CreateOrderParams } from '@/services/orderService';
 import { stashRecentOrder } from '@/lib/recentOrder';
 import paymentService from '@/services/paymentService';
 import { paymentSettingsService, PublicPaymentSettings } from '@/services/paymentSettingsService';
 import { userProfileService } from '@/services/userProfileService';
+import { addressService, MAX_SAVED_ADDRESSES, type SavedAddress } from '@/services/addressService';
+import { userAuthService } from '@/services/userAuthService';
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
 import { CheckoutSkeleton } from '@/components/ui/Skeleton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  DEFAULT_COUNTRY_ISO,
+  EMAIL_REGEX,
+  NAME_REGEX,
+  normalizeCountryToIso,
+  toE164,
+  validatePhone,
+  validatePostalCode,
+  getPostalRule,
+  getCountry,
+  getStates,
+} from './CheckoutProcess/constants';
 
 export interface CheckoutFormData {
   firstName: string;
@@ -45,6 +60,7 @@ export interface CheckoutFormData {
   email: string;
   phone: string;
   address: string;
+  addressLine2: string;
   city: string;
   state: string;
   zipCode: string;
@@ -60,6 +76,7 @@ export default function Checkout() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [shippingSubmitCount, setShippingSubmitCount] = useState(0);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [paymentSettings, setPaymentSettings] = useState<PublicPaymentSettings | null>(null);
@@ -73,10 +90,11 @@ export default function Checkout() {
     email: '',
     phone: '',
     address: '',
+    addressLine2: '',
     city: '',
     state: '',
     zipCode: '',
-    country: 'United States',
+    country: DEFAULT_COUNTRY_ISO,
     paymentMethod: 'razorpay',
     saveInfo: false,
     sameAsBilling: true,
@@ -85,11 +103,23 @@ export default function Checkout() {
 
   const [discountAmount, setDiscountAmount] = useState(0);
 
+  // Saved addresses
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [useNewAddress, setUseNewAddress] = useState(true);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [saveNewAddressToBook, setSaveNewAddressToBook] = useState(false);
+
+  // Bag add-on (persisted from Cart page)
+  const [bagName, setBagName] = useState('');
+  const [bagCost, setBagCost] = useState(0);
+
   const [orderSummary, setOrderSummary] = useState({
     subtotal: 0,
     shipping: 0,
     tax: 0,
     discount: 0,
+    bagCost: 0,
     total: 0,
   });
 
@@ -97,12 +127,25 @@ export default function Checkout() {
     fetchCart();
     fetchUserProfile();
     fetchPaymentSettings();
+    fetchSavedAddresses();
     loadSavedCoupon();
+    loadSavedBag();
   }, []);
 
   useEffect(() => {
     calculateTotals();
-  }, [cartItems, formData.shippingMethod, discountAmount]);
+  }, [cartItems, formData.shippingMethod, discountAmount, bagCost]);
+
+  const loadSavedBag = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('selectedBagType');
+      if (saved) {
+        const { name, price, priceINR, priceUSD } = JSON.parse(saved);
+        setBagName(name);
+        setBagCost(getRegionalPrice({ basePrice: price, priceINR, priceUSD }));
+      }
+    } catch { /* ignore */ }
+  };
 
   const fetchCart = async () => {
     try {
@@ -141,13 +184,88 @@ export default function Checkout() {
           city: userData.city || '',
           state: userData.state || '',
           zipCode: userData.zipCode || '',
-          country: userData.country || 'United States',
+          country: normalizeCountryToIso(userData.country),
         }));
       }
     } catch (err: any) {
       console.error('Failed to load user profile:', err);
       // Don't show error to user, just log it
     }
+  };
+
+  const fetchSavedAddresses = async () => {
+    try {
+      const auth = await userAuthService.isAuthenticated();
+      if (!auth) return;
+      const list = await addressService.list();
+      setSavedAddresses(list);
+      const def = list.find((a) => a.isDefault) || list[0];
+      if (def) {
+        setSelectedAddressId(def.id);
+        setUseNewAddress(false);
+        applySavedAddressToForm(def);
+      } else {
+        setUseNewAddress(true);
+      }
+    } catch {
+      setUseNewAddress(true);
+    }
+  };
+
+  const applySavedAddressToForm = (addr: SavedAddress) => {
+    const nameParts = (addr.name || '').trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    const countryIso = normalizeCountryToIso(addr.country);
+    setFormData((prev) => ({
+      ...prev,
+      firstName,
+      lastName,
+      phone: addr.phone || prev.phone,
+      address: addr.address || '',
+      addressLine2: addr.addressLine2 || '',
+      city: addr.city || '',
+      state: addr.state || '',
+      zipCode: addr.zipCode || '',
+      country: countryIso,
+    }));
+  };
+
+  const handleSelectSavedAddress = (id: string) => {
+    const addr = savedAddresses.find((a) => a.id === id);
+    if (!addr) return;
+    setSelectedAddressId(id);
+    setUseNewAddress(false);
+    setSaveNewAddressToBook(false);
+    applySavedAddressToForm(addr);
+  };
+
+  const handleEditAddress = (id: string) => {
+    const addr = savedAddresses.find((a) => a.id === id);
+    if (!addr) return;
+    setEditingAddressId(id);
+    setSelectedAddressId(id);
+    setUseNewAddress(true);
+    setSaveNewAddressToBook(false);
+    applySavedAddressToForm(addr);
+  };
+
+  const handleChooseNewAddress = () => {
+    setUseNewAddress(true);
+    setSelectedAddressId(null);
+    setEditingAddressId(null);
+    setFormData((prev) => ({
+      ...prev,
+      firstName: '',
+      lastName: '',
+      phone: '',
+      address: '',
+      addressLine2: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: DEFAULT_COUNTRY_ISO,
+    }));
   };
 
   const fetchPaymentSettings = async () => {
@@ -184,20 +302,31 @@ export default function Checkout() {
   };
 
   const calculateTotals = () => {
-    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = cartItems.reduce((sum, item) => {
+      const hasVariant = !!(item as any).variant;
+      const price = hasVariant
+        ? getRegionalPrice((item as any).variant as any)
+        : getRegionalPrice((item.product || { basePrice: item.price }) as any);
+      return sum + price * item.quantity;
+    }, 0);
     const shipping = 0;
     const tax = cartItems.reduce((sum, item) => {
-      const itemSubtotal = item.price * item.quantity;
+      const hasVariant = !!(item as any).variant;
+      const price = hasVariant
+        ? getRegionalPrice((item as any).variant as any)
+        : getRegionalPrice((item.product || { basePrice: item.price }) as any);
+      const itemSubtotal = price * item.quantity;
       const gstRate = item.product?.gstPercentage ? item.product.gstPercentage / 100 : 0;
       return sum + itemSubtotal * gstRate;
     }, 0);
-    const total = Math.max(0, subtotal + shipping + tax - discountAmount);
+    const total = Math.max(0, subtotal + shipping + tax - discountAmount + bagCost);
 
     setOrderSummary({
       subtotal,
       shipping,
       tax,
       discount: discountAmount,
+      bagCost,
       total,
     });
   };
@@ -210,36 +339,117 @@ export default function Checkout() {
   };
 
   const validateShippingForm = (): boolean => {
+    // If a saved address is selected (not using new address), skip field validation
+    if (!useNewAddress && selectedAddressId) return true;
+
+    const iso = (formData.country || DEFAULT_COUNTRY_ISO).toUpperCase();
+    const postalRule = getPostalRule(iso);
+    const stateList = getStates(iso);
+
     if (!formData.firstName?.trim()) {
       showErrorToast('Required Field', 'Please enter your first name');
       return false;
     }
+    if (formData.firstName.trim().length < 2 || formData.firstName.trim().length > 50) {
+      showErrorToast('Invalid Name', 'First name must be 2-50 characters');
+      return false;
+    }
+    if (!NAME_REGEX.test(formData.firstName.trim())) {
+      showErrorToast('Invalid Name', 'First name can only contain letters, spaces, and hyphens');
+      return false;
+    }
+
     if (!formData.lastName?.trim()) {
       showErrorToast('Required Field', 'Please enter your last name');
       return false;
     }
+    if (formData.lastName.trim().length < 2 || formData.lastName.trim().length > 50) {
+      showErrorToast('Invalid Name', 'Last name must be 2-50 characters');
+      return false;
+    }
+    if (!NAME_REGEX.test(formData.lastName.trim())) {
+      showErrorToast('Invalid Name', 'Last name can only contain letters, spaces, and hyphens');
+      return false;
+    }
+
     if (!formData.email?.trim()) {
       showErrorToast('Required Field', 'Please enter your email address');
       return false;
     }
+    if (!EMAIL_REGEX.test(formData.email.trim())) {
+      showErrorToast('Invalid Email', 'Please enter a valid email address');
+      return false;
+    }
+
     if (!formData.phone?.trim()) {
       showErrorToast('Required Field', 'Please enter your phone number');
       return false;
     }
+    if (!validatePhone(formData.phone, iso)) {
+      showErrorToast('Invalid Phone', `Enter a valid phone number for ${getCountry(iso)?.name ?? 'the selected country'}`);
+      return false;
+    }
+
     if (!formData.address?.trim()) {
       showErrorToast('Required Field', 'Please enter your address');
       return false;
     }
+    if (formData.address.trim().length < 3 || formData.address.trim().length > 100) {
+      showErrorToast('Invalid Address', 'Address must be 3-100 characters');
+      return false;
+    }
+
+    if (formData.addressLine2 && formData.addressLine2.trim().length > 100) {
+      showErrorToast('Invalid Address', 'Address Line 2 must be 100 characters or less');
+      return false;
+    }
+
+    if (!formData.country) {
+      showErrorToast('Required Field', 'Please select your country');
+      return false;
+    }
+
     if (!formData.city?.trim()) {
       showErrorToast('Required Field', 'Please enter your city');
       return false;
     }
-    if (!formData.state?.trim()) {
-      showErrorToast('Required Field', 'Please enter your state');
+    if (formData.city.trim().length < 2 || formData.city.trim().length > 50) {
+      showErrorToast('Invalid City', 'City must be 2-50 characters');
       return false;
     }
+
+    if (!formData.state?.trim()) {
+      showErrorToast('Required Field', stateList.length > 0 ? 'Please select your state' : 'Please enter your state / region');
+      return false;
+    }
+
     if (!formData.zipCode?.trim()) {
-      showErrorToast('Required Field', 'Please enter your ZIP code');
+      showErrorToast('Required Field', `Please enter your ${postalRule.label.toLowerCase()}`);
+      return false;
+    }
+    if (!validatePostalCode(formData.zipCode, iso)) {
+      showErrorToast('Invalid ' + postalRule.label, `Enter a valid ${postalRule.label.toLowerCase()} (e.g. ${postalRule.placeholder})`);
+      return false;
+    }
+
+    return true;
+  };
+
+  const validatePaymentStep = (): boolean => {
+    if (!formData.paymentMethod) {
+      showErrorToast('Payment Required', 'Please select a payment method');
+      return false;
+    }
+    if (!paymentSettings?.razorpayEnabled && !paymentSettings?.payuEnabled) {
+      showErrorToast('Unavailable', 'No payment gateway is configured. Please contact support.');
+      return false;
+    }
+    if (formData.paymentMethod === 'razorpay' && !paymentSettings?.razorpayEnabled) {
+      showErrorToast('Unavailable', 'Razorpay is not available. Please choose another method.');
+      return false;
+    }
+    if (formData.paymentMethod === 'payu' && !paymentSettings?.payuEnabled) {
+      showErrorToast('Unavailable', 'PayU is not available. Please choose another method.');
       return false;
     }
     return true;
@@ -247,12 +457,22 @@ export default function Checkout() {
 
   const handleContinue = () => {
     if (currentStep === 1) {
-      // Validate shipping form before moving to payment
+      if (!useNewAddress && !selectedAddressId) {
+        showErrorToast('Address Required', 'Please select a shipping address or enter a new one');
+        return;
+      }
       if (!validateShippingForm()) {
+        setShippingSubmitCount((c) => c + 1);
         return;
       }
     }
-    
+
+    if (currentStep === 2) {
+      if (!validatePaymentStep()) {
+        return;
+      }
+    }
+
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -309,8 +529,9 @@ export default function Checkout() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        phone: formData.phone,
+        phone: toE164(formData.phone, formData.country),
         street: formData.address,
+        addressLine2: formData.addressLine2,
         city: formData.city,
         state: formData.state,
         zipCode: formData.zipCode,
@@ -557,10 +778,12 @@ export default function Checkout() {
         // render immediately without re-fetching what we already have.
         await stashRecentOrder(response.data);
         await AsyncStorage.removeItem('appliedCoupon');
+        await AsyncStorage.removeItem('selectedBagType');
         showSuccessToast('Order Placed!', 'Your order has been placed successfully');
         router.replace(`/(any)/order-confirmation?id=${response.data.id}` as any);
       } else {
         await AsyncStorage.removeItem('appliedCoupon');
+        await AsyncStorage.removeItem('selectedBagType');
         showSuccessToast('Order Placed!', 'Your order has been placed successfully');
         router.replace('/(tabs)/orders' as any);
       }
@@ -601,7 +824,11 @@ export default function Checkout() {
 
           return (
             <React.Fragment key={step.id}>
-              <View style={{ alignItems: 'center', flex: 1 }}>
+              <View
+                style={{ alignItems: 'center', flex: 1 }}
+                accessibilityLabel={`Step ${step.id}: ${step.name}, ${isCompleted ? 'completed' : isActive ? 'current step' : 'upcoming'}`}
+                accessibilityRole="text"
+              >
                 {/* Step circle */}
                 <View
                   style={{
@@ -691,16 +918,17 @@ export default function Checkout() {
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Back to cart"
+          accessibilityHint="Returns to your shopping cart"
           hitSlop={8}
-          style={{ padding: 8 }}
+          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
         >
           <ArrowLeft size={22} color="#111827" />
         </Pressable>
         <View style={{ flex: 1, marginLeft: 4 }}>
           <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Checkout</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-            <Lock size={10} color="#16a34a" />
-            <Text style={{ fontSize: 11, color: '#16a34a', fontWeight: '600' }}>Secure payment</Text>
+            <Lock size={12} color="#16a34a" />
+            <Text style={{ fontSize: 13, color: '#16a34a', fontWeight: '600' }}>Secure payment</Text>
           </View>
         </View>
       </View>
@@ -790,7 +1018,77 @@ export default function Checkout() {
             )}
 
             {currentStep === 1 && (
-              <ShippingForm formData={formData} updateFormData={updateFormData} />
+              <View style={{ gap: 20 }}>
+                {/* Saved addresses */}
+                {savedAddresses.length > 0 ? (
+                  <AddressSelector
+                    addresses={savedAddresses}
+                    selectedId={selectedAddressId}
+                    useNewAddress={useNewAddress}
+                    onSelect={handleSelectSavedAddress}
+                    onChooseNew={handleChooseNewAddress}
+                    onEdit={handleEditAddress}
+                  />
+                ) : null}
+
+                {/* Shipping form — shown when using new address or editing */}
+                {useNewAddress ? (
+                  <>
+                    {savedAddresses.length > 0 ? (
+                      <View style={{ borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }}>
+                            {editingAddressId ? 'Edit shipping address' : 'Enter new shipping address'}
+                          </Text>
+                          {editingAddressId ? (
+                            <Pressable
+                              onPress={() => {
+                                setEditingAddressId(null);
+                                setUseNewAddress(false);
+                                if (selectedAddressId) {
+                                  const addr = savedAddresses.find((a) => a.id === selectedAddressId);
+                                  if (addr) applySavedAddressToForm(addr);
+                                }
+                              }}
+                              accessibilityRole="button"
+                              accessibilityLabel="Cancel editing"
+                            >
+                              <View style={{ paddingHorizontal: 16, minHeight: 44, backgroundColor: '#f1f5f9', borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Cancel</Text>
+                              </View>
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      </View>
+                    ) : null}
+                    <ShippingForm formData={formData} updateFormData={updateFormData} showAllErrors={shippingSubmitCount > 0} submitAttempt={shippingSubmitCount} />
+                    {/* Save to address book checkbox */}
+                    {!editingAddressId && savedAddresses.length < MAX_SAVED_ADDRESSES ? (
+                      <Pressable
+                        onPress={() => setSaveNewAddressToBook(!saveNewAddressToBook)}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: saveNewAddressToBook }}
+                        accessibilityLabel="Save this address to my address book"
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}>
+                          <View style={{
+                            width: 20, height: 20, borderRadius: 4,
+                            borderWidth: 2, borderColor: saveNewAddressToBook ? '#111827' : '#cbd5e1',
+                            backgroundColor: saveNewAddressToBook ? '#111827' : '#fff',
+                            alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {saveNewAddressToBook ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
+                          </View>
+                          <Text style={{ fontSize: 13, color: '#475569', flex: 1 }}>
+                            Save this address to my address book
+                            <Text style={{ color: '#94a3b8' }}> ({savedAddresses.length}/{MAX_SAVED_ADDRESSES} used)</Text>
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ) : null}
+                  </>
+                ) : null}
+              </View>
             )}
             {currentStep === 2 && (
               <PaymentForm
@@ -817,6 +1115,8 @@ export default function Checkout() {
                 onPress={() => setCurrentStep(Math.max(1, currentStep - 1))}
                 disabled={currentStep === 1 || placingOrder}
                 accessibilityRole="button"
+                accessibilityLabel="Go to previous step"
+                accessibilityState={{ disabled: currentStep === 1 || placingOrder }}
                 style={{ flex: 1 }}
               >
                 <View
@@ -839,6 +1139,8 @@ export default function Checkout() {
                 onPress={handleContinue}
                 disabled={placingOrder}
                 accessibilityRole="button"
+                accessibilityLabel={currentStep === 3 ? (placingOrder ? 'Processing order' : 'Place order') : 'Continue to next step'}
+                accessibilityState={{ disabled: placingOrder }}
                 style={{ flex: 1.5 }}
               >
                 <View
@@ -936,23 +1238,25 @@ export default function Checkout() {
                   >
                     {/* Product image */}
                     <View
+                      accessible
+                      accessibilityLabel={`Image of ${item.product?.name || 'product'}`}
                       style={{
-                        width: 70,
-                        height: 70,
-                        borderRadius: 16,
+                        width: 80,
+                        height: 80,
+                        borderRadius: 14,
                         backgroundColor: '#f9fafb',
                         overflow: 'hidden',
                         alignItems: 'center',
                         justifyContent: 'center',
                         borderWidth: 1,
-                        borderColor: '#e5e7eb',
+                        borderColor: '#f3f4f6',
                       }}
                     >
                       {displayImg ? (
                         <Image
                           source={{ uri: displayImg }}
-                          style={{ width: 70, height: 70 }}
-                          resizeMode="cover"
+                          style={{ width: 80, height: 80 }}
+                          resizeMode="contain"
                         />
                       ) : (
                         <Package size={26} color="#d1d5db" />
@@ -1028,16 +1332,24 @@ export default function Checkout() {
                     </View>
 
                     {/* Line total */}
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: '800',
-                        color: '#111827',
-                        alignSelf: 'center',
-                      }}
-                    >
-                      {fmtCurrency(item.price * item.quantity)}
-                    </Text>
+                    {(() => {
+                      const hasVariant = !!(item as any).variant;
+                      const linePrice = hasVariant
+                        ? getRegionalPrice((item as any).variant as any)
+                        : getRegionalPrice((item.product || { basePrice: item.price }) as any);
+                      return (
+                        <Text
+                          style={{
+                            fontSize: 16,
+                            fontWeight: '800',
+                            color: '#111827',
+                            alignSelf: 'center',
+                          }}
+                        >
+                          {fmtCurrency(linePrice * item.quantity)}
+                        </Text>
+                      );
+                    })()}
                   </View>
                 );
               })}
@@ -1094,7 +1406,11 @@ export default function Checkout() {
                 <View style={{ backgroundColor: '#f9fafb', borderRadius: 12, padding: 12, gap: 4 }}>
                   {cartItems.map((item) => {
                     if (!item.product?.gstPercentage) return null;
-                    const itemSubtotal = item.price * item.quantity;
+                    const hasVariant = !!(item as any).variant;
+                    const itemPrice = hasVariant
+                      ? getRegionalPrice((item as any).variant as any)
+                      : getRegionalPrice((item.product || { basePrice: item.price }) as any);
+                    const itemSubtotal = itemPrice * item.quantity;
                     const itemTax = itemSubtotal * (item.product.gstPercentage / 100);
                     return (
                       <View
@@ -1102,17 +1418,27 @@ export default function Checkout() {
                         style={{ flexDirection: 'row', justifyContent: 'space-between' }}
                       >
                         <Text
-                          style={{ fontSize: 11, color: '#9ca3af', flex: 1, marginRight: 8, fontWeight: '600' }}
+                          style={{ fontSize: 11, color: '#6b7280', flex: 1, marginRight: 8, fontWeight: '600' }}
                           numberOfLines={1}
                         >
                           {item.product.name} ({item.product.gstPercentage}%)
                         </Text>
-                        <Text style={{ fontSize: 11, color: '#9ca3af', fontWeight: '700' }}>
+                        <Text style={{ fontSize: 11, color: '#6b7280', fontWeight: '700' }}>
                           {fmtCurrency(itemTax)}
                         </Text>
                       </View>
                     );
                   })}
+                </View>
+              )}
+
+              {/* Bag add-on */}
+              {orderSummary.bagCost > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 15, color: '#6b7280', fontWeight: '600' }}>Bag ({bagName})</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
+                    {fmtCurrency(orderSummary.bagCost)}
+                  </Text>
                 </View>
               )}
 
@@ -1150,10 +1476,9 @@ export default function Checkout() {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   marginTop: 6,
-                  backgroundColor: '#fafafa',
+                  backgroundColor: '#f8fafc',
                   padding: 16,
-                  borderRadius: 16,
-                  marginHorizontal: -4,
+                  borderRadius: 14,
                 }}
               >
                 <View>
@@ -1165,7 +1490,7 @@ export default function Checkout() {
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 10, color: '#9ca3af', fontWeight: '600' }}>
+                  <Text style={{ fontSize: 11, color: '#6b7280', fontWeight: '600' }}>
                     incl. all taxes
                   </Text>
                 </View>
@@ -1220,19 +1545,23 @@ export default function Checkout() {
           setPlacingOrder(false);
         }}
       >
-        <View className="flex-1 bg-white">
-          <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-            <Text className="text-lg font-bold">Complete Payment</Text>
-            <TouchableOpacity
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: '#f9fafb' }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Complete Payment</Text>
+            <Pressable
               onPress={() => {
                 setShowPaymentModal(false);
                 setPlacingOrder(false);
                 showErrorToast('Payment Cancelled', 'You cancelled the payment');
               }}
-              className="p-2"
+              accessibilityRole="button"
+              accessibilityLabel="Cancel payment"
+              hitSlop={6}
             >
-              <X size={24} color="#666" />
-            </TouchableOpacity>
+              <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <X size={22} color="#6b7280" />
+              </View>
+            </Pressable>
           </View>
           <WebView
             source={{ html: paymentHtml }}
@@ -1241,9 +1570,9 @@ export default function Checkout() {
             domStorageEnabled={true}
             startInLoadingState={true}
             renderLoading={() => (
-              <View className="flex-1 items-center justify-center">
-                <ActivityIndicator size="large" color="#000000" />
-                <Text className="text-gray-600 mt-4">Loading payment gateway...</Text>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="large" color="#111827" />
+                <Text style={{ color: '#6b7280', marginTop: 16, fontSize: 14, fontWeight: '600' }}>Loading payment gateway...</Text>
               </View>
             )}
           />

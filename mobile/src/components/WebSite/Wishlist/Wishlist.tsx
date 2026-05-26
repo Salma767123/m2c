@@ -100,7 +100,7 @@ export default function Wishlist() {
             priceChanged,
             liveName: p.name,
             liveImage: primaryImg,
-            liveOriginalPrice: getRegionalOriginalPrice(p as any) ?? p.originalPrice,
+            liveOriginalPrice: getRegionalOriginalPrice(p as any) ?? undefined,
             liveDiscount: p.discount,
           };
 
@@ -241,7 +241,7 @@ export default function Wishlist() {
           const displayPrice = live?.livePrice ?? serverPrice;
           const displayName = live?.liveName ?? item.product.name;
           const displayImage = live?.liveImage ?? item.product.image;
-          const displayOriginalPrice = live?.liveOriginalPrice ?? item.product.originalPrice;
+          const displayOriginalPrice = live?.liveOriginalPrice ?? getRegionalOriginalPrice(item.product as any);
           const displayDiscount = live?.liveDiscount ?? item.product.discount;
           const priceChanged = live?.priceChanged ?? false;
           const hasVariants = item.product.hasVariants ?? false;

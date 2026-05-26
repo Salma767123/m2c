@@ -2,35 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { SquarePen, CheckCircle2, Calendar, Home } from 'lucide-react';
+import { CheckCircle2, Home, ArrowLeft, Send } from 'lucide-react';
 import { Button } from '@/components/UI/Button';
 import VendorService, { VendorRegistrationData, VendorFiles } from '@/services/vendorService';
 import { categoryService } from '@/services/categoryService';
+import VendorDataSummary from './VendorDataSummary';
 
 interface ReviewSubmitProps {
   onPrev: () => void;
   onGoToStep: (step: number) => void;
   data: any;
 }
-
-interface Certificate {
-  id: string;
-  label: string;
-}
-
-interface CertificateStatus {
-  status: 'expired' | 'expiring' | 'warning' | 'valid';
-  message: string;
-  color: string;
-}
-
-const FormCard: React.FC<{
-  children: React.ReactNode;
-}> = ({ children }) => (
-  <section className="bg-white rounded-lg border border-gray-200 p-4  shadow-sm">
-    {children}
-  </section>
-);
 
 export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitProps) {
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -86,31 +68,46 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
       // Prepare form data
       const registrationData: VendorRegistrationData = {
         // Company Details
-        businessType: data.businessType || 'corporation',
+        businessType: data.businessType || '',
         companyName: data.companyName || '',
         gstNumber: data.gstNumber || '',
+        companyIdNumber: data.companyIdNumber || '',
+        panNumber: data.panNumber || '',
         email: data.email || '',
+        email2: data.email2 || '',
         phone: data.phone || '',
         landlineNumber: data.landlineNumber || '',
         phoneNumber2: data.phoneNumber2 || '',
         website: data.website || '',
         address: data.address || '',
+        addressLine2: data.addressLine2 || '',
+        addressLine3: data.addressLine3 || '',
+        landmark: data.landmark || '',
         city: data.city || '',
         state: data.state || '',
         zipCode: data.zipCode || '',
         country: data.country || 'India',
+        factoryOwnershipType: data.factoryOwnershipType || '',
         
         // Owner Profile
         ownerName: data.ownerName || '',
+        designation: data.designation || '',
         ownerEmail: data.ownerEmail || '',
+        ownerEmail2: data.ownerEmail2 || '',
         ownerPhone: data.ownerPhone || '',
+        ownerPhone2: data.ownerPhone2 || '',
+        ownerLandline: data.ownerLandline || '',
         additionalOwners: data.additionalOwners || undefined,
+        businessStartDate: data.businessStartDate || '',
         yearEstablished: data.yearEstablished || '',
         employeeCount: data.employeeCount || '',
         
         // Warehouse Details
         ownershipType: data.ownershipType || 'owned',
         warehouseAddress: data.warehouseAddress || data.address || '',
+        warehouseAddressLine2: data.warehouseAddressLine2 || data.addressLine2 || '',
+        warehouseAddressLine3: data.warehouseAddressLine3 || data.addressLine3 || '',
+        warehouseLandmark: data.warehouseLandmark || data.landmark || '',
         warehouseCity: data.warehouseCity || data.city || '',
         warehouseState: data.warehouseState || data.state || '',
         warehouseZip: data.warehouseZip || data.zipCode || '',
@@ -122,6 +119,8 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         marketType: Array.isArray(data.marketType) ? data.marketType : (data.marketType ? [data.marketType] : ['domestic']),
         selectedCategories: data.selectedCategories || {},
         categoryRemarks: data.categoryRemarks || '',
+        categoryProducts: data.categoryProducts || {},
+        additionalCategories: data.additionalCategories || [],
         
         // Manufacturing Facilities
         enabledFacilities: data.enabledFacilities || {},
@@ -130,6 +129,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         // Certifications & Logistics
         selectedCertifications: data.selectedCertifications || [],
         certificationExpiryDates: data.certificationExpiryDates || {},
+        otherCertifications: data.otherCertifications || [],
         qualityControlProcess: data.qualityControlProcess || '',
         complianceStandards: data.complianceStandards || '',
         packagingCapabilities: data.packagingCapabilities || '',
@@ -153,17 +153,39 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         businessRegistrationNumber: data.businessRegistrationNumber || '',
         taxIdentificationNumber: data.taxIdentificationNumber || '',
         bankingDetails: data.bankingDetails || undefined,
-        
-        // Password - you should add a password field to your form
-        password: 'VendorPass123!' // Default password - should be user-defined
+
+        // Login password — collected on Step 1 (CompanyDetails). Backend
+        // bcrypts before persisting; admin approval later replaces it with
+        // a generated temporary password emailed to the vendor.
+        password: data.password || ''
       };
       
       // Prepare files
       const files: VendorFiles = {
         logo: data.logoFile,
         gstDocument: data.gstFile,
-        ownerPhoto: data.ownerPhotoFile,
-        factoryImages: data.factoryImages?.map((img: any) => img.file).filter(Boolean) || [],
+        panCardFile: data.panCardFile,
+        typeCertFile: data.typeCertFile,
+        // Contact photo flows through `mainContact.photo` (base64 data URI)
+        // and is uploaded to Cloudinary server-side via `resolveBase64InValue`.
+        // The previous `ownerPhoto: data.ownerPhotoFile` line was dead code —
+        // `data.ownerPhotoFile` was never set anywhere in the form chain.
+        // Factory images come in as a slot-keyed record from WarehouseDetails
+        // (Change 11): { nameBoard: {file,url,name}, frontView: {...}, ... }.
+        // Extract just the File objects keyed by slot ID — the upload path
+        // tags each file with its slot in a side-channel body field so the
+        // backend stores descriptive document names per slot.
+        factoryImages: data.factoryImages
+          ? Object.entries(data.factoryImages).reduce(
+              (acc: Record<string, File>, [slotId, slotData]: [string, any]) => {
+                if (slotData && slotData.file instanceof File) {
+                  acc[slotId] = slotData.file;
+                }
+                return acc;
+              },
+              {},
+            )
+          : {},
         // Extract File objects from certificationFiles (they're wrapped in metadata objects)
         certificationFiles: data.certificationFiles 
           ? Object.entries(data.certificationFiles).reduce((acc: Record<string, File>, [certId, fileData]: [string, any]) => {
@@ -177,13 +199,37 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
       
       // Submit registration
       const result = await VendorService.registerVendor(registrationData, files);
-      
+
       console.log('Registration successful:', result);
+
+      // Persist the JWT + vendor data the backend issued so the user can
+      // log in (or be auto-redirected to the dashboard) without re-entering
+      // credentials. Falls back gracefully when localStorage is unavailable
+      // (SSR / private mode).
+      if (typeof window !== 'undefined') {
+        if (result?.token) {
+          localStorage.setItem('vendorToken', result.token);
+        }
+        if (result?.vendor) {
+          localStorage.setItem('vendorData', JSON.stringify(result.vendor));
+        }
+      }
+
       setIsSubmitted(true);
-      
+
     } catch (error: any) {
       console.error('Registration failed:', error);
-      setSubmitError(error.message || 'Registration failed. Please try again.');
+      // Prefer the most specific server-side message available. The axios
+      // interceptor returns `{ message, status, data }`; older callers see
+      // raw axios errors with `response.data`. Cover both shapes.
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.data?.error ||
+        error?.data?.message ||
+        error?.message ||
+        'Registration failed. Please try again.';
+      setSubmitError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -191,41 +237,41 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
 
   if (isSubmitted) {
     return (
-      <div className="max-w-2xl mx-auto py-16 px-4 text-center animate-fade-in">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
-          <CheckCircle2 className="w-10 h-10 text-green-600" />
+      <div className="max-w-2xl mx-auto py-16 px-4 text-center animate-fade-in animate-in fade-in duration-500">
+        <div className="w-20 h-20 rounded-full bg-success-50 border border-success-100 flex items-center justify-center mx-auto mb-6">
+          <CheckCircle2 className="w-10 h-10 text-success-500" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">Registration Submitted Successfully!</h1>
-        <p className="text-lg text-gray-600 mb-8">
+        <h1 className="text-headline-lg text-slate-900 mb-4 font-bold">Registration Submitted Successfully!</h1>
+        <p className="text-lg text-slate-600 mb-8">
           Thank you for registering as a vendor. Our team will review your application
-          and contact you within <strong>48 hours</strong>.
+          and contact you within <strong className="text-slate-900 font-semibold">48 hours</strong>.
         </p>
-        <div className="bg-gray-50 rounded-lg p-6 text-left mb-8">
-          <h3 className="font-semibold text-gray-900 mb-3">What happens next?</h3>
-          <ul className="space-y-2 text-sm text-gray-600">
-            <li className="flex items-start gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs shrink-0 mt-0.5">1</span>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 text-left mb-8 shadow-sm">
+          <h3 className="font-bold text-slate-900 mb-3">What happens next?</h3>
+          <ul className="space-y-3 text-sm text-slate-600">
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-tertiary-50 border border-tertiary-100 text-tertiary-500 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">1</span>
               Our team will verify your submitted documents and information
             </li>
-            <li className="flex items-start gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs shrink-0 mt-0.5">2</span>
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-tertiary-50 border border-tertiary-100 text-tertiary-500 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">2</span>
               You may receive a call for additional verification if needed
             </li>
-            <li className="flex items-start gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs shrink-0 mt-0.5">3</span>
-              Once approved, you'll receive access to your vendor dashboard
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-tertiary-50 border border-tertiary-100 text-tertiary-500 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">3</span>
+              Once approved, you&apos;ll receive access to your vendor dashboard
             </li>
           </ul>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/">
-            <Button className="bg-[#313131] hover:bg-[#222222] text-white px-8 py-3 text-base font-semibold flex items-center gap-2">
+            <Button className="bg-slate-900 hover:bg-slate-800 text-white transition-colors h-11 px-8 text-base font-semibold flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40">
               <Home className="w-5 h-5" />
               Return to Homepage
             </Button>
           </Link>
           <Link href="/vendor">
-            <Button variant="outline" className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 px-8 py-3 text-base font-semibold">
+            <Button variant="outline" className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors h-11 px-8 text-base font-semibold rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30">
               Vendor Login
             </Button>
           </Link>
@@ -234,508 +280,169 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
     );
   }
 
-  // Check if Manufacturing Facilities step should be included
-  const isManufacturer = () => {
-    const vendorTypes = data.vendorType || [];
-    return Array.isArray(vendorTypes) ? vendorTypes.includes('manufacturer') : vendorTypes === 'manufacturer';
-  };
-
-  // Get the correct step numbers for edit buttons
-  const getStepNumber = (logicalStep: string) => {
-    const stepMap = {
-      'company': 0,
-      'warehouse': 1, 
-      'owner': 2,
-      'vendor': 3,
-      'manufacturing': 4, // Only shown if manufacturer
-      'certifications': isManufacturer() ? 5 : 4,
-      'contact': isManufacturer() ? 6 : 5
-    };
-    return stepMap[logicalStep as keyof typeof stepMap] || 0;
-  };
-
-  const SectionHeader = ({ title, step }: { title: string; step: number }) => (
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="font-bold text-lg">{title}</h3>
-      <button type="button" onClick={() => onGoToStep(step)} className="text-white bg-gray-900 p-2 rounded-md flex items-center gap-1 text-base">
-        <SquarePen className="w-4 h-4" />
-        Edit
-      </button>
-    </div>
-  );
-
-  const InfoRow = ({ label, value }: { label: string; value: string | React.ReactNode }) => (
-    <div className="flex flex-col sm:flex-row sm:items-start py-2 border-b border-border last:border-0">
-      <span className="text-sm text-muted-foreground sm:w-1/3 shrink-0">{label}</span>
-      <span className="text-sm text-foreground sm:w-2/3">{value || '—'}</span>
-    </div>
-  );
-
-  // Manufacturing Facilities
-  const enabledFacilities = Object.entries(data.enabledFacilities || {})
-    .filter(([_, enabled]) => enabled)
-    .map(([id]) => {
-      const facilityLabels: { [key: string]: string } = {
-        spinning: 'Spinning',
-        weaving: 'Weaving', 
-        dyeing: 'Dyeing',
-        printing: 'Printing',
-        stitching: 'Stitching',
-        finishing: 'Finishing'
-      };
-      return facilityLabels[id] || id;
-    })
-    .filter(Boolean);
-
-  // Certifications
-  const selectedCerts: Certificate[] = (data.selectedCertifications || []).map((c: string) => {
-    const certLabels: { [key: string]: string } = {
-      'oeko-tex': 'OEKO-TEX',
-      'gots': 'GOTS',
-      'grs': 'GRS', 
-      'smeta': 'SMETA'
-    };
-    return { id: c, label: certLabels[c] || c };
-  });
-
-  // Product Categories
-  const getSelectedCategories = () => {
-    const categories = data.selectedCategories || {};
-    const result: string[] = [];
-
-    Object.entries(categories).forEach(([categoryId, subCategories]) => {
-      if (subCategories && Array.isArray(subCategories) && subCategories.length > 0) {
-        const categoryName = categoryNameMap[categoryId] || categoryId;
-        result.push(`${categoryName}: ${subCategories.join(', ')}`);
-      }
-    });
-
-    return result;
-  };
-
-  // Vendor Type and Market Type
-  const getVendorTypeLabel = (types: string | string[]) => {
-    const labels: { [key: string]: string } = {
-      'manufacturer': 'Manufacturer',
-      'importer': 'Importer', 
-      'exporter': 'Exporter'
-    };
-    
-    if (Array.isArray(types)) {
-      return types.map(type => labels[type] || type).join(', ');
-    }
-    return labels[types] || types;
-  };
-
-  const getMarketTypeLabel = (type: string | string[]) => {
-    const labels: { [key: string]: string } = {
-      'domestic': 'Domestic',
-      'international': 'International'
-    };
-    
-    if (Array.isArray(type)) {
-      return type.map(t => labels[t] || t).join(', ');
-    }
-    return labels[type] || type;
-  };
-
-  // Business Type
-  const getBusinessTypeLabel = (type: string) => {
-    const labels: { [key: string]: string } = {
-      'sole': 'Sole Proprietorship',
-      'partnership': 'Partnership',
-      'corporation': 'Corporation',
-      'llc': 'Limited Liability Company (LLC)'
-    };
-    return labels[type] || type;
-  };
-
-  // Employee Count
-  const getEmployeeCountLabel = (count: string) => {
-    const labels: { [key: string]: string } = {
-      '10-20': '10-20 employees',
-      '20-50': '20-50 employees',
-      '50-100': '50-100 employees',
-      '100+': '100+ employees'
-    };
-    return labels[count] || count;
-  };
-
-  // Ownership Type
-  const getOwnershipTypeLabel = (type: string) => {
-    const labels: { [key: string]: string } = {
-      'owned': 'Owned',
-      'rented': 'Rented',
-      'lease': 'Lease'
-    };
-    return labels[type] || type;
-  };
-
-  // Certificate Status
-  const getCertificateStatus = (expiryDate: string): CertificateStatus | null => {
-    if (!expiryDate) return null;
-    
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (daysUntilExpiry < 0) {
-      return { status: 'expired', message: 'Expired', color: 'text-red-600 bg-red-50 border-red-200' };
-    } else if (daysUntilExpiry <= 30) {
-      return { status: 'expiring', message: `Expires in ${daysUntilExpiry} days`, color: 'text-orange-600 bg-orange-50 border-orange-200' };
-    } else if (daysUntilExpiry <= 90) {
-      return { status: 'warning', message: `Expires in ${daysUntilExpiry} days`, color: 'text-yellow-600 bg-yellow-50 border-yellow-200' };
-    } else {
-      return { status: 'valid', message: `Valid until ${expiry.toLocaleDateString()}`, color: 'text-green-600 bg-green-50 border-green-200' };
-    }
-  };
 
   return (
-    <div className="max-w-420 mx-auto py-8 px-4 animate-slide-up">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Review & Submit</h1>
-        <p className="text-muted-foreground mt-1">Please review all information before submitting your application</p>
+    <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header */}
+      <div className="flex items-center gap-3 pb-2">
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-50 text-brand-600 shrink-0">
+          <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-headline-md text-slate-900 leading-tight" style={{ textWrap: "balance" as any }}>
+            Review & Submit
+          </h2>
+          <p className="text-sm text-slate-600 mt-0.5">
+            Please review all information before submitting your application
+          </p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <FormCard >
-          <SectionHeader title="Company Details" step={getStepNumber('company')} />
-          <div className="space-y-1">
-            <InfoRow label="Business Type" value={getBusinessTypeLabel(data.businessType)} />
-            <InfoRow label="Company Name" value={data.companyName} />
-            <InfoRow label="GST Number" value={data.gstNumber || 'Not provided'} />
-            <InfoRow label="GST Document" value={data.gstFile ? 'Uploaded' : 'Not uploaded'} />
-            <InfoRow label="Email" value={data.email} />
-            <InfoRow label="Phone" value={data.phone} />
-            <InfoRow label="Website" value={data.website} />
-            <InfoRow label="Address" value={`${data.address || ''}, ${data.city || ''}, ${data.state || ''} ${data.zipCode || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, '')} />
-            <InfoRow label="Country" value={data.country} />
-            <InfoRow label="Same as Warehouse" value={data.sameAsWarehouse ? 'Yes' : 'No'} />
-            <InfoRow label="Company Logo" value={data.logo ? 'Uploaded' : 'Not uploaded'} />
-          </div>
-        </FormCard>
+        {/* Shared read-only summary — same component the admin
+            AddEditVendor flow uses on its review step, so both flows
+            stay field-identical by construction. */}
+        <VendorDataSummary
+          data={data}
+          onGoToStep={onGoToStep}
+          categoryNameMap={categoryNameMap}
+        />
 
-        <FormCard>
-          <SectionHeader title="Warehouse / Factory" step={getStepNumber('warehouse')} />
-          <div className="space-y-1">
-            <InfoRow label="Ownership Type" value={getOwnershipTypeLabel(data.ownershipType)} />
-            <InfoRow label="Address" value={`${data.warehouseAddress || ''}, ${data.warehouseCity || ''}, ${data.warehouseState || ''} ${data.warehouseZip || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, '')} />
-            <InfoRow label="Country" value={data.warehouseCountry} />
-            <InfoRow label="Factory Images" value={`${(data.factoryImages || []).length} file(s) uploaded`} />
-            <InfoRow label="Map Link" value={data.mapLink ? 'Provided' : 'Not provided'} />
-          </div>
-        </FormCard>
-
-        <FormCard>
-          <SectionHeader title="Owner Profile" step={getStepNumber('owner')} />
-          <div className="space-y-1">
-            <InfoRow label="Owner Name" value={data.ownerName} />
-            <InfoRow label="Email" value={data.ownerEmail} />
-            <InfoRow label="Phone" value={data.ownerPhone} />
-            <InfoRow label="Year Established" value={data.yearEstablished} />
-            <InfoRow label="Employee Count" value={getEmployeeCountLabel(data.employeeCount)} />
-            <InfoRow label="Years in Business" value={data.yearEstablished ? `${new Date().getFullYear() - parseInt(data.yearEstablished)} years` : 'N/A'} />
-            {data.additionalOwners && data.additionalOwners.length > 0 && (
-              <>
-                <div className="border-t border-gray-200 pt-2 mt-2">
-                  <p className="text-sm font-semibold text-gray-700 mb-1">Additional Owners ({data.additionalOwners.length})</p>
-                </div>
-                {data.additionalOwners.map((owner: any, index: number) => (
-                  <div key={index} className="pl-4 border-l-2 border-blue-200 space-y-1">
-                    <p className="text-sm font-medium text-gray-800">Owner {index + 2}</p>
-                    <InfoRow label="Name" value={owner.name} />
-                    <InfoRow label="Email" value={owner.email} />
-                    <InfoRow label="Phone" value={owner.phone} />
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </FormCard>
-
-        <FormCard>
-          <SectionHeader title="Vendor Type & Products" step={getStepNumber('vendor')} />
-          <div className="space-y-1">
-            <InfoRow label="Vendor Type" value={getVendorTypeLabel(data.vendorType)} />
-            <InfoRow label="Market Focus" value={getMarketTypeLabel(data.marketType)} />
-            <InfoRow label="Product Categories" value={
-              getSelectedCategories().length > 0 ? (
-                <div className="space-y-1">
-                  {getSelectedCategories().map((category, index) => (
-                    <div key={index} className="text-sm">{category}</div>
-                  ))}
-                </div>
-              ) : (
-                'None selected'
-              )
-            } />
-            {data.categoryRemarks && (
-              <InfoRow label="Category Remarks" value={
-                <div className="text-sm bg-gray-50 p-2 rounded border border-gray-200">
-                  {data.categoryRemarks}
-                </div>
-              } />
-            )}
-          </div>
-        </FormCard>
-
-        {/* Only show Manufacturing Facilities if vendor is a manufacturer */}
-        {isManufacturer() && (
-          <FormCard>
-            <SectionHeader title="Manufacturing Facilities" step={getStepNumber('manufacturing')} />
-            <div className="space-y-1">
-              <InfoRow label="Active Facilities" value={enabledFacilities.length > 0 ? enabledFacilities.join(', ') : 'None selected'} />
-              {Object.entries(data.facilityDetails || {}).map(([facilityId, details]: [string, any]) => {
-                if (!data.enabledFacilities?.[facilityId]) return null;
-                const facilityName = enabledFacilities.find(f => f.toLowerCase().includes(facilityId)) || facilityId;
-                return (
-                  <div key={facilityId} className="ml-4 space-y-1 border-l-2 border-gray-200 pl-4">
-                    <div className="font-medium text-sm text-gray-700">{facilityName} Details:</div>
-                    {Object.entries(details || {}).map(([key, value]: [string, any]) => (
-                      <InfoRow key={key} label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} value={value} />
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          </FormCard>
-        )}
-
-        <FormCard>
-          <SectionHeader title="Certifications & Logistics" step={getStepNumber('certifications')} />
-          <div className="space-y-1">
-            <InfoRow label="Certifications" value={
-              selectedCerts.length > 0 ? (
-                <div className="space-y-3">
-                  {selectedCerts.map((cert: Certificate) => {
-                    const expiryDate = data.certificationExpiryDates?.[cert.id];
-                    const status = expiryDate ? getCertificateStatus(expiryDate) : null;
-                    const hasFile = data.certificationFiles?.[cert.id];
-                    
-                    return (
-                      <div key={cert.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium">
-                            {cert.label}
-                          </span>
-                          <div className="flex items-center gap-2 text-xs">
-                            {hasFile && (
-                              <span className="text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200">
-                                ✓ File Uploaded
-                              </span>
-                            )}
-                            {!hasFile && (
-                              <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200">
-                                No File
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Expiry Date Information */}
-                        {expiryDate ? (
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">
-                              Expires: {new Date(expiryDate).toLocaleDateString()}
-                            </span>
-                            {status && (
-                              <span className={`text-xs px-2 py-1 rounded border ${status.color} ml-2`}>
-                                {status.message}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-400">No expiry date set</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                'None selected'
-              )
-            } />
-            <InfoRow label="Uploaded Certificate Files" value={
-              Object.keys(data.certificationFiles || {}).length > 0 ? (
-                <div className="space-y-2">
-                  {Object.entries(data.certificationFiles || {}).map(([certId, fileData]: [string, any]) => {
-                    const cert = selectedCerts.find((c: Certificate) => c.id === certId);
-                    const expiryDate = data.certificationExpiryDates?.[certId];
-                    const status = expiryDate ? getCertificateStatus(expiryDate) : null;
-                    
-                    return (
-                      <div key={certId} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900">
-                            {cert?.label || certId}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            ({fileData.name})
-                          </span>
-                        </div>
-                        {status && (
-                          <span className={`text-xs px-2 py-1 rounded border ${status.color}`}>
-                            <Calendar className="w-3 h-3 inline mr-1" />
-                            {status.message}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                'No files uploaded'
-              )
-            } />
-            <InfoRow label="Quality Control Process" value={data.qualityControlProcess || 'Not provided'} />
-            <InfoRow label="Compliance Standards" value={data.complianceStandards || 'Not provided'} />
-            <InfoRow label="Packaging Capabilities" value={data.packagingCapabilities || 'Not provided'} />
-            <InfoRow label="Warehousing Capacity" value={data.warehousingCapacity ? `${data.warehousingCapacity} sq ft` : 'Not provided'} />
-            <InfoRow label="Logistics Partners" value={data.logisticsPartners || 'Not provided'} />
-            <InfoRow label="Shipping Methods" value={
-              (data.shippingMethods || []).length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {data.shippingMethods.map((method: string) => (
-                    <span key={method} className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
-                      {method}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                'None selected'
-              )
-            } />
-          </div>
-        </FormCard>
-
-        <FormCard>
-          <SectionHeader title="Contact & Trade" step={getStepNumber('contact')} />
-          <div className="space-y-1">
-            <InfoRow label="Main Contact Name" value={data.mainContact?.name || 'Not provided'} />
-            <InfoRow label="Main Contact Designation" value={data.mainContact?.designation || 'Not provided'} />
-            <InfoRow label="Main Contact Email" value={data.mainContact?.email1 || data.mainContact?.email || 'Not provided'} />
-            <InfoRow label="Main Contact Phone" value={data.mainContact?.phone1 || data.mainContact?.phone || 'Not provided'} />
-            <InfoRow label="Main Contact Department" value={data.mainContact?.department || 'Not provided'} />
-            <InfoRow label="Alternate Contacts" value={`${(data.alternateContacts || []).length} contact(s) added`} />
-            {(data.alternateContacts || []).length > 0 && (
-              <div className="ml-4 space-y-2 border-l-2 border-gray-200 pl-4">
-                {data.alternateContacts.map((contact: any, index: number) => (
-                  <div key={contact.id || index} className="space-y-1">
-                    <div className="font-medium text-sm text-gray-700">Contact {index + 1}:</div>
-                    <InfoRow label="Name" value={contact.name || 'Not provided'} />
-                    <InfoRow label="Designation" value={contact.designation || 'Not provided'} />
-                    <InfoRow label="Email" value={contact.email1 || contact.email || 'Not provided'} />
-                    <InfoRow label="Phone" value={contact.phone1 || contact.phone || 'Not provided'} />
-                  </div>
-                ))}
-              </div>
-            )}
-            {data.hasImportExport === 'yes' && (
-              <>
-                <InfoRow label="Import/Export Activities" value="Yes" />
-                <InfoRow label="Import Countries" value={(data.importCountries || []).join(', ') || 'None'} />
-                <InfoRow label="Export Countries" value={(data.exportCountries || []).join(', ') || 'None'} />
-              </>
-            )}
-            {data.tradeLicenseNumber && <InfoRow label="Trade License Number" value={data.tradeLicenseNumber} />}
-            {data.businessRegistrationNumber && <InfoRow label="Business Registration Number" value={data.businessRegistrationNumber} />}
-            {data.taxIdentificationNumber && <InfoRow label="Tax Identification Number" value={data.taxIdentificationNumber} />}
-            {data.bankingDetails?.bankName && (
-              <>
-                <InfoRow label="Bank Name" value={data.bankingDetails.bankName} />
-                {data.bankingDetails.accountNumber && <InfoRow label="Account Number" value={'****' + data.bankingDetails.accountNumber.slice(-4)} />}
-                {data.bankingDetails.swiftCode && <InfoRow label="SWIFT Code" value={data.bankingDetails.swiftCode} />}
-              </>
-            )}
-          </div>
-        </FormCard>
-
-        <div className='max-w-5xl space-y-4'>
+        <div className='max-w-full space-y-4 pt-4'>
           {submitError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="text-red-800 text-sm">{submitError}</div>
+            <div className="bg-error-50 border border-error-200/50 rounded-lg p-4 animate-in fade-in duration-300">
+              <div className="text-error-700 text-sm font-semibold">{submitError}</div>
             </div>
           )}
 
           {/* Accuracy Confirmation */}
-          <div className="flex items-start gap-3 border border-gray-500 p-4 rounded-lg">
-            <input id="confirmAccuracy" type="checkbox" checked={confirmChecked} onChange={(e) => setConfirmChecked(e.target.checked)} className="mt-1" />
-            <label htmlFor="confirmAccuracy" className="text-base cursor-pointer">I Confirm that all the information provided above is accurate and complete to the best of my knowledge. I understand that providing false information may result in rejection of my vendor application.</label>
+          <div className="flex items-start gap-3 border border-slate-200 bg-slate-50/30 hover:bg-slate-50/60 transition-all duration-150 p-4 rounded-lg">
+            <input
+              id="confirmAccuracy"
+              type="checkbox"
+              checked={confirmChecked}
+              onChange={(e) => setConfirmChecked(e.target.checked)}
+              className="h-5 w-5 mt-[3px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:outline-none transition-colors"
+            />
+            <label htmlFor="confirmAccuracy" className="text-base text-slate-700 font-medium cursor-pointer leading-snug">
+              I Confirm that all the information provided above is accurate and complete to the best of my knowledge. I understand that providing false information may result in rejection of my vendor application.
+            </label>
           </div>
 
           {/* Terms & Conditions - Step by Step */}
-          <div className="border border-gray-500 rounded-lg overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-300 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-gray-900">Terms &amp; Conditions</h3>
-              <span className="text-xs font-medium text-gray-500">
+          <div className="border border-slate-200 rounded-lg overflow-hidden shadow-card-rest hover:shadow-card-hover hover:border-slate-300 transition-all duration-150">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900">Terms &amp; Conditions</h3>
+              <span className="text-xs font-semibold text-slate-500">
                 {Object.values(termsConditions).filter(Boolean).length}/{Object.keys(termsConditions).length} accepted
               </span>
             </div>
-            <div className="divide-y divide-gray-200">
-              <div className="flex items-start gap-3 p-4">
-                <input id="tc_acceptanceOfTerms" type="checkbox" checked={termsConditions.acceptanceOfTerms} onChange={(e) => handleTermChange('acceptanceOfTerms', e.target.checked)} className="mt-1" />
-                <label htmlFor="tc_acceptanceOfTerms" className="text-sm cursor-pointer">
-                  <strong>Acceptance of Terms</strong> — By accessing and using this website, I accept and agree to be bound by the terms and provision of this agreement. If I do not agree to abide by the above, I will not use this service.
+            <div className="divide-y divide-slate-100">
+              <div className="flex items-start gap-3 p-4 hover:bg-slate-50/30 transition-colors">
+                <input
+                  id="tc_acceptanceOfTerms"
+                  type="checkbox"
+                  checked={termsConditions.acceptanceOfTerms}
+                  onChange={(e) => handleTermChange('acceptanceOfTerms', e.target.checked)}
+                  className="h-5 w-5 mt-[3px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:outline-none transition-colors"
+                />
+                <label htmlFor="tc_acceptanceOfTerms" className="text-sm text-slate-600 cursor-pointer leading-snug">
+                  <strong className="text-slate-900 font-semibold">Acceptance of Terms</strong> — By accessing and using this website, I accept and agree to be bound by the terms and provision of this agreement. If I do not agree to abide by the above, I will not use this service.
                 </label>
               </div>
-              <div className="flex items-start gap-3 p-4">
-                <input id="tc_paymentTerms" type="checkbox" checked={termsConditions.paymentTerms} onChange={(e) => handleTermChange('paymentTerms', e.target.checked)} className="mt-1" />
-                <label htmlFor="tc_paymentTerms" className="text-sm cursor-pointer">
-                  <strong>Payment Terms</strong> — I acknowledge that all prices are subject to change without notice, payment is due at the time of purchase, and all transactions are processed securely.
+              <div className="flex items-start gap-3 p-4 hover:bg-slate-50/30 transition-colors">
+                <input
+                  id="tc_paymentTerms"
+                  type="checkbox"
+                  checked={termsConditions.paymentTerms}
+                  onChange={(e) => handleTermChange('paymentTerms', e.target.checked)}
+                  className="h-5 w-5 mt-[3px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:outline-none transition-colors"
+                />
+                <label htmlFor="tc_paymentTerms" className="text-sm text-slate-600 cursor-pointer leading-snug">
+                  <strong className="text-slate-900 font-semibold">Payment Terms</strong> — I acknowledge that all prices are subject to change without notice, payment is due at the time of purchase, and all transactions are processed securely.
                 </label>
               </div>
-              <div className="flex items-start gap-3 p-4">
-                <input id="tc_shippingDelivery" type="checkbox" checked={termsConditions.shippingDelivery} onChange={(e) => handleTermChange('shippingDelivery', e.target.checked)} className="mt-1" />
-                <label htmlFor="tc_shippingDelivery" className="text-sm cursor-pointer">
-                  <strong>Shipping and Delivery</strong> — I understand that delivery times vary by location and shipping method, risk of loss passes upon delivery to the carrier, and the platform is not responsible for delays caused by shipping carriers.
+              <div className="flex items-start gap-3 p-4 hover:bg-slate-50/30 transition-colors">
+                <input
+                  id="tc_shippingDelivery"
+                  type="checkbox"
+                  checked={termsConditions.shippingDelivery}
+                  onChange={(e) => handleTermChange('shippingDelivery', e.target.checked)}
+                  className="h-5 w-5 mt-[3px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:outline-none transition-colors"
+                />
+                <label htmlFor="tc_shippingDelivery" className="text-sm text-slate-600 cursor-pointer leading-snug">
+                  <strong className="text-slate-900 font-semibold">Shipping and Delivery</strong> — I understand that delivery times vary by location and shipping method, risk of loss passes upon delivery to the carrier, and the platform is not responsible for delays caused by shipping carriers.
                 </label>
               </div>
-              <div className="flex items-start gap-3 p-4">
-                <input id="tc_returnsRefunds" type="checkbox" checked={termsConditions.returnsRefunds} onChange={(e) => handleTermChange('returnsRefunds', e.target.checked)} className="mt-1" />
-                <label htmlFor="tc_returnsRefunds" className="text-sm cursor-pointer">
-                  <strong>Returns and Refunds</strong> — I agree to comply with the platform&apos;s returns policy for detailed information about returns, exchanges, and refunds.
+              <div className="flex items-start gap-3 p-4 hover:bg-slate-50/30 transition-colors">
+                <input
+                  id="tc_returnsRefunds"
+                  type="checkbox"
+                  checked={termsConditions.returnsRefunds}
+                  onChange={(e) => handleTermChange('returnsRefunds', e.target.checked)}
+                  className="h-5 w-5 mt-[3px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:outline-none transition-colors"
+                />
+                <label htmlFor="tc_returnsRefunds" className="text-sm text-slate-600 cursor-pointer leading-snug">
+                  <strong className="text-slate-900 font-semibold">Returns and Refunds</strong> — I agree to comply with the platform&apos;s returns policy for detailed information about returns, exchanges, and refunds.
                 </label>
               </div>
-              <div className="flex items-start gap-3 p-4">
-                <input id="tc_limitationOfLiability" type="checkbox" checked={termsConditions.limitationOfLiability} onChange={(e) => handleTermChange('limitationOfLiability', e.target.checked)} className="mt-1" />
-                <label htmlFor="tc_limitationOfLiability" className="text-sm cursor-pointer">
-                  <strong>Limitation of Liability</strong> — I acknowledge that in no event shall the company be liable for any direct, indirect, punitive, incidental, special, or consequential damages arising out of the use or performance of the website.
+              <div className="flex items-start gap-3 p-4 hover:bg-slate-50/30 transition-colors">
+                <input
+                  id="tc_limitationOfLiability"
+                  type="checkbox"
+                  checked={termsConditions.limitationOfLiability}
+                  onChange={(e) => handleTermChange('limitationOfLiability', e.target.checked)}
+                  className="h-5 w-5 mt-[3px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:outline-none transition-colors"
+                />
+                <label htmlFor="tc_limitationOfLiability" className="text-sm text-slate-600 cursor-pointer leading-snug">
+                  <strong className="text-slate-900 font-semibold">Limitation of Liability</strong> — I acknowledge that in no event shall the company be liable for any direct, indirect, punitive, incidental, special, or consequential damages arising out of the use or performance of the website.
                 </label>
               </div>
-              <div className="flex items-start gap-3 p-4">
-                <input id="tc_governingLaw" type="checkbox" checked={termsConditions.governingLaw} onChange={(e) => handleTermChange('governingLaw', e.target.checked)} className="mt-1" />
-                <label htmlFor="tc_governingLaw" className="text-sm cursor-pointer">
-                  <strong>Governing Law</strong> — I agree that these terms and conditions are governed by and construed in accordance with applicable laws, and I submit to the exclusive jurisdiction of the courts as described in the full <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Terms of Service</a>.
+              <div className="flex items-start gap-3 p-4 hover:bg-slate-50/30 transition-colors">
+                <input
+                  id="tc_governingLaw"
+                  type="checkbox"
+                  checked={termsConditions.governingLaw}
+                  onChange={(e) => handleTermChange('governingLaw', e.target.checked)}
+                  className="h-5 w-5 mt-[3px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:outline-none transition-colors"
+                />
+                <label htmlFor="tc_governingLaw" className="text-sm text-slate-600 cursor-pointer leading-snug">
+                  <strong className="text-slate-900 font-semibold">Governing Law</strong> — I agree that these terms and conditions are governed by and construed in accordance with applicable laws, and I submit to the exclusive jurisdiction of the courts as described in the full <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:text-brand-600 underline font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded px-0.5">Terms of Service</a>.
                 </label>
               </div>
             </div>
           </div>
 
           {/* Privacy Policy */}
-          <div className="flex items-start gap-3 border border-gray-500 p-4 rounded-lg">
-            <input id="agreePrivacy" type="checkbox" checked={privacyChecked} onChange={(e) => setPrivacyChecked(e.target.checked)} className="mt-1" />
-            <label htmlFor="agreePrivacy" className="text-base cursor-pointer">
-              I Agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Privacy Policy</a>
+          <div className="flex items-start gap-3 border border-slate-200 bg-slate-50/30 hover:bg-slate-50/60 transition-all duration-150 p-4 rounded-lg">
+            <input
+              id="agreePrivacy"
+              type="checkbox"
+              checked={privacyChecked}
+              onChange={(e) => setPrivacyChecked(e.target.checked)}
+              className="h-5 w-5 mt-[3px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 text-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:outline-none transition-colors"
+            />
+            <label htmlFor="agreePrivacy" className="text-base text-slate-700 font-medium cursor-pointer leading-snug">
+              I Agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:text-brand-600 underline font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded px-0.5">Privacy Policy</a>
             </label>
           </div>
         </div>  
 
-        <div className="flex justify-between pt-4">
-          <Button className='bg-red-500 text-white p-4 rounded-md' type="button" variant="outline" onClick={onPrev} disabled={isSubmitting}>
+        <div className="flex items-center justify-between pt-6 gap-3">
+          <Button
+            onClick={onPrev}
+            className="inline-flex items-center gap-2 h-11 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
+          >
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
             Back
           </Button>
-          <Button 
-            className="bg-green-400 text-white p-4 rounded-md" 
-            type="submit" 
-            size="lg" 
-            disabled={!confirmChecked || !allTermsAccepted || !privacyChecked || isSubmitting} 
+          <Button
             onClick={handleSubmit}
+            disabled={!confirmChecked || !allTermsAccepted || !privacyChecked || isSubmitting}
+            className="inline-flex items-center gap-2 h-11 px-8 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
+            {isSubmitting ? 'Submitting...' : 'Submit Application'}
+            {!isSubmitting && <Send className="w-4 h-4" aria-hidden="true" />}
           </Button>
         </div>
       </form>

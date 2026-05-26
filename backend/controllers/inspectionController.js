@@ -77,12 +77,16 @@ const createInspection = async (req, res) => {
             data: { assignedQcId: checkerId, status: 'UNDER_REVIEW' }
         });
 
-        // Notify the QC checker on mobile
-        // Notify the QC checker on mobile
-        const { notifications } = require('../utils/notificationService');
+        // Notify the QC checker — in-app feed + FCM push
         const vendorRecord = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { companyName: true } });
         const vendorName = vendorRecord?.companyName || 'Vendor';
-        notifications.inspectionScheduled(checkerId, vendorName, scheduledDate).catch(console.error);
+        const { createNotification: createInspNotif } = require('./notificationController');
+        createInspNotif({
+            userId: checkerId, role: 'QC_CHECKER', type: 'INSPECTION_SCHEDULED',
+            title: 'Inspection Scheduled',
+            message: `Inspection for "${vendorName}" scheduled on ${scheduledDate}.`,
+            data: { screen: 'vendors', vendorId }
+        }).catch(() => {});
 
         res.status(201).json({ success: true, message: 'Inspection assigned successfully', inspection: newInspection });
     } catch (error) {
@@ -172,11 +176,12 @@ const getInspectionsByChecker = async (req, res) => {
     }
 };
 
-// Start an Inspection
+// Start an Inspection — requires checker GPS within 500m of vendor factory
 const startInspection = async (req, res) => {
     try {
         const { id } = req.params; // inspection id
         const checkerId = req.user.id; // ensuring only assigned checker can start
+        const { checkerLatitude, checkerLongitude } = req.body;
 
         const inspection = await prisma.inspection.findUnique({ where: { id } });
 
@@ -188,27 +193,111 @@ const startInspection = async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized to start this inspection' });
         }
 
-        if (inspection.status !== 'SCHEDULED') {
+        // Both SCHEDULED (first start) and IN_PROGRESS (retry) re-verify
+        // against the CURRENT vendor coordinates — so if admin updates the
+        // vendor's mapLink mid-inspection, the next start call checks the
+        // checker against the NEW location and refreshes the snapshot. Any
+        // other status (COMPLETED, SUBMITTED…) is terminal.
+        if (inspection.status !== 'SCHEDULED' && inspection.status !== 'IN_PROGRESS') {
             return res.status(400).json({ error: `Cannot start an inspection that is currently ${inspection.status}` });
         }
 
+        // ── Location verification ──────────────────────────────────────
+        if (checkerLatitude == null || checkerLongitude == null) {
+            return res.status(400).json({
+                error: 'Location required',
+                message: 'Your current GPS location is required to start an inspection. Please enable location services and try again.',
+            });
+        }
+
+        // Fetch vendor factory coordinates — ALWAYS fresh from DB so admin
+        // edits to the mapLink take effect on the next start call.
+        const vendor = await prisma.vendor.findUnique({
+            where: { id: inspection.vendorId },
+            select: { factoryLatitude: true, factoryLongitude: true, companyName: true, mapLink: true },
+        });
+
+        let vendorLat = vendor?.factoryLatitude;
+        let vendorLng = vendor?.factoryLongitude;
+
+        // If vendor doesn't have stored coordinates, try to parse from mapLink on the fly
+        if ((vendorLat == null || vendorLng == null) && vendor?.mapLink) {
+            const { parseMapLinkCoordinates } = require('../utils/locationUtils');
+            const coords = parseMapLinkCoordinates(vendor.mapLink);
+            if (coords) {
+                vendorLat = coords.latitude;
+                vendorLng = coords.longitude;
+                // Persist for future lookups (fire-and-forget)
+                prisma.vendor.update({
+                    where: { id: inspection.vendorId },
+                    data: { factoryLatitude: vendorLat, factoryLongitude: vendorLng },
+                }).catch(e => console.error('Failed to backfill vendor coords:', e));
+            }
+        }
+
+        if (vendorLat == null || vendorLng == null) {
+            return res.status(400).json({
+                error: 'Vendor location not set',
+                message: 'The vendor\'s factory location (Map Embed Link) has not been configured. Please contact admin to set the vendor\'s map location before starting the inspection.',
+            });
+        }
+
+        const { haversineDistanceMeters, LOCATION_THRESHOLD_METERS } = require('../utils/locationUtils');
+        const distanceM = haversineDistanceMeters(checkerLatitude, checkerLongitude, vendorLat, vendorLng);
+        const locationVerified = distanceM <= LOCATION_THRESHOLD_METERS;
+
+        // Diagnostic — show both vendor and checker coords on every start.
+        console.log(
+            `[Geofence] startInspection ${id} — ${vendor?.companyName || 'vendor'} (${inspection.vendorId})\n` +
+            `  vendor:  ${vendorLat}, ${vendorLng}\n` +
+            `  checker: ${checkerLatitude}, ${checkerLongitude}\n` +
+            `  distance: ${Math.round(distanceM)}m / ${LOCATION_THRESHOLD_METERS}m → ${locationVerified ? '✓ PASS' : '✗ MISMATCH'}`,
+        );
+
+        if (!locationVerified) {
+            return res.status(403).json({
+                error: 'Location mismatch',
+                message: `You are approximately ${Math.round(distanceM)}m (straight-line) from the vendor's factory. You must be within ${LOCATION_THRESHOLD_METERS}m to start an inspection. Note: Google Maps may show a longer distance as it measures road/walking routes. Please travel closer to the factory location and try again.`,
+                distanceMeters: Math.round(distanceM),
+                thresholdMeters: LOCATION_THRESHOLD_METERS,
+            });
+        }
+
+        // ── All checks passed — start (or refresh) the inspection ───────
+        const wasScheduled = inspection.status === 'SCHEDULED';
         const updatedInspection = await prisma.inspection.update({
             where: { id },
             data: {
-                status: 'IN_PROGRESS',
-                startedAt: new Date()
+                checkerLatitude: parseFloat(checkerLatitude),
+                checkerLongitude: parseFloat(checkerLongitude),
+                vendorLatitude: vendorLat,
+                vendorLongitude: vendorLng,
+                locationVerified: true,
+                locationDistanceM: Math.round(distanceM),
+                // Flip status + stamp startedAt only on the very first start.
+                ...(wasScheduled ? { status: 'IN_PROGRESS', startedAt: new Date() } : {}),
             },
             include: {
                 vendor: true
             }
         });
 
-        res.json({ success: true, message: 'Inspection started', inspection: updatedInspection });
+        res.json({
+            success: true,
+            message: 'Inspection started',
+            inspection: updatedInspection,
+            locationVerification: {
+                verified: true,
+                distanceMeters: Math.round(distanceM),
+                thresholdMeters: LOCATION_THRESHOLD_METERS,
+            },
+        });
     } catch (error) {
         console.error('Error starting inspection:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
+
 
 // Get latest inspection for a vendor (Admin)
 const getInspectionByVendorId = async (req, res) => {
@@ -279,6 +368,7 @@ const completeInspection = async (req, res) => {
         const checkerId = req.user?.checkerId || req.user?.id || req.userId;
         const checkerName = req.user?.name || req.user?.email || 'QC Checker';
         const formData = req.body;
+        const { checkerLatitude, checkerLongitude } = req.body;
 
         const inspection = await prisma.inspection.findUnique({ where: { id } });
 
@@ -296,6 +386,31 @@ const completeInspection = async (req, res) => {
 
         if (inspection.status === 'CANCELLED') {
             return res.status(400).json({ error: 'Cannot complete a cancelled inspection' });
+        }
+
+        // ── Submit-time geofence — checker must STILL be at the vendor's factory
+        //   when submitting (not just when starting). Mirrors the product flow so
+        //   the location guarantee is identical for factory + product inspections.
+        const vendor = await prisma.vendor.findUnique({
+            where: { id: inspection.vendorId },
+            select: {
+                id: true,
+                factoryLatitude: true,
+                factoryLongitude: true,
+                mapLink: true,
+                companyName: true,
+            },
+        });
+        const { verifyCheckerAtVendor } = require('../utils/locationUtils');
+        const geo = await verifyCheckerAtVendor({
+            vendor,
+            checkerLatitude,
+            checkerLongitude,
+            prisma,
+            label: `completeInspection ${id}`,
+        });
+        if (!geo.ok) {
+            return res.status(geo.status).json(geo.body);
         }
 
         // Defence-in-depth: validate the payload server-side. The UI blocks this
@@ -341,6 +456,15 @@ const completeInspection = async (req, res) => {
                 status: 'SUBMITTED',
                 startedAt: inspection.startedAt || new Date(),
                 submittedAt: new Date(),
+                // Refresh location snapshot to the SUBMIT-time GPS (overwriting
+                // the start-time values) so the audit trail reflects where the
+                // checker was when finalising the inspection.
+                checkerLatitude: parseFloat(checkerLatitude),
+                checkerLongitude: parseFloat(checkerLongitude),
+                vendorLatitude: geo.vendorLat,
+                vendorLongitude: geo.vendorLng,
+                locationVerified: true,
+                locationDistanceM: Math.round(geo.distanceM),
                 result: resultStatus,
                 notes: formData.inspectorRemarks || '',
                 itemsToInspect: persistedFormData,
@@ -387,7 +511,9 @@ const completeInspection = async (req, res) => {
                 rejectionReason: resultStatus === 'FAILED' ? (formData.inspectorRemarks || 'Inspection failed') : null,
                 remarks: formData.remarks || null,
                 notes: formData.notes || null,
-                locationDetails: formData.factoryAddress || formData.locationDetails || null,
+                // Verified-location stamp at submit time — mirrors the
+                // product audit-log format so reports read consistently.
+                locationDetails: `Verified at factory — ${Math.round(geo.distanceM)}m from vendor (checker ${Number(checkerLatitude).toFixed(6)},${Number(checkerLongitude).toFixed(6)})`,
                 inspectionData: persistedFormData,
                 cycleNumber: inspection.cycleNumber || 1,
             },

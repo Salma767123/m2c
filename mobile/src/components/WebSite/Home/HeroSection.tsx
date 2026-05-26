@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Pressable, ScrollView, useWindowDimensions, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { bannerService, BannerImage } from '@/services/bannerService';
 
 const IMAGE_ASPECT_RATIO = 2872 / 1152;
+const BANNER_MARGIN = 12;   // side gap so the banner is inset (Flipkart-style)
+const BANNER_RADIUS = 16;
 
 type Slide = {
   id: string | number;
@@ -19,18 +21,18 @@ const fallbackSlides: Slide[] = [
   { id: 4, source: require('../../../../assets/images/hero/hs4.webp'), altText: 'Hero slide 4' },
 ];
 
-const pressableOpacity = ({ pressed }: { pressed: boolean }) => ({
-  opacity: pressed ? 0.8 : 1,
-});
-
 export default function HeroSection() {
   const { width } = useWindowDimensions();
-  const imageHeight = width / IMAGE_ASPECT_RATIO;
+  const bannerWidth = width - BANNER_MARGIN * 2;
+  const bannerHeight = bannerWidth / IMAGE_ASPECT_RATIO;
 
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [slides, setSlides] = useState<Slide[]>(fallbackSlides);
   const scrollViewRef = useRef<ScrollView>(null);
+  const progress = useRef(new Animated.Value(0)).current;
+
+  const SLIDE_DURATION = 5000;
 
   // Fetch dynamic banners on mount
   useEffect(() => {
@@ -56,20 +58,34 @@ export default function HeroSection() {
     };
   }, []);
 
-  // Auto-play
+  // Auto-play — the progress bar fills over SLIDE_DURATION, then advances.
+  // Restarts whenever the slide changes so the bar stays in sync.
   useEffect(() => {
-    if (!isAutoPlaying || slides.length <= 1) return;
+    progress.setValue(0);
 
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => {
-        const nextIndex = (prev + 1) % slides.length;
-        scrollViewRef.current?.scrollTo({ x: nextIndex * width, animated: true });
-        return nextIndex;
-      });
-    }, 5000);
+    if (!isAutoPlaying || slides.length <= 1) {
+      // Paused → show the current segment as fully filled.
+      progress.setValue(1);
+      return;
+    }
 
-    return () => clearInterval(interval);
-  }, [isAutoPlaying, slides.length, width]);
+    const anim = Animated.timing(progress, {
+      toValue: 1,
+      duration: SLIDE_DURATION,
+      useNativeDriver: false, // animating width % — must be JS-driven
+    });
+    anim.start(({ finished }) => {
+      if (finished) {
+        setCurrentSlide((prev) => {
+          const nextIndex = (prev + 1) % slides.length;
+          scrollViewRef.current?.scrollTo({ x: nextIndex * width, animated: true });
+          return nextIndex;
+        });
+      }
+    });
+
+    return () => anim.stop();
+  }, [currentSlide, isAutoPlaying, slides.length, width, progress]);
 
   const goToSlide = useCallback(
     (index: number) => {
@@ -95,50 +111,94 @@ export default function HeroSection() {
   const hasMultipleSlides = slides.length > 1;
 
   return (
-    <View className="relative bg-white">
-      <View style={{ height: imageHeight }} className="overflow-hidden">
-        <ScrollView
-          ref={scrollViewRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={handleMomentumScrollEnd}
-          scrollEventThrottle={16}
-        >
-          {slides.map((slide) => (
-            <View key={slide.id} style={{ width }}>
+    <View style={{ paddingTop: 12, paddingBottom: 6 }}>
+      {/* Banner carousel — each page is full-width, the image inside is inset & rounded */}
+      <ScrollView
+        ref={scrollViewRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        scrollEventThrottle={16}
+      >
+        {slides.map((slide) => (
+          <View key={slide.id} style={{ width, alignItems: 'center' }}>
+            <View
+              style={{
+                width: bannerWidth,
+                height: bannerHeight,
+                borderRadius: BANNER_RADIUS,
+                overflow: 'hidden',
+                backgroundColor: '#e5e7eb',
+              }}
+            >
               <Image
                 source={slide.uri ? { uri: slide.uri } : slide.source}
-                style={{ width, height: imageHeight }}
+                style={{ width: bannerWidth, height: bannerHeight }}
                 contentFit="cover"
                 transition={200}
                 accessibilityLabel={slide.altText}
               />
             </View>
-          ))}
-        </ScrollView>
-
-        {hasMultipleSlides ? (
-          <View className="absolute bottom-3 left-0 right-0 flex-row justify-center">
-            {slides.map((slide, index) => (
-              <Pressable
-                key={slide.id}
-                onPress={() => goToSlide(index)}
-                accessibilityLabel={`Go to slide ${index + 1}`}
-                accessibilityRole="button"
-                hitSlop={10}
-                style={pressableOpacity}
-              >
-                <View
-                  className={`h-2 rounded-full mx-1 ${
-                    index === currentSlide ? 'w-6 bg-white' : 'w-2 bg-white/60'
-                  }`}
-                />
-              </Pressable>
-            ))}
           </View>
-        ) : null}
-      </View>
+        ))}
+      </ScrollView>
+
+      {/* Pagination — animated stories-style progress bar */}
+      {hasMultipleSlides ? (
+        <View style={{ alignItems: 'center', marginTop: 12 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              width: Math.min(bannerWidth * 0.2, 72),
+              gap: 3,
+            }}
+          >
+            {slides.map((slide, index) => {
+              const isPast = index < currentSlide;
+              const isCurrent = index === currentSlide;
+              return (
+                <Pressable
+                  key={slide.id}
+                  onPress={() => goToSlide(index)}
+                  accessibilityLabel={`Go to slide ${index + 1}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isCurrent }}
+                  hitSlop={10}
+                  style={{ flex: 1 }}
+                >
+                  {/* Track segment */}
+                  <View
+                    style={{
+                      height: 5,
+                      borderRadius: 3,
+                      backgroundColor: '#d8dade',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Fill — past = full, current = animated, future = none */}
+                    {isPast ? (
+                      <View style={{ flex: 1, backgroundColor: '#111827' }} />
+                    ) : isCurrent ? (
+                      <Animated.View
+                        style={{
+                          height: '100%',
+                          borderRadius: 3,
+                          backgroundColor: '#111827',
+                          width: progress.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0%', '100%'],
+                          }),
+                        }}
+                      />
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

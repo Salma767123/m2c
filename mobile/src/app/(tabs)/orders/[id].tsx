@@ -22,7 +22,6 @@ import {
   Mail,
   XCircle,
   ShieldCheck,
-  AlertCircle,
   FileText,
   X,
   Star,
@@ -35,22 +34,36 @@ import { orderService, Order } from '@/services/orderService';
 import { showErrorToast, showSuccessToast } from '@/lib/toast-utils';
 import ReviewModal from '@/components/WebSite/Review/ReviewModal';
 import { reviewService } from '@/services/reviewService';
+import {
+  getCountryName,
+  getCountryFlag,
+  getStateName,
+  formatPhoneForDisplay,
+} from '@/components/WebSite/CheckOut/CheckoutProcess/constants';
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 type StatusInfo = { icon: any; label: string; bg: string; fg: string; iconBg: string };
+type CustomerStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
 
-const STATUS: Record<string, StatusInfo> = {
-  delivered:        { icon: CheckCircle, label: 'Delivered',    bg: '#f0fdf4', fg: '#16a34a', iconBg: '#16a34a' },
-  shipped:          { icon: Truck,       label: 'Shipped',      bg: '#eff6ff', fg: '#2563eb', iconBg: '#2563eb' },
-  processing:       { icon: Clock,       label: 'Processing',   bg: '#fffbeb', fg: '#d97706', iconBg: '#f59e0b' },
-  confirmed:        { icon: Clock,       label: 'Confirmed',    bg: '#fffbeb', fg: '#d97706', iconBg: '#f59e0b' },
-  order_created:    { icon: Package,     label: 'Order Placed', bg: '#f3f4f6', fg: '#374151', iconBg: '#6b7280' },
-  packed_by_vendor: { icon: Package,     label: 'Packed',       bg: '#eff6ff', fg: '#2563eb', iconBg: '#2563eb' },
-  cancelled:        { icon: XCircle,     label: 'Cancelled',    bg: '#fef2f2', fg: '#dc2626', iconBg: '#dc2626' },
+// Collapse internal/admin statuses → 4 customer-facing statuses (matches web).
+// Customers never see internal states like order_created, packed_by_vendor,
+// in_transit_to_admin_hub, approved_by_admin_hub, etc.
+const normalizeStatus = (s: string): CustomerStatus => {
+  const n = (s || '').toLowerCase();
+  if (['dispatched', 'shipped', 'shipped_to_customer'].includes(n)) return 'shipped';
+  if (['completed', 'delivered', 'received', 'returned'].includes(n)) return 'delivered';
+  if (['cancelled', 'failed', 'rejected', 'rejected_by_admin_hub'].includes(n)) return 'cancelled';
+  return 'processing';
 };
 
-const getStatus = (s: string): StatusInfo =>
-  STATUS[s.toLowerCase()] ?? { icon: AlertCircle, label: s, bg: '#f3f4f6', fg: '#374151', iconBg: '#6b7280' };
+const STATUS: Record<CustomerStatus, StatusInfo> = {
+  processing: { icon: Clock,       label: 'Processing', bg: '#fffbeb', fg: '#d97706', iconBg: '#f59e0b' },
+  shipped:    { icon: Truck,       label: 'Shipped',    bg: '#eff6ff', fg: '#2563eb', iconBg: '#2563eb' },
+  delivered:  { icon: CheckCircle, label: 'Delivered',  bg: '#f0fdf4', fg: '#16a34a', iconBg: '#16a34a' },
+  cancelled:  { icon: XCircle,     label: 'Cancelled',  bg: '#fef2f2', fg: '#dc2626', iconBg: '#dc2626' },
+};
+
+const getStatus = (s: string): StatusInfo => STATUS[normalizeStatus(s)];
 
 const STEPS = [
   { key: 'ORDER_CREATED', label: 'Placed',     icon: Package },
@@ -60,7 +73,14 @@ const STEPS = [
   { key: 'DELIVERED',     label: 'Delivered',  icon: CheckCircle },
 ];
 
-const getStepIndex = (s: string) => STEPS.findIndex((st) => st.key === s.toUpperCase());
+// How far along the 5-step timeline each customer status sits
+const STEP_INDEX: Record<CustomerStatus, number> = {
+  processing: 2,
+  shipped: 3,
+  delivered: 4,
+  cancelled: -1,
+};
+const getStepIndex = (s: string) => STEP_INDEX[normalizeStatus(s)];
 
 const fmt = (n: number) => `$${n.toFixed(2)}`;
 
@@ -85,7 +105,7 @@ export default function OrderDetailsScreen() {
       if (res.success && res.data) {
         setOrder(res.data);
         // Check if user already reviewed any product in this order
-        if (res.data.status === 'DELIVERED' && res.data.items?.length > 0) {
+        if (normalizeStatus(res.data.status) === 'delivered' && res.data.items?.length > 0) {
           const check = await reviewService.checkReviewStatus(
             res.data.items[0].productId,
             res.data.id,
@@ -155,7 +175,8 @@ export default function OrderDetailsScreen() {
 
   const s = getStatus(order.status);
   const SIcon = s.icon;
-  const isCancelled = order.status.toUpperCase() === 'CANCELLED';
+  const isCancelled = normalizeStatus(order.status) === 'cancelled';
+  const isDelivered = normalizeStatus(order.status) === 'delivered';
   const activeStep = getStepIndex(order.status);
 
   return (
@@ -270,12 +291,12 @@ export default function OrderDetailsScreen() {
             <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
               <Truck size={14} color="#2563eb" />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '600', color: '#111827' }}>
-                {order.status === 'DELIVERED' ? 'Delivered' : 'Estimated Delivery'}
+                {isDelivered ? 'Delivered' : 'Estimated Delivery'}
               </Text>
               <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                {order.status === 'DELIVERED'
+                {isDelivered
                   ? `Delivered on ${orderService.formatDate(order.updatedAt)}`
                   : (order as any).estimatedDelivery
                     ? orderService.formatDate((order as any).estimatedDelivery)
@@ -286,28 +307,47 @@ export default function OrderDetailsScreen() {
           <View style={{ height: 1, backgroundColor: '#f3f4f6', marginBottom: 12 }} />
 
           {/* Address */}
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 4 }}>{order.shippingAddress.fullName}</Text>
+          {order.shippingAddress.fullName?.trim() ? (
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 4 }}>
+              {order.shippingAddress.fullName.trim()}
+            </Text>
+          ) : null}
+          {(() => {
+            const street = [order.shippingAddress.addressLine1, order.shippingAddress.addressLine2]
+              .map((p) => (p ? String(p).trim() : ''))
+              .filter(Boolean)
+              .join(', ');
+            return street ? (
+              <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 18 }}>{street}</Text>
+            ) : null;
+          })()}
           <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 18 }}>
-            {order.shippingAddress.addressLine1}
-            {order.shippingAddress.addressLine2 ? `, ${order.shippingAddress.addressLine2}` : ''}
-          </Text>
-          <Text style={{ fontSize: 13, color: '#6b7280' }}>
-            {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}
+            {[
+              order.shippingAddress.city,
+              getStateName(order.shippingAddress.state, order.shippingAddress.country),
+              order.shippingAddress.zipCode,
+            ].filter(Boolean).join(', ')}
           </Text>
           {order.shippingAddress.country ? (
-            <Text style={{ fontSize: 13, color: '#6b7280' }}>{order.shippingAddress.country}</Text>
+            <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 18 }}>
+              {getCountryName(order.shippingAddress.country)} {getCountryFlag(order.shippingAddress.country)}
+            </Text>
           ) : null}
 
           {/* Contact — stacked vertically so email doesn't get cut */}
           <View style={{ marginTop: 12, gap: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Phone size={13} color="#6b7280" />
-              <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>{order.shippingAddress.phone}</Text>
+              <Text style={{ flex: 1, fontSize: 13, color: '#374151', fontWeight: '500' }}>
+                {formatPhoneForDisplay(order.shippingAddress.phone, order.shippingAddress.country)}
+              </Text>
             </View>
             {order.customerEmail ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Mail size={13} color="#6b7280" />
-                <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500', flexShrink: 1 }}>{order.customerEmail}</Text>
+                <Text style={{ flex: 1, fontSize: 13, color: '#374151', fontWeight: '500' }}>
+                  {order.customerEmail}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -369,7 +409,7 @@ export default function OrderDetailsScreen() {
             </Pressable>
 
             {/* Write Review — only for delivered orders */}
-            {order.status === 'DELIVERED' ? (
+            {isDelivered ? (
               <Pressable
                 onPress={() => { if (!hasReviewed) setShowReviewModal(true); }}
                 disabled={hasReviewed}

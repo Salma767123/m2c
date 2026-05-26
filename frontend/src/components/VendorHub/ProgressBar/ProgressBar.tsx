@@ -17,9 +17,9 @@ export default function ProgressBar({ steps, currentStep }: ProgressBarProps) {
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
                   index < currentStep
-                    ? 'bg-blue-600 border-blue-600 text-white'
+                    ? 'bg-success-500 border-success-500 text-white'
                     : index === currentStep
-                    ? 'bg-blue-50 border-blue-600 text-blue-600'
+                    ? 'bg-brand-50 border-brand-500 text-brand-500'
                     : 'bg-gray-100 border-gray-300 text-gray-400'
                 }`}
               >
@@ -42,7 +42,7 @@ export default function ProgressBar({ steps, currentStep }: ProgressBarProps) {
             {index < steps.length - 1 && (
               <div
                 className={`flex-1 h-0.5 mx-4 ${
-                  index < currentStep ? 'bg-blue-600' : 'bg-gray-200'
+                  index < currentStep ? 'bg-success-500' : 'bg-gray-200'
                 }`}
                 style={{ minWidth: '40px' }}
               />

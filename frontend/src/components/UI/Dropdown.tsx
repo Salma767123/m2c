@@ -17,9 +17,11 @@ interface DropdownProps {
   onChange: (value: string | string[]) => void;
   multiple?: boolean;
   disabled?: boolean;
+  error?: boolean | string;
+  onBlur?: () => void;
 }
 
-export default function Dropdown({ id, label, value, options, placeholder, onChange, multiple, disabled }: DropdownProps) {
+export default function Dropdown({ id, label, value, options, placeholder, onChange, multiple, disabled, error, onBlur }: DropdownProps) {
   const normalized = options.map(opt => {
     if (typeof opt === 'string' || typeof opt === 'number') {
       return { value: String(opt), label: String(opt) };
@@ -35,11 +37,17 @@ export default function Dropdown({ id, label, value, options, placeholder, onCha
     const handleClickOutside = (e: MouseEvent) => {
       if (open && containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
+        onBlur?.();
+      } else if (!open && containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        // do nothing
       }
     };
     const handleKey = (e: KeyboardEvent) => {
       if (!open) return;
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        onBlur?.();
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKey);
@@ -68,6 +76,7 @@ export default function Dropdown({ id, label, value, options, placeholder, onCha
   const onSelectSingle = (val: string) => {
     onChange(val);
     setOpen(false);
+    onBlur?.();
   };
 
   const onToggleMultiple = (val: string) => {
@@ -116,6 +125,9 @@ export default function Dropdown({ id, label, value, options, placeholder, onCha
         aria-expanded={open}
         aria-multiselectable={multiple || undefined}
         disabled={disabled}
+        onBlur={() => {
+          if (!open) onBlur?.();
+        }}
         onClick={toggleOpen}
         onKeyDown={(e) => {
           if (!disabled && (e.key === 'ArrowDown' || e.key === 'Enter')) {
@@ -123,10 +135,12 @@ export default function Dropdown({ id, label, value, options, placeholder, onCha
             setOpen(true);
           }
         }}
-        className={`w-full text-left px-4 py-2 border border-gray-300 rounded-lg flex items-center justify-between ${
+        className={`w-full text-left px-4 py-2 border rounded-lg flex items-center justify-between outline-none focus-visible:ring-1 focus-visible:ring-brand-500 transition-colors ${
           disabled 
-            ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
-            : 'bg-white cursor-pointer hover:border-gray-400'
+            ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed' 
+            : error 
+              ? 'bg-red-50 border-red-500' 
+              : 'bg-white border-slate-300 hover:border-slate-400 cursor-pointer'
         }`}
       >
         <span className={Array.isArray(value) ? (value.length ? 'text-gray-900' : 'text-gray-500') : (value ? 'text-gray-900' : 'text-gray-500')}>

@@ -38,6 +38,9 @@ const createNotificationForRole = async ({ role, type, title, message, data }) =
     } else if (role === 'VENDOR') {
       const vendors = await prisma.vendor.findMany({ select: { id: true } });
       userIds = vendors.map(v => v.id);
+    } else if (role === 'QC_CHECKER') {
+      const checkers = await prisma.qCChecker.findMany({ select: { id: true } });
+      userIds = checkers.map(c => c.id);
     }
 
     if (userIds.length === 0) return;
@@ -104,8 +107,10 @@ const getNotifications = async (req, res) => {
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
-    await prisma.notification.update({
-      where: { id },
+    const userId = req.user.id || req.user.checkerId;
+    // Scope to the requesting user so a notification can't be read on someone else's behalf
+    await prisma.notification.updateMany({
+      where: { id, userId },
       data: { isRead: true }
     });
     res.json({ success: true });

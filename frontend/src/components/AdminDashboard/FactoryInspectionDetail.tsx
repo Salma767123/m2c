@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
     ArrowLeft, Building2, ShieldCheck, Factory,
     CheckCircle, XCircle, AlertTriangle, Clock,
-    FileText, ClipboardList, Package, Settings, Download, Camera
+    FileText, ClipboardList, Package, Settings, Download, Camera, MapPin
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import vendorService from '@/services/vendorService'
@@ -438,6 +438,36 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                         </div>
                                     )
                                 })}
+                            </div>
+                        </Section>
+                    )}
+
+                    {/* Location Verification — shown when location data exists */}
+                    {(inspection.locationVerified !== undefined || inspection.checkerLatitude != null) && (
+                        <Section title="Location Verification" icon={MapPin} accent={inspection.locationVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}>
+                            <div className="flex items-center gap-3 mb-4">
+                                {inspection.locationVerified ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        <CheckCircle className="w-3.5 h-3.5" />
+                                        Location Verified ✓
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                                        <XCircle className="w-3.5 h-3.5" />
+                                        Location Mismatch
+                                    </span>
+                                )}
+                                {inspection.locationDistanceM != null && (
+                                    <span className="text-xs text-slate-500">
+                                        Distance: <strong>{inspection.locationDistanceM}m</strong> (threshold: 500m)
+                                    </span>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <InfoCard label="Checker Latitude" value={inspection.checkerLatitude?.toFixed(6)} />
+                                <InfoCard label="Checker Longitude" value={inspection.checkerLongitude?.toFixed(6)} />
+                                <InfoCard label="Vendor Latitude" value={inspection.vendorLatitude?.toFixed(6)} />
+                                <InfoCard label="Vendor Longitude" value={inspection.vendorLongitude?.toFixed(6)} />
                             </div>
                         </Section>
                     )}

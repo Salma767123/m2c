@@ -13,10 +13,10 @@ import { Image } from 'expo-image';
 import {
   Package,
   ShoppingCart,
-  ChevronRight,
   AlertCircle,
   RefreshCw,
   Search,
+  Layers,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { categoryService, type Category } from '@/services/categoryService';
@@ -213,48 +213,40 @@ const CategoryCard = memo(function CategoryCard({
     router.push(`/(tabs)/categories/${category.slug}` as any);
   }, [category.slug]);
 
+  const meta = count > 0 ? `${count} subcategories` : 'Explore collection';
+
   return (
     <Pressable
       onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={`${category.name}, ${count} subcategories`}
+      accessibilityLabel={`${category.name}, ${meta}`}
       accessibilityHint="Opens category details"
       android_ripple={{ color: 'rgba(15,23,42,0.06)' }}
       style={{ width: cardWidth }}
     >
       <View style={c.card}>
-        {/* Image — square for compact grid */}
+        {/* Image — square, padded so the full image shows */}
         <View style={c.imageWrap}>
           {category.image ? (
             <Image
               source={{ uri: category.image }}
               style={c.image}
-              contentFit="cover"
+              contentFit="contain"
               transition={250}
             />
           ) : (
             <View style={c.imagePlaceholder}>
-              <Package size={36} color="#d1d5db" strokeWidth={1.5} />
+              <Package size={34} color="#cbd5e1" strokeWidth={1.5} />
             </View>
           )}
-
-          {/* Subcategory count */}
-          {count > 0 ? (
-            <View style={c.badge}>
-              <Text style={c.badgeText}>{count}</Text>
-            </View>
-          ) : null}
         </View>
 
         {/* Info */}
         <View style={c.info}>
-          <Text style={c.name} numberOfLines={2}>{category.name}</Text>
-          {category.description ? (
-            <Text style={c.desc} numberOfLines={1}>{category.description}</Text>
-          ) : null}
-          <View style={c.exploreRow}>
-            <Text style={c.exploreText}>Explore</Text>
-            <ChevronRight size={12} color="#6b7280" strokeWidth={2.5} />
+          <Text style={c.name} numberOfLines={1}>{category.name}</Text>
+          <View style={c.metaRow}>
+            <Layers size={12} color="#6b7280" strokeWidth={2.25} />
+            <Text style={c.metaText} numberOfLines={1}>{meta}</Text>
           </View>
         </View>
       </View>
@@ -475,20 +467,21 @@ const s = StyleSheet.create({
 const c = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: '#eceef1',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
   imageWrap: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f7f8fa',
+    padding: 10,
   },
   image: {
     width: '100%',
@@ -499,23 +492,6 @@ const c = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: '#111827',
-    minWidth: 24,
-    height: 24,
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#ffffff',
   },
   info: {
     paddingHorizontal: 12,
@@ -528,20 +504,14 @@ const c = StyleSheet.create({
     color: '#111827',
     lineHeight: 18,
   },
-  desc: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginTop: 2,
-    lineHeight: 15,
-  },
-  exploreRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    gap: 2,
+    marginTop: 5,
+    gap: 4,
   },
-  exploreText: {
-    fontSize: 11,
+  metaText: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#6b7280',
   },

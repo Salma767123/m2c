@@ -129,7 +129,7 @@ export default function Order() {
                   productId: item.productId,
                   name: product.name,
                   price: finalPrice,
-                  originalPrice: product.originalPrice,
+                  originalPrice: getRegionalOriginalPrice(product as any) ?? undefined,
                   images: finalImages,
                   category: product.category,
                   rating: product.rating,
@@ -179,7 +179,7 @@ export default function Order() {
 
               // Variant-specific discount/originalPrice (region-aware)
               const liveOriginalPrice = hasVariant
-                ? getRegionalOriginalPrice(item.variant as any) ?? item.product?.originalPrice
+                ? getRegionalOriginalPrice(item.variant as any) ?? getRegionalOriginalPrice(item.product as any)
                 : getRegionalOriginalPrice(item.product as any);
               const liveDiscount = hasVariant
                 ? (item.variant.discount ?? item.product?.discount)
@@ -190,7 +190,7 @@ export default function Order() {
                 productId: item.productId,
                 name: item.product?.name || 'Unknown Product',
                 price: livePrice,
-                originalPrice: liveOriginalPrice,
+                originalPrice: liveOriginalPrice ?? undefined,
                 images: imgArray,
                 category: item.product?.category || '',
                 rating: item.product?.rating,

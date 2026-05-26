@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -27,6 +28,7 @@ import {
   UserCheck,
   RefreshCw,
   AlertCircle,
+  ShieldCheck,
   X,
 } from 'lucide-react-native';
 import qcCheckerService, { AuditLogEntry } from '../../services/qcCheckerService';
@@ -104,14 +106,20 @@ export default function ProductDetailScreen() {
     }
   }, [id, product]);
 
-  useEffect(() => {
-    load();
-    if (id) {
-      qcCheckerService.getAuditTrail('PRODUCT_INSPECTION', id)
-        .then(res => setAuditLogs(res.logs || []))
-        .catch(() => {});
-    }
-  }, [id]);
+  // Refetch product + audit trail on focus, so a returning user sees the
+  // latest approvalStatus and audit-log entries from their last action.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      if (id) {
+        qcCheckerService
+          .getAuditTrail('PRODUCT_INSPECTION', id)
+          .then((res) => setAuditLogs(res.logs || []))
+          .catch(() => {});
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]),
+  );
 
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
 
@@ -437,12 +445,31 @@ export default function ProductDetailScreen() {
 
                   {/* Audit Trail */}
                   {auditLogs.length > 0 && (
-                    <View className="bg-white rounded-2xl border border-slate-200 p-4">
-                      <View className="flex-row items-center mb-3">
-                        <Clock size={16} color="#475569" />
-                        <Text className="text-sm font-bold text-slate-900 ml-2">Audit Trail</Text>
+                    <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                      {/* Section header */}
+                      <View
+                        className="flex-row items-center justify-between px-4 py-3 border-b border-slate-100"
+                        style={{ backgroundColor: '#F8FAFC' }}
+                      >
+                        <View className="flex-row items-center" style={{ gap: 10 }}>
+                          <View
+                            className="w-8 h-8 rounded-lg items-center justify-center"
+                            style={{ backgroundColor: '#EFF6FF' }}
+                          >
+                            <ShieldCheck size={16} color="#2563EB" />
+                          </View>
+                          <Text className="text-sm font-bold text-slate-900">Audit Trail</Text>
+                        </View>
+                        <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: '#E2E8F0' }}>
+                          <Text className="text-[10px] font-bold text-slate-600">
+                            {auditLogs.length} {auditLogs.length === 1 ? 'entry' : 'entries'}
+                          </Text>
+                        </View>
                       </View>
-                      <AuditTimeline logs={auditLogs} />
+                      {/* Timeline content */}
+                      <View className="p-4">
+                        <AuditTimeline logs={auditLogs} />
+                      </View>
                     </View>
                   )}
                 </>

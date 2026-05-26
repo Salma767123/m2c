@@ -1,9 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Upload, X, Image, Trash2, GripVertical, Plus, Eye, EyeOff } from 'lucide-react';
+import { Save, Upload, X, Image, Trash2, GripVertical, Plus, Eye, EyeOff, Info } from 'lucide-react';
 import { Card, CardContent } from '../../UI/Card';
-import { showSuccessToast, showErrorToast } from '@/lib/toast-utils';
+import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils';
 import { bannerService, BannerImage } from '@/services/bannerService';
 import { hasPermission } from '@/lib/auth';
+
+// Banner display spec — keep in sync with the homepage hero (2872 × 1152, ≈2.49:1)
+const TARGET_RATIO = 2872 / 1152;        // ≈ 2.493
+const RATIO_TOLERANCE = 0.12;            // ±12% deviation allowed before warning
+const MIN_BANNER_WIDTH = 1400;           // below this, banner looks soft on large screens
+
+/**
+ * Reads an image file's natural dimensions and surfaces a non-blocking warning
+ * if its aspect ratio or resolution deviates from the recommended banner spec.
+ * Returns a Promise that resolves once dimensions are read (never rejects).
+ */
+function checkBannerDimensions(file: File, dataUrl: string): Promise<void> {
+    return new Promise((resolve) => {
+        const img = new window.Image();
+        img.onload = () => {
+            const { naturalWidth: w, naturalHeight: h } = img;
+            if (w > 0 && h > 0) {
+                const ratio = w / h;
+                const deviation = Math.abs(ratio - TARGET_RATIO) / TARGET_RATIO;
+                if (deviation > RATIO_TOLERANCE) {
+                    showWarningToast(
+                        'Aspect ratio mismatch',
+                        `This image is ${w}×${h}px (${ratio.toFixed(2)}:1). The homepage banner uses 2872×1152px (2.49:1) — parts of this image will be cropped. You can still upload it.`,
+                    );
+                } else if (w < MIN_BANNER_WIDTH) {
+                    showWarningToast(
+                        'Low resolution',
+                        `This image is only ${w}px wide. Use at least 2872px wide so the banner stays sharp on large screens.`,
+                    );
+                }
+            }
+            resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = dataUrl;
+    });
+}
 
 export default function BannerSettingsTab() {
     const canManage = hasPermission('manage_settings');
@@ -55,7 +92,11 @@ export default function BannerSettingsTab() {
 
         setSelectedFile(file);
         const reader = new FileReader();
-        reader.onload = (e) => setFilePreview(e.target?.result as string);
+        reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            setFilePreview(dataUrl);
+            checkBannerDimensions(file, dataUrl);
+        };
         reader.readAsDataURL(file);
     };
 
@@ -74,7 +115,11 @@ export default function BannerSettingsTab() {
 
         setEditFile(file);
         const reader = new FileReader();
-        reader.onload = (e) => setEditFilePreview(e.target?.result as string);
+        reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            setEditFilePreview(dataUrl);
+            checkBannerDimensions(file, dataUrl);
+        };
         reader.readAsDataURL(file);
     };
 
@@ -211,6 +256,23 @@ export default function BannerSettingsTab() {
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Banner Image *
                             </label>
+
+                            {/* Upload guidelines */}
+                            <div className="mb-3 flex items-start gap-2.5 rounded-lg bg-blue-50 border border-blue-200 p-3">
+                                <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                                <div className="text-xs text-blue-800 leading-5">
+                                    <p className="font-semibold">
+                                        Recommended size: 2872 × 1152 px (aspect ratio ≈ 2.49 : 1)
+                                    </p>
+                                    <ul className="text-blue-700 mt-1 list-disc pl-4 space-y-0.5">
+                                        <li>Use a <strong>wide landscape</strong> image at the exact ratio above for a crisp, full fit.</li>
+                                        <li>Keep text, logos &amp; key products in the <strong>centre</strong> — outer edges may be cropped on mobile and desktop.</li>
+                                        <li>Make the background extend edge-to-edge so cropping never shows blank space.</li>
+                                        <li>Format: <strong>JPG, PNG or WebP</strong> (WebP preferred) · keep under 5MB for fast loading.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
                             <div className="flex items-start gap-4">
                                 <div
                                     className="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-gray-400 transition-colors"
@@ -240,7 +302,7 @@ export default function BannerSettingsTab() {
                                                 Click to upload banner image
                                             </p>
                                             <p className="text-xs text-gray-400 mt-1">
-                                                JPG, PNG, WebP up to 5MB. Recommended: 1920x750px
+                                                JPG, PNG or WebP · up to 5MB · 2872 × 1152 px
                                             </p>
                                         </div>
                                     )}

@@ -1,9 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
+const { uploadToCloudinary, deleteFromCloudinary, resolveBase64InValue } = require('../config/cloudinary');
 const { prisma } = require('../config/database');
 const { normalizeCategoryValues } = require('../utils/categoryResolver');
 const { generateVendorCode, reconcileAndGenerate } = require('../utils/vendorCodeGenerator');
+const { parseMapLinkCoordinates } = require('../utils/locationUtils');
 const {
   sendVendorApprovalEmail,
   sendVendorRejectionEmail,
@@ -74,15 +75,21 @@ const writeInspectionAuditLogs = (pendingInspections, { decision, adminId, admin
   });
 };
 
-// Helper function to map business type to enum
-const getCompanyTypeEnum = (businessType) => {
+// Map the multi-select `vendorType` from Step 4 to the `companyType` enum.
+// The previous implementation matched `businessType` (legal entity from
+// Step 1: proprietorship / pvt-ltd / partnership-firm / llp) against a
+// legacy mapping (sole / partnership / corporation / llc) — none of the
+// current FE values matched any key, so every vendor was silently tagged
+// MANUFACTURER. Deriving from vendorType (manufacturer / importer /
+// exporter) makes the column reflect what the user actually selected.
+const getCompanyTypeEnum = (vendorTypes) => {
+  const first = Array.isArray(vendorTypes) ? vendorTypes[0] : vendorTypes;
   const mapping = {
-    'sole': 'MANUFACTURER', // Default for sole proprietorship
-    'partnership': 'TRADER',
-    'corporation': 'MANUFACTURER',
-    'llc': 'MANUFACTURER'
+    'manufacturer': 'MANUFACTURER',
+    'importer': 'IMPORTER',
+    'exporter': 'EXPORTER',
   };
-  return mapping[businessType] || 'MANUFACTURER';
+  return mapping[first] || 'MANUFACTURER';
 };
 
 // Helper function to map vendor type to enum
@@ -97,6 +104,20 @@ const getVendorTypeEnum = (vendorType) => {
     return mapping[vendorType[0]] || 'TEXTILE_MANUFACTURER';
   }
   return mapping[vendorType] || 'TEXTILE_MANUFACTURER';
+};
+
+// Best-effort cleanup for orphaned Cloudinary assets. Called when an
+// upload succeeds but a later step (vendor create / cert create / etc.)
+// fails — without this, the file lives in Cloudinary forever. Runs as
+// fire-and-forget: a delete failure is logged but never thrown, since
+// the caller is already in an error path.
+const cleanupOrphanedCloudinaryAssets = (publicIds) => {
+  if (!Array.isArray(publicIds) || publicIds.length === 0) return;
+  publicIds.forEach((publicId) => {
+    deleteFromCloudinary(publicId).catch((err) => {
+      console.error(`Orphan cleanup failed for ${publicId}:`, err.message);
+    });
+  });
 };
 
 // Helper function to upload files to Cloudinary
@@ -125,39 +146,53 @@ const uploadFiles = async (files, folder = 'vendor-documents') => {
 
 // Register new vendor
 const registerVendor = async (req, res) => {
+  // Function-scoped so the outer catch can clean up orphans even if the
+  // failure happens before/after the inner upload try-block. `const` inside
+  // try would be block-scoped and invisible to the outer catch.
+  const uploadedPublicIds = [];
   try {
     const {
       // Company Details
       businessType,
       companyName,
       gstNumber,
+      companyIdNumber,        // IEC / CIN / Partnership Deed / LLPIN
+      panNumber,
       email,
+      email2,
       phone,
       landlineNumber,
       phoneNumber2,
       website,
       address,
+      addressLine2,
+      addressLine3,
+      landmark,
       city,
       state,
       zipCode,
       country,
+      factoryOwnershipType,   // owned / rented / lease for the factory site
 
       // Owner Profile
       ownerName,
+      designation,             // Proprietor / CEO / Director / Founder / custom
       ownerEmail,
+      ownerEmail2,
       ownerPhone,
-      ownerAddress,
-      ownerCity,
-      ownerState,
-      ownerZipCode,
-      ownerCountry,
+      ownerPhone2,
+      ownerLandline,
       additionalOwners,
-      yearEstablished,
+      businessStartDate,       // Full date — preferred over legacy yearEstablished
+      yearEstablished,         // Legacy year-only fallback
       employeeCount,
 
       // Warehouse Details
       ownershipType,
       warehouseAddress,
+      warehouseAddressLine2,
+      warehouseAddressLine3,
+      warehouseLandmark,
       warehouseCity,
       warehouseState,
       warehouseZip,
@@ -169,6 +204,8 @@ const registerVendor = async (req, res) => {
       marketType,
       selectedCategories,
       categoryRemarks,
+      categoryProducts,        // Per-category products: { catId: [{ name, photos: [{preview: dataURI}] }] }
+      additionalCategories,    // User-defined categories: [{ id, name, products: [...] }]
 
       // Manufacturing Facilities (if manufacturer)
       enabledFacilities,
@@ -177,6 +214,7 @@ const registerVendor = async (req, res) => {
       // Certifications & Logistics
       selectedCertifications,
       certificationExpiryDates,
+      otherCertifications,     // User-defined custom certs: [{ id, name, description }]
       qualityControlProcess,
       complianceStandards,
       packagingCapabilities,
@@ -206,9 +244,16 @@ const registerVendor = async (req, res) => {
       });
     }
 
+    // Normalize emails before duplicate check + insert so "JOHN@x.com" and
+    // "john@x.com" don't register twice. The schema's @unique index is
+    // case-sensitive on MongoDB; normalizing at the application layer is
+    // the simplest fix. Same normalization applies in vendorLogin.
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedOwnerEmail = ownerEmail ? ownerEmail.trim().toLowerCase() : ownerEmail;
+
     // Check if vendor already exists
     const existingVendor = await prisma.vendor.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     });
 
     if (existingVendor) {
@@ -226,8 +271,14 @@ const registerVendor = async (req, res) => {
     // Handle file uploads
     let logoUrl = null;
     let gstDocumentUrl = null;
+    let panCardUrl = null;
+    let typeCertUrl = null;
     let ownerPhotoUrl = null;
-    let factoryImageUrls = [];
+    // Factory images carry slot identity (nameBoard / frontView / etc.) so the
+    // resulting VendorDocument rows have human-readable names instead of a
+    // generic "Factory Image N". Slot IDs arrive in side-channel body fields
+    // (`factoryImageSlot_<index>`) — same pattern as `certificationId_<index>`.
+    let factoryImageUploads = [];
     let certificationFileUrls = {};
 
     try {
@@ -235,24 +286,47 @@ const registerVendor = async (req, res) => {
       if (req.files?.logo?.[0]) {
         const logoResult = await uploadFiles([req.files.logo[0]], 'vendor-logos');
         logoUrl = logoResult[0].cloudinaryUrl;
+        if (logoResult[0].publicId) uploadedPublicIds.push(logoResult[0].publicId);
       }
 
       // Upload GST document
       if (req.files?.gstDocument?.[0]) {
         const gstResult = await uploadFiles([req.files.gstDocument[0]], 'vendor-documents/gst');
         gstDocumentUrl = gstResult[0].cloudinaryUrl;
+        if (gstResult[0].publicId) uploadedPublicIds.push(gstResult[0].publicId);
+      }
+
+      // Upload PAN Card document
+      if (req.files?.panCardFile?.[0]) {
+        const panResult = await uploadFiles([req.files.panCardFile[0]], 'vendor-documents/pan');
+        panCardUrl = panResult[0].cloudinaryUrl;
+        if (panResult[0].publicId) uploadedPublicIds.push(panResult[0].publicId);
+      }
+
+      // Upload type-specific business registration certificate
+      // (IEC for Proprietorship / CIN for Pvt Ltd / Deed for Partnership /
+      //  LLPIN for LLP). Stored as DocumentType.COMPANY_REGISTRATION.
+      if (req.files?.typeCertFile?.[0]) {
+        const typeCertResult = await uploadFiles([req.files.typeCertFile[0]], 'vendor-documents/business-cert');
+        typeCertUrl = typeCertResult[0].cloudinaryUrl;
+        if (typeCertResult[0].publicId) uploadedPublicIds.push(typeCertResult[0].publicId);
       }
 
       // Upload owner photo
       if (req.files?.ownerPhoto?.[0]) {
         const ownerPhotoResult = await uploadFiles([req.files.ownerPhoto[0]], 'vendor-owners');
         ownerPhotoUrl = ownerPhotoResult[0].cloudinaryUrl;
+        if (ownerPhotoResult[0].publicId) uploadedPublicIds.push(ownerPhotoResult[0].publicId);
       }
 
       // Upload factory images
       if (req.files?.factoryImages) {
         const factoryResults = await uploadFiles(req.files.factoryImages, 'vendor-factories');
-        factoryImageUrls = factoryResults.map(result => result.cloudinaryUrl);
+        factoryImageUploads = factoryResults.map((result, index) => ({
+          url: result.cloudinaryUrl,
+          slotId: req.body[`factoryImageSlot_${index}`] || null,
+        }));
+        factoryResults.forEach((r) => { if (r.publicId) uploadedPublicIds.push(r.publicId); });
       }
 
       // Upload certification files
@@ -264,10 +338,13 @@ const registerVendor = async (req, res) => {
           if (certId) {
             certificationFileUrls[certId] = result.cloudinaryUrl;
           }
+          if (result.publicId) uploadedPublicIds.push(result.publicId);
         });
       }
     } catch (uploadError) {
       console.error('File upload error:', uploadError);
+      // Best-effort cleanup of anything that did upload before the failure.
+      cleanupOrphanedCloudinaryAssets(uploadedPublicIds);
       return res.status(500).json({
         error: 'Failed to upload files: ' + uploadError.message
       });
@@ -281,12 +358,76 @@ const registerVendor = async (req, res) => {
     const parsedFacilityDetails = typeof facilityDetails === 'string' ? JSON.parse(facilityDetails) : facilityDetails;
     const parsedSelectedCertifications = typeof selectedCertifications === 'string' ? JSON.parse(selectedCertifications) : selectedCertifications;
     const parsedCertificationExpiryDates = typeof certificationExpiryDates === 'string' ? JSON.parse(certificationExpiryDates) : certificationExpiryDates;
+    const parsedOtherCertifications = typeof otherCertifications === 'string' ? JSON.parse(otherCertifications) : otherCertifications;
     const parsedShippingMethods = typeof shippingMethods === 'string' ? JSON.parse(shippingMethods) : shippingMethods;
-    const parsedMainContact = typeof mainContact === 'string' ? JSON.parse(mainContact) : mainContact;
-    const parsedAlternateContacts = typeof alternateContacts === 'string' ? JSON.parse(alternateContacts) : alternateContacts;
+    const rawParsedMainContact = typeof mainContact === 'string' ? JSON.parse(mainContact) : mainContact;
+    const rawParsedAlternateContacts = typeof alternateContacts === 'string' ? JSON.parse(alternateContacts) : alternateContacts;
+    // ── Contact photo upload (Step 7) ─────────────────────────────────────
+    // The form stores the main contact's photo as a base64 data URI inside
+    // `mainContact.photo` (FileReader.readAsDataURL). Without this resolve,
+    // the giant base64 string would be persisted directly into the JSON
+    // column and reloaded on every profile view. Deep-walking the object
+    // swaps each data URI for a Cloudinary URL while preserving the rest
+    // of the contact shape intact.
+    const parsedMainContact = await resolveBase64InValue(rawParsedMainContact, {
+      folder: 'vendor-contact-photos',
+      resource_type: 'image',
+    });
+    const parsedAlternateContacts = await resolveBase64InValue(rawParsedAlternateContacts, {
+      folder: 'vendor-contact-photos',
+      resource_type: 'image',
+    });
     const parsedImportCountries = typeof importCountries === 'string' ? JSON.parse(importCountries) : importCountries;
     const parsedExportCountries = typeof exportCountries === 'string' ? JSON.parse(exportCountries) : exportCountries;
     const parsedBankingDetails = typeof bankingDetails === 'string' ? JSON.parse(bankingDetails) : bankingDetails;
+    const parsedCategoryProducts = typeof categoryProducts === 'string' ? JSON.parse(categoryProducts) : categoryProducts;
+    const parsedAdditionalCategories = typeof additionalCategories === 'string' ? JSON.parse(additionalCategories) : additionalCategories;
+
+    // ── Step 4 product photo upload ────────────────────────────────────────
+    // Photos arrive as base64 data URIs nested deep inside categoryProducts
+    // and additionalCategories (FE uses FileReader.readAsDataURL). Walk the
+    // structure once and replace each data URI with its uploaded Cloudinary
+    // URL — keeps the rest of the JSON shape (product names, categories,
+    // ids) intact so admin UIs can render it as-is.
+    const resolvedCategoryProducts = await resolveBase64InValue(
+      parsedCategoryProducts,
+      { folder: 'vendor-product-photos', resource_type: 'image' },
+    );
+    const resolvedAdditionalCategories = await resolveBase64InValue(
+      parsedAdditionalCategories,
+      { folder: 'vendor-product-photos', resource_type: 'image' },
+    );
+
+    // ── Vendor type multi-select normalization ───────────────────────────
+    // The form lets vendors pick multiple types (manufacturer + importer +
+    // exporter). Keep the raw array for `vendorTypes` while the legacy
+    // single-enum `vendorType` column gets the first value mapped.
+    const vendorTypesArray = Array.isArray(parsedVendorType)
+      ? parsedVendorType.filter((v) => typeof v === 'string' && v.length > 0)
+      : parsedVendorType
+        ? [parsedVendorType]
+        : [];
+
+    // ── Production capacity summary (Step 5) ──────────────────────────────
+    // Build a human-readable summary string from facilityDetails. The FE
+    // stores capacity under prefixed keys (`spinningCapacity`, `weavingCapacity`
+    // etc.) — the previous derivation looked for a bare `capacity` key and
+    // always produced an empty string. Only enabled facilities are included
+    // so a disabled facility with stale data doesn't leak into the summary.
+    const buildProductionCapacitySummary = () => {
+      if (!parsedFacilityDetails || typeof parsedFacilityDetails !== 'object') return null;
+      const enabled = parsedEnabledFacilities || {};
+      const parts = [];
+      for (const [facilityId, details] of Object.entries(parsedFacilityDetails)) {
+        if (!enabled[facilityId]) continue;
+        if (!details || typeof details !== 'object') continue;
+        const capacityKey = Object.keys(details).find((k) => k.endsWith('Capacity'));
+        const capacityValue = capacityKey ? details[capacityKey] : null;
+        if (capacityValue) parts.push(`${facilityId}: ${capacityValue} kg/day`);
+      }
+      return parts.length > 0 ? parts.join(', ') : null;
+    };
+    const productionCapacitySummary = buildProductionCapacitySummary();
 
     // Normalize category values to names (drop unresolvable IDs) so the DB
     // never stores raw ObjectIds that would later leak into the UI.
@@ -297,39 +438,67 @@ const registerVendor = async (req, res) => {
       Object.values(parsedSelectedCategories || {}).flat()
     );
 
+    // ── Owner Profile date handling (Step 3) ──────────────────────────────
+    // The form sends a full ISO date string (`businessStartDate`); the older
+    // `yearEstablished` field is kept as a fallback for legacy clients. We
+    // persist the full date AND derive the year so existing code/UI that
+    // reads `establishedYear` keeps working without a separate migration.
+    const parsedBusinessStartDate = businessStartDate
+      ? new Date(businessStartDate)
+      : null;
+    const businessStartDateValid =
+      parsedBusinessStartDate && !isNaN(parsedBusinessStartDate.getTime());
+    const derivedEstablishedYear = businessStartDateValid
+      ? parsedBusinessStartDate.getFullYear()
+      : yearEstablished
+        ? parseInt(yearEstablished, 10)
+        : null;
+
     // Build the vendor data payload once — reused if we need to retry after a
     // unique-index collision on vendorCode (e.g. counter drift).
     const buildVendorData = (vendorCode) => ({
       vendorCode,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       status: 'PENDING',
 
       // Owner Profile
       ownerName,
-      ownerEmail,
+      designation: designation || null,
+      ownerEmail: normalizedOwnerEmail,
+      ownerEmail2: ownerEmail2 ? ownerEmail2.trim().toLowerCase() : null,
       ownerPhone,
-      ownerAddress: ownerAddress || address,
-      ownerCity: ownerCity || city,
-      ownerState: ownerState || state,
-      ownerZipCode: ownerZipCode || zipCode,
-      ownerCountry: ownerCountry || country || 'India',
+      ownerPhone2: ownerPhone2 || null,
+      ownerLandline: ownerLandline || null,
+      // Owner address columns dropped from the schema — they always copied
+      // the business address. Re-add only when a real owner-address input
+      // ships on Step 3.
       ownerPhoto: ownerPhotoUrl,
       additionalOwners: additionalOwners ? (typeof additionalOwners === 'string' ? JSON.parse(additionalOwners) : additionalOwners) : null,
+      businessStartDate: businessStartDateValid ? parsedBusinessStartDate : null,
 
       // Company Details
       companyName,
-      companyType: getCompanyTypeEnum(businessType),
-      establishedYear: yearEstablished ? parseInt(yearEstablished) : null,
-      companyDescription: `${companyName} - ${businessType} established in ${yearEstablished}`,
+      companyType: getCompanyTypeEnum(parsedVendorType),
+      establishedYear: derivedEstablishedYear,
+      companyDescription: derivedEstablishedYear
+        ? `${companyName} - ${businessType} established in ${derivedEstablishedYear}`
+        : `${companyName} - ${businessType}`,
       companyLogo: logoUrl,
+      companyIdNumber: companyIdNumber || null,
+      panNumber: panNumber || null,
+      factoryOwnershipType: factoryOwnershipType || null,
 
       // Contact & Trade Information
       businessPhone: phone,
       landlineNumber: landlineNumber || null,
       phoneNumber2: phoneNumber2 || null,
-      businessEmail: email,
+      businessEmail: normalizedEmail,
+      businessEmail2: email2 ? email2.trim().toLowerCase() : null,
       businessAddress: address,
+      addressLine2: addressLine2 || null,
+      addressLine3: addressLine3 || null,
+      landmark: landmark || null,
       businessCity: city,
       businessState: state,
       businessZipCode: zipCode,
@@ -338,26 +507,49 @@ const registerVendor = async (req, res) => {
       gstNumber: gstNumber || null,
 
       // Trade Information
-      annualTurnover: employeeCount, // Using employee count as proxy for now
-      exportExperience: hasImportExport === 'yes',
+      // annualTurnover is intentionally not set here — the form doesn't
+      // collect it. Schema column is now nullable; left undefined (which
+      // Prisma treats as not set, defaulting to null).
+      //
+      // Derive each experience flag from either the combined "yes" answer
+      // OR a non-empty country list — covers the case where a vendor lists
+      // countries without explicitly ticking the box.
+      importExperience:
+        hasImportExport === 'yes' ||
+        (Array.isArray(parsedImportCountries) && parsedImportCountries.length > 0),
+      exportExperience:
+        hasImportExport === 'yes' ||
+        (Array.isArray(parsedExportCountries) && parsedExportCountries.length > 0),
       exportCountries: parsedExportCountries || [],
+      importCountries: parsedImportCountries || [],
       primaryMarkets: Array.isArray(parsedMarketType) ? parsedMarketType : (parsedMarketType ? [parsedMarketType] : []),
 
       // Manufacturing Facilities
       enabledFacilities: parsedEnabledFacilities || null,
       facilityDetails: parsedFacilityDetails || null,
-      factoryAddress: warehouseAddress,
-      factoryCity: warehouseCity,
-      factoryState: warehouseState,
-      factoryZipCode: warehouseZip,
+      // Factory address mirrors warehouse address — the registration form
+      // treats them as the same physical location. The QC checker app
+      // (qcCheckerController, checker_app) reads these `factory*` columns
+      // directly, so they must be populated even though no separate factory
+      // address input exists on the form.
+      factoryAddress: warehouseAddress || null,
+      factoryCity: warehouseCity || null,
+      factoryState: warehouseState || null,
+      factoryZipCode: warehouseZip || null,
       factoryCountry: warehouseCountry || 'India',
       factorySize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
-      productionCapacity: Object.values(parsedFacilityDetails || {}).map(f => f.capacity).filter(Boolean).join(', '),
-      qualityControl: qualityControlProcess,
+      productionCapacity: productionCapacitySummary,
+      // Quality control measures — collected on Step 6 (Certifications &
+      // Logistics) but persisted under Manufacturing since the schema column
+      // lives in that semantic group.
+      qualityControl: qualityControlProcess || null,
 
       // Warehouse Details
       ownershipType: ownershipType || null,
       warehouseAddress,
+      warehouseAddressLine2: warehouseAddressLine2 || null,
+      warehouseAddressLine3: warehouseAddressLine3 || null,
+      warehouseLandmark: warehouseLandmark || null,
       warehouseCity,
       warehouseState,
       warehouseZipCode: warehouseZip,
@@ -365,19 +557,41 @@ const registerVendor = async (req, res) => {
       warehouseSize: warehousingCapacity ? `${warehousingCapacity} sq ft` : null,
       storageCapacity: warehousingCapacity,
       mapLink: mapLink || null,
+      ...(() => {
+        const coords = parseMapLinkCoordinates(mapLink);
+        return coords
+          ? { factoryLatitude: coords.latitude, factoryLongitude: coords.longitude }
+          : {};
+      })(),
 
       // Vendor Type & Products
       vendorType: getVendorTypeEnum(parsedVendorType),
+      vendorTypes: vendorTypesArray,
       productCategories: normalizedProductCategories,
       productTypes: normalizedProductTypes,
-      specializations: parsedSelectedCertifications || [],
+      // specializations is intentionally left empty here — it was previously
+      // populated from Step 6's `selectedCertifications`, which is wrong.
+      // Step 6 already owns certifications via the VendorCertification rows.
+      specializations: [],
       categoryRemarks: categoryRemarks || null,
+      categoryProducts: resolvedCategoryProducts || null,
+      additionalCategories: resolvedAdditionalCategories || null,
 
       // Logistics Information
       shippingMethods: parsedShippingMethods || [],
-      deliveryTime: '7-15 days', // Default
-      minimumOrderQuantity: '100 pieces', // Default
-      paymentTerms: ['30 days', 'LC'], // Default
+      // deliveryTime / minimumOrderQuantity / paymentTerms previously had
+      // hardcoded defaults ("7-15 days" / "100 pieces" / ["30 days", "LC"])
+      // even though the form doesn't collect them. Removed — admin or
+      // vendor settings UI can fill them later. Schema columns stay
+      // nullable / default-empty.
+      deliveryTime: null,
+      minimumOrderQuantity: null,
+      paymentTerms: [],
+      // Step 6 free-text fields — collected on Certifications & Logistics
+      // step. Previously destructured but never written; now persisted.
+      packagingCapabilities: packagingCapabilities || null,
+      logisticsPartners: logisticsPartners || null,
+      complianceStandards: complianceStandards || null,
 
       // Contact & Trade Information
       mainContact: parsedMainContact || null,
@@ -416,19 +630,59 @@ const registerVendor = async (req, res) => {
 
     const vendor = await createVendorWithCode();
 
-    // Create certifications
-    if (parsedSelectedCertifications && parsedSelectedCertifications.length > 0) {
-      const certificationData = parsedSelectedCertifications.map(certId => ({
-        vendorId: vendor.id,
-        name: certId.toUpperCase(),
-        issuedBy: 'Certification Authority',
-        expiryDate: parsedCertificationExpiryDates?.[certId] ? new Date(parsedCertificationExpiryDates[certId]) : null,
-        documentUrl: certificationFileUrls[certId] || null
-      }));
+    // ── Certifications (Step 6) ─────────────────────────────────────────
+    // Two sources feed into VendorCertification:
+    //  1. Catalog certs selected via checkbox — `parsedSelectedCertifications`
+    //     is an array of cert ids (oeko-tex, gots, iso-9001, …). The id is
+    //     mapped to a friendly name via CERT_NAME_MAP so the DB stores
+    //     "ISO 9001" not "ISO-9001". Unknown ids fall back to ID.toUpperCase().
+    //  2. User-defined custom certs — `parsedOtherCertifications` is an
+    //     array of { id, name, description }. These get isCustom=true so
+    //     admins can distinguish them from catalog entries.
+    const CERT_NAME_MAP = {
+      'oeko-tex': 'OEKO-TEX',
+      'gots': 'GOTS',
+      'grs': 'GRS',
+      'smeta': 'SMETA / Sedex',
+      'iso-9001': 'ISO 9001',
+      'iso-14001': 'ISO 14001',
+      'bsci': 'BSCI',
+      'fsc': 'FSC',
+      'fair-trade': 'Fair Trade',
+      'wrap': 'WRAP',
+      'bci': 'BCI',
+    };
 
-      await prisma.vendorCertification.createMany({
-        data: certificationData
-      });
+    // issuedBy is now nullable — leave it null on both paths. The
+    // `isCustom` flag is the proper signal for "vendor-declared vs catalog";
+    // the old "Certification Authority" / "Vendor-provided" placeholder
+    // strings carried no actual issuer information.
+    const catalogCertRows = (parsedSelectedCertifications || []).map((certId) => ({
+      vendorId: vendor.id,
+      name: CERT_NAME_MAP[certId] || String(certId).toUpperCase(),
+      issuedBy: null,
+      expiryDate: parsedCertificationExpiryDates?.[certId]
+        ? new Date(parsedCertificationExpiryDates[certId])
+        : null,
+      documentUrl: certificationFileUrls[certId] || null,
+      isCustom: false,
+    }));
+
+    const customCertRows = Array.isArray(parsedOtherCertifications)
+      ? parsedOtherCertifications
+          .filter((c) => c && c.name && String(c.name).trim().length > 0)
+          .map((c) => ({
+            vendorId: vendor.id,
+            name: String(c.name).trim(),
+            issuedBy: null,
+            description: c.description ? String(c.description).trim() : null,
+            isCustom: true,
+          }))
+      : [];
+
+    const allCertRows = [...catalogCertRows, ...customCertRows];
+    if (allCertRows.length > 0) {
+      await prisma.vendorCertification.createMany({ data: allCertRows });
     }
 
     // Create documents
@@ -443,13 +697,52 @@ const registerVendor = async (req, res) => {
       });
     }
 
-    if (factoryImageUrls.length > 0) {
-      factoryImageUrls.forEach((url, index) => {
+    if (panCardUrl) {
+      documents.push({
+        vendorId: vendor.id,
+        type: 'PAN_CARD',
+        name: 'PAN Card',
+        documentUrl: panCardUrl
+      });
+    }
+
+    if (typeCertUrl) {
+      // Stored under COMPANY_REGISTRATION since the actual document type
+      // varies by businessType (IEC / CIN / Partnership Deed / LLPIN). The
+      // `name` field carries the human-readable label for admins.
+      const certLabelMap = {
+        'proprietorship': 'IEC Certificate',
+        'pvt-ltd': 'CIN Certificate',
+        'partnership-firm': 'Partnership Deed Certificate',
+        'llp': 'LLPIN Certificate',
+      };
+      documents.push({
+        vendorId: vendor.id,
+        type: 'COMPANY_REGISTRATION',
+        name: certLabelMap[businessType] || 'Business Registration Certificate',
+        documentUrl: typeCertUrl
+      });
+    }
+
+    if (factoryImageUploads.length > 0) {
+      // Slot ID → admin-facing label. Mirrors FACTORY_IMAGE_SLOTS in
+      // WarehouseDetails.tsx; keep them in sync if new slots are added.
+      const slotLabelMap = {
+        nameBoard: 'Factory Name Board',
+        frontView: 'Factory Front View',
+        backView: 'Factory Back View',
+        leftView: 'Factory Left View',
+        rightView: 'Factory Right View',
+        roadView: 'Factory Road View',
+        insideFactory: 'Factory Interior',
+        others: 'Factory Image (Other)',
+      };
+      factoryImageUploads.forEach(({ url, slotId }, index) => {
         documents.push({
           vendorId: vendor.id,
           type: 'OTHER',
-          name: `Factory Image ${index + 1}`,
-          documentUrl: url
+          name: slotLabelMap[slotId] || `Factory Image ${index + 1}`,
+          documentUrl: url,
         });
       });
     }
@@ -460,36 +753,38 @@ const registerVendor = async (req, res) => {
       });
     }
 
-    // Create bank details if provided
+    // ── Bank details (Step 7) ───────────────────────────────────────────
+    // Persist honestly: the form collects bankName, accountNumber, swiftCode,
+    // and iban — everything else stays null until the form (or admin UI)
+    // adds the relevant fields. Previously the controller put `swiftCode`
+    // into the `ifscCode` column (mislabeled), invented a `branchName`
+    // from concatenation, copied the company address into `branchAddress`,
+    // hardcoded `accountType: 'Current'`, and left `accountHolderName`
+    // unset entirely — which would throw because the column was non-null.
     if (parsedBankingDetails && parsedBankingDetails.bankName) {
       await prisma.vendorBankDetails.create({
         data: {
           vendorId: vendor.id,
           bankName: parsedBankingDetails.bankName,
-          accountNumber: parsedBankingDetails.accountNumber,
-          ifscCode: parsedBankingDetails.swiftCode || 'SWIFT000',
-          accountType: 'Current',
-          branchName: parsedBankingDetails.bankName + ' Branch',
-          branchAddress: address
-        }
+          accountNumber: parsedBankingDetails.accountNumber || '',
+          swiftCode: parsedBankingDetails.swiftCode || null,
+          iban: parsedBankingDetails.iban || null,
+          ifscCode: parsedBankingDetails.ifscCode || null,
+          accountType: parsedBankingDetails.accountType || null,
+          accountHolderName: parsedBankingDetails.accountHolderName || null,
+          branchName: parsedBankingDetails.branchName || null,
+          branchAddress: parsedBankingDetails.branchAddress || null,
+        },
       });
     }
 
-    // Create references from alternate contacts
-    if (parsedAlternateContacts && parsedAlternateContacts.length > 0) {
-      const referenceData = parsedAlternateContacts.map(contact => ({
-        vendorId: vendor.id,
-        companyName: companyName,
-        contactPerson: contact.name,
-        email: contact.email1 || contact.email,
-        phone: contact.phone1 || contact.phone,
-        relationship: contact.department || 'Business Contact'
-      }));
-
-      await prisma.vendorReference.createMany({
-        data: referenceData
-      });
-    }
+    // Note: alternate contacts are NOT duplicated into VendorReference rows.
+    // Earlier code created reference rows from `parsedAlternateContacts`, but
+    // (a) VendorReference is for *external trade references* (Clients /
+    // Suppliers / Partners), not the vendor's own additional contacts, and
+    // (b) the alt contact data is already persisted in full on the vendor
+    // row's `alternateContacts` Json[] column. Keep the model unused here
+    // and reserve it for an actual references feature later.
 
     // Generate JWT token for vendor
     const token = jwt.sign(
@@ -531,6 +826,12 @@ const registerVendor = async (req, res) => {
 
   } catch (error) {
     console.error('Vendor registration error:', error);
+    // Any failure after files were uploaded leaves orphans in Cloudinary.
+    // `uploadedPublicIds` is hoisted to function scope above the try so
+    // it's always accessible here, even when the failure happens before
+    // the inner upload block runs (in which case the array is empty and
+    // cleanup is a no-op).
+    cleanupOrphanedCloudinaryAssets(uploadedPublicIds);
     res.status(500).json({
       error: 'Internal server error during vendor registration',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -951,6 +1252,76 @@ const updateVendorById = async (req, res) => {
     const parsedExportCountries = typeof updateData.exportCountries === 'string'
       ? JSON.parse(updateData.exportCountries)
       : updateData.exportCountries;
+    const parsedImportCountries = typeof updateData.importCountries === 'string'
+      ? JSON.parse(updateData.importCountries)
+      : updateData.importCountries;
+    const parsedOtherCertifications = typeof updateData.otherCertifications === 'string'
+      ? JSON.parse(updateData.otherCertifications)
+      : updateData.otherCertifications;
+    const parsedCategoryProducts = typeof updateData.categoryProducts === 'string'
+      ? JSON.parse(updateData.categoryProducts)
+      : updateData.categoryProducts;
+    const parsedAdditionalCategories = typeof updateData.additionalCategories === 'string'
+      ? JSON.parse(updateData.additionalCategories)
+      : updateData.additionalCategories;
+    const parsedBankingDetails = typeof updateData.bankingDetails === 'string'
+      ? JSON.parse(updateData.bankingDetails)
+      : updateData.bankingDetails;
+
+    // Resolve any base64 product photos to Cloudinary URLs before persist —
+    // same pipeline as the registration flow uses for Step 4 photos.
+    const resolvedCategoryProducts = await resolveBase64InValue(
+      parsedCategoryProducts,
+      { folder: 'vendor-product-photos', resource_type: 'image' },
+    );
+    const resolvedAdditionalCategories = await resolveBase64InValue(
+      parsedAdditionalCategories,
+      { folder: 'vendor-product-photos', resource_type: 'image' },
+    );
+
+    // Mirror registration path: keep the raw multi-select array alongside
+    // the legacy single-enum derivation so multi-role vendors aren't lossy.
+    const vendorTypesArray = Array.isArray(parsedVendorType)
+      ? parsedVendorType.filter((v) => typeof v === 'string' && v.length > 0)
+      : parsedVendorType
+        ? [parsedVendorType]
+        : [];
+
+    // Parse businessStartDate + derive establishedYear (same pattern as
+    // registerVendor — full date column preferred, year-only for back-compat).
+    const parsedBusinessStartDate = updateData.businessStartDate
+      ? new Date(updateData.businessStartDate)
+      : null;
+    const businessStartDateValid =
+      parsedBusinessStartDate && !isNaN(parsedBusinessStartDate.getTime());
+    const derivedEstablishedYear = businessStartDateValid
+      ? parsedBusinessStartDate.getFullYear()
+      : updateData.yearEstablished
+        ? parseInt(updateData.yearEstablished, 10)
+        : null;
+
+    // Production capacity summary derived from enabled facilities — same
+    // helper logic as registerVendor (find *Capacity keys per facility).
+    const buildProductionCapacityForUpdate = () => {
+      const enabledRaw = typeof updateData.enabledFacilities === 'string'
+        ? JSON.parse(updateData.enabledFacilities)
+        : updateData.enabledFacilities;
+      const detailsRaw = typeof updateData.facilityDetails === 'string'
+        ? JSON.parse(updateData.facilityDetails)
+        : updateData.facilityDetails;
+      if (!detailsRaw || typeof detailsRaw !== 'object') return null;
+      const enabled = enabledRaw || {};
+      const parts = [];
+      for (const [facilityId, details] of Object.entries(detailsRaw)) {
+        if (!enabled[facilityId]) continue;
+        if (!details || typeof details !== 'object') continue;
+        const capacityKey = Object.keys(details).find((k) => k.endsWith('Capacity'));
+        const capacityValue = capacityKey ? details[capacityKey] : null;
+        if (capacityValue) parts.push(`${facilityId}: ${capacityValue} kg/day`);
+      }
+      return parts.length > 0 ? parts.join(', ') : null;
+    };
+    const updateProductionCapacity = buildProductionCapacityForUpdate();
 
     // Normalize categories to names so the DB never stores raw ObjectIds.
     const normalizedProductCategories = await normalizeCategoryValues(
@@ -965,26 +1336,40 @@ const updateVendorById = async (req, res) => {
       // Company Details
       companyName: updateData.companyName,
       gstNumber: updateData.gstNumber || null,
+      companyIdNumber: updateData.companyIdNumber || null,
+      panNumber: updateData.panNumber || null,
       businessEmail: updateData.email,
+      businessEmail2: updateData.email2 || null,
       businessPhone: updateData.phone,
       landlineNumber: updateData.landlineNumber || null,
       phoneNumber2: updateData.phoneNumber2 || null,
       website: updateData.website,
       businessAddress: updateData.address,
+      addressLine2: updateData.addressLine2 || null,
+      addressLine3: updateData.addressLine3 || null,
+      landmark: updateData.landmark || null,
       businessCity: updateData.city,
       businessState: updateData.state,
       businessZipCode: updateData.zipCode || null,
       businessCountry: updateData.country || 'India',
+      factoryOwnershipType: updateData.factoryOwnershipType || null,
 
       // Owner Profile
       ownerName: updateData.ownerName,
+      designation: updateData.designation || null,
       ownerEmail: updateData.ownerEmail,
+      ownerEmail2: updateData.ownerEmail2 || null,
       ownerPhone: updateData.ownerPhone,
+      ownerPhone2: updateData.ownerPhone2 || null,
+      ownerLandline: updateData.ownerLandline || null,
       ...(updateData.additionalOwners !== undefined && {
         additionalOwners: typeof updateData.additionalOwners === 'string' ? JSON.parse(updateData.additionalOwners) : updateData.additionalOwners
       }),
-      ...(updateData.yearEstablished && { establishedYear: parseInt(updateData.yearEstablished) }),
-      annualTurnover: updateData.employeeCount || undefined,
+      businessStartDate: businessStartDateValid ? parsedBusinessStartDate : null,
+      establishedYear: derivedEstablishedYear,
+      // annualTurnover deliberately not set here — the admin form doesn't
+      // collect a real turnover value. The previous `employeeCount` proxy
+      // was semantic nonsense ("10-20" is a headcount range, not money).
 
       // Warehouse Details
       ...(updateData.enabledFacilities !== undefined && {
@@ -995,29 +1380,62 @@ const updateVendorById = async (req, res) => {
       }),
       ownershipType: updateData.ownershipType || null,
       warehouseAddress: updateData.warehouseAddress,
+      warehouseAddressLine2: updateData.warehouseAddressLine2 || null,
+      warehouseAddressLine3: updateData.warehouseAddressLine3 || null,
+      warehouseLandmark: updateData.warehouseLandmark || null,
       warehouseCity: updateData.warehouseCity,
       warehouseState: updateData.warehouseState,
       warehouseZipCode: updateData.warehouseZip || null,
       warehouseCountry: updateData.warehouseCountry || 'India',
+      warehouseSize: updateData.warehousingCapacity ? `${updateData.warehousingCapacity} sq ft` : null,
+      // Mirror to the `factory*` columns the checker app reads from —
+      // the CREATE flow mirrors these, the UPDATE flow used to forget,
+      // so changing a vendor's address in admin left the checker app
+      // showing the old one.
+      factoryAddress: updateData.warehouseAddress,
+      factoryCity: updateData.warehouseCity,
+      factoryState: updateData.warehouseState,
+      factoryZipCode: updateData.warehouseZip || null,
+      factorySize: updateData.warehousingCapacity ? `${updateData.warehousingCapacity} sq ft` : null,
+      productionCapacity: updateProductionCapacity,
       storageCapacity: updateData.warehousingCapacity,
       mapLink: updateData.mapLink || null,
+      ...(() => {
+        const coords = parseMapLinkCoordinates(updateData.mapLink);
+        return coords
+          ? { factoryLatitude: coords.latitude, factoryLongitude: coords.longitude }
+          : {};
+      })(),
 
       // Vendor Type & Products
-      vendorType: Array.isArray(parsedVendorType) && parsedVendorType.includes('manufacturer')
+      vendorType: getCompanyTypeEnum(parsedVendorType) === 'MANUFACTURER'
         ? 'TEXTILE_MANUFACTURER'
         : 'TRADING_COMPANY',
+      vendorTypes: vendorTypesArray,
       primaryMarkets: parsedMarketType || [],
       productCategories: normalizedProductCategories,
       productTypes: normalizedProductTypes,
       categoryRemarks: updateData.categoryRemarks || null,
+      categoryProducts: resolvedCategoryProducts || null,
+      additionalCategories: resolvedAdditionalCategories || null,
 
       // Logistics
       shippingMethods: parsedShippingMethods || [],
       qualityControl: updateData.qualityControlProcess,
+      packagingCapabilities: updateData.packagingCapabilities || null,
+      logisticsPartners: updateData.logisticsPartners || null,
+      complianceStandards: updateData.complianceStandards || null,
 
-      // Trade Info
-      exportExperience: updateData.hasImportExport === 'yes',
+      // Trade Info — mirror the registration-path derivation: either the
+      // combined "yes" answer OR a non-empty country list flips the flag.
+      importExperience:
+        updateData.hasImportExport === 'yes' ||
+        (Array.isArray(parsedImportCountries) && parsedImportCountries.length > 0),
+      exportExperience:
+        updateData.hasImportExport === 'yes' ||
+        (Array.isArray(parsedExportCountries) && parsedExportCountries.length > 0),
       exportCountries: parsedExportCountries || [],
+      importCountries: parsedImportCountries || [],
 
       // Contact & Trade Information
       mainContact: updateData.mainContact ? (typeof updateData.mainContact === 'string' ? JSON.parse(updateData.mainContact) : updateData.mainContact) : null,
@@ -1029,6 +1447,40 @@ const updateVendorById = async (req, res) => {
       // Status (admin can update these)
       status: updateData.status?.toUpperCase() || existingVendor.status
     };
+
+    // ── Bank details upsert (admin update path) ─────────────────────────
+    // The previous version of this controller never touched bank info on
+    // update — admin edits to bankName/accountNumber/swiftCode/iban were
+    // silently dropped. Use upsert so the row is created on first save
+    // and updated thereafter.
+    if (parsedBankingDetails && parsedBankingDetails.bankName) {
+      await prisma.vendorBankDetails.upsert({
+        where: { vendorId },
+        create: {
+          vendorId,
+          bankName: parsedBankingDetails.bankName,
+          accountNumber: parsedBankingDetails.accountNumber || '',
+          swiftCode: parsedBankingDetails.swiftCode || null,
+          iban: parsedBankingDetails.iban || null,
+          ifscCode: parsedBankingDetails.ifscCode || null,
+          accountType: parsedBankingDetails.accountType || null,
+          accountHolderName: parsedBankingDetails.accountHolderName || null,
+          branchName: parsedBankingDetails.branchName || null,
+          branchAddress: parsedBankingDetails.branchAddress || null,
+        },
+        update: {
+          bankName: parsedBankingDetails.bankName,
+          accountNumber: parsedBankingDetails.accountNumber || '',
+          swiftCode: parsedBankingDetails.swiftCode || null,
+          iban: parsedBankingDetails.iban || null,
+          ifscCode: parsedBankingDetails.ifscCode || null,
+          accountType: parsedBankingDetails.accountType || null,
+          accountHolderName: parsedBankingDetails.accountHolderName || null,
+          branchName: parsedBankingDetails.branchName || null,
+          branchAddress: parsedBankingDetails.branchAddress || null,
+        },
+      });
+    }
 
     // Handle factory images update
     // Parse existing factory image URLs the frontend wants to keep
@@ -1177,64 +1629,60 @@ const updateVendorById = async (req, res) => {
         where: { vendorId }
       });
 
-      // Create new certifications
-      if (parsedSelectedCertifications.length > 0) {
-        const certificationData = parsedSelectedCertifications.map(certId => {
-          const certIdUpper = certId.toUpperCase();
-          // Use new uploaded file URL, or preserve existing URL, or null
-          const documentUrl = certificationFileUrls[certId] || existingCertUrls[certId] || null;
+      // Same cert-name map used by the registration path — keep them in
+      // sync. Falls back to ID.toUpperCase() for unknown / legacy ids.
+      const CERT_NAME_MAP = {
+        'oeko-tex': 'OEKO-TEX',
+        'gots': 'GOTS',
+        'grs': 'GRS',
+        'smeta': 'SMETA / Sedex',
+        'iso-9001': 'ISO 9001',
+        'iso-14001': 'ISO 14001',
+        'bsci': 'BSCI',
+        'fsc': 'FSC',
+        'fair-trade': 'Fair Trade',
+        'wrap': 'WRAP',
+        'bci': 'BCI',
+      };
 
-          return {
-            vendorId,
-            name: certIdUpper,
-            issuedBy: 'Certification Authority',
-            expiryDate: parsedCertificationExpiryDates?.[certId]
-              ? new Date(parsedCertificationExpiryDates[certId])
-              : null,
-            documentUrl
-          };
-        });
+      // Catalog certs
+      const catalogRows = parsedSelectedCertifications.map((certId) => ({
+        vendorId,
+        name: CERT_NAME_MAP[certId] || String(certId).toUpperCase(),
+        issuedBy: null, // schema is nullable; isCustom flag distinguishes catalog vs custom
+        expiryDate: parsedCertificationExpiryDates?.[certId]
+          ? new Date(parsedCertificationExpiryDates[certId])
+          : null,
+        // Use new uploaded file URL, or preserve existing URL, or null
+        documentUrl: certificationFileUrls[certId] || existingCertUrls[certId] || null,
+        isCustom: false,
+      }));
 
-        await prisma.vendorCertification.createMany({
-          data: certificationData
-        });
+      // Custom certs (Step 6 "other certifications") — vendor-typed name +
+      // description. Created with isCustom=true so admins can distinguish
+      // them from catalog entries.
+      const customRows = Array.isArray(parsedOtherCertifications)
+        ? parsedOtherCertifications
+            .filter((c) => c && c.name && String(c.name).trim().length > 0)
+            .map((c) => ({
+              vendorId,
+              name: String(c.name).trim(),
+              issuedBy: null,
+              description: c.description ? String(c.description).trim() : null,
+              isCustom: true,
+            }))
+        : [];
+
+      const allRows = [...catalogRows, ...customRows];
+      if (allRows.length > 0) {
+        await prisma.vendorCertification.createMany({ data: allRows });
       }
     }
 
-    // Update bank details if provided
-    const parsedBankingDetails = typeof updateData.bankingDetails === 'string'
-      ? JSON.parse(updateData.bankingDetails)
-      : updateData.bankingDetails;
-
-    if (parsedBankingDetails && parsedBankingDetails.bankName) {
-      // Check if bank details exist
-      const existingBankDetails = await prisma.vendorBankDetails.findFirst({
-        where: { vendorId }
-      });
-
-      if (existingBankDetails) {
-        await prisma.vendorBankDetails.update({
-          where: { id: existingBankDetails.id },
-          data: {
-            bankName: parsedBankingDetails.bankName,
-            accountNumber: parsedBankingDetails.accountNumber,
-            ifscCode: parsedBankingDetails.swiftCode || 'SWIFT000'
-          }
-        });
-      } else {
-        await prisma.vendorBankDetails.create({
-          data: {
-            vendorId,
-            bankName: parsedBankingDetails.bankName,
-            accountNumber: parsedBankingDetails.accountNumber,
-            ifscCode: parsedBankingDetails.swiftCode || 'SWIFT000',
-            accountType: 'Current',
-            branchName: parsedBankingDetails.bankName + ' Branch',
-            branchAddress: updateData.address
-          }
-        });
-      }
-    }
+    // Bank details are upserted earlier in this function (see the
+    // `vendorBankDetails.upsert` block right after vendorUpdateData is
+    // assembled). The legacy fallback that stuffed swiftCode into ifscCode
+    // and invented branch values has been removed.
 
     // Fetch updated vendor with relations
     const vendor = await prisma.vendor.findUnique({
@@ -1836,8 +2284,11 @@ const vendorLogin = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
+    // Case-insensitive lookup — registration normalizes the email before
+    // insert, so we normalize the login attempt the same way.
+    const normalizedEmail = email.trim().toLowerCase();
     const vendor = await prisma.vendor.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     });
 
     if (!vendor) {
@@ -2008,6 +2459,15 @@ const assignQc = async (req, res) => {
         }
       }
     });
+
+    // Notify the QC checker — in-app feed + FCM push
+    const { createNotification: createAssignNotif } = require('./notificationController');
+    createAssignNotif({
+      userId: checkerId, role: 'QC_CHECKER', type: 'VENDOR_ASSIGNED',
+      title: 'New Vendor Assigned',
+      message: `"${vendor.companyName}" has been assigned to you for inspection.`,
+      data: { screen: 'vendors', vendorId }
+    }).catch(() => {});
 
     res.json({
       message: 'QC Checker assigned successfully',

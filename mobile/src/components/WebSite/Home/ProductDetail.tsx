@@ -61,8 +61,8 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
     ? getRegionalPrice(selectedVariant as any)
     : getRegionalPrice(product as any);
   const originalPrice = selectedVariant
-    ? getRegionalOriginalPrice(selectedVariant as any) ?? selectedVariant.originalPrice
-    : getRegionalOriginalPrice(product as any) ?? product.originalPrice;
+    ? getRegionalOriginalPrice(selectedVariant as any)
+    : getRegionalOriginalPrice(product as any);
 
   // Smart logistics calculation
   const logisticsResult = useMemo(() => {
@@ -287,26 +287,6 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
             </View>
           ) : null}
 
-          {/* Wishlist FAB */}
-          <Pressable
-            onPress={handleToggleWishlist}
-            disabled={isTogglingWishlist}
-            accessibilityRole="button"
-            accessibilityLabel={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
-            accessibilityHint="Double tap to toggle wishlist"
-            style={s.wishlistFab}
-            className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-white items-center justify-center z-20"
-          >
-            {isTogglingWishlist ? (
-              <ActivityIndicator size="small" color="#ef4444" />
-            ) : (
-              <Heart
-                size={22}
-                color={isWishlisted ? '#ef4444' : '#6b7280'}
-                fill={isWishlisted ? '#ef4444' : 'transparent'}
-              />
-            )}
-          </Pressable>
         </View>
 
         {/* Thumbnail strip */}
@@ -360,10 +340,32 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
           </View>
         ) : null}
 
-        {/* Product name */}
-        <Text className="text-[22px] font-extrabold text-gray-900 leading-[28px] mb-3">
-          {product.name}
-        </Text>
+        {/* Product name + Wishlist */}
+        <View className="flex-row items-start justify-between mb-3">
+          <Text className="text-[22px] font-extrabold text-gray-900 leading-[28px] flex-1 mr-3">
+            {product.name}
+          </Text>
+          <Pressable
+            onPress={handleToggleWishlist}
+            disabled={isTogglingWishlist}
+            accessibilityRole="button"
+            accessibilityLabel={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+            accessibilityHint="Double tap to toggle wishlist"
+            style={s.wishlistButton}
+            className="items-center justify-center"
+          >
+            {isTogglingWishlist ? (
+              <ActivityIndicator size="small" color="#ef4444" />
+            ) : (
+              <Heart
+                size={20}
+                color={isWishlisted ? '#ef4444' : '#9ca3af'}
+                fill={isWishlisted ? '#ef4444' : 'transparent'}
+                strokeWidth={2}
+              />
+            )}
+          </Pressable>
+        </View>
 
         {/* Star rating row */}
         <View className="flex-row items-center mb-5">
@@ -452,7 +454,7 @@ export default function ProductDetail({ product, productId }: ProductDetailProps
                     colorName={variant.color || 'Default'}
                     colorHex={variant.colorHex}
                     price={fmt(variantPrice)}
-                    originalPrice={hasDiscount ? fmt(variant.originalPrice) : undefined}
+                    originalPrice={hasDiscount ? fmt(variantOriginal!) : undefined}
                     discountPercent={hasDiscount && variant.discount > 0 ? variant.discount : undefined}
                     stock={variant.stock}
                     onPress={() => handleSelectVariant(variant)}
@@ -1003,10 +1005,10 @@ const s = StyleSheet.create({
   paginationDot: { height: 6, borderRadius: 3 },
   paginationDotActive: { width: 20, backgroundColor: '#111827' },
   paginationDotInactive: { width: 6, backgroundColor: '#d1d5db' },
-  wishlistFab: {
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12, shadowRadius: 8, elevation: 6,
-    borderWidth: 1, borderColor: '#f3f4f6',
+  wishlistButton: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#f3f4f6',
+    alignItems: 'center', justifyContent: 'center',
   },
   thumbnailStrip: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   thumbnail: { borderWidth: 2.5 },

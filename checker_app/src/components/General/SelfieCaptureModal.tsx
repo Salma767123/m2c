@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, CheckCircle, RotateCcw, UserCheck } from 'lucide-react-native';
+import * as Location from 'expo-location';
+import { Camera, CheckCircle, RotateCcw, UserCheck, MapPin } from 'lucide-react-native';
 
 export type SelfieResult = {
   /** base64-encoded string (without data URI prefix) */
@@ -19,6 +20,10 @@ export type SelfieResult = {
   dataUri: string;
   /** Timestamp when the photo was taken */
   takenAt: string;
+  /** GPS latitude (null if permission denied) */
+  latitude: number | null;
+  /** GPS longitude (null if permission denied) */
+  longitude: number | null;
 };
 
 interface SelfieCaptureModalProps {
@@ -47,13 +52,18 @@ export default function SelfieCaptureModal({
   const [preview, setPreview] = useState<string | null>(null);
   const [rawBase64, setRawBase64] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const requestAndCapture = async () => {
     setCapturing(true);
     try {
-      // Request camera permission
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
+      // Request camera + location permissions in parallel
+      const [camPerm, locPerm] = await Promise.all([
+        ImagePicker.requestCameraPermissionsAsync(),
+        Location.requestForegroundPermissionsAsync(),
+      ]);
+
+      if (camPerm.status !== 'granted') {
         Alert.alert(
           'Camera Permission Required',
           'Please allow camera access in your device settings to take a selfie.',
@@ -62,13 +72,28 @@ export default function SelfieCaptureModal({
         return;
       }
 
-      const result = await ImagePicker.launchCameraAsync({
-        cameraType: ImagePicker.CameraType.front,
-        quality: 0.6,
-        base64: true,
-        allowsEditing: false,
-        mediaTypes: ['images'],
-      });
+      if (locPerm.status !== 'granted') {
+        Alert.alert(
+          'Location Permission Required',
+          'Location access is mandatory for inspection verification. Please enable location services in your device settings.',
+          [{ text: 'OK' }],
+        );
+        return;
+      }
+
+      // Capture selfie + GPS in parallel
+      const [result, location] = await Promise.all([
+        ImagePicker.launchCameraAsync({
+          cameraType: ImagePicker.CameraType.front,
+          quality: 0.6,
+          base64: true,
+          allowsEditing: false,
+          mediaTypes: ['images'],
+        }),
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        }).catch(() => null),
+      ]);
 
       if (result.canceled || !result.assets?.[0]) return;
 
@@ -80,6 +105,9 @@ export default function SelfieCaptureModal({
 
       setRawBase64(asset.base64);
       setPreview(`data:image/jpeg;base64,${asset.base64}`);
+      if (location) {
+        setCoords({ latitude: location.coords.latitude, longitude: location.coords.longitude });
+      }
     } finally {
       setCapturing(false);
     }
@@ -88,6 +116,7 @@ export default function SelfieCaptureModal({
   const handleRetake = () => {
     setPreview(null);
     setRawBase64(null);
+    setCoords(null);
   };
 
   const handleConfirm = () => {
@@ -96,10 +125,13 @@ export default function SelfieCaptureModal({
       base64: rawBase64,
       dataUri: preview,
       takenAt: new Date().toISOString(),
+      latitude: coords?.latitude ?? null,
+      longitude: coords?.longitude ?? null,
     });
     // Reset for next use
     setPreview(null);
     setRawBase64(null);
+    setCoords(null);
   };
 
   return (
@@ -140,6 +172,18 @@ export default function SelfieCaptureModal({
             </View>
           )}
         </View>
+
+        {/* GPS Status Badge */}
+        {preview && (
+          <View className="mx-6 mt-3 flex-row items-center justify-center" style={{ columnGap: 6 }}>
+            <MapPin size={14} color={coords ? '#10b981' : '#ef4444'} />
+            <Text className={`text-xs font-semibold ${coords ? 'text-emerald-400' : 'text-red-400'}`}>
+              {coords
+                ? `GPS Captured (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`
+                : 'GPS not available — location verification may fail'}
+            </Text>
+          </View>
+        )}
 
         {/* Actions */}
         <View

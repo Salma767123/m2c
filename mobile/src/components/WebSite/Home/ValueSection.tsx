@@ -42,7 +42,10 @@ const features: Feature[] = [
 
 export default function ValueSection() {
   return (
-    <View className="bg-white py-12 border-t border-gray-100">
+    <View
+      className="bg-white py-12"
+      style={{ marginTop: 10, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
+    >
       {/* Header — matches web: title + subtitle, no teal eyebrow */}
       <View className="px-6 mb-8">
         <Text className="text-gray-900 text-2xl font-bold mb-3">

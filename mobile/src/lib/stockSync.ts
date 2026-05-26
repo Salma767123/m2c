@@ -9,6 +9,7 @@
  */
 import { publicProductService } from '@/services/publicProductService';
 import { CartItem } from '@/services/cartService';
+import { getRegionalPrice, getRegionalOriginalPrice } from '@/lib/currency';
 
 // Re-export so callers import from one place.
 export type StockStatus = 'in_stock' | 'low_stock' | 'out_of_stock';
@@ -84,19 +85,16 @@ export async function syncCartStock(
         let livePrice: number;
         let availableStock: number;
         let liveImages: string[] = [];
-        let liveOriginalPrice: number | undefined = p.originalPrice;
+        let liveOriginalPrice: number | undefined = getRegionalOriginalPrice(p as any) ?? undefined;
         let liveDiscount: number | undefined = p.discount;
         let liveVariant: { size: string; color: string; colorHex?: string; sku: string } | undefined;
 
         if (item.variantId && p.variants) {
           const variant = p.variants.find((v) => v.id === item.variantId);
           if (variant) {
-            livePrice =
-              variant.adminFixedPrice != null
-                ? variant.adminFixedPrice
-                : variant.price;
+            livePrice = getRegionalPrice(variant as any);
             availableStock = variant.stock;
-            liveOriginalPrice = variant.originalPrice ?? p.originalPrice;
+            liveOriginalPrice = getRegionalOriginalPrice(variant as any) ?? getRegionalOriginalPrice(p as any) ?? undefined;
             liveDiscount = variant.discount ?? p.discount;
             liveVariant = {
               size: variant.size,
@@ -114,8 +112,7 @@ export async function syncCartStock(
             availableStock = 0;
           }
         } else {
-          livePrice =
-            p.adminFixedPrice != null ? p.adminFixedPrice : p.basePrice;
+          livePrice = getRegionalPrice(p as any);
           // For products with variants but no variantId selected (base unit),
           // use baseStock from inventory — NOT totalStock (which sums all variants).
           availableStock = p.hasVariants

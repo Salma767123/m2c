@@ -7,7 +7,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   ArrowLeft, FileText, CheckCircle, XCircle,
   AlertTriangle, Building2, ShieldCheck, Factory,
-  Settings, ClipboardList, Package, Download, Camera, Clock
+  Settings, ClipboardList, Package, Download, Camera, Clock, MapPin
 } from "lucide-react"
 import { Badge } from "@/components/UI/Badge"
 import qcCheckerService from "@/services/qcCheckerService"
@@ -94,6 +94,13 @@ interface InspectionRecord {
   itemsToInspect?: Record<string, any> | AssignedItem[]
   vendor?: { companyName?: string }
   checker?: { name?: string }
+  // Location verification
+  checkerLatitude?: number
+  checkerLongitude?: number
+  vendorLatitude?: number
+  vendorLongitude?: number
+  locationVerified?: boolean
+  locationDistanceM?: number
 }
 
 export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
@@ -437,6 +444,36 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                 </div>
               )
             })}
+          </div>
+        </Section>
+      )}
+
+      {/* Location Verification — shown when location data exists */}
+      {(inspection.locationVerified !== undefined || inspection.checkerLatitude != null) && (
+        <Section title="Location Verification" icon={MapPin} accent={inspection.locationVerified ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}>
+          <div className="flex items-center gap-3 mb-4">
+            {inspection.locationVerified ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Location Verified ✓
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
+                <XCircle className="w-3.5 h-3.5" />
+                Location Mismatch
+              </span>
+            )}
+            {inspection.locationDistanceM != null && (
+              <span className="text-xs text-slate-500">
+                Distance: <strong>{inspection.locationDistanceM}m</strong> (threshold: 500m)
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <InfoRow label="Checker Latitude" value={inspection.checkerLatitude?.toFixed(6)} />
+            <InfoRow label="Checker Longitude" value={inspection.checkerLongitude?.toFixed(6)} />
+            <InfoRow label="Vendor Latitude" value={inspection.vendorLatitude?.toFixed(6)} />
+            <InfoRow label="Vendor Longitude" value={inspection.vendorLongitude?.toFixed(6)} />
           </div>
         </Section>
       )}

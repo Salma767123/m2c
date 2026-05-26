@@ -31,17 +31,10 @@ interface VendorFormData {
   website: string;
 }
 
-const inputBaseStyle = { fontSize: 16 };
+const inputBaseStyle = { fontSize: 16, minHeight: 48, paddingVertical: 12 };
 const inputClass =
-  'w-full px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900';
+  'w-full px-4 border border-gray-300 rounded-xl bg-white text-gray-900';
 const placeholderColor = '#9ca3af';
-
-const pressablePrimary = ({ pressed }: { pressed: boolean }) => ({
-  opacity: pressed ? 0.8 : 1,
-});
-const pressableSecondary = ({ pressed }: { pressed: boolean }) => ({
-  opacity: pressed ? 0.7 : 1,
-});
 
 export default function Contact() {
   const [formData, setFormData] = useState<ContactFormData>({
@@ -303,7 +296,9 @@ export default function Contact() {
             disabled={isSubmitting}
             accessibilityLabel="Send message"
             accessibilityRole="button"
-            style={({ pressed }) => ({ opacity: isSubmitting ? 0.7 : pressed ? 0.85 : 1 })}
+            accessibilityState={{ disabled: isSubmitting }}
+            android_ripple={{ color: 'rgba(255,255,255,0.15)' }}
+            style={{ opacity: isSubmitting ? 0.7 : 1 }}
             className="bg-gray-900 py-4 rounded-xl flex-row items-center justify-center"
           >
             {isSubmitting ? (
@@ -354,7 +349,7 @@ export default function Contact() {
             onPress={() => setShowVendorModal(true)}
             accessibilityLabel="Open vendor application form"
             accessibilityRole="button"
-            style={pressablePrimary}
+            android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
             className="bg-white px-8 py-4 rounded-xl flex-row items-center"
           >
             <Store size={20} color="#111827" />
@@ -390,11 +385,12 @@ export default function Contact() {
                 onPress={() => setShowVendorModal(false)}
                 accessibilityLabel="Close application form"
                 accessibilityRole="button"
-                hitSlop={8}
-                style={pressableSecondary}
-                className="p-2"
+                hitSlop={4}
+                android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: true, radius: 22 }}
               >
-                <X size={24} color="#6b7280" />
+                <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={22} color="#6b7280" />
+                </View>
               </Pressable>
             </View>
 
@@ -523,10 +519,9 @@ export default function Contact() {
                     disabled={isSubmittingVendor}
                     accessibilityLabel="Cancel"
                     accessibilityRole="button"
-                    style={({ pressed }) => ({
-                      opacity: isSubmittingVendor ? 0.5 : pressed ? 0.7 : 1,
-                    })}
-                    className="flex-1 px-6 py-3 border border-gray-300 rounded-xl items-center"
+                    android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+                    style={{ opacity: isSubmittingVendor ? 0.5 : 1 }}
+                    className="flex-1 px-6 py-3.5 border border-gray-300 rounded-xl items-center justify-center"
                   >
                     <Text className="text-gray-700 font-bold">Cancel</Text>
                   </Pressable>
@@ -535,10 +530,10 @@ export default function Contact() {
                     disabled={isSubmittingVendor}
                     accessibilityLabel="Submit application"
                     accessibilityRole="button"
-                    style={({ pressed }) => ({
-                      opacity: isSubmittingVendor ? 0.7 : pressed ? 0.85 : 1,
-                    })}
-                    className="flex-1 px-6 py-3 bg-gray-900 rounded-xl flex-row items-center justify-center"
+                    accessibilityState={{ disabled: isSubmittingVendor }}
+                    android_ripple={{ color: 'rgba(255,255,255,0.15)' }}
+                    style={{ opacity: isSubmittingVendor ? 0.7 : 1 }}
+                    className="flex-1 px-6 py-3.5 bg-gray-900 rounded-xl flex-row items-center justify-center"
                   >
                     {isSubmittingVendor ? (
                       <>

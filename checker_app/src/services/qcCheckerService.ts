@@ -350,33 +350,91 @@ class QCCheckerService {
     }
   }
 
-  // Approve Product
-  async approveProduct(productId: string, formData?: any): Promise<{ success: boolean; message: string; data: any }> {
+  // Start Product Inspection — pre-flight GPS check that mirrors
+  // startInspection (factory). Verifies the checker is at the vendor's
+  // factory before the form opens, so the backend can log the geofence at
+  // the moment the inspection begins. No state change on the product.
+  async startProductInspection(
+    productId: string,
+    location?: { latitude: number | null; longitude: number | null } | null,
+  ): Promise<{ success: boolean; message: string; locationVerification?: { verified: boolean; distanceMeters: number; thresholdMeters: number } }> {
     try {
       const token = await this.getCheckerToken();
-      const response = await axios.post(`/qc-checkers/products/${productId}/approve`, { formData }, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await axios.post(
+        `/qc-checkers/products/${productId}/start`,
+        {
+          checkerLatitude: location?.latitude ?? null,
+          checkerLongitude: location?.longitude ?? null,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to approve product');
+      // Preserve the full error response for location-specific error handling
+      const errData = error?.response?.data || error?.data;
+      const err: any = new Error(errData?.message || error.message || 'Failed to start product inspection');
+      err.status = error?.response?.status || error?.status;
+      err.data = errData;
+      throw err;
     }
   }
 
-  // Reject Product
-  async rejectProduct(productId: string, rejectionReason: string, formData?: any): Promise<{ success: boolean; message: string; data: any }> {
+  // Approve Product — requires GPS so the backend can verify the checker
+  // is at the vendor's factory (same geofence as startInspection).
+  async approveProduct(
+    productId: string,
+    formData?: any,
+    location?: { latitude: number | null; longitude: number | null } | null,
+  ): Promise<{ success: boolean; message: string; data: any }> {
     try {
       const token = await this.getCheckerToken();
-      const response = await axios.post(`/qc-checkers/products/${productId}/reject`, { reason: rejectionReason, formData }, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await axios.post(
+        `/qc-checkers/products/${productId}/approve`,
+        {
+          formData,
+          checkerLatitude: location?.latitude ?? null,
+          checkerLongitude: location?.longitude ?? null,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to reject product');
+      // Preserve the full error response for location-specific error handling
+      const errData = error?.response?.data || error?.data;
+      const err: any = new Error(errData?.message || error.message || 'Failed to approve product');
+      err.status = error?.response?.status || error?.status;
+      err.data = errData;
+      throw err;
+    }
+  }
+
+  // Reject Product — requires GPS so the backend can verify the checker
+  // is at the vendor's factory (same geofence as startInspection).
+  async rejectProduct(
+    productId: string,
+    rejectionReason: string,
+    formData?: any,
+    location?: { latitude: number | null; longitude: number | null } | null,
+  ): Promise<{ success: boolean; message: string; data: any }> {
+    try {
+      const token = await this.getCheckerToken();
+      const response = await axios.post(
+        `/qc-checkers/products/${productId}/reject`,
+        {
+          reason: rejectionReason,
+          formData,
+          checkerLatitude: location?.latitude ?? null,
+          checkerLongitude: location?.longitude ?? null,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      return response.data;
+    } catch (error: any) {
+      const errData = error?.response?.data || error?.data;
+      const err: any = new Error(errData?.message || error.message || 'Failed to reject product');
+      err.status = error?.response?.status || error?.status;
+      err.data = errData;
+      throw err;
     }
   }
 
@@ -409,34 +467,62 @@ class QCCheckerService {
     }
   }
 
-  // Start an Inspection
-  async startInspection(inspectionId: string): Promise<{ success: boolean; message: string; inspection: any }> {
+  // Start an Inspection (requires GPS location for proximity verification)
+  async startInspection(
+    inspectionId: string,
+    location?: { latitude: number; longitude: number } | null,
+  ): Promise<{ success: boolean; message: string; inspection: any; locationVerification?: any }> {
     try {
       const token = await this.getCheckerToken();
-      const response = await axios.post(`/inspections/${inspectionId}/start`, {}, {
+      const response = await axios.post(`/inspections/${inspectionId}/start`, {
+        checkerLatitude: location?.latitude ?? null,
+        checkerLongitude: location?.longitude ?? null,
+      }, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to start inspection');
+      // Preserve the full error response for location-specific error handling
+      const errData = error?.response?.data || error?.data;
+      const err: any = new Error(errData?.message || error.message || 'Failed to start inspection');
+      err.status = error?.response?.status || error?.status;
+      err.data = errData;
+      throw err;
     }
   }
 
-  // Complete an Inspection
-  async completeInspection(inspectionId: string, formData: any): Promise<{ success: boolean; message: string; inspection: any }> {
+  // Complete an Inspection — also runs the submit-time geofence so the
+  // checker has to STILL be at the vendor factory when submitting (not just
+  // when they started). Mirrors approveProduct/rejectProduct.
+  async completeInspection(
+    inspectionId: string,
+    formData: any,
+    location?: { latitude: number | null; longitude: number | null } | null,
+  ): Promise<{ success: boolean; message: string; inspection: any }> {
     try {
       const token = await this.getCheckerToken();
-      const response = await axios.post(`/inspections/${inspectionId}/complete`, formData, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await axios.post(
+        `/inspections/${inspectionId}/complete`,
+        {
+          ...formData,
+          checkerLatitude: location?.latitude ?? null,
+          checkerLongitude: location?.longitude ?? null,
         },
-        timeout: 120000, // 2 minutes — payload can include multiple base64 images
-      });
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 120000, // 2 minutes — payload can include multiple base64 images
+        },
+      );
       return response.data;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to complete inspection');
+      // Preserve the full error response for location-specific error handling
+      const errData = error?.response?.data || error?.data;
+      const err: any = new Error(errData?.message || error.message || 'Failed to complete inspection');
+      err.status = error?.response?.status || error?.status;
+      err.data = errData;
+      throw err;
     }
   }
 

@@ -9,28 +9,51 @@ export interface VendorRegistrationData {
   businessType: string;
   companyName: string;
   gstNumber?: string;
+  /** Type-specific regulatory ID — IEC / CIN / Deed details / LLPIN. */
+  companyIdNumber?: string;
+  /** PAN Number — required for all 4 supported businessType values. */
+  panNumber?: string;
   email: string;
+  email2?: string;
   phone: string;
   landlineNumber?: string;
   phoneNumber2?: string;
   website?: string;
   address: string;
+  addressLine2?: string;
+  addressLine3?: string;
+  landmark?: string;
   city: string;
   state: string;
   zipCode: string;
   country: string;
+  /** Factory ownership — owned / rented / lease. Mirrored to warehouse
+   *  `ownershipType` when the user ticks "Same as warehouse". */
+  factoryOwnershipType?: string;
 
   // Owner Profile
   ownerName: string;
+  /** Designation — Proprietor / CEO / Director / Managing Director / Founder
+   *  / custom typed value when "Other" chip is selected. */
+  designation?: string;
   ownerEmail: string;
+  ownerEmail2?: string;
   ownerPhone: string;
+  ownerPhone2?: string;
+  ownerLandline?: string;
   additionalOwners?: Array<{ name: string; email: string; phone: string }>;
+  /** Full date — preferred over legacy `yearEstablished`. Backend derives
+   *  `establishedYear` from this. */
+  businessStartDate?: string;
   yearEstablished: string;
   employeeCount: string;
 
   // Warehouse Details
   ownershipType: string;
   warehouseAddress: string;
+  warehouseAddressLine2?: string;
+  warehouseAddressLine3?: string;
+  warehouseLandmark?: string;
   warehouseCity: string;
   warehouseState: string;
   warehouseZip: string;
@@ -42,6 +65,15 @@ export interface VendorRegistrationData {
   marketType: string | string[];
   selectedCategories: Record<string, string[]>;
   categoryRemarks?: string;
+  /** Per-category products from Step 4. Shape:
+   *  `{ [categoryId]: Array<{ id, name, photos: Array<{ file?, preview }> }> }`
+   *  The `preview` field carries a base64 data URI that the backend swaps for
+   *  a Cloudinary URL via `resolveBase64InValue` before persisting. */
+  categoryProducts?: Record<string, any[]>;
+  /** User-defined custom categories created on Step 4. Same product shape
+   *  as `categoryProducts`, but the category is named freely by the vendor
+   *  rather than picked from the master Category tree. */
+  additionalCategories?: Array<{ id: string; name: string; products: any[] }>;
 
   // Manufacturing Facilities
   enabledFacilities?: Record<string, boolean>;
@@ -50,6 +82,10 @@ export interface VendorRegistrationData {
   // Certifications & Logistics
   selectedCertifications: string[];
   certificationExpiryDates: Record<string, string>;
+  /** User-defined custom certifications added on Step 6. Each entry has a
+   *  vendor-typed name + free-text description; the backend creates
+   *  `VendorCertification` rows with `isCustom: true` for these. */
+  otherCertifications?: Array<{ id: string; name: string; description?: string }>;
   qualityControlProcess?: string;
   complianceStandards?: string;
   packagingCapabilities?: string;
@@ -59,15 +95,42 @@ export interface VendorRegistrationData {
 
   // Contact & Trade Info
   mainContact: {
-    name: string;
+    /** Full name — concatenated by the form's `handleNext` from
+     *  `firstName / middleName / lastName` for legacy consumers. */
+    name?: string;
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
     designation: string;
+    customDesignation?: string;
     email1: string;
     email2?: string;
     phone1: string;
     phone2?: string;
+    landline?: string;
     department: string;
+    customDepartment?: string;
+    /** Base64 data URI of the contact photo. Backend deep-walks the
+     *  `mainContact` object with `resolveBase64InValue` and replaces this
+     *  with a Cloudinary URL before persisting. */
+    photo?: string;
   };
-  alternateContacts: any[];
+  alternateContacts: Array<{
+    id?: string;
+    name?: string;
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
+    designation?: string;
+    customDesignation?: string;
+    email1?: string;
+    email2?: string;
+    phone1?: string;
+    phone2?: string;
+    landline?: string;
+    department?: string;
+    customDepartment?: string;
+  }>;
   hasImportExport: string;
   importCountries: string[];
   exportCountries: string[];
@@ -77,7 +140,8 @@ export interface VendorRegistrationData {
   bankingDetails?: {
     bankName: string;
     accountNumber: string;
-    swiftCode: string;
+    swiftCode?: string;
+    iban?: string;
   };
 
   // Password
@@ -87,8 +151,19 @@ export interface VendorRegistrationData {
 export interface VendorFiles {
   logo?: File;
   gstDocument?: File;
+  /** PAN Card certificate upload — required by the Company Details step. */
+  panCardFile?: File;
+  /** Type-specific business registration certificate
+   *  (IEC / CIN / Partnership Deed / LLPIN). */
+  typeCertFile?: File;
   ownerPhoto?: File;
-  factoryImages?: File[];
+  /** Factory images keyed by slot ID (nameBoard / frontView / backView /
+   *  leftView / rightView / roadView / insideFactory / others). Each slot
+   *  is uploaded under the shared `factoryImages` field with the slot ID
+   *  carried in a side-channel `factoryImageSlot_<index>` body field so the
+   *  backend can store descriptive document names ("Factory Front View"
+   *  etc.) instead of "Factory Image N". */
+  factoryImages?: Record<string, File>;
   certificationFiles?: Record<string, File>;
 }
 
@@ -110,31 +185,61 @@ export interface VendorProfile {
   companyName: string;
   companyLogo?: string;
   gstNumber?: string;
+  /** Type-specific regulatory ID — IEC / CIN / Partnership Deed / LLPIN. */
+  companyIdNumber?: string;
+  /** PAN Number — required across the 4 supported business types. */
+  panNumber?: string;
   status: string;
   ownerName: string;
+  /** Owner designation chip (Proprietor / CEO / Director / etc.). */
+  designation?: string;
   ownerEmail: string;
+  ownerEmail2?: string;
   ownerPhone: string;
+  ownerPhone2?: string;
+  ownerLandline?: string;
   ownerPhoto?: string;
   additionalOwners?: Array<{ name: string; email: string; phone: string }>;
+  /** Full date — backend derives `establishedYear` from this. */
+  businessStartDate?: string;
   businessPhone: string;
   landlineNumber?: string;
   phoneNumber2?: string;
   businessEmail: string;
+  /** Optional secondary business email. */
+  businessEmail2?: string;
   businessAddress: string;
+  /** Optional company address detail lines + landmark. */
+  addressLine2?: string;
+  addressLine3?: string;
+  landmark?: string;
   businessCity: string;
   businessState: string;
   businessZipCode: string;
   businessCountry: string;
   website?: string;
+  /** Factory ownership — owned / rented / lease. */
+  factoryOwnershipType?: string;
   establishedYear?: number;
   companyType?: string;
   vendorType: string;
+  /** Raw multi-select vendor types — present on rows submitted after the
+   *  Step 4 audit. Prefer this over the single-enum `vendorType` for display. */
+  vendorTypes?: string[];
   vendorCode?: string;
   productCategories: string[];
   productTypes: string[];
   specializations: string[];
   categoryRemarks?: string;
+  /** Per-category products (JSON). Shape:
+   *  `{ [categoryId]: Array<{ id, name, photos }> }`. Photos already point
+   *  to Cloudinary URLs by the time they reach the frontend. */
+  categoryProducts?: Record<string, unknown[]>;
+  /** User-defined custom categories. */
+  additionalCategories?: Array<{ id: string; name: string; products: unknown[] }>;
   annualTurnover?: string;
+  /** Import / export experience flags (split as of Step 7 audit). */
+  importExperience?: boolean;
   exportExperience?: boolean;
   exportCountries?: string[];
   importCountries?: string[];
@@ -142,6 +247,8 @@ export interface VendorProfile {
   factoryAddress?: string;
   factoryCity?: string;
   factoryState?: string;
+  factoryZipCode?: string;
+  factoryCountry?: string;
   factorySize?: string;
   productionCapacity?: string;
   qualityControl?: string;
@@ -149,10 +256,18 @@ export interface VendorProfile {
   facilityDetails?: Record<string, any>;
   ownershipType?: string;
   warehouseAddress?: string;
+  /** Optional warehouse address detail lines + landmark. */
+  warehouseAddressLine2?: string;
+  warehouseAddressLine3?: string;
+  warehouseLandmark?: string;
   warehouseCity?: string;
   warehouseState?: string;
   warehouseZipCode?: string;
   warehouseCountry?: string;
+  /** Step 6 free-text logistics / compliance fields. */
+  packagingCapabilities?: string;
+  logisticsPartners?: string;
+  complianceStandards?: string;
   warehouseSize?: string;
   storageCapacity?: string;
   mapLink?: string;
@@ -345,12 +460,19 @@ class VendorService {
     if (files.gstDocument) {
       form.append('gstDocument', files.gstDocument);
     }
+    if (files.panCardFile) {
+      form.append('panCardFile', files.panCardFile);
+    }
+    if (files.typeCertFile) {
+      form.append('typeCertFile', files.typeCertFile);
+    }
     if (files.ownerPhoto) {
       form.append('ownerPhoto', files.ownerPhoto);
     }
-    if (files.factoryImages && files.factoryImages.length > 0) {
-      files.factoryImages.forEach(file => {
+    if (files.factoryImages) {
+      Object.entries(files.factoryImages).forEach(([slotId, file], index) => {
         form.append('factoryImages', file);
+        form.append(`factoryImageSlot_${index}`, slotId);
       });
     }
     if (files.certificationFiles) {

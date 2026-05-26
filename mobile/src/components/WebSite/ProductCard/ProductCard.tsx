@@ -12,7 +12,7 @@ import { useWishlist } from "@/context/WishlistContext";
 import { Product as ServiceProduct } from "@/services/productService";
 import { PublicProduct } from "@/services/publicProductService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
-import { getRegionalPrice, formatPrice as fmtCurrency } from "@/lib/currency";
+import { getRegionalPrice, getRegionalOriginalPrice, formatPrice as fmtCurrency } from "@/lib/currency";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface MockProduct {
@@ -352,17 +352,10 @@ function ProductCardImpl({
             <Text className="text-lg font-black text-[#111827]">
               {fmtCurrency(displayPrice)}
             </Text>
-            {product.originalPrice ? (
+            {getRegionalOriginalPrice(product as any) ? (
               <Text className="text-xs text-red-500 line-through font-medium opacity-80">
-                {fmtCurrency(product.originalPrice)}
+                {fmtCurrency(getRegionalOriginalPrice(product as any)!)}
               </Text>
-            ) : null}
-            {product.discount && product.discount > 0 ? (
-              <View style={{ backgroundColor: '#1A2830', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>
-                  {product.discount}% OFF
-                </Text>
-              </View>
             ) : null}
           </View>
 
