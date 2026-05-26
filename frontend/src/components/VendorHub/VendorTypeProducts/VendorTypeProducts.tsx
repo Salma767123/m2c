@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
-import { Package, Globe, ChevronDown, ChevronRight, Loader2, Upload, X, ImageIcon } from 'lucide-react';
+import { Package, Globe, ChevronDown, ChevronRight, Loader2, Upload, X, ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import { categoryService, Category } from '@/services/categoryService';
 
@@ -37,35 +37,170 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
     categoryRemarks: data.categoryRemarks || ''
   });
 
-  // Product photo uploads
-  const [productPhotos, setProductPhotos] = useState<Array<{ file: File; preview: string }>>(
-    data.productPhotos || []
+  // Product photo uploads & manual product entries
+  type ProductItem = { id: string, name: string, photos: Array<{ file?: File; preview: string }> };
+  const [categoryProducts, setCategoryProducts] = useState<Record<string, ProductItem[]>>(
+    data.categoryProducts || {}
   );
 
-  const handleProductPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const addProduct = (categoryId: string) => {
+    setCategoryProducts(prev => ({
+      ...prev,
+      [categoryId]: [...(prev[categoryId] || []), { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), name: '', photos: [] }]
+    }));
+  };
+
+  const removeProduct = (categoryId: string, productId: string) => {
+    setCategoryProducts(prev => ({
+      ...prev,
+      [categoryId]: prev[categoryId].filter(p => p.id !== productId)
+    }));
+  };
+
+  const updateProductName = (categoryId: string, productId: string, name: string) => {
+    setCategoryProducts(prev => ({
+      ...prev,
+      [categoryId]: prev[categoryId].map(p => p.id === productId ? { ...p, name } : p)
+    }));
+  };
+
+  const handleProductPhotoUpload = (categoryId: string, productId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const validFiles = files.filter(f => {
-      if (f.size > 5 * 1024 * 1024) return false;
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) return false;
-      return true;
-    });
-    if (productPhotos.length + validFiles.length > 10) {
-      alert('Maximum 10 product photos allowed');
-      return;
-    }
+    const validFiles = files.filter(f => f.size <= 5 * 1024 * 1024 && ['image/jpeg', 'image/png', 'image/webp'].includes(f.type));
+    
     validFiles.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setProductPhotos(prev => [...prev, { file, preview: reader.result as string }]);
+        setCategoryProducts(prev => {
+          const categoryList = prev[categoryId] || [];
+          return {
+            ...prev,
+            [categoryId]: categoryList.map(p => {
+              if (p.id === productId) {
+                if (p.photos.length >= 5) return p;
+                return { ...p, photos: [...p.photos, { file, preview: reader.result as string }] };
+              }
+              return p;
+            })
+          };
+        });
       };
       reader.readAsDataURL(file);
     });
-    // Reset input so same file can be selected again
     e.target.value = '';
   };
 
-  const removeProductPhoto = (index: number) => {
-    setProductPhotos(prev => prev.filter((_, i) => i !== index));
+  const removeProductPhoto = (categoryId: string, productId: string, photoIndex: number) => {
+    setCategoryProducts(prev => ({
+      ...prev,
+      [categoryId]: prev[categoryId].map(p => p.id === productId ? { ...p, photos: p.photos.filter((_, i) => i !== photoIndex) } : p)
+    }));
+  };
+
+  // Additional Categories & Products
+  type AdditionalCategory = { id: string; name: string; products: ProductItem[] };
+  const [additionalCategories, setAdditionalCategories] = useState<AdditionalCategory[]>(
+    data.additionalCategories || []
+  );
+
+  const addAdditionalCategory = () => {
+    setAdditionalCategories(prev => [
+      ...prev,
+      {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        name: '',
+        products: [{ id: Date.now().toString() + Math.random().toString(36).substr(2, 5), name: '', photos: [] }]
+      }
+    ]);
+  };
+
+  const removeAdditionalCategory = (categoryId: string) => {
+    setAdditionalCategories(prev => prev.filter(c => c.id !== categoryId));
+  };
+
+  const updateAdditionalCategoryName = (categoryId: string, name: string) => {
+    setAdditionalCategories(prev => prev.map(c => c.id === categoryId ? { ...c, name } : c));
+  };
+
+  const addAdditionalProduct = (categoryId: string) => {
+    setAdditionalCategories(prev => prev.map(c => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          products: [...c.products, { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), name: '', photos: [] }]
+        };
+      }
+      return c;
+    }));
+  };
+
+  const removeAdditionalProduct = (categoryId: string, productId: string) => {
+    setAdditionalCategories(prev => prev.map(c => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          products: c.products.filter(p => p.id !== productId)
+        };
+      }
+      return c;
+    }));
+  };
+
+  const updateAdditionalProductName = (categoryId: string, productId: string, name: string) => {
+    setAdditionalCategories(prev => prev.map(c => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          products: c.products.map(p => p.id === productId ? { ...p, name } : p)
+        };
+      }
+      return c;
+    }));
+  };
+
+  const handleAdditionalProductPhotoUpload = (categoryId: string, productId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(f => f.size <= 5 * 1024 * 1024 && ['image/jpeg', 'image/png', 'image/webp'].includes(f.type));
+    
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAdditionalCategories(prev => prev.map(c => {
+          if (c.id === categoryId) {
+            return {
+              ...c,
+              products: c.products.map(p => {
+                if (p.id === productId) {
+                  if (p.photos.length >= 5) return p;
+                  return { ...p, photos: [...p.photos, { file, preview: reader.result as string }] };
+                }
+                return p;
+              })
+            };
+          }
+          return c;
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const removeAdditionalProductPhoto = (categoryId: string, productId: string, photoIndex: number) => {
+    setAdditionalCategories(prev => prev.map(c => {
+      if (c.id === categoryId) {
+        return {
+          ...c,
+          products: c.products.map(p => {
+            if (p.id === productId) {
+              return { ...p, photos: p.photos.filter((_, i) => i !== photoIndex) };
+            }
+            return p;
+          })
+        };
+      }
+      return c;
+    }));
   };
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -216,27 +351,7 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
     }));
   };
 
-  const toggleSubCategory = (categoryId: string, subCategory: string) => {
-    setFormData(prev => {
-      const categorySelections = prev.selectedCategories[categoryId] || [];
-      const isSelected = categorySelections.includes(subCategory);
-
-      return {
-        ...prev,
-        selectedCategories: {
-          ...prev.selectedCategories,
-          [categoryId]: isSelected
-            ? categorySelections.filter((item: string) => item !== subCategory)
-            : [...categorySelections, subCategory]
-        }
-      };
-    });
-    // Clear error when user makes a selection
-    if (errors.selectedCategories) {
-      setErrors(prev => ({ ...prev, selectedCategories: '' }));
-    }
-    setTouched(prev => ({ ...prev, selectedCategories: true }));
-  };
+  // toggleSubCategory removed in favor of manual product entry
 
   const handleNext = () => {
     // Validate required fields
@@ -251,12 +366,38 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
     }
 
     // Check if at least one product category is selected
-    const hasSelectedCategories = Object.values(formData.selectedCategories).some(
-      (subCategories: any) => subCategories && subCategories.length > 0
+    const hasSelectedCategories = Object.keys(formData.selectedCategories).some(
+      (catId) => formData.selectedCategories[catId]
     );
 
     if (!hasSelectedCategories) {
       newErrors.selectedCategories = 'Please select at least one product category';
+    } else {
+      // Validate that selected categories have at least one product with a name
+      const hasEmptyProducts = Object.keys(formData.selectedCategories).some(catId => {
+        if (formData.selectedCategories[catId]) {
+          const prods = categoryProducts[catId];
+          if (!prods || prods.length === 0) return true;
+          return prods.some(p => !p.name.trim());
+        }
+        return false;
+      });
+      if (hasEmptyProducts) {
+        newErrors.selectedCategories = 'Please ensure all added products have a name';
+      }
+    }
+
+    // Validate additional categories
+    if (additionalCategories.length > 0) {
+      const hasInvalidCustomCategories = additionalCategories.some(c => !c.name.trim());
+      if (hasInvalidCustomCategories) {
+        newErrors.additionalCategories = 'Please provide a name for all custom categories';
+      } else {
+        const hasInvalidCustomProducts = additionalCategories.some(c => c.products.some(p => !p.name.trim()));
+        if (hasInvalidCustomProducts) {
+          newErrors.additionalCategories = 'Please ensure all custom products have a name';
+        }
+      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -277,7 +418,7 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
       return;
     }
 
-    onUpdateData({ ...formData, productPhotos });
+    onUpdateData({ ...formData, categoryProducts, additionalCategories });
     onNext();
   };
 
@@ -325,257 +466,380 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
   }
 
   return (
-    <div className="max-w-420 p-4 space-y-4 font-sans">
+    <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
-      <div className="flex p-2 items-center gap-4 mb-4">
-        <Package className="w-12 h-12 text-gray-600" />
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Vendor Type & Product Categories</h1>
-          <p className="text-gray-600 mt-1">Define your business model and product offerings</p>
+      <div className="flex items-center gap-3 pb-2">
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-50 text-brand-600 shrink-0">
+          <Package className="w-5 h-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-headline-md text-gray-900 leading-tight" style={{ textWrap: "balance" as any }}>
+            Vendor Type & Product Categories
+          </h2>
+          <p className="text-sm text-gray-600 mt-0.5">
+            Define your business model and product offerings
+          </p>
         </div>
       </div>
 
       {/* Vendor Type */}
-      <section className="bg-white border border-gray-200 rounded-lg" data-section="vendorType">
-        <div className="px-4 py-3">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Vendor Type <span className="text-red-500 text-lg">*</span>
+      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden" data-section="vendorType">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Vendor Type <span className="text-red-500">*</span>
           </h2>
+          <p className="text-sm text-slate-600 mt-1">What is your primary business model?</p>
         </div>
-        <div className="px-6 pb-6">
-          <div className="flex flex-wrap gap-2">
-            {vendorTypes.map((type) => (
-              <div
-                key={type.id}
-                onClick={() => toggleVendorType(type.id)}
-                className={`p-4 rounded-4xl cursor-pointer transition-colors ${(formData.vendorType || []).includes(type.id)
-                    ? "border-2 border-blue-600 bg-blue-50 text-blue-700 "
-                    : errors.vendorType && touched.vendorType
-                      ? "border-2 border-red-500 bg-red-50"
-                      : "bg-gray-100 text-gray-500"
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {vendorTypes.map((type) => {
+              const isSelected = (formData.vendorType || []).includes(type.id);
+              const hasError = errors.vendorType && touched.vendorType;
+              
+              return (
+                <button
+                  type="button"
+                  key={type.id}
+                  onClick={() => toggleVendorType(type.id)}
+                  className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 active:scale-[0.98] ${
+                    isSelected
+                      ? 'border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10'
+                      : hasError
+                      ? 'border-red-500 bg-red-50 hover:bg-red-100 hover:border-red-600'
+                      : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'
                   }`}
-              >
-                <div className="font-semibold text-base">{type.label}</div>
-              </div>
-            ))}
+                >
+                  <div className={`font-semibold text-base ${isSelected ? 'text-brand-900' : 'text-slate-900'}`}>{type.label}</div>
+                  <div className={`text-sm mt-1 ${isSelected ? 'text-brand-700' : 'text-slate-500'}`}>{type.description}</div>
+                </button>
+              );
+            })}
           </div>
           {errors.vendorType && touched.vendorType && (
-            <p className="text-red-500 text-sm mt-2">{errors.vendorType}</p>
+            <p className="text-red-500 text-sm mt-3">{errors.vendorType}</p>
           )}
         </div>
       </section>
 
       {/* Market Type */}
-      <section className="bg-white border border-gray-200 rounded-lg" data-section="marketType">
-        <div className="px-4 py-3">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden" data-section="marketType">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-900 flex items-center">
             <Globe className="w-5 h-5 mr-2" />
-            Market Focus <span className="text-red-500 text-lg ml-1">*</span>
+            Market Focus <span className="text-red-500 ml-1">*</span>
           </h2>
+          <p className="text-sm text-slate-600 mt-1">Which markets do you primarily serve?</p>
         </div>
-        <div className="px-6 pb-6">
-          <div className="flex flex-wrap gap-2">
-            {marketTypes.map((type) => (
-              <div
-                key={type.id}
-                onClick={() => toggleMarketType(type.id)}
-                className={`p-4 rounded-4xl cursor-pointer transition-colors ${(formData.marketType || []).includes(type.id)
-                    ? "border-2 border-blue-600 bg-blue-50 text-blue-700 "
-                    : errors.marketType && touched.marketType
-                      ? "border-2 border-red-500 bg-red-50"
-                      : "bg-gray-100 text-gray-500"
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {marketTypes.map((type) => {
+              const isSelected = (formData.marketType || []).includes(type.id);
+              const hasError = errors.marketType && touched.marketType;
+              
+              return (
+                <button
+                  type="button"
+                  key={type.id}
+                  onClick={() => toggleMarketType(type.id)}
+                  className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 active:scale-[0.98] ${
+                    isSelected
+                      ? 'border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10'
+                      : hasError
+                      ? 'border-red-500 bg-red-50 hover:bg-red-100 hover:border-red-600'
+                      : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'
                   }`}
-              >
-                <div className="font-semibold text-base">{type.label}</div>
-              </div>
-            ))}
+                >
+                  <div className={`font-semibold text-base ${isSelected ? 'text-brand-900' : 'text-slate-900'}`}>{type.label}</div>
+                  <div className={`text-sm mt-1 ${isSelected ? 'text-brand-700' : 'text-slate-500'}`}>{type.description}</div>
+                </button>
+              );
+            })}
           </div>
           {errors.marketType && touched.marketType && (
-            <p className="text-red-500 text-sm mt-2">{errors.marketType}</p>
+            <p className="text-red-500 text-sm mt-3">{errors.marketType}</p>
           )}
         </div>
       </section>
 
       {/* Product Categories */}
-      <section className="bg-white border border-gray-200 rounded-lg" data-section="selectedCategories">
-        <div className="px-4 py-3">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Product Categories <span className="text-red-500 text-lg">*</span>
+      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden" data-section="selectedCategories">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Product Categories & Offerings <span className="text-red-500">*</span>
           </h2>
-          <p className="text-sm text-gray-600">Select the categories that match your products</p>
+          <p className="text-sm text-slate-600 mt-1">Select your categories and manually add your products with photos.</p>
         </div>
-        <div className={`p-4 ${errors.selectedCategories && touched.selectedCategories ? 'bg-red-50 border-2 border-red-500 rounded-lg' : ''}`}>
+        
+        <div className={`p-6 ${errors.selectedCategories && touched.selectedCategories ? 'bg-red-50/50' : ''}`}>
           <div className="space-y-4">
-            {categories.map((category) => (
-              <div key={category.id} className="border border-gray-200 rounded-lg">
-                <button
-                  onClick={() => toggleCategory(category.id)}
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-lg text-gray-900">{category.name}</span>
-                    {category.subcategories && category.subcategories.length > 0 && (
-                      <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        {category.subcategories.length} subcategories
-                      </span>
-                    )}
-                  </div>
-                  {formData.expandedCategories[category.id] ? (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
-                  )}
-                </button>
+            {categories.map((category) => {
+              const isCategorySelected = !!formData.selectedCategories[category.id];
+              const isExpanded = formData.expandedCategories[category.id];
+              const products = categoryProducts[category.id] || [];
 
-                {formData.expandedCategories[category.id] && (
-                  <div className="px-4 pb-4">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {category.subcategories && category.subcategories.length > 0 ? (
-                        category.subcategories.map((subCategory) => (
-                          <label
-                            key={subCategory.id}
-                            className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={(formData.selectedCategories[category.id] || []).includes(subCategory.name)}
-                              onChange={() => toggleSubCategory(category.id, subCategory.name)}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <span className="ml-2 text-base font-medium text-gray-700">{subCategory.name}</span>
-                          </label>
-                        ))
-                      ) : (
-                        <div className="col-span-full text-gray-500 text-sm italic p-2">
-                          No subcategories available for this category.
-                        </div>
-                      )}
-                    </div>
+              return (
+                <div key={category.id} className={`border rounded-lg overflow-hidden transition-colors ${isCategorySelected ? 'border-brand-300 bg-brand-50/10' : 'border-slate-200 bg-white'}`}>
+                  <div className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                    <label className="flex items-center gap-3 cursor-pointer flex-1">
+                      <input
+                        type="checkbox"
+                        checked={isCategorySelected}
+                        onChange={() => {
+                           // Toggle category selection
+                           setFormData(prev => {
+                             const newSelected = { ...prev.selectedCategories };
+                             if (isCategorySelected) {
+                               delete newSelected[category.id];
+                             } else {
+                               newSelected[category.id] = true;
+                             }
+                             return { ...prev, selectedCategories: newSelected };
+                           });
+                           
+                           // If selecting, auto expand
+                           if (!isCategorySelected) {
+                             setFormData(prev => ({ ...prev, expandedCategories: { ...prev.expandedCategories, [category.id]: true } }));
+                             // Auto add first product row if empty
+                             setCategoryProducts(prev => {
+                               if (!prev[category.id] || prev[category.id].length === 0) {
+                                 return { ...prev, [category.id]: [{ id: Date.now().toString(), name: '', photos: [] }] };
+                               }
+                               return prev;
+                             });
+                           }
+                           
+                           if (errors.selectedCategories) setErrors(prev => ({ ...prev, selectedCategories: '' }));
+                        }}
+                        className="w-5 h-5 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
+                      />
+                      <span className={`font-semibold text-lg ${isCategorySelected ? 'text-brand-900' : 'text-slate-900'}`}>{category.name}</span>
+                    </label>
+                    <button type="button" onClick={() => toggleCategory(category.id)} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100">
+                      {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                    </button>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {isExpanded && isCategorySelected && (
+                    <div className="px-4 pb-6 pt-2 border-t border-slate-100 bg-white">
+                      <div className="space-y-4">
+                        {products.map((product) => (
+                          <div key={product.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
+                            <div className="flex items-start justify-between gap-4 mb-4">
+                              <div className="flex-1">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Product Name <span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  value={product.name}
+                                  onChange={(e) => updateProductName(category.id, product.id, e.target.value)}
+                                  placeholder="e.g. Cotton Towel, Bath Mat..."
+                                  className="w-full px-4 py-2 border border-slate-300 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 bg-white"
+                                />
+                              </div>
+                              <button type="button" onClick={() => removeProduct(category.id, product.id)} className="mt-7 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors" title="Remove Product">
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            
+                            {/* Product Photos */}
+                            <div>
+                               <label className="block text-sm font-medium text-slate-700 mb-2">Product Photos (Max 5)</label>
+                               <div className="flex flex-wrap gap-3">
+                                 {product.photos.map((photo, photoIndex) => (
+                                   <div key={photoIndex} className="relative group w-20 h-20 rounded-md overflow-hidden border border-slate-200 bg-white">
+                                     <Image src={photo.preview} alt="Product" fill className="object-cover" />
+                                     <button type="button" onClick={() => removeProductPhoto(category.id, product.id, photoIndex)} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <X className="w-3 h-3" />
+                                     </button>
+                                   </div>
+                                 ))}
+                                 
+                                 {product.photos.length < 5 && (
+                                   <label className="w-20 h-20 rounded-md border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors bg-white">
+                                     <Upload className="w-5 h-5 text-slate-400 mb-1" />
+                                     <input
+                                       type="file"
+                                       accept="image/jpeg,image/png,image/webp"
+                                       multiple
+                                       onChange={(e) => handleProductPhotoUpload(category.id, product.id, e)}
+                                       className="hidden"
+                                     />
+                                   </label>
+                                 )}
+                               </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        <button type="button" onClick={() => addProduct(category.id)} className="inline-flex items-center px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-md transition-colors border border-brand-200">
+                          + Add Another Product
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {isExpanded && !isCategorySelected && (
+                    <div className="px-4 py-4 border-t border-slate-100 bg-slate-50 text-slate-500 text-sm italic">
+                      Please select this category to add products.
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           {errors.selectedCategories && touched.selectedCategories && (
-            <p className="text-red-500 text-sm mt-2">{errors.selectedCategories}</p>
+            <p className="text-red-500 text-sm mt-3">{errors.selectedCategories}</p>
           )}
         </div>
       </section>
 
-      {/* Selected Categories Summary */}
-      {Object.keys(formData.selectedCategories).some(key => formData.selectedCategories[key]?.length > 0) && (
-        <section className="bg-white border border-gray-200 rounded-lg">
-          <div className="px-4 py-3 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Selected Products Summary</h2>
+      {/* Additional Categories & Remarks */}
+      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Additional Categories & Remarks</h2>
+            <p className="text-sm text-slate-600 mt-1">If your products don't fit into the standard categories above, add them here.</p>
           </div>
-          <div className="p-4">
-            <div className="space-y-2">
-              {Object.entries(formData.selectedCategories).map(([categoryId, subCategories]) => {
-                if (!subCategories || (subCategories as string[]).length === 0) return null;
-                const category = categories.find(c => c.id === categoryId || c.name === categoryId);
-
-                if (!category) return null;
-
-                const uniqueSubCategories = Array.from(new Set(subCategories as string[]));
-                return (
-                  <div key={categoryId} className="flex flex-wrap gap-2">
-                    <span className="font-medium text-gray-900 mt-1">{category.name}:</span>
-                    {uniqueSubCategories.map((sub, index) => (
-                      <span key={`${category.id}-${sub}-${index}`} className="px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded">
-                        {sub}
-                      </span>
-                    ))}
-                  </div>
-                );
-              })}
+          <button
+            type="button"
+            onClick={addAdditionalCategory}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-md transition-colors border border-brand-200 whitespace-nowrap"
+          >
+            + Add Custom Category
+          </button>
+        </div>
+        
+        <div className="p-6 space-y-6">
+          {errors.additionalCategories && (
+            <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-600 text-sm">
+              {errors.additionalCategories}
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* Product Photos */}
-      <section className="bg-white border border-gray-200 rounded-lg">
-        <div className="px-4 py-3">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <ImageIcon className="w-5 h-5 mr-2" />
-            Product Photos
-          </h2>
-          <p className="text-sm text-gray-600">Upload sample images of your products (max 10 photos, 5MB each)</p>
-        </div>
-        <div className="p-4">
-          {/* Photo Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
-            {productPhotos.map((photo, index) => (
-              <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200">
-                <Image
-                  src={photo.preview}
-                  alt={`Product ${index + 1}`}
-                  fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 20vw"
-                  className="object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeProductPhoto(index)}
-                  className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-
-            {/* Upload Button */}
-            {productPhotos.length < 10 && (
-              <label className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                <Upload className="w-6 h-6 text-gray-400 mb-1" />
-                <span className="text-xs text-gray-500">Upload</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  onChange={handleProductPhotoUpload}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
-
-          {productPhotos.length > 0 && (
-            <p className="text-xs text-gray-500">{productPhotos.length}/10 photos uploaded</p>
           )}
-        </div>
-      </section>
+          
+          {/* Additional Categories List */}
+          {additionalCategories.length > 0 && (
+            <div className="space-y-6">
+              {additionalCategories.map((category) => (
+                <div key={category.id} className="border border-brand-200 rounded-lg overflow-hidden bg-white shadow-sm shadow-brand-500/5">
+                  <div className="px-4 py-3 bg-brand-50 border-b border-brand-100 flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <label className="sr-only">Custom Category Name</label>
+                      <input
+                        type="text"
+                        value={category.name}
+                        onChange={(e) => updateAdditionalCategoryName(category.id, e.target.value)}
+                        placeholder="e.g. Custom Textile Products"
+                        className="w-full bg-white px-3 py-2 border border-brand-200 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-brand-500 font-semibold text-brand-900 placeholder:text-brand-300 placeholder:font-normal"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAdditionalCategory(category.id)}
+                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                      title="Remove Custom Category"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="p-4 space-y-4">
+                    {category.products.map((product) => (
+                      <div key={product.id} className="p-4 border border-slate-200 rounded-lg bg-white shadow-sm">
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                          <div className="flex-1">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Product Name <span className="text-red-500">*</span></label>
+                            <input
+                              type="text"
+                              value={product.name}
+                              onChange={(e) => updateAdditionalProductName(category.id, product.id, e.target.value)}
+                              placeholder="e.g. Organic Cotton Towels..."
+                              className="w-full px-4 py-2 border border-slate-300 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-brand-500 bg-white"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeAdditionalProduct(category.id, product.id)}
+                            className="mt-7 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        
+                        {/* Product Photos */}
+                        <div>
+                           <label className="block text-sm font-medium text-slate-700 mb-2">Product Photos (Max 5)</label>
+                           <div className="flex flex-wrap gap-3">
+                             {product.photos.map((photo, photoIndex) => (
+                               <div key={photoIndex} className="relative group w-20 h-20 rounded-md overflow-hidden border border-slate-200 bg-slate-50">
+                                 <Image src={photo.preview} alt="Product" fill className="object-cover" />
+                                 <button
+                                   type="button"
+                                   onClick={() => removeAdditionalProductPhoto(category.id, product.id, photoIndex)}
+                                   className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                 >
+                                   <X className="w-3 h-3" />
+                                 </button>
+                               </div>
+                             ))}
+                             
+                             {product.photos.length < 5 && (
+                               <label className="w-20 h-20 rounded-md border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors bg-white">
+                                 <Upload className="w-5 h-5 text-slate-400 mb-1" />
+                                 <input
+                                   type="file"
+                                   accept="image/jpeg,image/png,image/webp"
+                                   multiple
+                                   onChange={(e) => handleAdditionalProductPhotoUpload(category.id, product.id, e)}
+                                   className="hidden"
+                                 />
+                               </label>
+                             )}
+                           </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <button
+                      type="button"
+                      onClick={() => addAdditionalProduct(category.id)}
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-md transition-colors"
+                    >
+                      + Add Another Product
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-      {/* Category Remarks */}
-      <section className="bg-white border border-gray-200 rounded-lg">
-        <div className="px-4 py-3">
-          <h2 className="text-lg font-semibold text-gray-900">Additional Remarks</h2>
-          <p className="text-sm text-gray-600">Any additional information about your product categories</p>
-        </div>
-        <div className="p-4">
-          <textarea
-            value={formData.categoryRemarks}
-            onChange={(e) => handleInputChange('categoryRemarks', e.target.value)}
-            placeholder="Enter any additional remarks about your product categories, specializations, or unique offerings..."
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-          />
+          {/* Fallback to simple remarks */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">General Remarks</label>
+            <textarea
+              value={formData.categoryRemarks}
+              onChange={(e) => handleInputChange('categoryRemarks', e.target.value)}
+              placeholder="Enter any additional remarks, specializations, or unique offerings..."
+              rows={3}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 outline-none resize-none transition-colors text-slate-900"
+            />
+          </div>
         </div>
       </section>
 
       {/* Navigation */}
-      <div className="flex justify-between text-white ">
+      <div className="flex items-center justify-between pt-4 gap-3">
         <Button
           onClick={onPrev}
-          className="px-8 font-bold bg-green-400 hover:bg-gray-300"
+          className="inline-flex items-center gap-2 h-11 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
         >
-          Previous
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+          Back
         </Button>
         <Button
           onClick={handleNext}
-          className="bg-blue-600 hover:bg-blue-700 px-8 font-bold"
+          className="inline-flex items-center gap-2 h-11 px-6 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
         >
-          Continue
+          Save & Continue
+          <ArrowRight className="w-4 h-4" aria-hidden="true" />
         </Button>
       </div>
     </div>

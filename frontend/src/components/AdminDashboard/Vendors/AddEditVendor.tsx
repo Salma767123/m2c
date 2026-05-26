@@ -31,44 +31,74 @@ import VendorTypeProducts from '@/components/VendorHub/VendorTypeProducts/Vendor
 import ManufacturingFacilities from '@/components/VendorHub/ManufacturingFacilities/ManufacturingFacilities'
 import CertificationsLogistics from '@/components/VendorHub/CertificationsLogistics/CertificationsLogistics'
 import ContactTradeInfo from '@/components/VendorHub/ContactTradeInfo/ContactTradeInfo'
-import ReviewSubmit from '@/components/VendorHub/ReviewSubmit/ReviewSubmit'
+import VendorDataSummary from '@/components/VendorHub/ReviewSubmit/VendorDataSummary'
 
 interface VendorFormData {
   // Company Details
   businessType: string
   companyName: string
   gstNumber: string
+  /** Type-specific regulatory ID — IEC / CIN / Deed details / LLPIN. */
+  companyIdNumber: string
+  /** PAN Number — required across all 4 supported business types. */
+  panNumber: string
   email: string
+  email2: string
   phone: string
   landlineNumber: string
   phoneNumber2: string
   website: string
   address: string
+  /** Optional address detail lines collected on Step 1. */
+  addressLine2: string
+  addressLine3: string
+  landmark: string
   city: string
   state: string
   zipCode: string
   country: string
+  /** Factory ownership — owned / rented / lease. Mirrored to warehouse
+   *  `ownershipType` when "Same as warehouse" is checked. */
+  factoryOwnershipType: string
   sameAsWarehouse: boolean
   logo: string | null
   logoFile: File | null
   gstDocument: string | null
   gstFile: File | null
+  /** PAN Card certificate upload. */
+  panCardDocument: string | null
+  panCardFile: File | null
+  /** Type-specific business certificate (IEC / CIN / Deed / LLPIN). */
+  typeCertDocument: string | null
+  typeCertFile: File | null
+  /** Login password for the vendor account (collected on Step 1). */
+  password: string
 
   // Warehouse Details
   ownershipType: string
   warehouseAddress: string
+  /** Warehouse address detail lines collected on Step 2. */
+  warehouseAddressLine2: string
+  warehouseAddressLine3: string
+  warehouseLandmark: string
   warehouseCity: string
   warehouseState: string
   warehouseZip: string
   warehouseCountry: string
   factoryImages: any[]
-  routeMap: string | null
   mapLink: string
 
   // Owner Profile
   ownerName: string
+  /** Owner designation chip — Proprietor / CEO / Director / etc. */
+  designation: string
   ownerEmail: string
+  ownerEmail2: string
   ownerPhone: string
+  ownerPhone2: string
+  ownerLandline: string
+  /** Full ISO date — preferred over legacy yearEstablished. */
+  businessStartDate: string
   yearEstablished: string
   employeeCount: string
   additionalOwners: any[]
@@ -80,6 +110,10 @@ interface VendorFormData {
   expandedCategories: { [key: string]: boolean }
   categoryRemarks?: string
   productPhotos: any[]
+  /** Per-category products from Step 4 — { catId: [{ id, name, photos }] }. */
+  categoryProducts: { [key: string]: unknown[] }
+  /** User-defined custom categories from Step 4. */
+  additionalCategories: unknown[]
 
   // Manufacturing Facilities (if manufacturer)
   enabledFacilities: { [key: string]: boolean }
@@ -148,37 +182,56 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     businessType: '',
     companyName: '',
     gstNumber: '',
+    companyIdNumber: '',
+    panNumber: '',
     email: '',
+    email2: '',
     phone: '',
     landlineNumber: '',
     phoneNumber2: '',
     website: '',
     address: '',
+    addressLine2: '',
+    addressLine3: '',
+    landmark: '',
     city: '',
     state: '',
     zipCode: '',
     country: 'India',
+    factoryOwnershipType: '',
     sameAsWarehouse: false,
     logo: null,
     logoFile: null,
     gstDocument: null,
     gstFile: null,
+    panCardDocument: null,
+    panCardFile: null,
+    typeCertDocument: null,
+    typeCertFile: null,
+    password: '',
 
     // Warehouse Details
     ownershipType: '',
     warehouseAddress: '',
+    warehouseAddressLine2: '',
+    warehouseAddressLine3: '',
+    warehouseLandmark: '',
     warehouseCity: '',
     warehouseState: '',
     warehouseZip: '',
     warehouseCountry: 'India',
     factoryImages: [],
-    routeMap: null,
     mapLink: '',
 
     // Owner Profile
     ownerName: '',
+    designation: '',
     ownerEmail: '',
+    ownerEmail2: '',
     ownerPhone: '',
+    ownerPhone2: '',
+    ownerLandline: '',
+    businessStartDate: '',
     yearEstablished: '',
     employeeCount: '',
     additionalOwners: [],
@@ -190,6 +243,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     expandedCategories: {},
     categoryRemarks: '',
     productPhotos: [],
+    categoryProducts: {},
+    additionalCategories: [],
 
     // Manufacturing Facilities
     enabledFacilities: {},
@@ -350,31 +405,54 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       // Parse mainContact from backend (stored as JSON)
       const mainContactData = vendor.mainContact || {}
 
+      // Resolve uploaded document URLs by type so the form can preview
+      // existing files. Each registration cert (PAN / business reg) lands
+      // as a VendorDocument row keyed by `type`.
+      const findDocUrl = (type: string): string | null =>
+        vendor.documents?.find((doc: { type: string; documentUrl: string }) => doc.type === type)?.documentUrl || null;
+
       // Map vendor data to form structure
       setFormData({
         // Company Details
         businessType: (vendor.companyType && companyTypeMap[vendor.companyType]) || 'corporation',
         companyName: vendor.companyName || '',
         gstNumber: vendor.gstNumber || '',
+        companyIdNumber: vendor.companyIdNumber || '',
+        panNumber: vendor.panNumber || '',
         email: vendor.businessEmail || vendor.email || '',
+        email2: vendor.businessEmail2 || '',
         phone: vendor.businessPhone || '',
         landlineNumber: vendor.landlineNumber || '',
         phoneNumber2: vendor.phoneNumber2 || '',
         website: vendor.website || '',
         address: vendor.businessAddress || '',
+        addressLine2: vendor.addressLine2 || '',
+        addressLine3: vendor.addressLine3 || '',
+        landmark: vendor.landmark || '',
         city: vendor.businessCity || '',
         state: vendor.businessState || '',
         zipCode: vendor.businessZipCode || '',
         country: vendor.businessCountry || 'India',
+        factoryOwnershipType: vendor.factoryOwnershipType || '',
         sameAsWarehouse: false,
         logo: vendor.companyLogo || null,
         logoFile: null,
-        gstDocument: vendor.documents?.find((doc: any) => doc.type === 'GST_CERTIFICATE')?.documentUrl || null,
+        gstDocument: findDocUrl('GST_CERTIFICATE'),
         gstFile: null,
+        panCardDocument: findDocUrl('PAN_CARD'),
+        panCardFile: null,
+        typeCertDocument: findDocUrl('COMPANY_REGISTRATION'),
+        typeCertFile: null,
+        // Password is never returned by the server — left empty in edit mode.
+        // Admins should not be able to read/edit existing passwords from here.
+        password: '',
 
         // Warehouse Details
         ownershipType: vendor.ownershipType || 'owned',
         warehouseAddress: vendor.warehouseAddress || '',
+        warehouseAddressLine2: vendor.warehouseAddressLine2 || '',
+        warehouseAddressLine3: vendor.warehouseAddressLine3 || '',
+        warehouseLandmark: vendor.warehouseLandmark || '',
         warehouseCity: vendor.warehouseCity || '',
         warehouseState: vendor.warehouseState || '',
         warehouseZip: vendor.warehouseZipCode || '',
@@ -385,20 +463,32 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           id: doc.id || `existing-${index}`,
           isExisting: true,
         })) || [],
-        routeMap: null,
         mapLink: vendor.mapLink || '',
 
         // Owner Profile
         ownerName: vendor.ownerName || '',
+        designation: vendor.designation || '',
         ownerEmail: vendor.ownerEmail || '',
+        ownerEmail2: vendor.ownerEmail2 || '',
         ownerPhone: vendor.ownerPhone || '',
+        ownerPhone2: vendor.ownerPhone2 || '',
+        ownerLandline: vendor.ownerLandline || '',
+        businessStartDate: vendor.businessStartDate
+          ? new Date(vendor.businessStartDate).toISOString().split('T')[0]
+          : '',
         yearEstablished: vendor.establishedYear?.toString() || '',
         employeeCount: vendor.annualTurnover || '',
         additionalOwners: vendor.additionalOwners || [],
 
         // Vendor Type & Products
-        vendorType: vendor.vendorType === 'TEXTILE_MANUFACTURER' ? ['manufacturer'] : ['trader'],
+        // Prefer the new multi-select `vendorTypes` array when present; fall
+        // back to the legacy single-enum mapping for older rows.
+        vendorType: Array.isArray(vendor.vendorTypes) && vendor.vendorTypes.length > 0
+          ? vendor.vendorTypes
+          : vendor.vendorType === 'TEXTILE_MANUFACTURER' ? ['manufacturer'] : ['trader'],
         marketType: vendor.primaryMarkets || [],
+        categoryProducts: (vendor.categoryProducts as { [key: string]: unknown[] }) || {},
+        additionalCategories: vendor.additionalCategories || [],
         selectedCategories: mappedSelectedCategories,
         expandedCategories: {},
         categoryRemarks: vendor.categoryRemarks || '',
@@ -438,12 +528,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           }
           return acc
         }, {}) || {},
-        packagingCapabilities: '',
+        packagingCapabilities: vendor.packagingCapabilities || '',
         warehousingCapacity: vendor.storageCapacity || '',
-        logisticsPartners: '',
+        logisticsPartners: vendor.logisticsPartners || '',
         shippingMethods: vendor.shippingMethods || [],
         qualityControlProcess: vendor.qualityControl || '',
-        complianceStandards: '',
+        complianceStandards: vendor.complianceStandards || '',
 
         // Contact & Trade Info
         mainContact: {
@@ -457,22 +547,29 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           photo: mainContactData.photo || vendor.ownerPhoto || null
         },
         alternateContacts: vendor.alternateContacts || [],
-        hasImportExport: vendor.exportExperience ? 'yes' : 'no',
+        // Treat either flag as "yes" so the FE chip reflects any kind of
+        // international trade experience the vendor declared.
+        hasImportExport: (vendor.importExperience || vendor.exportExperience) ? 'yes' : 'no',
         importCountries: vendor.importCountries || [],
         exportCountries: vendor.exportCountries || [],
         tradeLicenseNumber: vendor.tradeLicenseNumber || '',
         businessRegistrationNumber: vendor.businessRegistrationNumber || '',
         taxIdentificationNumber: vendor.taxIdentificationNumber || '',
+        // Bank detail load — match the columns the backend now writes
+        // (swiftCode → swiftCode column, NOT ifscCode). Older rows may
+        // still have a SWIFT value mistakenly stored as `ifscCode` from
+        // the pre-Step-7-fix era; fall back to that so legacy data still
+        // populates the form correctly.
         bankingDetails: vendor.bankDetails ? {
           bankName: vendor.bankDetails.bankName || '',
           accountNumber: vendor.bankDetails.accountNumber || '',
-          swiftCode: vendor.bankDetails.ifscCode || '',
-          iban: ''
+          swiftCode: vendor.bankDetails.swiftCode || vendor.bankDetails.ifscCode || '',
+          iban: vendor.bankDetails.iban || '',
         } : {
           bankName: '',
           accountNumber: '',
           swiftCode: '',
-          iban: ''
+          iban: '',
         },
 
         // Status
@@ -633,7 +730,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {isLoadingVendorData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-(--z-modal-backdrop)">
           <div className="bg-white rounded-lg p-6 flex flex-col items-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-700 mb-4"></div>
             <p className="text-gray-700 font-medium">Loading vendor data...</p>
@@ -641,8 +738,9 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         </div>
       )}
       <div className="flex h-full">
-        {/* Left Sidebar - Progress Steps */}
-        <div className="w-1/5 bg-white shadow-lg border-r border-gray-200 rounded-lg">
+        {/* Left Sidebar — Progress Steps. Fixed 272px width per DESIGN.md
+            sidebar spec, matching VendorPanel (public registration flow). */}
+        <div className="w-68 bg-white shadow-lg border-r border-gray-200 rounded-lg">
           <div className="p-6">
             <div className="flex items-center gap-3 mb-6">
               <Button
@@ -670,18 +768,18 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                   <div
                     key={index}
                     className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${isCurrent
-                      ? 'bg-gray-200 border-r-4 border-[#313131] cursor-pointer'
+                      ? 'bg-brand-50/50 border-r-4 border-brand-500 cursor-pointer'
                       : isCompleted
-                        ? 'bg-green-50 hover:bg-green-100 cursor-pointer'
+                        ? 'bg-success-50 hover:bg-success-50/70 cursor-pointer'
                         : 'bg-gray-50 opacity-60 cursor-not-allowed'
                       }`}
                     onClick={() => goToStep(index)}
                   >
                     <div
                       className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isCurrent
-                        ? 'bg-[#313131] text-white'
+                        ? 'bg-brand-500 text-white'
                         : isCompleted
-                          ? 'bg-green-600 text-white'
+                          ? 'bg-success-500 text-white'
                           : 'bg-gray-300 text-gray-500'
                         }`}
                     >
@@ -701,19 +799,19 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                     <div className="flex-1">
                       <p
                         className={`text-sm font-medium ${isCurrent
-                          ? 'text-[#313131]'
+                          ? 'text-brand-700'
                           : isCompleted
-                            ? 'text-green-900'
+                            ? 'text-success-700'
                             : 'text-gray-400'
                           }`}
                       >
                         {step.title}
                       </p>
                       {isCurrent && (
-                        <p className="text-xs text-[#313131] mt-1">Current Step</p>
+                        <p className="text-xs text-brand-600 mt-1">Current Step</p>
                       )}
                       {isCompleted && (
-                        <p className="text-xs text-green-600 mt-1">Completed</p>
+                        <p className="text-xs text-success-500 mt-1">Completed</p>
                       )}
                       {isLocked && (
                         <p className="text-xs text-gray-400 mt-1">Locked</p>
@@ -734,7 +832,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
-                  className="bg-[#313131] h-2 rounded-full transition-all duration-300"
+                  className="bg-linear-to-r from-brand-500 to-brand-600 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${((currentStep) / (filteredSteps.length - 1)) * 100}%` }}
                 ></div>
               </div>
@@ -749,17 +847,17 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
               {/* Step Header */}
               <div className="mb-8">
                 <div className="flex items-center space-x-4 mb-4">
-                  <div className="flex items-center justify-center w-10 h-10 bg-[#313131] text-white rounded-full font-semibold">
+                  <div className="flex items-center justify-center w-10 h-10 bg-brand-500 text-white rounded-full font-semibold">
                     {currentStep + 1}
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-900">{filteredSteps[currentStep].title}</h1>
+                    <h1 className="text-headline-md text-gray-900">{filteredSteps[currentStep].title}</h1>
                     <p className="text-gray-600">Step {currentStep + 1} of {filteredSteps.length}</p>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-1">
                   <div
-                    className="bg-[#313131] h-1 rounded-full transition-all duration-300"
+                    className="bg-brand-500 h-1 rounded-full transition-all duration-300"
                     style={{ width: `${((currentStep + 1) / filteredSteps.length) * 100}%` }}
                   ></div>
                 </div>
@@ -862,109 +960,10 @@ function AdminReviewSubmitStep({
         </div>
       </div>
 
-      {/* Vendor Data Summary - Read Only */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Vendor Information Summary</h3>
-
-        <div className="space-y-6">
-          {/* Company Details */}
-          <div>
-            <h4 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
-              Company Details
-              <button
-                onClick={() => onGoToStep(0)}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                Edit
-              </button>
-            </h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">Company Name:</span>
-                <span className="ml-2 font-medium">{formData.companyName || 'Not provided'}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">GST Number:</span>
-                <span className="ml-2 font-medium">{formData.gstNumber || 'Not provided'}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Email:</span>
-                <span className="ml-2 font-medium">{formData.email || 'Not provided'}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Phone:</span>
-                <span className="ml-2 font-medium">{formData.phone || 'Not provided'}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Business Type:</span>
-                <span className="ml-2 font-medium capitalize">{formData.businessType || 'Not provided'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Owner Details */}
-          <div>
-            <h4 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
-              Owner Information
-              <button
-                onClick={() => onGoToStep(2)}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                Edit
-              </button>
-            </h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">Owner Name:</span>
-                <span className="ml-2 font-medium">{formData.ownerName || 'Not provided'}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Owner Email:</span>
-                <span className="ml-2 font-medium">{formData.ownerEmail || 'Not provided'}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Owner Phone:</span>
-                <span className="ml-2 font-medium">{formData.ownerPhone || 'Not provided'}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Year Established:</span>
-                <span className="ml-2 font-medium">{formData.yearEstablished || 'Not provided'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Vendor Type */}
-          <div>
-            <h4 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
-              Vendor Type & Products
-              <button
-                onClick={() => onGoToStep(3)}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                Edit
-              </button>
-            </h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">Vendor Type:</span>
-                <span className="ml-2 font-medium capitalize">
-                  {Array.isArray(formData.vendorType)
-                    ? formData.vendorType.join(', ')
-                    : formData.vendorType || 'Not provided'}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-600">Market Type:</span>
-                <span className="ml-2 font-medium capitalize">
-                  {Array.isArray(formData.marketType)
-                    ? formData.marketType.join(', ')
-                    : formData.marketType || 'Not provided'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Shared read-only vendor summary — same component the public
+          ReviewSubmit (Step 8) uses, so admin + vendor review surfaces
+          stay field-identical by construction. */}
+      <VendorDataSummary data={formData} onGoToStep={onGoToStep} />
 
       {/* Admin Submit Button */}
       <div className="flex justify-between pt-4">
@@ -978,7 +977,7 @@ function AdminReviewSubmitStep({
         <Button
           onClick={handleAdminSubmit}
           disabled={isSubmitting}
-          className="bg-[#313131] text-white hover:bg-[#222222] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <>

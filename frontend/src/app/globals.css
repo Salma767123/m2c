@@ -12,7 +12,11 @@ button, [role="button"], a, select, summary, [type="checkbox"], [type="radio"] {
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+    /* --primary / --ring point to brand red (#e01a1b ≈ HSL 0 78% 49%) so
+       `bg-primary` / `ring-primary` resolve to the M2C brand rather than
+       black. (Earlier this was `0 0% 9%`, which silently rendered every
+       `bg-primary` as black across the app.) See /DESIGN.md. */
+    --primary: 0 78% 49%;
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
@@ -24,13 +28,25 @@ button, [role="button"], a, select, summary, [type="checkbox"], [type="radio"] {
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --ring: 0 78% 49%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+
+    /* ── Z-index scale (DESIGN.md → semantic layering) ──
+       Use via `style={{ zIndex: 'var(--z-modal)' }}` or
+       arbitrary Tailwind: `className="z-[var(--z-modal)]"`.
+       Document any new layer here before introducing it. */
+    --z-base: 0;
+    --z-dropdown: 100;        /* CountryDialPicker, CountrySelect, etc. */
+    --z-sticky: 200;          /* VendorHeader, table sticky rows */
+    --z-modal-backdrop: 300;
+    --z-modal: 400;
+    --z-toast: 500;           /* Toaster — global toast layer */
+    --z-tooltip: 600;
   }
 
   .dark {
@@ -62,8 +78,103 @@ button, [role="button"], a, select, summary, [type="checkbox"], [type="radio"] {
 }
 
 @theme inline {
+  /* ───────────────────────────────────────────────────────────────
+   * M2C MarkDowns Design System — see /DESIGN.md for the spec.
+   * Tokens are organised: fonts → 4 colour families → surfaces →
+   * typography (9 levels) → shadows. Z-index scale lives in :root
+   * below (Tailwind v4 doesn't have a --z-* prefix yet).
+   * ─────────────────────────────────────────────────────────────── */
+
   --font-sans: var(--font-outfit);
   --font-playfair: var(--font-playfair);
+
+  /* ── Brand red ── primary actions, selected states, focus rings.
+     Kept distinct from --color-error-* so "active selection" never
+     reads as a validation failure. */
+  --color-brand-50: #fff1f1;
+  --color-brand-100: #ffdede;
+  --color-brand-200: #ffc1c1;
+  --color-brand-400: #f24344;
+  --color-brand-500: #e01a1b;
+  --color-brand-600: #c41617;
+  --color-brand-700: #a31314;
+
+  /* ── Success green ── completion states, valid badges.
+     Matches Stitch overrideSecondaryColor (= Tailwind green-600). */
+  --color-success-50: #ecfdf3;
+  --color-success-500: #16a34a;
+  --color-success-700: #15803d;
+
+  /* ── Tertiary blue ── info actions, link-style buttons.
+     Distinct from primary so "info" never collides with a primary CTA. */
+  --color-tertiary-50: #f5f7ff;
+  --color-tertiary-500: #0074c8;
+
+  /* ── Error red ── validation failures, destructive confirmations.
+     Slightly darker / cooler than brand red. */
+  --color-error-50: #ffdad6;
+  --color-error-500: #ba1a1a;
+
+  /* ── Surfaces ── canvas under cards. Card surface is plain white
+     (Tailwind's bg-white already covers it). Outline is the standard
+     1px border colour used on cards/inputs/containers. */
+  --color-surface-canvas: #f7f7f5;
+  --color-outline: #e5e7eb;
+
+  /* ── Typography ── 9 named levels per DESIGN.md. Tailwind v4 syntax:
+     --text-X declares the size, --text-X--line-height/letter-spacing/
+     font-weight set the matching metadata. Utilities: text-display-lg,
+     text-headline-md, text-body-md, text-label-sm, etc. */
+  --text-display-lg: 48px;
+  --text-display-lg--line-height: 56px;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 700;
+
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 40px;
+  --text-headline-lg--letter-spacing: -0.01em;
+  --text-headline-lg--font-weight: 600;
+
+  --text-headline-md: 24px;
+  --text-headline-md--line-height: 32px;
+  --text-headline-md--font-weight: 600;
+
+  --text-headline-sm: 20px;
+  --text-headline-sm--line-height: 28px;
+  --text-headline-sm--font-weight: 600;
+
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+
+  --text-body-md: 16px;
+  --text-body-md--line-height: 24px;
+
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 20px;
+
+  --text-label-lg: 14px;
+  --text-label-lg--line-height: 20px;
+  --text-label-lg--font-weight: 600;
+  --text-label-lg--letter-spacing: 0.02em;
+
+  --text-label-md: 12px;
+  --text-label-md--line-height: 16px;
+  --text-label-md--font-weight: 600;
+  --text-label-md--letter-spacing: 0.04em;
+
+  --text-label-sm: 11px;
+  --text-label-sm--line-height: 14px;
+  --text-label-sm--font-weight: 500;
+  --text-label-sm--letter-spacing: 0.05em;
+
+  /* ── Shadows ── elevation scale per DESIGN.md.
+     Low-contrast by design — system relies on borders + tonal layers,
+     not heavy shadows. Utilities: shadow-card-rest, shadow-card-hover,
+     shadow-dropdown, shadow-modal. */
+  --shadow-card-rest:  0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-dropdown:   0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-modal:      0 20px 40px rgba(15, 23, 42, 0.16);
 }
 
 body {

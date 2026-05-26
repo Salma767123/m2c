@@ -54,6 +54,8 @@ const upload = multer({
 const vendorUploadFields = upload.fields([
   { name: 'logo', maxCount: 1 },
   { name: 'gstDocument', maxCount: 1 },
+  { name: 'panCardFile', maxCount: 1 },
+  { name: 'typeCertFile', maxCount: 1 },
   { name: 'ownerPhoto', maxCount: 1 },
   { name: 'factoryImages', maxCount: 10 },
   { name: 'productPhotos', maxCount: 10 },
@@ -73,6 +75,8 @@ const handleUploadError = (error, req, res, next) => {
     const fieldLabels = {
       'logo': 'Company Logo',
       'gstDocument': 'GST Certificate',
+      'panCardFile': 'PAN Card',
+      'typeCertFile': 'Business Registration Certificate',
       'ownerPhoto': 'Owner/Contact Photo',
       'factoryImages': 'Factory Images',
       'productPhotos': 'Product Photos',

@@ -552,6 +552,16 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   </div>
                 </div>
 
+                {(vendor as any).businessEmail2 && (
+                  <div className="flex items-center space-x-3">
+                    <Mail className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600">Business Email 2</p>
+                      <p className="font-medium">{(vendor as any).businessEmail2}</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center space-x-3">
                   <Phone className="h-4 w-4 text-gray-400" />
                   <div>
@@ -658,17 +668,51 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <p className="text-sm text-gray-600">Name</p>
                   <p className="font-medium">{vendor.ownerName}</p>
                 </div>
+                {(vendor as any).designation && (
+                  <div>
+                    <p className="text-sm text-gray-600">Designation</p>
+                    <p className="font-medium">{(vendor as any).designation}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-gray-600">Email</p>
                   <p className="font-medium">{vendor.ownerEmail}</p>
                 </div>
+                {(vendor as any).ownerEmail2 && (
+                  <div>
+                    <p className="text-sm text-gray-600">Email 2</p>
+                    <p className="font-medium">{(vendor as any).ownerEmail2}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-gray-600">Phone</p>
                   <p className="font-medium">{vendor.ownerPhone}</p>
                 </div>
+                {(vendor as any).ownerPhone2 && (
+                  <div>
+                    <p className="text-sm text-gray-600">Phone 2</p>
+                    <p className="font-medium">{(vendor as any).ownerPhone2}</p>
+                  </div>
+                )}
+                {(vendor as any).ownerLandline && (
+                  <div>
+                    <p className="text-sm text-gray-600">Landline</p>
+                    <p className="font-medium">{(vendor as any).ownerLandline}</p>
+                  </div>
+                )}
+                {(vendor as any).businessStartDate && (
+                  <div>
+                    <p className="text-sm text-gray-600">Business Start Date</p>
+                    <p className="font-medium">{new Date((vendor as any).businessStartDate).toLocaleDateString()}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-gray-600">Vendor Type</p>
-                  <p className="font-medium capitalize">{vendor.vendorType.replace('_', ' ')}</p>
+                  <p className="font-medium capitalize">
+                    {Array.isArray((vendor as any).vendorTypes) && (vendor as any).vendorTypes.length > 0
+                      ? (vendor as any).vendorTypes.join(', ')
+                      : vendor.vendorType.replace(/_/g, ' ').toLowerCase()}
+                  </p>
                 </div>
               </div>
             </div>
@@ -803,15 +847,70 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
 }
 
 function DetailsTab({ vendor }: { vendor: VendorProfile }) {
+  // Resolve a friendly label for `companyIdNumber` based on the business
+  // entity type. The actual regulatory ID is IEC for proprietorships,
+  // CIN for Pvt Ltd, Deed details for partnerships, LLPIN for LLPs.
+  const v = vendor as any;
+  const idLabelByType: Record<string, string> = {
+    'proprietorship': 'IEC Code',
+    'pvt-ltd': 'CIN Number',
+    'partnership-firm': 'Partnership Deed',
+    'llp': 'LLPIN Number',
+  };
+  const companyIdLabel = idLabelByType[v.businessType] || 'Business Registration ID';
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Identification & Compliance — legal IDs collected on Step 1
+          (CompanyDetails). Surfaced here so admins can verify against
+          uploaded certificates during approval review. */}
+      {(v.companyIdNumber || v.panNumber || v.factoryOwnershipType) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <FileText className="h-5 w-5" />
+              <span>Identification &amp; Compliance</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {v.companyIdNumber && (
+                <div>
+                  <p className="text-sm text-gray-600">{companyIdLabel}</p>
+                  <p className="font-medium">{v.companyIdNumber}</p>
+                </div>
+              )}
+              {v.panNumber && (
+                <div>
+                  <p className="text-sm text-gray-600">PAN Number</p>
+                  <p className="font-medium">{v.panNumber}</p>
+                </div>
+              )}
+              {v.factoryOwnershipType && (
+                <div>
+                  <p className="text-sm text-gray-600">Factory Ownership</p>
+                  <p className="font-medium capitalize">{v.factoryOwnershipType}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Business Address</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-1">
             <p>{vendor.businessAddress}</p>
+            {v.addressLine2 && <p>{v.addressLine2}</p>}
+            {v.addressLine3 && <p>{v.addressLine3}</p>}
+            {v.landmark && (
+              <p className="text-sm text-gray-600">
+                <span className="font-semibold">Landmark:</span> {v.landmark}
+              </p>
+            )}
             <p>{vendor.businessCity}, {vendor.businessState} {vendor.businessZipCode}</p>
             <p>{vendor.businessCountry}</p>
           </div>
@@ -839,6 +938,17 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                 <div>
                   <p className="text-sm text-gray-600 font-semibold mb-1">Warehouse Address</p>
                   <p className="font-medium">{vendor.warehouseAddress}</p>
+                  {(vendor as any).warehouseAddressLine2 && (
+                    <p className="font-medium">{(vendor as any).warehouseAddressLine2}</p>
+                  )}
+                  {(vendor as any).warehouseAddressLine3 && (
+                    <p className="font-medium">{(vendor as any).warehouseAddressLine3}</p>
+                  )}
+                  {(vendor as any).warehouseLandmark && (
+                    <p className="text-sm text-gray-600">
+                      <span className="font-semibold">Landmark:</span> {(vendor as any).warehouseLandmark}
+                    </p>
+                  )}
                   <p className="font-medium">
                     {vendor.warehouseCity}, {vendor.warehouseState} {vendor.warehouseZipCode}
                   </p>
@@ -947,6 +1057,11 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
 }
 
 function ProductsTab({ vendor }: { vendor: VendorProfile }) {
+  const v = vendor as any;
+  const vendorTypesArray: string[] = Array.isArray(v.vendorTypes) && v.vendorTypes.length > 0
+    ? v.vendorTypes
+    : [vendor.vendorType.replace(/_/g, ' ').toLowerCase()];
+
   return (
     <div className="space-y-6">
       <Card>
@@ -954,9 +1069,11 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
           <CardTitle>Vendor Type</CardTitle>
         </CardHeader>
         <CardContent>
-          <Badge className="bg-blue-100 text-blue-800 capitalize">
-            {vendor.vendorType.replace('_', ' ')}
-          </Badge>
+          <div className="flex flex-wrap gap-2">
+            {vendorTypesArray.map((t) => (
+              <Badge key={t} className="bg-blue-100 text-blue-800 capitalize">{t}</Badge>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -1035,6 +1152,93 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 whitespace-pre-wrap">{(vendor as any).categoryRemarks}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Per-category Products — vendor-declared items under each selected
+          category, with photos uploaded to Cloudinary. Shape:
+          { [categoryId]: Array<{ id, name, photos: [{ preview, ... }] }> }. */}
+      {v.categoryProducts && typeof v.categoryProducts === 'object' && Object.keys(v.categoryProducts).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Products by Category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-5">
+              {Object.entries(v.categoryProducts).map(([catId, products]) => {
+                const list = Array.isArray(products) ? products : [];
+                if (list.length === 0) return null;
+                return (
+                  <div key={catId}>
+                    <p className="text-sm font-semibold text-gray-700 mb-2">{catId}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {list.map((p: any, i: number) => (
+                        <div key={p.id || i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                          <p className="font-medium text-gray-900 truncate">{p.name || `Product ${i + 1}`}</p>
+                          {Array.isArray(p.photos) && p.photos.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {p.photos.slice(0, 5).map((photo: any, j: number) => (
+                                <img
+                                  key={j}
+                                  src={photo.preview || photo.url}
+                                  alt={`${p.name || 'Product'} photo ${j + 1}`}
+                                  className="w-12 h-12 object-cover rounded border border-gray-200"
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* User-defined custom categories — vendor created their own category
+          outside the master catalog. Same shape as categoryProducts but the
+          category itself is a free-text name. */}
+      {Array.isArray(v.additionalCategories) && v.additionalCategories.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Additional (Custom) Categories</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-5">
+              {v.additionalCategories.map((cat: any) => (
+                <div key={cat.id}>
+                  <p className="text-sm font-semibold text-gray-700 mb-2">
+                    {cat.name || 'Unnamed Category'}
+                    <Badge className="ml-2 bg-orange-50 text-orange-700 border border-orange-200">Custom</Badge>
+                  </p>
+                  {Array.isArray(cat.products) && cat.products.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {cat.products.map((p: any, i: number) => (
+                        <div key={p.id || i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                          <p className="font-medium text-gray-900 truncate">{p.name || `Product ${i + 1}`}</p>
+                          {Array.isArray(p.photos) && p.photos.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {p.photos.slice(0, 5).map((photo: any, j: number) => (
+                                <img
+                                  key={j}
+                                  src={photo.preview || photo.url}
+                                  alt={`${p.name || 'Product'} photo ${j + 1}`}
+                                  className="w-12 h-12 object-cover rounded border border-gray-200"
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1136,8 +1340,18 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="flex items-center space-x-3">
                     <Award className="h-8 w-8 text-yellow-500" />
                     <div>
-                      <p className="font-medium">{cert.name}</p>
-                      <p className="text-sm text-gray-600">Issued by: {cert.issuedBy}</p>
+                      <p className="font-medium flex items-center gap-2">
+                        {cert.name}
+                        {(cert as any).isCustom && (
+                          <Badge className="bg-orange-50 text-orange-700 border border-orange-200">Custom</Badge>
+                        )}
+                      </p>
+                      {cert.issuedBy && (
+                        <p className="text-sm text-gray-600">Issued by: {cert.issuedBy}</p>
+                      )}
+                      {(cert as any).description && (
+                        <p className="text-sm text-gray-700 mt-1">{(cert as any).description}</p>
+                      )}
                       {cert.expiryDate && (
                         <p className="text-xs text-gray-500">Expires: {new Date(cert.expiryDate).toLocaleDateString()}</p>
                       )}
@@ -1166,34 +1380,70 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
         </Card>
       )}
 
-      {vendor.shippingMethods && vendor.shippingMethods.length > 0 && (
+      {((vendor.shippingMethods && vendor.shippingMethods.length > 0) ||
+        vendor.deliveryTime ||
+        vendor.minimumOrderQuantity ||
+        (vendor as any).packagingCapabilities ||
+        (vendor as any).logisticsPartners ||
+        (vendor as any).complianceStandards ||
+        ((vendor as any).paymentTerms?.length > 0)) && (
         <Card>
           <CardHeader>
-            <CardTitle>Logistics & Shipping</CardTitle>
+            <CardTitle>Logistics &amp; Compliance</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div>
-              <p className="text-sm text-gray-600 mb-2">Shipping Methods</p>
-              <div className="flex flex-wrap gap-2">
-                {vendor.shippingMethods.map((method, index) => (
-                  <Badge key={index} className="bg-indigo-100 text-indigo-800">
-                    {method}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {vendor.deliveryTime && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-600">Delivery Time</p>
-                <p className="font-medium">{vendor.deliveryTime}</p>
+          <CardContent className="space-y-4">
+            {vendor.shippingMethods && vendor.shippingMethods.length > 0 && (
+              <div>
+                <p className="text-sm text-gray-600 mb-2">Shipping Methods</p>
+                <div className="flex flex-wrap gap-2">
+                  {vendor.shippingMethods.map((method, index) => (
+                    <Badge key={index} className="bg-indigo-100 text-indigo-800 capitalize">{method}</Badge>
+                  ))}
+                </div>
               </div>
             )}
 
-            {vendor.minimumOrderQuantity && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-600">Minimum Order Quantity</p>
-                <p className="font-medium">{vendor.minimumOrderQuantity}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {vendor.deliveryTime && (
+                <div>
+                  <p className="text-sm text-gray-600">Delivery Time</p>
+                  <p className="font-medium">{vendor.deliveryTime}</p>
+                </div>
+              )}
+              {vendor.minimumOrderQuantity && (
+                <div>
+                  <p className="text-sm text-gray-600">Minimum Order Quantity</p>
+                  <p className="font-medium">{vendor.minimumOrderQuantity}</p>
+                </div>
+              )}
+              {Array.isArray((vendor as any).paymentTerms) && (vendor as any).paymentTerms.length > 0 && (
+                <div className="md:col-span-2">
+                  <p className="text-sm text-gray-600 mb-1.5">Payment Terms</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(vendor as any).paymentTerms.map((t: string) => (
+                      <Badge key={t} className="bg-slate-100 text-slate-700">{t}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {(vendor as any).packagingCapabilities && (
+              <div>
+                <p className="text-sm text-gray-600">Packaging Capabilities</p>
+                <p className="font-medium whitespace-pre-wrap">{(vendor as any).packagingCapabilities}</p>
+              </div>
+            )}
+            {(vendor as any).logisticsPartners && (
+              <div>
+                <p className="text-sm text-gray-600">Logistics Partners</p>
+                <p className="font-medium whitespace-pre-wrap">{(vendor as any).logisticsPartners}</p>
+              </div>
+            )}
+            {(vendor as any).complianceStandards && (
+              <div>
+                <p className="text-sm text-gray-600">Compliance Standards</p>
+                <p className="font-medium whitespace-pre-wrap">{(vendor as any).complianceStandards}</p>
               </div>
             )}
           </CardContent>
@@ -1303,15 +1553,40 @@ function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, 
           </div>
 
           <div className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-600">IFSC / Swift Code</p>
-              <p className="font-medium">{bankDetails.ifscCode || bankDetails.swiftCode || 'N/A'}</p>
-            </div>
+            {bankDetails.swiftCode && (
+              <div>
+                <p className="text-sm text-gray-600">SWIFT / BIC Code</p>
+                <p className="font-medium font-mono">{bankDetails.swiftCode}</p>
+              </div>
+            )}
 
-            <div>
-              <p className="text-sm text-gray-600">Account Type</p>
-              <p className="font-medium capitalize">{bankDetails.accountType || 'N/A'}</p>
-            </div>
+            {bankDetails.iban && (
+              <div>
+                <p className="text-sm text-gray-600">IBAN</p>
+                <p className="font-medium font-mono break-all">{bankDetails.iban}</p>
+              </div>
+            )}
+
+            {bankDetails.ifscCode && (
+              <div>
+                <p className="text-sm text-gray-600">IFSC Code</p>
+                <p className="font-medium font-mono">{bankDetails.ifscCode}</p>
+              </div>
+            )}
+
+            {!bankDetails.swiftCode && !bankDetails.iban && !bankDetails.ifscCode && (
+              <div>
+                <p className="text-sm text-gray-600">Routing Code</p>
+                <p className="font-medium text-gray-400">Not provided</p>
+              </div>
+            )}
+
+            {bankDetails.accountType && (
+              <div>
+                <p className="text-sm text-gray-600">Account Type</p>
+                <p className="font-medium capitalize">{bankDetails.accountType}</p>
+              </div>
+            )}
 
             {(bankDetails.branchName || bankDetails.branchAddress) && (
               <div>
@@ -1499,6 +1774,53 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Import / Export — split flags + country lists */}
+      {((vendor as any).importExperience ||
+        (vendor as any).exportExperience ||
+        ((vendor as any).importCountries?.length > 0) ||
+        ((vendor as any).exportCountries?.length > 0)) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Globe className="h-5 w-5" />
+              <span>Import &amp; Export</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Import Experience</p>
+                <p className="font-medium">{(vendor as any).importExperience ? 'Yes' : 'No'}</p>
+                {Array.isArray((vendor as any).importCountries) && (vendor as any).importCountries.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Import Countries</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(vendor as any).importCountries.map((c: string) => (
+                        <Badge key={c} className="bg-blue-50 text-blue-700 border border-blue-200">{c}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Export Experience</p>
+                <p className="font-medium">{(vendor as any).exportExperience ? 'Yes' : 'No'}</p>
+                {Array.isArray((vendor as any).exportCountries) && (vendor as any).exportCountries.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Export Countries</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(vendor as any).exportCountries.map((c: string) => (
+                        <Badge key={c} className="bg-emerald-50 text-emerald-700 border border-emerald-200">{c}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

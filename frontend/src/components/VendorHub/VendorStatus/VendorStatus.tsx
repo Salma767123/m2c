@@ -76,7 +76,7 @@ export default function VendorStatus() {
           <div className={`w-20 h-20 rounded-full ${config.bgColor} flex items-center justify-center mx-auto mb-6`}>
             <Icon className={`w-10 h-10 ${config.color}`} />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">{config.title}</h1>
+          <h1 className="text-headline-lg text-gray-900 mb-4">{config.title}</h1>
           <p className="text-lg text-gray-700 mb-4">{config.message}</p>
           <p className="text-gray-600">{config.description}</p>
         </div>
@@ -185,7 +185,7 @@ export default function VendorStatus() {
           {status === 'approved' && (
             <Button 
               onClick={() => window.location.href = '/vendor/dashboard'}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-success-500 hover:bg-success-700 text-white"
             >
               Go to Dashboard
             </Button>

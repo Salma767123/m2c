@@ -1,9 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Button } from '@/components/UI/Button';
-import { Shield, Upload, Package, Award, CheckCircle, X, FileText, Download, Calendar } from 'lucide-react';
+import {
+  Shield,
+  ShieldCheck,
+  Upload,
+  Package,
+  Award,
+  CheckCircle,
+  X,
+  FileText,
+  Download,
+  Calendar,
+  ArrowLeft,
+  ArrowRight,
+  Leaf,
+  Recycle,
+  Users,
+  BadgeCheck,
+  Globe2,
+  TreePine,
+  HeartHandshake,
+  Factory,
+  Plus,
+  Trash2,
+  Sparkles,
+} from 'lucide-react';
+import { handleUpload } from '@/lib/toast-utils';
 
 interface CertificationsLogisticsProps {
   onNext: () => void;
@@ -12,40 +37,154 @@ interface CertificationsLogisticsProps {
   data: any;
 }
 
-const certifications = [
+// ── Certification catalog ──────────────────────────────────────────────
+// Each entry pairs a Lucide icon with a colour swatch so the cards are
+// visually distinct at a glance (icon + 2-3 letter badge). Colours are
+// hard-coded strings (not template-built) so Tailwind's content scanner
+// picks them up at build time.
+interface CertificationConfig {
+  id: string;
+  name: string;
+  abbreviation: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconBg: string;
+  iconText: string;
+  iconRing: string;
+}
+
+const CERTIFICATIONS: CertificationConfig[] = [
   {
     id: 'oeko-tex',
     name: 'OEKO-TEX',
-    description: 'Textile safety and environmental standards',
-    icon: Shield
+    abbreviation: 'OT',
+    description: 'Textile safety & harmful-substance testing (Standard 100).',
+    icon: Shield,
+    iconBg: 'bg-sky-50',
+    iconText: 'text-sky-600',
+    iconRing: 'ring-sky-200/60',
   },
   {
     id: 'gots',
     name: 'GOTS',
-    description: 'Global Organic Textile Standard',
-    icon: Award
+    abbreviation: 'GO',
+    description: 'Global Organic Textile Standard for organic fibre.',
+    icon: Leaf,
+    iconBg: 'bg-emerald-50',
+    iconText: 'text-emerald-600',
+    iconRing: 'ring-emerald-200/60',
   },
   {
     id: 'grs',
     name: 'GRS',
-    description: 'Global Recycled Standard',
-    icon: CheckCircle
+    abbreviation: 'GR',
+    description: 'Global Recycled Standard for recycled material content.',
+    icon: Recycle,
+    iconBg: 'bg-teal-50',
+    iconText: 'text-teal-600',
+    iconRing: 'ring-teal-200/60',
   },
   {
     id: 'smeta',
-    name: 'SMETA',
-    description: 'Sedex Members Ethical Trade Audit',
-    icon: Shield
-  }
+    name: 'SMETA / Sedex',
+    abbreviation: 'SM',
+    description: 'Sedex Members Ethical Trade Audit — labour & ethics.',
+    icon: Users,
+    iconBg: 'bg-indigo-50',
+    iconText: 'text-indigo-600',
+    iconRing: 'ring-indigo-200/60',
+  },
+  {
+    id: 'iso-9001',
+    name: 'ISO 9001',
+    abbreviation: 'ISO',
+    description: 'Quality Management Systems.',
+    icon: BadgeCheck,
+    iconBg: 'bg-blue-50',
+    iconText: 'text-blue-600',
+    iconRing: 'ring-blue-200/60',
+  },
+  {
+    id: 'iso-14001',
+    name: 'ISO 14001',
+    abbreviation: '14K',
+    description: 'Environmental Management Systems.',
+    icon: Globe2,
+    iconBg: 'bg-green-50',
+    iconText: 'text-green-600',
+    iconRing: 'ring-green-200/60',
+  },
+  {
+    id: 'bsci',
+    name: 'BSCI',
+    abbreviation: 'BS',
+    description: 'Business Social Compliance Initiative (amfori).',
+    icon: ShieldCheck,
+    iconBg: 'bg-purple-50',
+    iconText: 'text-purple-600',
+    iconRing: 'ring-purple-200/60',
+  },
+  {
+    id: 'fsc',
+    name: 'FSC',
+    abbreviation: 'FSC',
+    description: 'Forest Stewardship Council — responsible forestry.',
+    icon: TreePine,
+    iconBg: 'bg-lime-50',
+    iconText: 'text-lime-600',
+    iconRing: 'ring-lime-200/60',
+  },
+  {
+    id: 'fair-trade',
+    name: 'Fair Trade',
+    abbreviation: 'FT',
+    description: 'Fair Trade certified — equitable trade practices.',
+    icon: HeartHandshake,
+    iconBg: 'bg-pink-50',
+    iconText: 'text-pink-600',
+    iconRing: 'ring-pink-200/60',
+  },
+  {
+    id: 'wrap',
+    name: 'WRAP',
+    abbreviation: 'WR',
+    description: 'Worldwide Responsible Accredited Production.',
+    icon: Factory,
+    iconBg: 'bg-orange-50',
+    iconText: 'text-orange-600',
+    iconRing: 'ring-orange-200/60',
+  },
+  {
+    id: 'bci',
+    name: 'BCI',
+    abbreviation: 'BCI',
+    description: 'Better Cotton Initiative — sustainable cotton.',
+    icon: Sparkles,
+    iconBg: 'bg-amber-50',
+    iconText: 'text-amber-600',
+    iconRing: 'ring-amber-200/60',
+  },
 ];
+
+// File upload constraints (Change 12: KB)
+const CERT_ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+const CERT_ALLOWED_LABEL = 'PDF, JPG, or PNG';
+const CERT_MAX_BYTES = 10 * 1024 * 1024;
+const CERT_MAX_LABEL = '10,240 KB';
+
+interface OtherCertification {
+  id: string; // local-only id (timestamp-random)
+  name: string;
+  description: string;
+}
 
 export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, data }: CertificationsLogisticsProps) {
   const [formData, setFormData] = useState({
     selectedCertifications: data.selectedCertifications || [],
     certificationFiles: data.certificationFiles || {},
     certificationExpiryDates: data.certificationExpiryDates || {},
+    otherCertifications: (data.otherCertifications as OtherCertification[]) || [],
     packagingCapabilities: data.packagingCapabilities || '',
-    warehousingCapacity: data.warehousingCapacity || '',
     logisticsPartners: data.logisticsPartners || '',
     shippingMethods: data.shippingMethods || [],
     qualityControlProcess: data.qualityControlProcess || '',
@@ -53,70 +192,152 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
   });
 
   const [uploadErrors, setUploadErrors] = useState<{[key: string]: string}>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // Sync formData with data prop when it changes (for edit mode)
-  useEffect(() => {
-    console.log('CertificationsLogistics: data prop changed', data)
+  // Render-phase sync (Vercel §5.1) — avoids the
+  // `react-hooks/set-state-in-effect` rule.
+  const [prevData, setPrevData] = useState(data);
+  if (data !== prevData) {
+    setPrevData(data);
     setFormData({
       selectedCertifications: data.selectedCertifications || [],
       certificationFiles: data.certificationFiles || {},
       certificationExpiryDates: data.certificationExpiryDates || {},
+      otherCertifications: (data.otherCertifications as OtherCertification[]) || [],
       packagingCapabilities: data.packagingCapabilities || '',
-      warehousingCapacity: data.warehousingCapacity || '',
       logisticsPartners: data.logisticsPartners || '',
       shippingMethods: data.shippingMethods || [],
       qualityControlProcess: data.qualityControlProcess || '',
-      complianceStandards: data.complianceStandards || ''
-    })
-  }, [data])
+      complianceStandards: data.complianceStandards || '',
+    });
+  }
 
-  const handleCertificationToggle = (certId: string) => {
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    if (errors[field]) {
+      if (field === 'qualityControlProcess' && formData.qualityControlProcess.trim()) setErrors(p => ({ ...p, [field]: '' }));
+      if (field === 'complianceStandards' && formData.complianceStandards.trim()) setErrors(p => ({ ...p, [field]: '' }));
+      if (field === 'packagingCapabilities' && formData.packagingCapabilities.trim()) setErrors(p => ({ ...p, [field]: '' }));
+      if (field === 'logisticsPartners' && formData.logisticsPartners.trim()) setErrors(p => ({ ...p, [field]: '' }));
+    }
+  };
+
+  const clearError = (key: string) => {
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const handleCertificationToggle = useCallback((certId: string) => {
     setFormData(prev => {
       const isCurrentlySelected = prev.selectedCertifications.includes(certId);
-      
+
       if (isCurrentlySelected) {
         // Remove certification and clean up associated data
         const newFiles = { ...prev.certificationFiles };
         const newExpiryDates = { ...prev.certificationExpiryDates };
-        
+
         // Clean up file URL if it exists
         if (newFiles[certId] && newFiles[certId].url) {
           URL.revokeObjectURL(newFiles[certId].url);
         }
-        
+
         delete newFiles[certId];
         delete newExpiryDates[certId];
-        
+
+        clearError(`certFile_${certId}`);
+        clearError(`certExpiry_${certId}`);
+
         return {
           ...prev,
           selectedCertifications: prev.selectedCertifications.filter((id: string) => id !== certId),
           certificationFiles: newFiles,
-          certificationExpiryDates: newExpiryDates
+          certificationExpiryDates: newExpiryDates,
         };
       } else {
-        // Add certification
         return {
           ...prev,
-          selectedCertifications: [...prev.selectedCertifications, certId]
+          selectedCertifications: [...prev.selectedCertifications, certId],
         };
       }
     });
-    
-    // Clear any errors for this certification
-    setUploadErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[certId];
-      return newErrors;
-    });
-  };
 
-  const handleShippingMethodToggle = (method: string) => {
+    setUploadErrors(prev => {
+      if (!prev[certId]) return prev;
+      const next = { ...prev };
+      delete next[certId];
+      return next;
+    });
+  }, []);
+
+  // ── Other Certifications (free-form list) ───────────────────────────
+  const handleAddOtherCertification = useCallback(() => {
     setFormData(prev => ({
       ...prev,
-      shippingMethods: prev.shippingMethods.includes(method)
-        ? prev.shippingMethods.filter((m: string) => m !== method)
-        : [...prev.shippingMethods, method]
+      otherCertifications: [
+        ...prev.otherCertifications,
+        {
+          id: `other-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name: '',
+          description: '',
+        },
+      ],
     }));
+  }, []);
+
+  const handleOtherCertificationChange = useCallback(
+    (id: string, field: 'name' | 'description', value: string) => {
+      setFormData(prev => ({
+        ...prev,
+        otherCertifications: prev.otherCertifications.map((c: OtherCertification) =>
+          c.id === id ? { ...c, [field]: value } : c,
+        ),
+      }));
+      if (field === 'name' && value.trim()) clearError(`otherCertName_${id}`);
+    },
+    [],
+  );
+
+  const handleRemoveOtherCertification = useCallback((id: string) => {
+    setFormData(prev => {
+      const newFiles = { ...prev.certificationFiles };
+      const newExpiry = { ...prev.certificationExpiryDates };
+      if (newFiles[id]?.url) URL.revokeObjectURL(newFiles[id].url);
+      delete newFiles[id];
+      delete newExpiry[id];
+
+      clearError(`otherCertName_${id}`);
+      clearError(`otherCertFile_${id}`);
+      clearError(`otherCertExpiry_${id}`);
+
+      return {
+        ...prev,
+        otherCertifications: prev.otherCertifications.filter(
+          (c: OtherCertification) => c.id !== id,
+        ),
+        certificationFiles: newFiles,
+        certificationExpiryDates: newExpiry,
+      };
+    });
+    setUploadErrors(prev => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  const handleShippingMethodToggle = (method: string) => {
+    setFormData(prev => {
+      const next = prev.shippingMethods.includes(method)
+        ? prev.shippingMethods.filter((m: string) => m !== method)
+        : [...prev.shippingMethods, method];
+      if (next.length > 0) clearError('shippingMethods');
+      return { ...prev, shippingMethods: next };
+    });
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -124,6 +345,7 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       ...prev,
       [field]: value
     }));
+    if (value.trim()) clearError(field);
   };
 
   const handleExpiryDateChange = (certId: string, date: string) => {
@@ -134,6 +356,10 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
         [certId]: date
       }
     }));
+    if (date) {
+      clearError(`certExpiry_${certId}`);
+      clearError(`otherCertExpiry_${certId}`);
+    }
   };
 
   // Check if certificate is expired or expiring soon
@@ -155,72 +381,76 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
     }
   };
 
-  // File upload handling
-  const handleFileUpload = (certId: string, file: File) => {
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
-
-    // Validate file type
-    if (!allowedTypes.includes(file.type)) {
-      setUploadErrors(prev => ({
-        ...prev,
-        [certId]: 'Invalid file type. Please upload PDF, JPG, or PNG files only.'
-      }));
+  // ── File upload (Change 12: KB, shared toast pipeline) ─────────────
+  // Routes the validation through `handleUpload` so the success/error
+  // toasts match every other upload flow in the app. Caller can pass a
+  // human label (e.g. "GOTS certificate") for the toast title.
+  const handleFileUpload = useCallback((certId: string, label: string, file: File) => {
+    const result = handleUpload(file, {
+      label: `${label} certificate`,
+      allowedTypes: CERT_ALLOWED_TYPES,
+      allowedLabel: CERT_ALLOWED_LABEL,
+      maxBytes: CERT_MAX_BYTES,
+      maxLabel: CERT_MAX_LABEL,
+    });
+    if (!result.ok) {
+      setUploadErrors(prev => ({ ...prev, [certId]: result.message }));
       return;
     }
 
-    // Validate file size
-    if (file.size > maxSize) {
-      setUploadErrors(prev => ({
-        ...prev,
-        [certId]: 'File size too large. Maximum size is 10MB.'
-      }));
-      return;
-    }
+    clearError(`certFile_${certId}`);
+    clearError(`otherCertFile_${certId}`);
 
-    // Clear any previous errors
     setUploadErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[certId];
-      return newErrors;
+      if (!prev[certId]) return prev;
+      const next = { ...prev };
+      delete next[certId];
+      return next;
     });
 
-    // Create file object with preview URL
-    const fileData = {
-      file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      url: URL.createObjectURL(file),
-      uploadedAt: new Date().toISOString()
-    };
-
-    // Update form data
-    setFormData(prev => ({
-      ...prev,
-      certificationFiles: {
-        ...prev.certificationFiles,
-        [certId]: fileData
+    setFormData(prev => {
+      // Revoke prior blob URL if replacing
+      const prevFile = prev.certificationFiles[certId];
+      if (prevFile?.url && !prevFile.isExisting) {
+        URL.revokeObjectURL(prevFile.url);
       }
-    }));
-  };
+      return {
+        ...prev,
+        certificationFiles: {
+          ...prev.certificationFiles,
+          [certId]: {
+            file,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            url: URL.createObjectURL(file),
+            uploadedAt: new Date().toISOString(),
+          },
+        },
+      };
+    });
+  }, []);
 
-  const handleFileChange = (certId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleFileUpload(certId, file);
-    }
-  };
+  const handleFileChange = useCallback(
+    (certId: string, label: string, event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) handleFileUpload(certId, label, file);
+      // Reset value so re-selecting the same file works
+      event.target.value = '';
+    },
+    [handleFileUpload],
+  );
 
-  const handleFileDrop = (certId: string, event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const file = event.dataTransfer.files?.[0];
-    if (file) {
-      handleFileUpload(certId, file);
-    }
-  };
+  const handleFileDrop = useCallback(
+    (certId: string, label: string, event: React.DragEvent<HTMLElement>) => {
+      event.preventDefault();
+      const file = event.dataTransfer.files?.[0];
+      if (file) handleFileUpload(certId, label, file);
+    },
+    [handleFileUpload],
+  );
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
   };
 
@@ -240,6 +470,9 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       };
     });
 
+    clearError(`certFile_${certId}`);
+    clearError(`otherCertFile_${certId}`);
+
     // Clear any errors for this certification
     setUploadErrors(prev => {
       const newErrors = { ...prev };
@@ -257,227 +490,573 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
   };
 
   const handleNext = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.qualityControlProcess.trim()) {
+      newErrors.qualityControlProcess = 'Quality Control Process description is required';
+    }
+    if (!formData.complianceStandards.trim()) {
+      newErrors.complianceStandards = 'Compliance Standards are required';
+    }
+
+    formData.selectedCertifications.forEach((certId: string) => {
+      if (!formData.certificationFiles[certId]) {
+        newErrors[`certFile_${certId}`] = 'Certificate file is required';
+      }
+      if (!formData.certificationExpiryDates[certId]) {
+        newErrors[`certExpiry_${certId}`] = 'Expiry date is required';
+      }
+    });
+
+    formData.otherCertifications.forEach((cert: OtherCertification) => {
+      if (!cert.name.trim()) {
+        newErrors[`otherCertName_${cert.id}`] = 'Certification Name is required';
+      }
+      if (!formData.certificationFiles[cert.id]) {
+        newErrors[`otherCertFile_${cert.id}`] = 'Certificate file is required';
+      }
+      if (!formData.certificationExpiryDates[cert.id]) {
+        newErrors[`otherCertExpiry_${cert.id}`] = 'Expiry date is required';
+      }
+    });
+
+    if (!formData.packagingCapabilities.trim()) {
+      newErrors.packagingCapabilities = 'Packaging Capabilities are required';
+    }
+    if (!formData.logisticsPartners.trim()) {
+      newErrors.logisticsPartners = 'Logistics Partners are required';
+    }
+    if (formData.shippingMethods.length === 0) {
+      newErrors.shippingMethods = 'Select at least one shipping method';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      const allTouched: Record<string, boolean> = { ...touched };
+      Object.keys(newErrors).forEach(key => {
+        allTouched[key] = true;
+      });
+      setTouched(allTouched);
+
+      setTimeout(() => {
+        const firstErrorKey = Object.keys(newErrors)[0];
+        let element = document.getElementById(firstErrorKey) || document.querySelector(`[name="${firstErrorKey}"]`);
+        
+        if (firstErrorKey === 'shippingMethods') {
+          element = document.getElementById('shippingMethodsContainer');
+        } else if (firstErrorKey.startsWith('certFile_') || firstErrorKey.startsWith('otherCertFile_')) {
+          const id = firstErrorKey.replace('certFile_', '').replace('otherCertFile_', '');
+          element = document.getElementById(`file-${id}`);
+        }
+        
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus({ preventScroll: true });
+        }
+      }, 50);
+      return;
+    }
+
     onUpdateData(formData);
     onNext();
   };
 
   return (
-    <div className="space-y-4 p-4 max-w-420 font-sans">
+    <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
-          <div className="flex p-2 items-center gap-4 mb-4">
-            <Shield className="w-12 h-12 text-gray-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Quality, Certifications & Logistics</h1>
-              <p className="text-gray-600 mt-1">Showcase your quality standards and logistics capabilities</p>
-            </div>
-          </div>
+      <div className="flex items-center gap-3 pb-2">
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-50 text-brand-600 shrink-0">
+          <Shield className="w-5 h-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-headline-md text-gray-900 leading-tight" style={{ textWrap: "balance" as any }}>
+            Quality, Certifications & Logistics
+          </h2>
+          <p className="text-sm text-gray-600 mt-0.5">
+            Showcase your quality standards and logistics capabilities
+          </p>
+        </div>
+      </div>
 
       {/* Certifications */}
-      <section className="bg-white border border-gray-200 rounded-lg">
-        <div className="px-4 py-3">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Award className="w-5 h-5 mr-2" />
+      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Award className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
             Certifications
-          </h2>
+          </h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Pick the standards your facility holds. Upload the certificate and expiry date for each one selected.
+          </p>
         </div>
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {certifications.map((cert) => {
+        <div className="px-6 py-6 space-y-6">
+          {/* Standard cert grid — 3-col on lg, 2-col on md, 1-col mobile */}
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+            role="group"
+            aria-label="Standard certifications"
+          >
+            {CERTIFICATIONS.map((cert) => {
               const Icon = cert.icon;
               const isSelected = formData.selectedCertifications.includes(cert.id);
-              
               return (
-                <div key={cert.id} className="space-y-3">
-                  <div
-                    onClick={() => handleCertificationToggle(cert.id)}
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center">
-                      <Icon className={`w-6 h-6 mr-3 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
-                      <div>
-                        <h3 className="font-medium text-gray-900">{cert.name}</h3>
-                        <p className="text-sm text-gray-600">{cert.description}</p>
+                <button
+                  key={cert.id}
+                  type="button"
+                  onClick={() => handleCertificationToggle(cert.id)}
+                  aria-pressed={isSelected}
+                  className={`group relative text-left p-3.5 border rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
+                    isSelected
+                      ? 'border-brand-500/40 bg-brand-50/30 shadow-sm shadow-brand-500/5'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/40'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Colored icon chip — distinct per cert */}
+                    <div
+                      className={`flex items-center justify-center w-10 h-10 rounded-md ring-1 shrink-0 ${cert.iconBg} ${cert.iconText} ${cert.iconRing}`}
+                      aria-hidden="true"
+                    >
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{cert.name}</p>
+                        {isSelected && (
+                          <CheckCircle className="w-4 h-4 text-brand-600 shrink-0" aria-hidden="true" />
+                        )}
                       </div>
-                      <div className="ml-auto">
-                        <div className={`w-5 h-5 rounded-full border-2 ${
-                          isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
-                        }`}>
-                          {isSelected && <CheckCircle className="w-5 h-5 text-white" />}
-                        </div>
-                      </div>
+                      <p className="text-xs text-slate-500 leading-snug mt-0.5">{cert.description}</p>
                     </div>
                   </div>
+                </button>
+              );
+            })}
+          </div>
 
-                  {/* Upload field and expiry date for selected certifications */}
-                  {isSelected && (
-                    <div className="ml-9 space-y-4">
-                      {/* Expiry Date Field */}
+          {/* Details for selected certs — appears below the grid in a
+              clean list, not inline inside each card (cleaner scanning). */}
+          {formData.selectedCertifications.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-slate-400" aria-hidden="true" />
+                Upload certificates ({formData.selectedCertifications.length} selected)
+              </h4>
+              {formData.selectedCertifications.map((certId: string) => {
+                const cert = CERTIFICATIONS.find((c) => c.id === certId);
+                if (!cert) return null;
+                const Icon = cert.icon;
+                const file = formData.certificationFiles[cert.id];
+                const expiry = formData.certificationExpiryDates[cert.id];
+                const status = expiry ? getCertificateStatus(expiry) : null;
+                const inputId = `file-${cert.id}`;
+                return (
+                  <div
+                    key={cert.id}
+                    className="rounded-lg border border-slate-200 bg-white p-4"
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <div
+                        className={`flex items-center justify-center w-8 h-8 rounded-md ring-1 shrink-0 ${cert.iconBg} ${cert.iconText} ${cert.iconRing}`}
+                        aria-hidden="true"
+                      >
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-900">{cert.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{cert.description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCertificationToggle(cert.id)}
+                        aria-label={`Deselect ${cert.name}`}
+                        className="shrink-0 text-slate-400 hover:text-slate-600 p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                      >
+                        <X className="w-4 h-4" aria-hidden="true" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Expiry Date */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          <Calendar className="w-4 h-4 inline mr-1" />
-                          Certificate Expiry Date
+                        <label
+                          htmlFor={`expiry-${cert.id}`}
+                          className="block text-xs font-medium text-slate-700 mb-1.5"
+                        >
+                          <Calendar className="w-3.5 h-3.5 inline mr-1 -mt-0.5" aria-hidden="true" />
+                          Expiry Date
                         </label>
                         <input
+                          id={`expiry-${cert.id}`}
                           type="date"
                           value={formData.certificationExpiryDates[cert.id] || ''}
                           onChange={(e) => handleExpiryDateChange(cert.id, e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          min={new Date().toISOString().split('T')[0]} // Prevent past dates
+                          onBlur={() => handleBlur(`certExpiry_${cert.id}`)}
+                          className={`w-full px-3 py-2 text-sm border rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 transition-colors ${
+                            errors[`certExpiry_${cert.id}`] && touched[`certExpiry_${cert.id}`]
+                              ? 'border-red-500 bg-red-50'
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                          min={new Date().toISOString().split('T')[0]}
                         />
-                        
-                        {/* Certificate Status */}
-                        {formData.certificationExpiryDates[cert.id] && (
-                          <div className="mt-2">
-                            {(() => {
-                              const status = getCertificateStatus(formData.certificationExpiryDates[cert.id]);
-                              return status ? (
-                                <div className={`text-sm px-3 py-1 rounded border ${status.color} inline-block`}>
-                                  {status.message}
-                                </div>
-                              ) : null;
-                            })()}
+                        {errors[`certExpiry_${cert.id}`] && touched[`certExpiry_${cert.id}`] && (
+                          <p className="text-red-500 text-xs mt-1 font-medium">{errors[`certExpiry_${cert.id}`]}</p>
+                        )}
+                        {status && (
+                          <div className={`mt-1.5 text-xs px-2 py-1 rounded border ${status.color} inline-block`}>
+                            {status.message}
                           </div>
                         )}
                       </div>
 
-                      {/* File Upload Section */}
+                      {/* Upload Field */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Upload {cert.name} Certificate
+                        <label
+                          htmlFor={inputId}
+                          className="block text-xs font-medium text-slate-700 mb-1.5"
+                        >
+                          Certificate File <span className="text-red-500">*</span>
                         </label>
-                        
-                        {/* Check if file is already uploaded */}
-                        {formData.certificationFiles[cert.id] ? (
-                          <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="shrink-0">
-                                  {formData.certificationFiles[cert.id].type === 'application/pdf' ? (
-                                    <FileText className="w-12 h-12 text-red-500" />
-                                  ) : (
-                                    <img
-                                      src={formData.certificationFiles[cert.id].url}
-                                      alt="Certificate preview"
-                                      className="w-12 h-12 object-cover rounded"
-                                    />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 truncate">
-                                    {formData.certificationFiles[cert.id].name}
-                                  </p>
-                                  <p className="text-sm text-gray-500">
-                                    {formData.certificationFiles[cert.id].isExisting
-                                      ? 'Uploaded'
-                                      : formatFileSize(formData.certificationFiles[cert.id].size)}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                {(formData.certificationFiles[cert.id].isExisting || formData.certificationFiles[cert.id].type !== 'application/pdf') && (
-                                  <button
-                                    type="button"
-                                    onClick={() => window.open(formData.certificationFiles[cert.id].url, '_blank')}
-                                    className="text-blue-600 hover:text-blue-800 p-1"
-                                    title="View"
-                                  >
-                                    <Download className="w-4 h-4" />
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => removeFile(cert.id)}
-                                  className="text-red-600 hover:text-red-800 p-1"
-                                  title="Remove file"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
+                        {file ? (
+                          <div className={`flex items-center justify-between gap-2 p-2 border rounded-md ${errors[`certFile_${cert.id}`] ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-slate-50/40'}`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              {file.type === 'application/pdf' ? (
+                                <FileText className="w-5 h-5 text-red-500 shrink-0" aria-hidden="true" />
+                              ) : (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={file.url}
+                                  alt={`${cert.name} preview`}
+                                  className="w-5 h-5 object-cover rounded shrink-0"
+                                />
+                              )}
+                              <p className="text-xs font-medium text-slate-700 truncate" title={file.name}>
+                                {file.name}
+                              </p>
                             </div>
-                          </div>
-                        ) : (
-                          <div
-                            className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors cursor-pointer"
-                            onDrop={(e) => handleFileDrop(cert.id, e)}
-                            onDragOver={handleDragOver}
-                            onClick={() => document.getElementById(`file-${cert.id}`)?.click()}
-                          >
-                            <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                            <p className="text-sm text-gray-600 mb-1">
-                              Click to upload or drag and drop
-                            </p>
-                            <p className="text-xs text-gray-500">PDF, JPG, PNG up to 10MB</p>
-                            
+                            <div className="flex items-center gap-1 shrink-0">
+                              <label
+                                htmlFor={inputId}
+                                className="cursor-pointer text-xs font-medium text-brand-700 hover:text-brand-600 px-1.5 py-0.5 rounded focus-within:ring-2 focus-within:ring-brand-500/40"
+                              >
+                                Replace
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => removeFile(cert.id)}
+                                aria-label={`Remove ${cert.name} certificate`}
+                                className="text-red-600 hover:text-red-700 p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+                              >
+                                <X className="w-3.5 h-3.5" aria-hidden="true" />
+                              </button>
+                            </div>
                             <input
-                              id={`file-${cert.id}`}
+                              id={inputId}
                               type="file"
                               accept=".pdf,.jpg,.jpeg,.png"
-                              onChange={(e) => handleFileChange(cert.id, e)}
-                              className="hidden"
+                              onChange={(e) => handleFileChange(cert.id, cert.name, e)}
+                              className="sr-only"
                             />
                           </div>
+                        ) : (
+                          <label
+                            htmlFor={inputId}
+                            onDrop={(e) => handleFileDrop(cert.id, cert.name, e)}
+                            onDragOver={handleDragOver}
+                            className={`flex items-center justify-center gap-2 px-3 py-2 text-xs border border-dashed rounded-md cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-brand-500/40 ${
+                              errors[`certFile_${cert.id}`]
+                                ? 'border-red-500 bg-red-50 hover:bg-red-100'
+                                : 'border-slate-300 hover:border-brand-500/40 hover:bg-brand-50/20'
+                            }`}
+                          >
+                            <Upload className="w-4 h-4 text-slate-400" aria-hidden="true" />
+                            <span className="font-medium text-brand-700">Upload</span>
+                            <span className="text-slate-500">or drag &amp; drop</span>
+                            <input
+                              id={inputId}
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              onChange={(e) => handleFileChange(cert.id, cert.name, e)}
+                              className="sr-only"
+                            />
+                          </label>
                         )}
-                        
-                        {/* Display upload errors */}
+                        {errors[`certFile_${cert.id}`] && (
+                          <p className="text-red-500 text-xs mt-1 font-medium">{errors[`certFile_${cert.id}`]}</p>
+                        )}
                         {uploadErrors[cert.id] && (
-                          <div className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                          <p className="text-xs text-red-600 mt-1 font-medium" role="alert">
                             {uploadErrors[cert.id]}
-                          </div>
+                          </p>
                         )}
-                        
-                        {/* Upload success message - only show for newly uploaded files */}
-                        {formData.certificationFiles[cert.id] && !uploadErrors[cert.id] && !formData.certificationFiles[cert.id].isExisting && (
-                          <div className="mt-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded p-2">
-                            ✓ Certificate uploaded successfully
-                          </div>
-                        )}
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          {CERT_ALLOWED_LABEL} · up to {CERT_MAX_LABEL}
+                        </p>
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Other Certifications — user-defined certs not in the catalog ── */}
+          <div className="border-t border-slate-100 pt-5">
+            <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Plus className="w-4 h-4 text-slate-400" aria-hidden="true" />
+                  Other Certifications
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Holding a certification we haven&rsquo;t listed? Add it here.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddOtherCertification}
+                className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium text-brand-700 bg-brand-50 border border-brand-500/30 rounded-md hover:bg-brand-100 hover:border-brand-500/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+              >
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                Add Other Certification
+              </button>
+            </div>
+            {formData.otherCertifications.length === 0 ? (
+              <p className="text-xs text-slate-500 italic">
+                No other certifications added. Use the button above to add one.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {formData.otherCertifications.map((other: OtherCertification, idx: number) => {
+                  const file = formData.certificationFiles[other.id];
+                  const expiry = formData.certificationExpiryDates[other.id];
+                  const status = expiry ? getCertificateStatus(expiry) : null;
+                  const inputId = `file-${other.id}`;
+                  const label = other.name || `Other Certification ${idx + 1}`;
+                  return (
+                    <div
+                      key={other.id}
+                      className="rounded-lg border border-slate-200 bg-white p-4 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-xs font-semibold text-slate-700">
+                          Other Certification {idx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveOtherCertification(other.id)}
+                          aria-label={`Remove ${label}`}
+                          className="text-red-600 hover:text-red-700 p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+                        >
+                          <Trash2 className="w-4 h-4" aria-hidden="true" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label
+                            htmlFor={`other-name-${other.id}`}
+                            className="block text-xs font-medium text-slate-700 mb-1.5"
+                          >
+                            Certification Name <span className="text-red-500" aria-hidden="true">*</span>
+                          </label>
+                          <input
+                            id={`other-name-${other.id}`}
+                            name={`otherCertName_${other.id}`}
+                            type="text"
+                            value={other.name}
+                            onChange={(e) =>
+                              handleOtherCertificationChange(other.id, 'name', e.target.value)
+                            }
+                            onBlur={() => handleBlur(`otherCertName_${other.id}`)}
+                            placeholder="e.g. ZDHC, Cradle to Cradle, etc."
+                            className={`w-full px-3 py-2 text-sm border rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 transition-colors ${
+                              errors[`otherCertName_${other.id}`] && touched[`otherCertName_${other.id}`]
+                                ? 'border-red-500 bg-red-50'
+                                : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          />
+                          {errors[`otherCertName_${other.id}`] && touched[`otherCertName_${other.id}`] && (
+                            <p className="text-red-500 text-xs mt-1 font-medium">{errors[`otherCertName_${other.id}`]}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={`other-desc-${other.id}`}
+                            className="block text-xs font-medium text-slate-700 mb-1.5"
+                          >
+                            Description{' '}
+                            <span className="text-gray-400 text-[10px] font-normal">(optional)</span>
+                          </label>
+                          <input
+                            id={`other-desc-${other.id}`}
+                            type="text"
+                            value={other.description}
+                            onChange={(e) =>
+                              handleOtherCertificationChange(other.id, 'description', e.target.value)
+                            }
+                            placeholder="Short description"
+                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 hover:border-slate-300 transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={`expiry-${other.id}`}
+                            className="block text-xs font-medium text-slate-700 mb-1.5"
+                          >
+                            <Calendar className="w-3.5 h-3.5 inline mr-1 -mt-0.5" aria-hidden="true" />
+                            Expiry Date
+                          </label>
+                          <input
+                            id={`expiry-${other.id}`}
+                            name={`otherCertExpiry_${other.id}`}
+                            type="date"
+                            value={formData.certificationExpiryDates[other.id] || ''}
+                            onChange={(e) => handleExpiryDateChange(other.id, e.target.value)}
+                            onBlur={() => handleBlur(`otherCertExpiry_${other.id}`)}
+                            className={`w-full px-3 py-2 text-sm border rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 transition-colors ${
+                              errors[`otherCertExpiry_${other.id}`] && touched[`otherCertExpiry_${other.id}`]
+                                ? 'border-red-500 bg-red-50'
+                                : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                            min={new Date().toISOString().split('T')[0]}
+                          />
+                          {errors[`otherCertExpiry_${other.id}`] && touched[`otherCertExpiry_${other.id}`] && (
+                            <p className="text-red-500 text-xs mt-1 font-medium">{errors[`otherCertExpiry_${other.id}`]}</p>
+                          )}
+                          {status && (
+                            <div className={`mt-1.5 text-xs px-2 py-1 rounded border ${status.color} inline-block`}>
+                              {status.message}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={inputId}
+                            className="block text-xs font-medium text-slate-700 mb-1.5"
+                          >
+                            Certificate File <span className="text-red-500">*</span>
+                          </label>
+                          {file ? (
+                            <div className={`flex items-center justify-between gap-2 p-2 border rounded-md ${errors[`otherCertFile_${other.id}`] ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-slate-50/40'}`}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                {file.type === 'application/pdf' ? (
+                                  <FileText className="w-5 h-5 text-red-500 shrink-0" aria-hidden="true" />
+                                ) : (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img
+                                    src={file.url}
+                                    alt={`${label} preview`}
+                                    className="w-5 h-5 object-cover rounded shrink-0"
+                                  />
+                                )}
+                                <p className="text-xs font-medium text-slate-700 truncate" title={file.name}>
+                                  {file.name}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <label
+                                  htmlFor={inputId}
+                                  className="cursor-pointer text-xs font-medium text-brand-700 hover:text-brand-600 px-1.5 py-0.5 rounded focus-within:ring-2 focus-within:ring-brand-500/40"
+                                >
+                                  Replace
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFile(other.id)}
+                                  aria-label={`Remove ${label} certificate`}
+                                  className="text-red-600 hover:text-red-700 p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+                                >
+                                  <X className="w-3.5 h-3.5" aria-hidden="true" />
+                                </button>
+                              </div>
+                              <input
+                                id={inputId}
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={(e) => handleFileChange(other.id, label, e)}
+                                className="sr-only"
+                              />
+                            </div>
+                          ) : (
+                            <label
+                              htmlFor={inputId}
+                              onDrop={(e) => handleFileDrop(other.id, label, e)}
+                              onDragOver={handleDragOver}
+                              className={`flex items-center justify-center gap-2 px-3 py-2 text-xs border border-dashed rounded-md cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-brand-500/40 ${
+                                errors[`otherCertFile_${other.id}`]
+                                  ? 'border-red-500 bg-red-50 hover:bg-red-100'
+                                  : 'border-slate-300 hover:border-brand-500/40 hover:bg-brand-50/20'
+                              }`}
+                            >
+                              <Upload className="w-4 h-4 text-slate-400" aria-hidden="true" />
+                              <span className="font-medium text-brand-700">Upload</span>
+                              <span className="text-slate-500">or drag &amp; drop</span>
+                              <input
+                                id={inputId}
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={(e) => handleFileChange(other.id, label, e)}
+                                className="sr-only"
+                              />
+                            </label>
+                          )}
+                          {errors[`otherCertFile_${other.id}`] && (
+                            <p className="text-red-500 text-xs mt-1 font-medium">{errors[`otherCertFile_${other.id}`]}</p>
+                          )}
+                          {uploadErrors[other.id] && (
+                            <p className="text-xs text-red-600 mt-1 font-medium" role="alert">
+                              {uploadErrors[other.id]}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </section>
 
       {/* Uploaded Files Summary */}
       {Object.keys(formData.certificationFiles).length > 0 && (
-        <section className="bg-white border border-gray-200 rounded-lg">
-          <div className="px-4 py-3">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <FileText className="w-5 h-5 mr-2" />
+        <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
               Uploaded Certificates ({Object.keys(formData.certificationFiles).length})
-            </h2>
+            </h3>
           </div>
-          <div className="p-4">
+          <div className="px-6 py-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Object.entries(formData.certificationFiles).map(([certId, fileData]: [string, any]) => {
-                const cert = certifications.find(c => c.id === certId);
+                const cert = CERTIFICATIONS.find((c) => c.id === certId);
+                const otherCert = formData.otherCertifications.find(
+                  (o: OtherCertification) => o.id === certId,
+                );
+                const displayName = cert?.name || otherCert?.name || 'Other Certification';
                 const expiryDate = formData.certificationExpiryDates[certId];
                 const status = expiryDate ? getCertificateStatus(expiryDate) : null;
-                
+
                 return (
                   <div key={certId} className="border border-gray-200 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-3">
                         <div className="shrink-0">
                           {fileData.type === 'application/pdf' ? (
-                            <FileText className="w-6 h-6 text-red-500" />
+                            <FileText className="w-6 h-6 text-red-500" aria-hidden="true" />
                           ) : (
+                            /* eslint-disable-next-line @next/next/no-img-element */
                             <img
                               src={fileData.url}
-                              alt="Certificate preview"
+                              alt={`${displayName} preview`}
                               className="w-6 h-6 object-cover rounded"
                             />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
-                            {cert?.name || certId}
-                          </p>
+                          <p className="text-sm font-medium text-gray-900">{displayName}</p>
                           <p className="text-xs text-gray-500 truncate">
                             {fileData.name} • {formatFileSize(fileData.size)}
                           </p>
@@ -516,124 +1095,157 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       )}
 
       {/* Quality Control */}
-      <section className="bg-white border border-gray-200 rounded-lg">
-        <div className="px-4 py-3">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <CheckCircle className="w-5 h-5 mr-2" />
+      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
             Quality Control Process
-          </h2>
+          </h3>
         </div>
-        <div className="p-4 space-y-4">
+        <div className="px-6 py-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Quality Control Process Description
+              Quality Control Process Description <span className="text-red-500">*</span>
             </label>
             <textarea
+              id="qualityControlProcess"
+              name="qualityControlProcess"
               value={formData.qualityControlProcess}
               onChange={(e) => handleInputChange('qualityControlProcess', e.target.value)}
+              onBlur={() => handleBlur('qualityControlProcess')}
               rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
+                errors.qualityControlProcess && touched.qualityControlProcess
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-slate-300 hover:border-slate-400'
+              }`}
               placeholder="Describe your quality control processes, testing procedures, and standards..."
             />
+            {errors.qualityControlProcess && touched.qualityControlProcess && (
+              <p className="text-red-500 text-sm mt-1">{errors.qualityControlProcess}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Compliance Standards
+              Compliance Standards <span className="text-red-500">*</span>
             </label>
             <input
+              id="complianceStandards"
+              name="complianceStandards"
               type="text"
               value={formData.complianceStandards}
               onChange={(e) => handleInputChange('complianceStandards', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onBlur={() => handleBlur('complianceStandards')}
+              className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
+                errors.complianceStandards && touched.complianceStandards
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-slate-300 hover:border-slate-400'
+              }`}
               placeholder="ISO 9001, ISO 14001, etc."
             />
+            {errors.complianceStandards && touched.complianceStandards && (
+              <p className="text-red-500 text-sm mt-1">{errors.complianceStandards}</p>
+            )}
           </div>
         </div>
       </section>
 
       {/* Packaging & Logistics */}
-      <section className="bg-white border border-gray-200 rounded-lg">
-        <div className="px-4 py-3">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Package className="w-5 h-5 mr-2" />
+      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Package className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
             Packaging & Logistics
-          </h2>
+          </h3>
         </div>
-        <div className="p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="px-6 py-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Packaging Capabilities
+                Packaging Capabilities <span className="text-red-500">*</span>
               </label>
               <textarea
+                id="packagingCapabilities"
+                name="packagingCapabilities"
                 value={formData.packagingCapabilities}
                 onChange={(e) => handleInputChange('packagingCapabilities', e.target.value)}
+                onBlur={() => handleBlur('packagingCapabilities')}
                 rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
+                  errors.packagingCapabilities && touched.packagingCapabilities
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-slate-300 hover:border-slate-400'
+                }`}
                 placeholder="Custom packaging, eco-friendly options, bulk packaging..."
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Warehousing Capacity (sq ft)
-              </label>
-              <input
-                type="number"
-                value={formData.warehousingCapacity}
-                onChange={(e) => handleInputChange('warehousingCapacity', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="50000"
-              />
+              {errors.packagingCapabilities && touched.packagingCapabilities && (
+                <p className="text-red-500 text-sm mt-1">{errors.packagingCapabilities}</p>
+              )}
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Logistics Partners
+              Logistics Partners <span className="text-red-500">*</span>
             </label>
             <input
+              id="logisticsPartners"
+              name="logisticsPartners"
               type="text"
               value={formData.logisticsPartners}
               onChange={(e) => handleInputChange('logisticsPartners', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onBlur={() => handleBlur('logisticsPartners')}
+              className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
+                errors.logisticsPartners && touched.logisticsPartners
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-slate-300 hover:border-slate-400'
+              }`}
               placeholder="DHL, FedEx, UPS, Local carriers..."
             />
+            {errors.logisticsPartners && touched.logisticsPartners && (
+              <p className="text-red-500 text-sm mt-1">{errors.logisticsPartners}</p>
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              Shipping Methods
+              Shipping Methods <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div id="shippingMethodsContainer" className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {['Air Freight', 'Sea Freight', 'Road Transport', 'Express Delivery'].map((method) => (
                 <label key={method} className="flex items-center">
                   <input
                     type="checkbox"
                     checked={formData.shippingMethods.includes(method)}
                     onChange={() => handleShippingMethodToggle(method)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 accent-brand-500 rounded border-slate-300 focus-visible:ring-2 focus-visible:ring-brand-500/40 cursor-pointer"
                   />
                   <span className="ml-2 text-sm text-gray-700">{method}</span>
                 </label>
               ))}
             </div>
+            {errors.shippingMethods && touched.shippingMethods && (
+              <p className="text-red-500 text-sm mt-2">{errors.shippingMethods}</p>
+            )}
           </div>
         </div>
       </section>
 
       {/* Navigation */}
-      <div className="flex justify-between text-white ">
+      <div className="flex items-center justify-between pt-4 gap-3">
         <Button
           onClick={onPrev}
-          className="px-8 font-bold bg-green-400 hover:bg-gray-300"
+          className="inline-flex items-center gap-2 h-11 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
         >
-          Previous
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+          Back
         </Button>
         <Button
           onClick={handleNext}
-          className="bg-blue-600 hover:bg-blue-700 px-8 font-bold"
+          className="inline-flex items-center gap-2 h-11 px-6 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
         >
-          Continue
+          Save &amp; Continue
+          <ArrowRight className="w-4 h-4" aria-hidden="true" />
         </Button>
       </div>
     </div>

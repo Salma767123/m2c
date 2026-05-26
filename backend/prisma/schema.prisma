@@ -9,53 +9,54 @@ datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
 }
+
 // ============================================
 // AUTH & USER MANAGEMENT
 // ============================================
 
 model Admin {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  email         String    @unique
-  password      String?   // Optional for Google OAuth users
-  name          String
-  image         String?
-  roleId        String?   @db.ObjectId
-  role          Role?     @relation(fields: [roleId], references: [id])
-  isActive      Boolean   @default(true)
-  isVerified    Boolean   @default(false)
-  googleId      String?   @unique
-  provider      String    @default("local") // "local" or "google"
-  lastLogin     DateTime?
-  resetToken    String?
-  resetTokenExpiry DateTime?
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  email             String    @unique
+  password          String? // Optional for Google OAuth users
+  name              String
+  image             String?
+  roleId            String?   @db.ObjectId
+  role              Role?     @relation(fields: [roleId], references: [id])
+  isActive          Boolean   @default(true)
+  isVerified        Boolean   @default(false)
+  googleId          String?   @unique
+  provider          String    @default("local") // "local" or "google"
+  lastLogin         DateTime?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
   verificationToken String?
-  
+
   // FCM Push Notification Tokens (Multi-device support)
-  fcmTokens     Json[]    @default([]) // Array of { token, device, lastUsed }
-  
+  fcmTokens Json[] @default([]) // Array of { token, device, lastUsed }
+
   // Additional admin profile fields
-  phoneNumber   String?
-  address       String?
-  addressLine2  String?
-  city          String?
-  state         String?
-  zipCode       String?
-  country       String?
-  dateOfBirth   DateTime?
-  currency      String?   @default("INR") // Admin's preferred currency
-  
+  phoneNumber  String?
+  address      String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String?
+  dateOfBirth  DateTime?
+  currency     String?   @default("INR") // Admin's preferred currency
+
   // Business Information
-  companyName   String?   // Company/Business name
-  gstNumber     String?   // GST/Tax identification number
-  
+  companyName String? // Company/Business name
+  gstNumber   String? // GST/Tax identification number
+
   // Onboarding Configuration (IMMUTABLE after completion)
   onboardingCompleted Boolean @default(false)
-  
+
   // Working Hours Configuration
-  workingHours  WorkingHour[]
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  workingHours WorkingHour[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("admins")
 }
@@ -67,9 +68,9 @@ model Role {
   permissions String[] @default([])
   isSystem    Boolean  @default(false)
   admins      Admin[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("roles")
 }
@@ -77,13 +78,13 @@ model Role {
 model WorkingHour {
   id        String  @id @default(auto()) @map("_id") @db.ObjectId
   adminId   String  @db.ObjectId
-  day       String  // "Monday", "Tuesday", etc.
+  day       String // "Monday", "Tuesday", etc.
   enabled   Boolean @default(true)
-  startTime String  // "00:00" format
-  endTime   String  // "23:59" format
-  
-  admin     Admin   @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  
+  startTime String // "00:00" format
+  endTime   String // "23:59" format
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -92,42 +93,39 @@ model WorkingHour {
 }
 
 model User {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  email         String    @unique
-  password      String?   // Optional for Google OAuth users
-  name          String
-  image         String?
-  isActive      Boolean   @default(true)
-  isVerified    Boolean   @default(false)
-  googleId      String?   @unique
-  provider      String    @default("local") // "local" or "google"
-  lastLogin     DateTime?
-  resetToken    String?
-  resetTokenExpiry DateTime?
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  email             String    @unique
+  password          String? // Optional for Google OAuth users
+  name              String
+  image             String?
+  isActive          Boolean   @default(true)
+  isVerified        Boolean   @default(false)
+  googleId          String?   @unique
+  provider          String    @default("local") // "local" or "google"
+  lastLogin         DateTime?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
   verificationToken String?
-  
 
-  
   // Additional user profile fields
-  phoneNumber   String? 
-  address       String?
-  addressLine2  String?
-  city          String?
-  state         String?
-  zipCode       String?
-  country       String?
-  dateOfBirth   DateTime?
-  
+  phoneNumber  String?
+  address      String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String?
+  dateOfBirth  DateTime?
+
   // Multiple addresses support
-  addresses     Address[]
-  reviews       Review[]
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  addresses Address[]
+  reviews   Review[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
 }
- 
 
 model Session {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -141,22 +139,23 @@ model Session {
   @@index([expiresAt])
   @@map("sessions")
 }
+
 model Address {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String?  @db.ObjectId
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  type      String   // home, work, other
-  name      String?
-  phone     String?
-  address   String
+  id     String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId String? @db.ObjectId
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type         String // home, work, other
+  name         String?
+  phone        String?
+  address      String
   addressLine2 String?
-  city      String
-  state     String
-  zipCode   String
-  country   String
-  isDefault Boolean  @default(false)
-  
+  city         String
+  state        String
+  zipCode      String
+  country      String
+  isDefault    Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -168,25 +167,25 @@ model Address {
 // ============================================
 
 model Cart {
-  id        String     @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String     @db.ObjectId
-  items     CartItem[]
-  
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id     String     @id @default(auto()) @map("_id") @db.ObjectId
+  userId String     @db.ObjectId
+  items  CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("carts")
 }
 
 model CartItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  cartId    String   @db.ObjectId
-  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  productId String   @db.ObjectId
-  variantId String?  @db.ObjectId
-  quantity  Int      @default(1)
-  price     Float    // Store price at time of adding to cart
-  currency  String   @default("INR") // INR or USD
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  cartId    String  @db.ObjectId
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String  @db.ObjectId
+  variantId String? @db.ObjectId
+  quantity  Int     @default(1)
+  price     Float // Store price at time of adding to cart
+  currency  String  @default("INR") // INR or USD
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -200,8 +199,8 @@ model Wishlist {
   shareToken String?
   items      WishlistItem[]
 
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([shareToken])
   @@map("wishlists")
@@ -212,9 +211,9 @@ model WishlistItem {
   wishlistId String   @db.ObjectId
   wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
   productId  String   @db.ObjectId
-  
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([wishlistId, productId])
   @@map("wishlist_items")
@@ -225,141 +224,230 @@ model WishlistItem {
 // ============================================
 
 model Vendor {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  vendorCode            String?   @unique // Human-readable code, format VND-YYYY-NNNN
-  email                 String    @unique
-  password              String?
-  
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  vendorCode String? @unique // Human-readable code, format VND-YYYY-NNNN
+  email      String  @unique
+  password   String?
+
   // Password Reset Fields
-  resetToken            String?
-  resetTokenExpiry      DateTime?
-  
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
   // Application Status
-  status                VendorStatus @default(PENDING)
-  rejectionReason       String?
-  rejectionRequestedBy  String?   // Admin/Employee ID who requested the rejection
-  rejectionRequestedAt  DateTime? // When rejection was requested
-  approvalRequestedBy   String?   // Admin/Employee ID who requested the approval
-  approvalRequestedAt   DateTime? // When approval was requested
-  approvedAt            DateTime?
-  rejectedAt            DateTime?
-  suspendedAt           DateTime?
-  
+  status               VendorStatus @default(PENDING)
+  rejectionReason      String?
+  rejectionRequestedBy String? // Admin/Employee ID who requested the rejection
+  rejectionRequestedAt DateTime? // When rejection was requested
+  approvalRequestedBy  String? // Admin/Employee ID who requested the approval
+  approvalRequestedAt  DateTime? // When approval was requested
+  approvedAt           DateTime?
+  rejectedAt           DateTime?
+  suspendedAt          DateTime?
+
   // Owner Profile
-  ownerName             String
-  ownerEmail            String
-  ownerPhone            String
-  ownerAddress          String
-  ownerCity             String
-  ownerState            String
-  ownerZipCode          String
-  ownerCountry          String    @default("India")
-  ownerPhoto            String?   // Cloudinary URL
-  additionalOwners      Json?     // Array of { name, email, phone } for multiple owners
+  ownerName        String
+  // Owner's designation — Proprietor / CEO / Director / Managing Director /
+  // Founder / custom "Other" string. Optional because legacy rows pre-date
+  // this field; new submissions enforce it on the frontend.
+  designation      String?
+  ownerEmail       String
+  ownerEmail2      String? // Optional secondary owner email
+  ownerPhone       String
+  ownerPhone2      String? // Optional secondary owner phone (E.164)
+  ownerLandline    String? // Optional owner landline (E.164)
+  // Owner address — nullable because the registration form does NOT
+  // collect a separate owner address (it shares the business address).
+  // The Vendor Settings page lets vendors edit these post-approval; until
+  // then they're left null rather than fake-copying the business address.
+  ownerAddress     String?
+  ownerCity        String?
+  ownerState       String?
+  ownerZipCode     String?
+  ownerCountry     String?
+  ownerPhoto       String? // Cloudinary URL
+  // Array of additional owners / directors / partners (Step 3). Each entry
+  // is currently the minimal shape `{ name, email, phone }`. Note the
+  // ASYMMETRY: the primary owner above has 9+ fields (designation, email2,
+  // phone2, landline, customDesignation, customDepartment, etc.). The
+  // additional-contact UI on Step 3 only collects the basics — enrich both
+  // the FE form and this JSON shape together if the team wants parity.
+  additionalOwners Json?
+  // When the business started — captured as a full date on Step 3.
+  // `establishedYear` below is derived from this on the backend for
+  // backward-compat with code that still reads year-only.
+  businessStartDate DateTime?
 
   // Company Details
-  companyName           String
-  companyType           CompanyType
-  establishedYear       Int
-  companyDescription    String?
-  companyLogo           String?   // Cloudinary URL
-  gstNumber             String?   // GST/Tax identification number
-  
+  companyName        String
+  companyType        CompanyType
+  // Derived from `businessStartDate` (Owner Profile step) at write time.
+  // Made nullable because not every submission carries a parseable date,
+  // and the previous non-null constraint was silently breaking registration.
+  establishedYear    Int?
+  companyDescription String?
+  companyLogo        String? // Cloudinary URL
+  gstNumber          String? // GST/Tax identification number
+  // Type-specific regulatory ID — IEC (proprietorship) / CIN (Pvt Ltd) /
+  // Partnership Deed details / LLPIN. Optional because "Other" businessType
+  // values skip this in the frontend validation.
+  companyIdNumber    String?
+  // PAN Number — required for the 4 supported business types in the form,
+  // optional at the column level so "Other" submissions still persist.
+  panNumber          String?
+  // Factory ownership type — owned / rented / lease. Distinct from the
+  // warehouse `ownershipType` column above; mirrored to it when the vendor
+  // ticks "Same as warehouse" in CompanyDetails.
+  factoryOwnershipType String?
+
   // Contact & Trade Information
-  businessPhone         String
-  landlineNumber        String?
-  phoneNumber2          String?
-  businessEmail         String
-  businessAddress       String
-  businessCity          String
-  businessState         String
-  businessZipCode       String
-  businessCountry       String    @default("India")
-  website               String?
-  
+  businessPhone   String
+  landlineNumber  String?
+  phoneNumber2    String?
+  businessEmail   String
+  businessEmail2  String? // Optional secondary contact email
+  businessAddress String
+  // Optional address detail lines collected on the Company Details step.
+  // Line 2 / Line 3 cover apartment, suite, floor, building name etc.;
+  // landmark is a free-form nearby reference for delivery.
+  addressLine2    String?
+  addressLine3    String?
+  landmark        String?
+  businessCity    String
+  businessState   String
+  businessZipCode String
+  businessCountry String  @default("India")
+  website         String?
+
   // Trade Information
-  annualTurnover        String
-  exportExperience      Boolean   @default(false)
-  exportCountries       String[]  @default([])
-  primaryMarkets        String[]  @default([])
-  
+  // annualTurnover is nullable because the registration form doesn't collect
+  // it — the controller previously stuffed `employeeCount` ("10-20" etc.)
+  // into this column as a proxy, which was semantic nonsense. Leave null
+  // until a real turnover input exists.
+  annualTurnover   String?
+  // Import / export experience flags. The form currently asks one combined
+  // `hasImportExport` yes/no question but maintains separate import + export
+  // country lists. We derive each flag from "yes flag OR list non-empty" so
+  // a vendor who lists countries without ticking the box still gets flagged.
+  // When the FE splits the question, both columns are already in place.
+  importExperience Boolean  @default(false)
+  exportExperience Boolean  @default(false)
+  exportCountries  String[] @default([])
+  // Countries the vendor imports from. Previously collected by the form
+  // and destructured by the backend but never persisted; added now so the
+  // data flows through end-to-end.
+  importCountries  String[] @default([])
+  primaryMarkets   String[] @default([])
+
   // Manufacturing Facilities
-  enabledFacilities     Json?     // { spinning: true, weaving: false, ... }
-  facilityDetails       Json?     // { spinning: { capacity: '100', machines: '5', ... }, ... }
-  factoryAddress        String?
-  factoryCity           String?
-  factoryState          String?
-  factoryZipCode        String?
-  factoryCountry        String?   @default("India")
-  factorySize           String?   // e.g., "10000 sq ft"
-  productionCapacity    String?   // e.g., "1000 units/month"
-  qualityControl        String?   // Quality control measures
-  
+  enabledFacilities  Json? // { spinning: true, weaving: false, ... }
+  // Per-facility detail map. Keys are facility ids (spinning / weaving /
+  // dyeing / printing / stitching / finishing); values are objects whose
+  // fields are themselves prefixed by the facility id — e.g.
+  // { spinning: { spinningMachines: '10', spinningCapacity: '500', remarks: '...' } }.
+  // `productionCapacity` (string column) is derived from the *Capacity
+  // fields of enabled facilities at write time.
+  facilityDetails    Json?
+  // Factory address — the registration form treats factory + warehouse as
+  // the same physical location, so the controller mirrors warehouse values
+  // into these columns. The QC checker app reads these fields directly
+  // (qcCheckerController/checker_app), so they're load-bearing.
+  factoryAddress     String?
+  factoryCity        String?
+  factoryState       String?
+  factoryZipCode     String?
+  factoryCountry     String? @default("India")
+  factorySize        String? // e.g., "10000 sq ft" — read by admin + checker UIs
+  productionCapacity String? // e.g., "1000 units/month"
+  qualityControl     String? // Quality control measures
+
   // Warehouse Details
-  ownershipType         String?   // owned, rented, lease
-  warehouseAddress      String?
-  warehouseCity         String?
-  warehouseState        String?
-  warehouseZipCode      String?
-  warehouseCountry      String?   @default("India")
-  warehouseSize         String?
-  storageCapacity       String?
-  mapLink               String?   // Google Maps embed link
-  factoryLatitude       Float?    // Auto-extracted from mapLink
-  factoryLongitude      Float?    // Auto-extracted from mapLink
-  
+  ownershipType    String? // owned, rented, lease
+  warehouseAddress String?
+  // Optional warehouse address detail lines collected on Step 2. Mirror the
+  // company-address shape (addressLine2 / addressLine3 / landmark) so the
+  // "Same as warehouse" linker in CompanyDetails can copy them through.
+  warehouseAddressLine2 String?
+  warehouseAddressLine3 String?
+  warehouseLandmark     String?
+  warehouseCity    String?
+  warehouseState   String?
+  warehouseZipCode String?
+  warehouseCountry String? @default("India")
+  warehouseSize    String?
+  storageCapacity  String?
+  mapLink          String? // Google Maps embed link
+  factoryLatitude  Float? // Auto-extracted from mapLink
+  factoryLongitude Float? // Auto-extracted from mapLink
+
   // Vendor Type & Products
-  vendorType            VendorType
-  productCategories     String[]  @default([])
-  productTypes          String[]  @default([])
-  specializations       String[]  @default([])
-  categoryRemarks       String?   // Additional remarks about product categories
-  
+  vendorType        VendorType
+  // Raw multi-select values from the Step 4 form (manufacturer / importer /
+  // exporter). `vendorType` above stays as the primary enum for legacy code;
+  // `vendorTypes` carries the full FE array so multi-select isn't lossy.
+  vendorTypes       String[]   @default([])
+  productCategories String[]   @default([])
+  productTypes      String[]   @default([])
+  specializations   String[]   @default([])
+  categoryRemarks   String? // Additional remarks about product categories
+  // Per-category product entries collected on Step 4 — each entry has a
+  // product name + up to 5 photo URLs (Cloudinary, after upload). Stored
+  // as JSON to keep the nested shape together; admin UIs render it as-is.
+  categoryProducts     Json?
+  // User-defined custom categories created on Step 4 ("Other" path) —
+  // same shape as categoryProducts but the category itself is not in the
+  // master Category collection.
+  additionalCategories Json?
+
   // Certifications & Logistics
-  certifications        VendorCertification[]
-  documents             VendorDocument[]
-  
+  certifications VendorCertification[]
+  documents      VendorDocument[]
+
   // Logistics Information
-  shippingMethods       String[]  @default([])
-  deliveryTime          String?   // e.g., "7-15 days"
-  minimumOrderQuantity  String?
-  paymentTerms          String[]  @default([])
-  
+  shippingMethods      String[] @default([])
+  deliveryTime         String? // e.g., "7-15 days"
+  minimumOrderQuantity String?
+  paymentTerms         String[] @default([])
+  // Step 6 (Certifications & Logistics) free-text fields. Previously the
+  // controller destructured these but never persisted them — values went
+  // straight to /dev/null. Stored as optional strings.
+  packagingCapabilities String?
+  logisticsPartners     String?
+  complianceStandards   String?
+
   // Contact & Trade Information
-  mainContact           Json?     // Main contact person details
-  alternateContacts     Json[]    @default([]) // Array of alternate contacts
-  tradeLicenseNumber    String?
+  mainContact                Json? // Main contact person details
+  alternateContacts          Json[]  @default([]) // Array of alternate contacts
+  tradeLicenseNumber         String?
   businessRegistrationNumber String?
-  taxIdentificationNumber String?
-  
+  taxIdentificationNumber    String?
+
   // Additional Information
-  bankDetails           VendorBankDetails?
-  references            VendorReference[]
-  inventory             Inventory[]
-  products              Product[]
-  
+  bankDetails VendorBankDetails?
+  references  VendorReference[]
+  inventory   Inventory[]
+  products    Product[]
+
   // Quality Checker Assignment
-  assignedQcId          String?   @db.ObjectId
-  assignedQc            QCChecker? @relation("VendorQCChecker", fields: [assignedQcId], references: [id])
-  inspections           Inspection[]
-  settlements           Settlement[]
+  assignedQcId String?      @db.ObjectId
+  assignedQc   QCChecker?   @relation("VendorQCChecker", fields: [assignedQcId], references: [id])
+  inspections  Inspection[]
+  settlements  Settlement[]
 
   // Admin delivery rating aggregates — recomputed whenever an admin submits a
   // review on a vendor-to-hub order. `rating` is the average over all admin
   // reviews scored for this vendor (1-5); `ratingCount` is the sample size.
-  rating                Float?
-  ratingCount           Int       @default(0)
-  adminReviews          AdminReview[]
-
+  rating       Float?
+  ratingCount  Int           @default(0)
+  adminReviews AdminReview[]
 
   // System fields
-  applicationStep       Int       @default(1) // Current step in application process
-  completedSteps        Int[]     @default([]) // Array of completed step numbers
-  submittedAt           DateTime?
-  lastLoginAt           DateTime?
-  
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  applicationStep Int       @default(1) // Current step in application process
+  completedSteps  Int[]     @default([]) // Array of completed step numbers
+  submittedAt     DateTime?
+  lastLoginAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([assignedQcId, status])
   @@index([assignedQcId, submittedAt])
@@ -368,78 +456,95 @@ model Vendor {
 }
 
 model VendorCertification {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId      String   @db.ObjectId
-  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  
-  name          String   // e.g., "ISO 9001", "GOTS", "OEKO-TEX"
-  issuedBy      String   // Issuing authority
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId String @db.ObjectId
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  name              String // e.g., "ISO 9001", "GOTS", "OEKO-TEX"
+  // Issuing authority. Nullable because the registration form doesn't
+  // collect a per-cert issuer — previously the backend hardcoded the
+  // string "Certification Authority" (meaningless noise). Use `isCustom`
+  // to distinguish vendor-declared certs from catalog ones instead.
+  issuedBy          String?
   certificateNumber String?
-  issuedDate    DateTime?
-  expiryDate    DateTime?
-  documentUrl   String?  // Cloudinary URL
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  issuedDate        DateTime?
+  expiryDate        DateTime?
+  documentUrl       String? // Cloudinary URL
+  // Free-form description for user-defined "Other" certifications added on
+  // Step 6. Empty for catalog certs (OEKO-TEX, GOTS, etc.).
+  description       String?
+  // True when the vendor created this certification entry themselves via
+  // the "Add custom certification" path. Useful for admin filtering and
+  // for distinguishing user-supplied data from canonical catalog certs.
+  isCustom          Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("vendor_certifications")
 }
 
 model VendorDocument {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId      String   @db.ObjectId
-  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  
-  type          DocumentType
-  name          String
-  documentUrl   String   // Cloudinary URL
-  uploadedAt    DateTime @default(now())
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId String @db.ObjectId
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  type        DocumentType
+  name        String
+  documentUrl String // Cloudinary URL
+  uploadedAt  DateTime     @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("vendor_documents")
 }
 
 model VendorBankDetails {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId          String   @unique @db.ObjectId
-  vendor            Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId String @unique @db.ObjectId
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
   bankName          String
   accountNumber     String
-  ifscCode          String
-  accountType       String   // Savings, Current, etc.
-  accountHolderName String
+  // India-specific routing code. Nullable because international vendors
+  // submit SWIFT/BIC + IBAN instead, and the registration form doesn't
+  // collect IFSC. Previously the controller was stuffing `swiftCode` into
+  // this column with a fake `SWIFT000` fallback when missing.
+  ifscCode          String?
+  // SWIFT/BIC code — 8 or 11 chars, used for international wire transfers.
+  swiftCode         String?
+  // IBAN — used by European/Middle Eastern banking. Up to 34 chars.
+  iban              String?
+  accountType       String? // Savings, Current, etc. Nullable — FE doesn't collect this.
+  accountHolderName String? // Nullable — FE doesn't collect this on Step 7 yet.
   branchName        String?
   branchAddress     String?
-  
 
-  
   // Verification status
-  isVerified        Boolean  @default(false)
-  verifiedAt        DateTime?
-  verifiedBy        String?  // Admin ID who verified
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  isVerified Boolean   @default(false)
+  verifiedAt DateTime?
+  verifiedBy String? // Admin ID who verified
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("vendor_bank_details")
 }
 
 model VendorReference {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId      String   @db.ObjectId
-  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId String @db.ObjectId
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
   companyName   String
   contactPerson String
   email         String
   phone         String
-  relationship  String   // e.g., "Client", "Supplier", "Partner"
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  relationship  String // e.g., "Client", "Supplier", "Partner"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("vendor_references")
 }
@@ -501,30 +606,30 @@ enum DocumentType {
 // ============================================
 
 model Category {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  name            String
-  description     String
-  slug            String    @unique
-  
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String
+  slug        String @unique
+
   // Hierarchy support
-  parentId        String?   @db.ObjectId
-  parent          Category? @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  subcategories   Category[] @relation("CategoryHierarchy")
-  
+  parentId      String?    @db.ObjectId
+  parent        Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subcategories Category[] @relation("CategoryHierarchy")
+
   // SEO fields
   metaTitle       String?
   metaDescription String?
-  
+
   // Display settings
-  image           String?   // Cloudinary URL
-  sortOrder       Int       @default(0)
-  status          CategoryStatus @default(ACTIVE)
-  
+  image     String? // Cloudinary URL
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
+
   // System fields
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  createdBy       String?   @db.ObjectId // Admin who created
-  updatedBy       String?   @db.ObjectId // Admin who last updated
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?  @db.ObjectId // Admin who created
+  updatedBy String?  @db.ObjectId // Admin who last updated
 
   @@map("categories")
 }
@@ -539,10 +644,10 @@ enum CategoryStatus {
 // ============================================
 
 model Inventory {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId          String    @db.ObjectId
-  vendor            Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId String @db.ObjectId
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
   // Basic Product Info
   name              String
   sku               String    @unique
@@ -550,53 +655,53 @@ model Inventory {
   subcategory       String?
   description       String?
   manufacturingDate DateTime?
-  
+
   // Inventory Management
-  currentStock      Int       @default(0)
-  baseStock         Int       @default(0) // Stock for base/default variant
-  lowStockAlert     Int       @default(5)
-  location          String?
-  
+  currentStock  Int     @default(0)
+  baseStock     Int     @default(0) // Stock for base/default variant
+  lowStockAlert Int     @default(5)
+  location      String?
+
   // Product Status
-  status            InventoryStatus @default(ACTIVE)
-  
+  status InventoryStatus @default(ACTIVE)
+
   // Source Information
-  sourceType        SourceType?
-  supplier          String?
-  lastRestocked     DateTime?
-  notes             String?
-  
+  sourceType    SourceType?
+  supplier      String?
+  lastRestocked DateTime?
+  notes         String?
+
   // Product Creation Status
   hasProductCreated Boolean   @default(false)
   productId         String?   @db.ObjectId
   products          Product[] @relation("InventoryProducts")
-  
+
   // Stock Change History
-  stockHistory      StockChangeHistory[]
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  stockHistory StockChangeHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("inventory")
 }
 
 model StockChangeHistory {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  inventoryId   String    @db.ObjectId
-  inventory     Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
-  
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  inventoryId String    @db.ObjectId
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
   // Stock Change Details
   previousStock Int
   newStock      Int
-  changeAmount  Int       // Can be positive (increase) or negative (decrease)
+  changeAmount  Int // Can be positive (increase) or negative (decrease)
   reason        String
-  
+
   // User Information
-  changedBy     String    // User ID (Admin or Vendor)
-  changedByType String    // "admin" or "vendor"
-  changedByName String?   // Name of the person who made the change
-  
-  createdAt     DateTime  @default(now())
+  changedBy     String // User ID (Admin or Vendor)
+  changedByType String // "admin" or "vendor"
+  changedByName String? // Name of the person who made the change
+
+  createdAt DateTime @default(now())
 
   @@map("stock_change_history")
 }
@@ -616,99 +721,99 @@ enum SourceType {
 // ============================================
 
 model Product {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  vendorId              String    @db.ObjectId
-  vendor                Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId String @db.ObjectId
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
   // Inventory Connection
-  inventoryItemId       String?   @db.ObjectId
-  inventory             Inventory? @relation("InventoryProducts", fields: [inventoryItemId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  isFromInventory       Boolean   @default(false)
-  
+  inventoryItemId String?    @db.ObjectId
+  inventory       Inventory? @relation("InventoryProducts", fields: [inventoryItemId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  isFromInventory Boolean    @default(false)
+
   // Basic Information
-  name                  String
-  slug                  String?   @unique
-  description           String
-  category              String
-  subCategory           String?
-  
+  name        String
+  slug        String? @unique
+  description String
+  category    String
+  subCategory String?
+
   // Pricing Information
-  basePrice             Float
-  originalPrice         Float?
-  discount              Float?
-  gstPercentage         Float?    // GST Percentage for the product
-  
+  basePrice     Float
+  originalPrice Float?
+  discount      Float?
+  gstPercentage Float? // GST Percentage for the product
+
   // Single Unit Pricing Configuration
-  singleUnitSize        String?
-  singleUnitColor       String?
-  singleUnitColorHex    String?
-  
+  singleUnitSize     String?
+  singleUnitColor    String?
+  singleUnitColorHex String?
+
   // Product Rating & Reviews
-  rating                Float?
-  reviews               Int?      @default(0)
-  
+  rating  Float?
+  reviews Int?   @default(0)
+
   // Fabric & Specifications
-  fabricType            String?
-  material              String?
-  fabricSpecifications  Json?     // FabricSpecification object
-  
+  fabricType           String?
+  material             String?
+  fabricSpecifications Json? // FabricSpecification object
+
   // Variants Management
-  variants              ProductVariant[]
-  hasVariants           Boolean   @default(false)
-  
+  variants    ProductVariant[]
+  hasVariants Boolean          @default(false)
+
   // Base Product Info
-  baseSku               String
-  
+  baseSku String
+
   // Images
-  images                ProductImage[]
-  reviewsList           Review[] @relation("ProductReviews")
-  
+  images      ProductImage[]
+  reviewsList Review[]       @relation("ProductReviews")
+
   // Stock Management
-  totalStock            Int       @default(0)
-  lowStockThreshold     Int       @default(10)
-  trackInventory        Boolean   @default(true)
-  
+  totalStock        Int     @default(0)
+  lowStockThreshold Int     @default(10)
+  trackInventory    Boolean @default(true)
+
   // Dispatch & Shipping
-  dispatchTimeline      Json      // DispatchTimeline object
-  
+  dispatchTimeline Json // DispatchTimeline object
+
   // Additional Info
-  uom                   String    @default("pcs") // Unit of Measurement: pcs, meters, kg, yards, sets, rolls
-  tags                  String[]  @default([])
-  dimensions            String?
-  weight                String?
-  inStock               Boolean   @default(true)
+  uom        String   @default("pcs") // Unit of Measurement: pcs, meters, kg, yards, sets, rolls
+  tags       String[] @default([])
+  dimensions String?
+  weight     String?
+  inStock    Boolean  @default(true)
 
   // Logistics Configuration (per-product transport, weight rules, costs)
-  logisticsConfig       Json?     // LogisticsConfig object
-  
-  // Product Status & Approval
-  status                ProductStatus @default(ACTIVE)
-  approvalStatus        ProductApprovalStatus @default(PENDING)
-  approvedAt            DateTime?
-  approvedBy            String?   @db.ObjectId // Admin ID who approved
-  rejectionReason       String?
-  adminFixedPrice       Float?    // Admin can override the vendor's base price
-  priceINR              Float?    // Admin selling price in INR (for .in domain)
-  priceUSD              Float?    // Admin selling price in USD (for .com domain)
-  originalPriceINR      Float?    // Original/MRP price in INR (for strikethrough)
-  originalPriceUSD      Float?    // Original/MRP price in USD (for strikethrough)
-  priceVisibility       PriceVisibility @default(BOTH) // Controls which domain shows this product: IN_ONLY (.in), COM_ONLY (.com), BOTH
+  logisticsConfig Json? // LogisticsConfig object
 
-  assignedQcId          String?   @db.ObjectId
-  assignedQc            QCChecker? @relation("ProductQCChecker", fields: [assignedQcId], references: [id])
-  qcInspectionData      Json?     // Stores the product inspection form data
+  // Product Status & Approval
+  status           ProductStatus         @default(ACTIVE)
+  approvalStatus   ProductApprovalStatus @default(PENDING)
+  approvedAt       DateTime?
+  approvedBy       String?               @db.ObjectId // Admin ID who approved
+  rejectionReason  String?
+  adminFixedPrice  Float? // Admin can override the vendor's base price
+  priceINR         Float? // Admin selling price in INR (for .in domain)
+  priceUSD         Float? // Admin selling price in USD (for .com domain)
+  originalPriceINR Float? // Original/MRP price in INR (for strikethrough)
+  originalPriceUSD Float? // Original/MRP price in USD (for strikethrough)
+  priceVisibility  PriceVisibility       @default(BOTH) // Controls which domain shows this product: IN_ONLY (.in), COM_ONLY (.com), BOTH
+
+  assignedQcId     String?    @db.ObjectId
+  assignedQc       QCChecker? @relation("ProductQCChecker", fields: [assignedQcId], references: [id])
+  qcInspectionData Json? // Stores the product inspection form data
 
   // Re-inspection tracking
-  inspectionCycleNumber   Int      @default(1)
-  previousInspectionData  Json[]   @default([]) // Array of past qcInspectionData snapshots
-  lastReviewedBy          String?  @db.ObjectId
-  lastReviewedAt          DateTime?
-  rejectionRemarks        String?
-  rejectionNotes          String?
-  rejectionAttachments    String[] @default([])
+  inspectionCycleNumber  Int       @default(1)
+  previousInspectionData Json[]    @default([]) // Array of past qcInspectionData snapshots
+  lastReviewedBy         String?   @db.ObjectId
+  lastReviewedAt         DateTime?
+  rejectionRemarks       String?
+  rejectionNotes         String?
+  rejectionAttachments   String[]  @default([])
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([approvalStatus])
   @@index([status])
@@ -719,46 +824,46 @@ model Product {
 }
 
 model ProductVariant {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  productId       String    @db.ObjectId
-  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
-  size            String
-  color           String
-  colorHex        String?
-  sku             String    @unique
-  price           Float     // Vendor's price
-  originalPrice   Float?    // Original price before discount
-  discount        Float?    // Discount percentage
-  adminFixedPrice Float?    // Admin's fixed price for this variant
-  priceINR        Float?    // Admin selling price in INR for this variant
-  priceUSD        Float?    // Admin selling price in USD for this variant
-  originalPriceINR Float?   // Original price in INR for this variant
-  originalPriceUSD Float?   // Original price in USD for this variant
-  priceVisibility PriceVisibility @default(BOTH) // Controls which domain shows this variant
-  stock           Int       @default(0)
-  images          String[]  @default([]) // Array of image URLs
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  productId String  @db.ObjectId
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  size             String
+  color            String
+  colorHex         String?
+  sku              String          @unique
+  price            Float // Vendor's price
+  originalPrice    Float? // Original price before discount
+  discount         Float? // Discount percentage
+  adminFixedPrice  Float? // Admin's fixed price for this variant
+  priceINR         Float? // Admin selling price in INR for this variant
+  priceUSD         Float? // Admin selling price in USD for this variant
+  originalPriceINR Float? // Original price in INR for this variant
+  originalPriceUSD Float? // Original price in USD for this variant
+  priceVisibility  PriceVisibility @default(BOTH) // Controls which domain shows this variant
+  stock            Int             @default(0)
+  images           String[]        @default([]) // Array of image URLs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([productId])
   @@map("product_variants")
 }
 
 model ProductImage {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  productId String    @db.ObjectId
-  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  productId String  @db.ObjectId
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
   url       String
   alt       String
-  isPrimary Boolean   @default(false)
-  imageType String    @default("gallery") // "cover" or "gallery"
-  sortOrder Int       @default(0)
-  
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  isPrimary Boolean @default(false)
+  imageType String  @default("gallery") // "cover" or "gallery"
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([productId, isPrimary])
   @@map("product_images")
@@ -789,78 +894,78 @@ enum PriceVisibility {
 // ============================================
 
 model Order {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  orderId               String    @unique // Human readable order ID (e.g., ORD-2024-001)
-  invoiceNo             String?   // Invoice number per InvoiceSettings (e.g., INV-2024-25-0001)
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String  @unique // Human readable order ID (e.g., ORD-2024-001)
+  invoiceNo String? // Invoice number per InvoiceSettings (e.g., INV-2024-25-0001)
 
   // Customer Information
-  customerId            String?   @db.ObjectId
-  customerName          String
-  customerEmail         String
-  customerPhone         String
+  customerId    String? @db.ObjectId
+  customerName  String
+  customerEmail String
+  customerPhone String
 
   // Shipping Address
-  shippingAddress       Json      // Complete address object
+  shippingAddress Json // Complete address object
 
   // Order Items
-  items                 OrderItem[]
+  items OrderItem[]
 
   // Pricing
-  subtotal              Float
-  shippingCost          Float     @default(0)
-  tax                   Float     @default(0)
-  discount              Float     @default(0)
-  totalAmount           Float
-  couponCode            String?
+  subtotal     Float
+  shippingCost Float   @default(0)
+  tax          Float   @default(0)
+  discount     Float   @default(0)
+  totalAmount  Float
+  couponCode   String?
 
   // Bag Add-on
-  bagTypeId             String?   @db.ObjectId
-  bagTypeName           String?
-  bagTypePrice          Float?    @default(0)
+  bagTypeId    String? @db.ObjectId
+  bagTypeName  String?
+  bagTypePrice Float?  @default(0)
 
   // Currency
-  currency              String    @default("INR") // INR or USD
+  currency String @default("INR") // INR or USD
 
   // Payment Information
-  paymentStatus         PaymentStatus @default(PENDING)
-  paymentMethod         String?
-  paymentId             String?
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod String?
+  paymentId     String?
 
   // Order Status & Tracking
   // NOTE: status is now a computed aggregate of all VendorShipment statuses.
   // It is persisted for backward compatibility and efficient queries.
-  status                OrderStatus @default(ORDER_CREATED)
-  trackingReference     String?   // Internal tracking reference
+  status            OrderStatus @default(ORDER_CREATED)
+  trackingReference String? // Internal tracking reference
 
   // DEPRECATED: Vendor shipping details now live on VendorShipment.
   // Retained for backward compatibility with pre-migration orders.
-  vendorCarrier         String?
-  vendorTrackingId      String?
-  vendorShippedAt       DateTime?
-  assignedHubId         String?   @db.ObjectId
-  hub                   Hub?      @relation(fields: [assignedHubId], references: [id])
+  vendorCarrier    String?
+  vendorTrackingId String?
+  vendorShippedAt  DateTime?
+  assignedHubId    String?   @db.ObjectId
+  hub              Hub?      @relation(fields: [assignedHubId], references: [id])
 
   // Vendor Information (for single vendor orders)
-  vendorId              String?   @db.ObjectId
+  vendorId String? @db.ObjectId
 
   // Vendor Shipments (one per vendor in this order)
-  shipments             VendorShipment[]
+  shipments VendorShipment[]
 
   // Admin Hub Processing
-  adminReview           AdminReview[]
+  adminReview AdminReview[]
 
   // Status History
-  statusHistory         OrderStatusHistory[]
-  reviews               Review[]
-  settlements           Settlement[]
+  statusHistory OrderStatusHistory[]
+  reviews       Review[]
+  settlements   Settlement[]
 
   // Timestamps
-  orderDate             DateTime  @default(now())
-  estimatedDelivery     DateTime?
-  actualDelivery        DateTime?
+  orderDate         DateTime  @default(now())
+  estimatedDelivery DateTime?
+  actualDelivery    DateTime?
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([createdAt])
@@ -869,89 +974,89 @@ model Order {
 }
 
 model OrderItem {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  orderId               String    @db.ObjectId
-  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  orderId String @db.ObjectId
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
   // Product Information
-  productId             String    @db.ObjectId
-  productName           String
-  productImage          String?
-  
+  productId    String  @db.ObjectId
+  productName  String
+  productImage String?
+
   // Variant Information (if applicable)
-  variantId             String?   @db.ObjectId
-  size                  String?
-  color                 String?
-  sku                   String
-  
+  variantId String? @db.ObjectId
+  size      String?
+  color     String?
+  sku       String
+
   // Pricing & Quantity
-  quantity              Int
-  unitPrice             Float
-  totalPrice            Float
-  
+  quantity   Int
+  unitPrice  Float
+  totalPrice Float
+
   // Vendor Information
-  vendorId              String    @db.ObjectId
-  vendorName            String
+  vendorId   String @db.ObjectId
+  vendorName String
 
   // Link to VendorShipment (set at order creation time)
-  shipmentId            String?   @db.ObjectId
-  shipment              VendorShipment? @relation(fields: [shipmentId], references: [id])
+  shipmentId String?         @db.ObjectId
+  shipment   VendorShipment? @relation(fields: [shipmentId], references: [id])
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("order_items")
 }
 
 model OrderStatusHistory {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  orderId               String    @db.ObjectId
-  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
-  status                OrderStatus
-  comment               String?
-  updatedBy             String?   // Admin/Vendor ID who updated
-  updatedByType         String?   // "admin", "vendor", "system"
-  
-  timestamp             DateTime  @default(now())
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  orderId String @db.ObjectId
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  status        OrderStatus
+  comment       String?
+  updatedBy     String? // Admin/Vendor ID who updated
+  updatedByType String? // "admin", "vendor", "system"
+
+  timestamp DateTime @default(now())
 
   @@map("order_status_history")
 }
 
 model AdminReview {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
   // Primary link: one review per VendorShipment.
   // Not @unique because existing pre-migration rows have null shipmentId
   // (MongoDB unique indexes reject multiple nulls). Uniqueness enforced in app code.
-  shipmentId            String?   @db.ObjectId
-  shipment              VendorShipment? @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipmentId String?         @db.ObjectId
+  shipment   VendorShipment? @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
   // Denormalized order reference (for listing queries).
   // No longer @unique — a multi-vendor order can have multiple reviews.
-  orderId               String?   @db.ObjectId
-  order                 Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String? @db.ObjectId
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   // Denormalized vendor reference for aggregate rating queries.
-  vendorId              String?   @db.ObjectId
-  vendor                Vendor?   @relation(fields: [vendorId], references: [id])
+  vendorId String? @db.ObjectId
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
 
   // Review Details
-  reviewComments        String?
-  qualityCheckNotes     String?
-  rating                Int?      // 1-5 rating
-  approved              Boolean   @default(false)
+  reviewComments    String?
+  qualityCheckNotes String?
+  rating            Int? // 1-5 rating
+  approved          Boolean @default(false)
 
   // Admin Information
-  reviewedBy            String?   @db.ObjectId // Admin ID
-  reviewedAt            DateTime?
+  reviewedBy String?   @db.ObjectId // Admin ID
+  reviewedAt DateTime?
 
   // Rejection Details (if applicable)
-  rejectionReason       String?
-  returnToVendor        Boolean   @default(false)
+  rejectionReason String?
+  returnToVendor  Boolean @default(false)
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([vendorId])
   @@index([orderId])
@@ -964,36 +1069,36 @@ model AdminReview {
 // ============================================
 
 model VendorShipment {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  shipmentId            String    @unique // Human-readable e.g. ORD-2024-123456789-V1
-  orderId               String    @db.ObjectId
-  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendorId              String    @db.ObjectId
-  vendorName            String
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  shipmentId String @unique // Human-readable e.g. ORD-2024-123456789-V1
+  orderId    String @db.ObjectId
+  order      Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorId   String @db.ObjectId
+  vendorName String
 
   // Independent status lifecycle per vendor
-  status                OrderStatus @default(ORDER_CREATED)
+  status OrderStatus @default(ORDER_CREATED)
 
   // Per-shipment shipping details
-  vendorCarrier         String?
-  vendorTrackingId      String?
-  vendorShippedAt       DateTime?
+  vendorCarrier    String?
+  vendorTrackingId String?
+  vendorShippedAt  DateTime?
 
   // Per-shipment hub assignment
-  assignedHubId         String?   @db.ObjectId
-  hub                   Hub?      @relation(fields: [assignedHubId], references: [id])
+  assignedHubId String? @db.ObjectId
+  hub           Hub?    @relation(fields: [assignedHubId], references: [id])
 
   // Items belonging to this shipment
-  items                 OrderItem[]
+  items OrderItem[]
 
   // Per-shipment admin review (logically 1:1, enforced in app code)
-  adminReviews          AdminReview[]
+  adminReviews AdminReview[]
 
   // Status history
-  statusHistory         ShipmentStatusHistory[]
+  statusHistory ShipmentStatusHistory[]
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orderId])
   @@index([vendorId])
@@ -1002,16 +1107,16 @@ model VendorShipment {
 }
 
 model ShipmentStatusHistory {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  shipmentId            String    @db.ObjectId
-  shipment              VendorShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  id         String         @id @default(auto()) @map("_id") @db.ObjectId
+  shipmentId String         @db.ObjectId
+  shipment   VendorShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
-  status                OrderStatus
-  comment               String?
-  updatedBy             String?   // Admin/Vendor ID who updated
-  updatedByType         String?   // "admin", "vendor", "system"
+  status        OrderStatus
+  comment       String?
+  updatedBy     String? // Admin/Vendor ID who updated
+  updatedByType String? // "admin", "vendor", "system"
 
-  timestamp             DateTime  @default(now())
+  timestamp DateTime @default(now())
 
   @@map("shipment_status_history")
 }
@@ -1021,37 +1126,37 @@ model ShipmentStatusHistory {
 // ============================================
 
 model Coupon {
-  id                String        @id @default(auto()) @map("_id") @db.ObjectId
-  code              String        @unique
+  id                String       @id @default(auto()) @map("_id") @db.ObjectId
+  code              String       @unique
   description       String?
   discountType      DiscountType
   discountValue     Float
-  minPurchaseAmount Float?        @default(0)
-  maxDiscountAmount Float?        // Max discount cap for percentage based coupons
+  minPurchaseAmount Float?       @default(0)
+  maxDiscountAmount Float? // Max discount cap for percentage based coupons
 
-  startDate         DateTime      @default(now())
-  expiryDate        DateTime
+  startDate  DateTime @default(now())
+  expiryDate DateTime
 
-  usageLimit        Int?          // Total times this coupon can be used globally
-  usedCount         Int           @default(0)
+  usageLimit Int? // Total times this coupon can be used globally
+  usedCount  Int  @default(0)
 
-  perUserLimit      Int?          @default(1) // How many times a single user can use this
+  perUserLimit Int? @default(1) // How many times a single user can use this
 
-  isActive          Boolean       @default(true)
+  isActive Boolean @default(true)
 
   // Dynamic Free Shipping on Nth Orders
-  freeShipping      Boolean       @default(false)  // Whether this coupon grants free shipping
-  freeShippingOrderNumbers Int[]  // Which order numbers get free shipping (e.g., [3, 5, 10] = 3rd, 5th, 10th orders)
+  freeShipping             Boolean @default(false) // Whether this coupon grants free shipping
+  freeShippingOrderNumbers Int[] // Which order numbers get free shipping (e.g., [3, 5, 10] = 3rd, 5th, 10th orders)
 
   // Promotional Popup Fields
-  showAsPopup             Boolean       @default(false)
-  popupImage              String?       // Cloudinary URL
-  popupTitle              String?
-  popupMessage            String?
-  applicableCategories    String[]      // Category names to target (e.g., ["Towel", "Apron"])
+  showAsPopup          Boolean  @default(false)
+  popupImage           String? // Cloudinary URL
+  popupTitle           String?
+  popupMessage         String?
+  applicableCategories String[] // Category names to target (e.g., ["Towel", "Apron"])
 
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("coupons")
 }
@@ -1061,13 +1166,13 @@ model Coupon {
 // ============================================
 
 model FreeShippingOffer {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  minOrderValue         Float     @default(0)
-  orderNumbers          Int[]     @default([]) // Which order numbers get free shipping (e.g., [3, 5, 10] = 3rd, 5th, 10th orders)
-  isActive              Boolean   @default(true)
-  
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  minOrderValue Float   @default(0)
+  orderNumbers  Int[]   @default([]) // Which order numbers get free shipping (e.g., [3, 5, 10] = 3rd, 5th, 10th orders)
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("free_shipping_offers")
 }
@@ -1077,18 +1182,18 @@ model FreeShippingOffer {
 // ============================================
 
 model BagType {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
   price       Float
-  priceINR    Float?    // Price for .in domain
-  priceUSD    Float?    // Price for .com domain
+  priceINR    Float? // Price for .in domain
+  priceUSD    Float? // Price for .com domain
   image       String?
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("bag_types")
 }
@@ -1096,8 +1201,7 @@ model BagType {
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
-}  
-
+}
 
 enum PaymentStatus {
   PENDING
@@ -1105,7 +1209,6 @@ enum PaymentStatus {
   FAILED
   REFUNDED
 }
-
 
 // Enums for Order Management
 enum OrderStatus {
@@ -1127,23 +1230,23 @@ enum OrderStatus {
 // ============================================
 
 model PaymentSettings {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
   // Razorpay Settings
-  razorpayEnabled       Boolean   @default(false)
+  razorpayEnabled       Boolean @default(false)
   razorpayKeyId         String?
   razorpayKeySecret     String?
   razorpayWebhookSecret String?
-  
+
   // PayU Settings
-  payuEnabled           Boolean   @default(false)
-  payuMerchantKey       String?
-  payuMerchantSalt      String?
-  
+  payuEnabled      Boolean @default(false)
+  payuMerchantKey  String?
+  payuMerchantSalt String?
+
   // Metadata
-  updatedBy             String?   @db.ObjectId
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  updatedBy String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("payment_settings")
 }
@@ -1153,44 +1256,44 @@ model PaymentSettings {
 // ============================================
 
 model CompanyInfo {
-  id                        String    @id @default(auto()) @map("_id") @db.ObjectId
-  
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
   // Basic Company Information
-  companyName               String
-  companyLogo               String?
-  companyEmail              String?
-  companyPhone              String?
-  companyWebsite            String?
-  
+  companyName    String
+  companyLogo    String?
+  companyEmail   String?
+  companyPhone   String?
+  companyWebsite String?
+
   // Legal & Tax Information
-  gstNumber                 String?
-  panNumber                 String?
-  cinNumber                 String?
+  gstNumber                  String?
+  panNumber                  String?
+  cinNumber                  String?
   businessRegistrationNumber String?
-  taxId                     String?
-  
+  taxId                      String?
+
   // Registered Address
-  registeredAddress         String?
-  city                      String?
-  state                     String?
-  country                   String?
-  zipCode                   String?
-  
+  registeredAddress String?
+  city              String?
+  state             String?
+  country           String?
+  zipCode           String?
+
   // Bank Details
-  bankName                  String?
-  bankAccountNumber         String?
-  bankIfscCode              String?
-  bankBranch                String?
+  bankName          String?
+  bankAccountNumber String?
+  bankIfscCode      String?
+  bankBranch        String?
 
   // Social Media Links
-  socialInstagram           String?
-  socialFacebook            String?
-  socialYoutube             String?
+  socialInstagram String?
+  socialFacebook  String?
+  socialYoutube   String?
 
   // Metadata
-  updatedBy                 String?   @db.ObjectId
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  updatedBy String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("company_info")
 }
@@ -1200,11 +1303,11 @@ model CompanyInfo {
 // ============================================
 
 model VendorNotificationSettings {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  emails        String[] @default([]) // Email IDs to notify on new vendor registration
-  updatedBy     String?  @db.ObjectId
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  emails    String[] @default([]) // Email IDs to notify on new vendor registration
+  updatedBy String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("vendor_notification_settings")
 }
@@ -1220,7 +1323,7 @@ model GSTSetting {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@map("gst_settings")
 }
 
@@ -1230,11 +1333,11 @@ model GSTSetting {
 
 model ExchangeRate {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  baseCurrency String   @default("INR")    // Source currency (always INR)
-  currency     String   @unique            // Target currency (e.g. "USD")
-  rate         Float                       // 1 USD = X INR (e.g. 83.50)
+  baseCurrency String   @default("INR") // Source currency (always INR)
+  currency     String   @unique // Target currency (e.g. "USD")
+  rate         Float // 1 USD = X INR (e.g. 83.50)
   isActive     Boolean  @default(true)
-  updatedBy    String?  @db.ObjectId       // Admin who last updated
+  updatedBy    String?  @db.ObjectId // Admin who last updated
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -1246,18 +1349,18 @@ model ExchangeRate {
 // ============================================
 
 model SEOSettings {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
-  
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
   // Page-specific SEO settings
-  page             String   @unique // e.g., "home", "about", "products", etc.
-  metaTitle        String?
-  metaDescription  String?
-  metaKeywords     String?
-  ogImage          String?
-  
-  updatedBy        String?   @db.ObjectId
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  page            String  @unique // e.g., "home", "about", "products", etc.
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  ogImage         String?
+
+  updatedBy String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("seo_settings")
 }
@@ -1284,19 +1387,19 @@ model BannerImage {
 // ============================================
 
 model Hub {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  address     String?
-  city        String
-  state       String
-  zipCode     String?
-  phone       String?
-  email       String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  orders      Order[]
-  shipments   VendorShipment[]
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  address   String?
+  city      String
+  state     String
+  zipCode   String?
+  phone     String?
+  email     String?
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  orders    Order[]
+  shipments VendorShipment[]
 
   @@map("hubs")
 }
@@ -1306,18 +1409,18 @@ model Hub {
 // ============================================
 
 model VendorEnquiry {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   companyName String
   gstNumber   String
   email       String
   phone       String
   website     String?
-  status      String   @default("pending") // pending | approved | rejected
+  status      String    @default("pending") // pending | approved | rejected
   approvedAt  DateTime?
   rejectedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@map("vendor_enquiries")
 }
@@ -1327,18 +1430,18 @@ model VendorEnquiry {
 // ============================================
 
 model ContactEnquiry {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   email     String
   phone     String?
   subject   String
   message   String
-  status    String   @default("new") // new | read | replied | closed
+  status    String    @default("new") // new | read | replied | closed
   repliedAt DateTime?
   closedAt  DateTime?
-  notes     String?  // Admin notes
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  notes     String? // Admin notes
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@map("contact_enquiries")
 }
@@ -1348,44 +1451,44 @@ model ContactEnquiry {
 // ============================================
 
 model SupportTicket {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  ticketId    String   @unique
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId    String @unique
   subject     String
   category    String
-  priority    String   @default("medium") // low, medium, high, urgent
+  priority    String @default("medium") // low, medium, high, urgent
   description String
-  status      String   @default("open")   // open, in_progress, resolved, closed
-  
+  status      String @default("open") // open, in_progress, resolved, closed
+
   attachments String[] @default([])
-  
-  creatorId   String   @db.ObjectId
-  creatorType String   // "admin", "vendor", "user"
-  creatorName String?
+
+  creatorId    String  @db.ObjectId
+  creatorType  String // "admin", "vendor", "user"
+  creatorName  String?
   creatorEmail String?
-  
-  messages    TicketMessage[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  messages TicketMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("support_tickets")
 }
 
 model TicketMessage {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  ticketId    String   @db.ObjectId
-  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  
+  id       String        @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId String        @db.ObjectId
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
   message     String
   attachments String[] @default([])
-  
-  senderId    String   @db.ObjectId
-  senderType  String   // "admin", "vendor", "user"
-  senderName  String
-  
-  isRead      Boolean  @default(false)
-  
-  createdAt   DateTime @default(now())
+
+  senderId   String @db.ObjectId
+  senderType String // "admin", "vendor", "user"
+  senderName String
+
+  isRead Boolean @default(false)
+
+  createdAt DateTime @default(now())
 
   @@map("ticket_messages")
 }
@@ -1395,21 +1498,21 @@ model TicketMessage {
 // ============================================
 
 model Review {
-  id          String       @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String       @db.ObjectId
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productId   String       @db.ObjectId
-  product     Product      @relation("ProductReviews", fields: [productId], references: [id], onDelete: Cascade)
-  orderId     String       @db.ObjectId
-  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  rating      Int          @default(5)
-  comment     String?
-  images      String[]     @default([])
-  isApproved  Boolean      @default(false)
-  status      ReviewStatus @default(PENDING)
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String       @db.ObjectId
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId  String       @db.ObjectId
+  product    Product      @relation("ProductReviews", fields: [productId], references: [id], onDelete: Cascade)
+  orderId    String       @db.ObjectId
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rating     Int          @default(5)
+  comment    String?
+  images     String[]     @default([])
+  isApproved Boolean      @default(false)
+  status     ReviewStatus @default(PENDING)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, productId, orderId])
   @@map("reviews")
@@ -1426,48 +1529,48 @@ enum ReviewStatus {
 // ============================================
 
 model QCChecker {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  checkerId         String    @unique // Human readable checker ID (e.g., QC-001)
-  email             String    @unique
-  password          String    // Hashed password
-  name              String
-  phone             String
-  
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  checkerId String @unique // Human readable checker ID (e.g., QC-001)
+  email     String @unique
+  password  String // Hashed password
+  name      String
+  phone     String
+
   // Address
-  address           String?
-  city              String?
-  state             String?
-  zipCode           String?
-  country           String?   @default("India")
-  
+  address String?
+  city    String?
+  state   String?
+  zipCode String?
+  country String? @default("India")
+
   // Personal
-  dateOfBirth       DateTime?
-  
+  dateOfBirth DateTime?
+
   // Professional
-  joiningDate       DateTime  @default(now())
-  specialization    String?
-  experience        Int?      @default(0) // Years of experience
-  certifications    String?
-  
+  joiningDate    DateTime @default(now())
+  specialization String?
+  experience     Int?     @default(0) // Years of experience
+  certifications String?
+
   // Assigned Hub
-  assignedHubId     String?   @db.ObjectId
-  
+  assignedHubId String? @db.ObjectId
+
   // Status & Activity
-  status            QCCheckerStatus @default(ACTIVE)
-  isActive          Boolean   @default(true)
-  lastLoginAt       DateTime?
-  
+  status      QCCheckerStatus @default(ACTIVE)
+  isActive    Boolean         @default(true)
+  lastLoginAt DateTime?
+
   // Stats
-  assignedVendors   Int       @default(0)
-  completedInspections Int    @default(0)
-  
+  assignedVendors      Int @default(0)
+  completedInspections Int @default(0)
+
   // Relations
-  vendorsList       Vendor[]  @relation("VendorQCChecker")
-  productsList      Product[] @relation("ProductQCChecker")
-  inspections       Inspection[]
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  vendorsList  Vendor[]     @relation("VendorQCChecker")
+  productsList Product[]    @relation("ProductQCChecker")
+  inspections  Inspection[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("qc_checkers")
 }
@@ -1491,12 +1594,12 @@ model InvoiceSettings {
   financialYearEnd        DateTime
   autoFinancialYear       Boolean  @default(true)
   // Month (1-12) and day of month when FY starts — used for auto rollover
-  financialYearStartMonth Int      @default(4)   // 4 = April (Indian FY)
-  financialYearStartDay   Int      @default(1)   // 1st of the month
+  financialYearStartMonth Int      @default(4) // 4 = April (Indian FY)
+  financialYearStartDay   Int      @default(1) // 1st of the month
   formatTemplate          String   @default("{PREFIX}-{FY}-{SEQ}")
-  
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("invoice_settings")
 }
@@ -1506,24 +1609,24 @@ model InvoiceSettings {
 // ============================================
 
 model Settlement {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
-  settlementNumber String   // e.g. SET-2024-0001
-  vendorId         String   @db.ObjectId
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  settlementNumber String // e.g. SET-2024-0001
+  vendorId         String    @db.ObjectId
   vendorName       String
-  orderId          String   @db.ObjectId
-  billingNumber    String   // e.g. same as order invoice number
-  period           String   // e.g. "February 2024"
+  orderId          String    @db.ObjectId
+  billingNumber    String // e.g. same as order invoice number
+  period           String // e.g. "February 2024"
   amount           Float
   dueDate          DateTime?
-  status           String   @default("Pending") // Pending, Processing, Paid, Failed
+  status           String    @default("Pending") // Pending, Processing, Paid, Failed
   paymentDate      DateTime?
   transactionId    String?
 
-  vendor           Vendor   @relation(fields: [vendorId], references: [id])
-  order            Order    @relation(fields: [orderId], references: [id])
-  
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("settlements")
 }
@@ -1533,61 +1636,61 @@ model Settlement {
 // ============================================
 
 model Inspection {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
   // Relations
-  vendorId          String    @db.ObjectId
-  vendor            Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  checkerId         String    @db.ObjectId
-  checker           QCChecker @relation(fields: [checkerId], references: [id], onDelete: Cascade)
-  
+  vendorId  String    @db.ObjectId
+  vendor    Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  checkerId String    @db.ObjectId
+  checker   QCChecker @relation(fields: [checkerId], references: [id], onDelete: Cascade)
+
   // Assignment Details
   poNumber          String
   clientName        String
-  scheduledDate     String    // YYYY-MM-DD
-  scheduledTime     String    // HH:MM AM/PM
-  priority          String    // high, medium, low
+  scheduledDate     String // YYYY-MM-DD
+  scheduledTime     String // HH:MM AM/PM
+  priority          String // high, medium, low
   estimatedDuration String
-  
+
   // Status & Timing
-  status            InspectionStatus @default(SCHEDULED)
-  startedAt         DateTime?
-  completedAt       DateTime?
-  
+  status      InspectionStatus @default(SCHEDULED)
+  startedAt   DateTime?
+  completedAt DateTime?
+
   // Inspection Items (JSON array of category/subcategory objects assigned)
-  itemsToInspect    Json
-  
+  itemsToInspect Json
+
   // Results
-  result            InspectionResult?
-  score             Float?
-  notes             String?
+  result InspectionResult?
+  score  Float?
+  notes  String?
 
   // Re-inspection tracking
-  parentInspectionId  String?   @db.ObjectId
-  cycleNumber         Int       @default(1)
+  parentInspectionId String? @db.ObjectId
+  cycleNumber        Int     @default(1)
 
   // Rejection details (populated when checker submits as failed)
-  rejectionReason     String?
-  rejectionRemarks    String?
-  rejectionNotes      String?
-  locationDetails     String?
+  rejectionReason      String?
+  rejectionRemarks     String?
+  rejectionNotes       String?
+  locationDetails      String?
   rejectionAttachments String[] @default([])
 
   // Location verification (QC checker GPS vs vendor factory)
-  checkerLatitude       Float?
-  checkerLongitude      Float?
-  vendorLatitude        Float?    // Snapshot of vendor factory lat at inspection time
-  vendorLongitude       Float?    // Snapshot of vendor factory lng at inspection time
-  locationVerified      Boolean   @default(false)
-  locationDistanceM     Float?    // Distance in meters between checker and vendor
+  checkerLatitude   Float?
+  checkerLongitude  Float?
+  vendorLatitude    Float? // Snapshot of vendor factory lat at inspection time
+  vendorLongitude   Float? // Snapshot of vendor factory lng at inspection time
+  locationVerified  Boolean @default(false)
+  locationDistanceM Float? // Distance in meters between checker and vendor
 
   // Review tracking
-  submittedAt         DateTime?
-  reviewedAt          DateTime?
-  reviewedBy          String?   @db.ObjectId
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  reviewedBy  String?   @db.ObjectId
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([vendorId, status])
   @@index([vendorId, status, result])
@@ -1618,20 +1721,20 @@ enum InspectionResult {
 // ============================================
 
 model InspectionAuditLog {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
   // Polymorphic reference: "FACTORY_INSPECTION" or "PRODUCT_INSPECTION"
-  entityType      String
-  entityId        String   @db.ObjectId
+  entityType String
+  entityId   String @db.ObjectId
 
   // What happened
-  action          String   // SUBMITTED, ADMIN_APPROVED, ADMIN_REJECTED, REINSPECTION_RAISED, REINSPECTION_STARTED, REINSPECTION_COMPLETED
-  fromStatus      String?
-  toStatus        String?
+  action     String // SUBMITTED, ADMIN_APPROVED, ADMIN_REJECTED, REINSPECTION_RAISED, REINSPECTION_STARTED, REINSPECTION_COMPLETED
+  fromStatus String?
+  toStatus   String?
 
   // Who did it
-  performedById   String   @db.ObjectId
-  performedByType String   // ADMIN, QC_CHECKER
+  performedById   String  @db.ObjectId
+  performedByType String // ADMIN, QC_CHECKER
   performedByName String?
 
   // Rejection / review details
@@ -1640,13 +1743,13 @@ model InspectionAuditLog {
   notes           String?
   locationDetails String?
   attachments     String[] @default([]) // Cloudinary URLs
-  inspectionData  Json?    // Snapshot of form data at this point
+  inspectionData  Json? // Snapshot of form data at this point
 
   // Re-inspection tracking
-  cycleNumber     Int      @default(1)
-  parentLogId     String?  @db.ObjectId
+  cycleNumber Int     @default(1)
+  parentLogId String? @db.ObjectId
 
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([entityType, entityId])
   @@index([entityType, entityId, createdAt])
@@ -1668,9 +1771,9 @@ model Counter {
 model DeviceToken {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String
-  role      String   // ADMIN, VENDOR, QC_CHECKER, USER
+  role      String // ADMIN, VENDOR, QC_CHECKER, USER
   token     String   @unique
-  platform  String   // android, ios, web
+  platform  String // android, ios, web
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1681,12 +1784,12 @@ model DeviceToken {
 // In-app notifications (persisted for dropdown UI + history)
 model Notification {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   // recipient's ID (vendorId, adminId, or customerId)
-  role      String   // ADMIN, VENDOR, USER — determines which dashboard shows it
-  type      String   // ORDER_RECEIVED, PRODUCT_APPROVED, PAYMENT_RECEIVED, etc.
+  userId    String // recipient's ID (vendorId, adminId, or customerId)
+  role      String // ADMIN, VENDOR, USER — determines which dashboard shows it
+  type      String // ORDER_RECEIVED, PRODUCT_APPROVED, PAYMENT_RECEIVED, etc.
   title     String
   message   String
-  data      Json?    // optional metadata (orderId, productId, etc.)
+  data      Json? // optional metadata (orderId, productId, etc.)
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -1700,15 +1803,15 @@ model Notification {
 // ============================================
 
 model PageView {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  page        String   // Page path e.g. "/products", "/checkout"
-  userId      String?  @db.ObjectId
-  sessionId   String?
-  referrer    String?
-  device      String?  // mobile, tablet, desktop
-  browser     String?
-  duration    Int?     // Time spent in seconds
-  createdAt   DateTime @default(now())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  page      String // Page path e.g. "/products", "/checkout"
+  userId    String?  @db.ObjectId
+  sessionId String?
+  referrer  String?
+  device    String? // mobile, tablet, desktop
+  browser   String?
+  duration  Int? // Time spent in seconds
+  createdAt DateTime @default(now())
 
   @@index([page])
   @@index([createdAt])
@@ -1723,7 +1826,7 @@ model ProductView {
   category    String?
   userId      String?  @db.ObjectId
   sessionId   String?
-  source      String?  // "search", "category", "home", "direct"
+  source      String? // "search", "category", "home", "direct"
   createdAt   DateTime @default(now())
 
   @@index([productId])
@@ -1732,4 +1835,3 @@ model ProductView {
   @@index([productId, sessionId, createdAt])
   @@map("product_views")
 }
-
