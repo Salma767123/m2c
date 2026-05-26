@@ -80,26 +80,27 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
             <div
-                className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+                className="bg-white rounded-xl sm:rounded-2xl w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                    <div>
-                        <h2 className="text-lg font-bold text-gray-900">Write a Review</h2>
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 shrink-0">
+                    <div className="min-w-0">
+                        <h2 className="text-base sm:text-lg font-bold text-gray-900">Write a Review</h2>
                         <p className="text-xs text-gray-500 mt-0.5">Share your experience</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors"
+                        aria-label="Close"
+                        className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors shrink-0"
                     >
                         <X className="w-4 h-4 text-gray-500" />
                     </button>
                 </div>
 
-                <div className="px-6 py-5">
+                <div className="px-4 sm:px-6 py-4 sm:py-5 overflow-y-auto flex-1">
                     {success ? (
                         /* Success State */
                         <div className="text-center py-6">
@@ -153,7 +154,7 @@ export default function ReviewModal({ isOpen, onClose, orderId, items }: ReviewM
                                                         </div>
                                                     )}
                                                 </div>
-                                                <p className="flex-1 text-sm font-semibold text-gray-900 line-clamp-1">
+                                                <p className="flex-1 text-sm font-semibold text-gray-900 break-words">
                                                     {item.name || item.productName}
                                                 </p>
                                                 {selected && items.length > 1 && (

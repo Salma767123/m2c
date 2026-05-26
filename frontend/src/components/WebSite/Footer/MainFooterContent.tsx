@@ -54,7 +54,7 @@ const MainFooterContent = () => {
   return (
     <div className="bg-[#000000] text-white">
       <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-8 sm:py-10 md:py-12 lg:py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 :grid-cols-2 xl:grid-cols-4 gap-6 sm:gap-8 md:gap-10 lg:gap-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 md:gap-10 lg:gap-12">
           {/* Company Info */}
           <div className="text-center sm:text-left lg:col-span-1">
             <h4 className="text-white font-semibold mb-4 sm:mb-6 text-sm sm:text-base md:text-lg">

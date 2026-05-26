@@ -54,7 +54,7 @@ export default function Categories() {
     return (
       <div className="min-h-screen bg-gray-50 font-sans">
         {/* Banner skeleton — light neutral, same height ladder as loaded banner. */}
-        <div className="relative h-52 md:h-60 lg:h-80 overflow-hidden bg-gray-100">
+        <div className="relative h-40 sm:h-52 md:h-60 lg:h-80 overflow-hidden bg-gray-100">
           <div className="absolute inset-0 flex items-center justify-center animate-pulse">
             <div className="text-center px-4 space-y-3 w-full max-w-2xl">
               <div className="h-10 md:h-12 lg:h-14 w-64 md:w-80 bg-gray-300 rounded-md mx-auto" />
@@ -71,7 +71,7 @@ export default function Categories() {
               <div className="h-7 w-56 bg-gray-200 rounded animate-pulse" />
               <div className="h-5 w-80 max-w-full bg-gray-100 rounded animate-pulse" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="text-center">
                   <div className="relative w-full aspect-square mb-4 overflow-hidden rounded-md bg-gray-200 animate-pulse" />
@@ -88,13 +88,14 @@ export default function Categories() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 font-sans">
-        <div className="relative h-52 md:h-60 lg:h-80 overflow-hidden bg-gray-200">
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-            <div className="text-center text-white px-4">
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold font-sans mb-4">
+        <div className="relative min-h-40 sm:min-h-52 md:min-h-60 lg:min-h-80 overflow-hidden bg-gray-200">
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative z-10 flex items-center justify-center min-h-40 sm:min-h-52 md:min-h-60 lg:min-h-80 px-3 sm:px-4 py-5 sm:py-6 md:py-8">
+            <div className="text-center text-white">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold font-sans mb-3 sm:mb-4 break-words">
                 Error Loading Categories
               </h1>
-              <p className="text-lg md:text-xl">{error}</p>
+              <p className="text-sm sm:text-lg md:text-xl">{error}</p>
             </div>
           </div>
         </div>
@@ -104,8 +105,8 @@ export default function Categories() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      {/* Banner Section */}
-      <div className="relative h-52 md:h-60 lg:h-80 overflow-hidden">
+      {/* Banner Section — min-h so it grows with long copy on mobile */}
+      <div className="relative min-h-40 sm:min-h-52 md:min-h-60 lg:min-h-80 overflow-hidden">
         <Image
           src="/assets/images/categories/cb5.jpg"
           alt="Categories Banner"
@@ -114,12 +115,13 @@ export default function Categories() {
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-          <div className="text-center text-white px-4">
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold font-sans mb-4">
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="relative z-10 flex items-center justify-center min-h-40 sm:min-h-52 md:min-h-60 lg:min-h-80 px-3 sm:px-4 py-5 sm:py-6 md:py-8">
+          <div className="text-center text-white">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold font-sans mb-2 sm:mb-4">
               Shop by Categories
             </h1>
-            <p className="text-lg md:text-xl max-w-2xl mx-auto">
+            <p className="text-sm sm:text-lg md:text-xl max-w-2xl mx-auto">
               Discover our wide range of traditional textile products organized by categories
             </p>
           </div>
@@ -127,25 +129,25 @@ export default function Categories() {
       </div>
 
       {/* Categories Content */}
-      <div className="py-12">
-        <div className="max-w-7xl 2xl:max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-start mb-12">
-            <h2 className="text-2xl font-bold font-sans text-gray-700">Browse Our Collections</h2>
-            <p className="text-lg text-gray-600 max-w-2xl">
+      <div className="py-8 sm:py-10 lg:py-12">
+        <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="text-start mb-6 sm:mb-8 lg:mb-12">
+            <h2 className="text-xl sm:text-2xl font-bold font-sans text-gray-700">Browse Our Collections</h2>
+            <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-2xl">
               Find exactly what you're looking for in our carefully curated categories.
             </p>
           </div>
 
           {categories.length === 0 ? (
-            <div className="text-center py-20">
-              <Package className="mx-auto h-20 w-20 text-gray-300 mb-6" />
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">No Categories Available</h3>
-              <p className="text-gray-600 mb-6">
+            <div className="text-center py-12 sm:py-16 lg:py-20">
+              <Package className="mx-auto h-14 w-14 sm:h-16 sm:w-16 lg:h-20 lg:w-20 text-gray-300 mb-4 sm:mb-6" />
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">No Categories Available</h3>
+              <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
                 Categories will appear here once they are added.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
               {categories.map((category) => (
                 <Link
                   key={category.id}
@@ -188,21 +190,21 @@ export default function Categories() {
             </div>
           )}
 
-          <div className="mt-16 bg-white rounded-xl shadow-lg p-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Need Help?</h2>
-            <p className="text-gray-600 mb-6">
+          <div className="mt-10 sm:mt-12 lg:mt-16 bg-white rounded-xl shadow-lg p-5 sm:p-6 lg:p-8 text-center">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Need Help?</h2>
+            <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
               Use our search feature or contact our support team for assistance finding specific products.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
               <Link
                 href="/products"
-                className="bg-gray-700 text-white px-6 py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                className="bg-gray-700 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium text-sm sm:text-base"
               >
                 Search Products
               </Link>
               <Link
                 href="/contact"
-                className="border-2 border-gray-700 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-700 hover:text-white transition-colors font-medium"
+                className="border-2 border-gray-700 text-gray-700 px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-gray-700 hover:text-white transition-colors font-medium text-sm sm:text-base"
               >
                 Contact Support
               </Link>

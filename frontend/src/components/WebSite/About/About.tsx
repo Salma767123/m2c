@@ -83,7 +83,7 @@ const About = () => {
       </section> */}
 
       {/* Mission Statement */}
-      <section className="relative h-104 py-24 overflow-hidden">
+      <section className="relative min-h-64 py-12 sm:py-16 md:py-20 lg:py-24 overflow-hidden">
         <div className="absolute inset-0">
           {missionStatement.image && (
             <>
@@ -99,28 +99,28 @@ const About = () => {
             </>
           )}
         </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className={`text-3xl font-bold mb-6 ${missionStatement.image ? 'text-white' : 'text-gray-900'}`}>{missionStatement.title}</h2>
-          <p className={`text-lg font-medium leading-relaxed ${missionStatement.image ? 'text-white/90' : 'text-gray-700'}`}>
+        <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 text-center">
+          <h2 className={`text-2xl sm:text-3xl font-bold mb-3 sm:mb-6 ${missionStatement.image ? 'text-white' : 'text-gray-900'}`}>{missionStatement.title}</h2>
+          <p className={`text-sm sm:text-base lg:text-lg font-medium leading-relaxed ${missionStatement.image ? 'text-white/90' : 'text-gray-700'}`}>
             {missionStatement.content}
           </p>
         </div>
       </section>
 
       {/* Video Content Section */}
-      <section className="py-16 bg-slate-50 relative overflow-hidden">
+      <section className="py-10 sm:py-12 lg:py-16 bg-slate-50 relative overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}></div>
         </div>
-        
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Story in Motion</h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Discover the passion, craftsmanship, and dedication that drives our mission to bring 
+
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 relative">
+          <div className="text-center mb-8 sm:mb-10 lg:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Our Story in Motion</h2>
+            <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-3xl mx-auto">
+              Discover the passion, craftsmanship, and dedication that drives our mission to bring
               authentic handcrafted textiles from traditional artisans to your home.
             </p>
           </div>
@@ -206,19 +206,19 @@ const About = () => {
       </section>
 
       {/* Story Sections */}
-      <section className="py-16">
-        <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-10 sm:py-12 lg:py-16">
+        <div className="max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           {aboutContent.map((section, index) => (
-            <div key={index} className={`mb-16 ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''} lg:flex lg:items-center lg:gap-12`}>
-              <div className="lg:w-1/2 mb-8 lg:mb-0">
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">{section.title}</h3>
-                <p className="text-gray-700 font-medium leading-relaxed text-lg">
+            <div key={index} className={`mb-10 sm:mb-12 lg:mb-16 ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''} lg:flex lg:items-center lg:gap-12`}>
+              <div className="lg:w-1/2 mb-6 lg:mb-0">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">{section.title}</h3>
+                <p className="text-gray-700 font-medium leading-relaxed text-sm sm:text-base lg:text-lg">
                   {section.content}
                 </p>
               </div>
               {section.image && (
                 <div className="lg:w-1/2">
-                  <div className="relative h-64 lg:h-105 rounded-lg overflow-hidden shadow-lg">
+                  <div className="relative h-52 sm:h-64 lg:h-105 rounded-lg overflow-hidden shadow-lg">
                     <Image
                       src={section.image}
                       alt={section.title}
@@ -235,23 +235,23 @@ const About = () => {
       </section>
 
       {/* Values Section */}
-      <section className="py-16 bg-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Values</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              These core principles guide everything we do, from selecting artisan partners 
+      <section className="py-10 sm:py-12 lg:py-16 bg-gray-100">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="text-center mb-8 sm:mb-10 lg:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Our Values</h2>
+            <p className="text-sm sm:text-base lg:text-lg text-gray-600 max-w-2xl mx-auto">
+              These core principles guide everything we do, from selecting artisan partners
               to delivering exceptional products to your doorstep.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {values.map((value, index) => (
-              <div key={index} className="text-center p-6 rounded-lg bg-gray-50 hover:bg-gray-50 transition-colors">
-                <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-6 h-6 text-white" />
+              <div key={index} className="text-center p-4 sm:p-5 lg:p-6 rounded-lg bg-gray-50 hover:bg-gray-50 transition-colors">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">{value.title}</h3>
-                <p className="text-gray-600">{value.description}</p>
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1 sm:mb-2">{value.title}</h3>
+                <p className="text-sm sm:text-base text-gray-600">{value.description}</p>
               </div>
             ))}
           </div>

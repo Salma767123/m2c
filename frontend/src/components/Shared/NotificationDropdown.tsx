@@ -185,16 +185,16 @@ export default function NotificationDropdown() {
     <>
       {/* Toast Banner — shows when FCM push arrives in foreground */}
       {toast && (
-        <div className="fixed top-4 right-4 z-100 animate-in slide-in-from-top-2 duration-300">
-          <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-4 max-w-sm flex gap-3 border border-gray-700">
+        <div className="fixed top-3 sm:top-4 right-3 sm:right-4 left-3 sm:left-auto z-100 animate-in slide-in-from-top-2 duration-300">
+          <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 sm:p-4 sm:max-w-sm sm:ml-auto flex gap-2.5 sm:gap-3 border border-gray-700">
             <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${BG_MAP[toast.type] || 'bg-gray-700'}`}>
               {ICON_MAP[toast.type] || <Bell className="h-4 w-4 text-white" />}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{toast.title}</p>
-              <p className="text-xs text-gray-300 mt-0.5 line-clamp-2">{toast.body}</p>
+              <p className="text-xs text-gray-300 mt-0.5 line-clamp-2 break-words">{toast.body}</p>
             </div>
-            <button onClick={dismissToast} className="shrink-0 p-1 hover:bg-gray-700 rounded-lg transition-colors self-start">
+            <button onClick={dismissToast} aria-label="Dismiss notification" className="shrink-0 p-1 hover:bg-gray-700 rounded-lg transition-colors self-start">
               <X className="h-4 w-4 text-gray-400" />
             </button>
           </div>
@@ -217,14 +217,15 @@ export default function NotificationDropdown() {
         </button>
 
         {open && (
-          <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+          /* Dropdown — `fixed` on mobile so it anchors to the viewport (Bell sits in the middle of the icon row, so `right-0` relative to Bell would push it off-screen left). `absolute` on sm+ where Bell has enough room to the right. */
+          <div className="fixed sm:absolute top-[4.25rem] sm:top-full sm:mt-2 right-2 sm:right-0 left-2 sm:left-auto sm:w-96 max-h-[82vh] sm:max-h-none bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-100 gap-2 shrink-0">
               <h3 className="text-sm font-bold text-gray-900">Notifications</h3>
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllRead}
-                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors shrink-0"
                 >
                   <CheckCheck className="h-3.5 w-3.5" />
                   Mark all read
@@ -233,7 +234,7 @@ export default function NotificationDropdown() {
             </div>
 
             {/* List */}
-            <div className="max-h-96 overflow-y-auto">
+            <div className="flex-1 sm:max-h-96 overflow-y-auto">
               {loading && notifications.length === 0 ? (
                 <div className="py-10 text-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto" />
@@ -249,11 +250,11 @@ export default function NotificationDropdown() {
                   <button
                     key={n.id}
                     onClick={() => { if (!n.isRead) handleMarkAsRead(n.id); }}
-                    className={`w-full text-left px-4 py-3 border-b border-gray-50 transition-colors hover:bg-gray-50 ${
+                    className={`w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-50 transition-colors hover:bg-gray-50 ${
                       n.isRead ? '' : 'bg-blue-50/40'
                     }`}
                   >
-                    <div className="flex gap-3">
+                    <div className="flex gap-2.5 sm:gap-3 min-w-0">
                       <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 ${
                         BG_MAP[n.type] || 'bg-gray-100'
                       }`}>
@@ -266,7 +267,7 @@ export default function NotificationDropdown() {
                           </p>
                           {!n.isRead && <span className="shrink-0 w-2 h-2 bg-blue-500 rounded-full" />}
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 break-words">{n.message}</p>
                         <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
                       </div>
                     </div>

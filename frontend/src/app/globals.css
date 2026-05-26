@@ -4,6 +4,35 @@ button, [role="button"], a, select, summary, [type="checkbox"], [type="radio"] {
   cursor: pointer;
 }
 
+/* Prevent horizontal page scroll caused by stray overflow elements */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+/* Hide scrollbars while keeping scroll functionality (used by category strip, etc.) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth horizontal scrolling for mobile category strips */
+.scroll-snap-x {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-snap-start {
+  scroll-snap-align: start;
+}
+
+/* Improve text wrapping on long product names/titles */
+.text-balance {
+  text-wrap: balance;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

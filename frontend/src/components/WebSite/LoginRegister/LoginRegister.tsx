@@ -94,6 +94,33 @@ export default function LoginRegister() {
               )}
             </CardContent>
           </Card>
+
+          {/* Bottom switch link — saves users from scrolling back up to the toggle */}
+          <div className="mt-4 sm:mt-6 text-center text-sm text-gray-600">
+            {isLogin ? (
+              <>
+                Don&apos;t have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsLogin(false)}
+                  className="font-semibold text-gray-900 hover:text-gray-700 underline underline-offset-2 transition-colors"
+                >
+                  Create one
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setIsLogin(true)}
+                  className="font-semibold text-gray-900 hover:text-gray-700 underline underline-offset-2 transition-colors"
+                >
+                  Sign in
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

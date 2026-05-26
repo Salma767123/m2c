@@ -116,28 +116,28 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
       fetch resolves.
     */
     return (
-      <div className="max-w-360 mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center gap-2 mb-6">
-          <div className="h-4 w-12 bg-gray-200 rounded animate-pulse" />
-          <div className="h-4 w-4 bg-gray-100 rounded animate-pulse" />
-          <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
-          <div className="h-4 w-4 bg-gray-100 rounded animate-pulse" />
-          <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+      <div className="max-w-360 mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <div className="flex items-center gap-2 mb-4 sm:mb-6 overflow-hidden">
+          <div className="h-4 w-12 bg-gray-200 rounded animate-pulse shrink-0" />
+          <div className="h-4 w-4 bg-gray-100 rounded animate-pulse shrink-0" />
+          <div className="h-4 w-20 bg-gray-200 rounded animate-pulse shrink-0" />
+          <div className="h-4 w-4 bg-gray-100 rounded animate-pulse shrink-0" />
+          <div className="h-4 w-32 bg-gray-200 rounded animate-pulse shrink-0" />
         </div>
         <div className="bg-white rounded-2xl overflow-hidden">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
             {/* Image column skeleton */}
-            <div className="p-8 lg:p-12 bg-linear-to-br from-gray-50 to-white">
-              <div className="aspect-square bg-gray-200 rounded-xl animate-pulse mb-6" />
-              <div className="flex gap-3">
+            <div className="p-4 sm:p-6 lg:p-12 bg-linear-to-br from-gray-50 to-white">
+              <div className="aspect-square bg-gray-200 rounded-xl animate-pulse mb-4 sm:mb-6" />
+              <div className="flex gap-2 sm:gap-3 overflow-x-auto scrollbar-hide">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="w-20 h-20 bg-gray-200 rounded-lg animate-pulse" />
+                  <div key={i} className="w-14 h-14 sm:w-20 sm:h-20 bg-gray-200 rounded-lg animate-pulse shrink-0" />
                 ))}
               </div>
             </div>
 
             {/* Details column skeleton */}
-            <div className="p-8 lg:p-12 space-y-6">
+            <div className="p-4 sm:p-6 lg:p-12 space-y-4 sm:space-y-6">
               {/* Title */}
               <div className="space-y-3">
                 <div className="h-9 w-3/4 bg-gray-200 rounded animate-pulse" />
@@ -203,11 +203,11 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
   if (!product || !isVisibleInRegion((product as any).priceVisibility)) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-10 sm:py-12 lg:py-16">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Product Not Available</h1>
-          <p className="text-gray-600 mb-8">This product is not available in your region or no longer exists.</p>
-          <a href="/products" className="bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 transition-colors">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">Product Not Available</h1>
+          <p className="text-sm sm:text-base text-gray-600 mb-5 sm:mb-8">This product is not available in your region or no longer exists.</p>
+          <a href="/products" className="bg-amber-600 text-white px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base rounded-lg hover:bg-amber-700 transition-colors">
             Back to Products
           </a>
         </div>
@@ -413,7 +413,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
       <PromotionalPopup category={product.category} />
       {/* Breadcrumb */}
       <div className="bg-white">
-        <div className="max-w-7xl xl:max-w-420 mx-auto px-4 sm:px-6 lg:px-8 xl:px-0 py-4">
+        <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-0 py-2 sm:py-4">
           <Breadcrumb items={breadcrumbItems} />
         </div>
       </div>
@@ -423,29 +423,33 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
         <style jsx>{`
           .product-info-container {
             position: relative;
-            min-height: 600px;
           }
-          
+          @media (min-width: 1024px) {
+            .product-info-container {
+              min-height: 600px;
+            }
+          }
+
           /* Smooth transitions for image switching */
           .magnify-image {
             animation: fadeIn 0.3s ease-in-out;
           }
-          
+
           @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
           }
         `}</style>
 
-        <div className="max-w-360 mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-white rounded-2xl overflow-hidden">
+        <div className="max-w-360 mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+          <div className="bg-white rounded-xl sm:rounded-2xl overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
               {/* Product Images */}
-              <div className="p-8 lg:p-12 bg-linear-to-br from-gray-50 to-white">
-                <div className="sticky top-8">
+              <div className="p-4 sm:p-6 lg:p-12 bg-linear-to-br from-gray-50 to-white">
+                <div className="lg:sticky lg:top-8">
                   {/* Main Image with Custom Magnification */}
                   <div
-                    className="aspect-square bg-white rounded-xl overflow-hidden mb-6 border border-gray-100 relative cursor-crosshair"
+                    className="aspect-square bg-white rounded-xl overflow-hidden mb-4 sm:mb-6 border border-gray-100 relative lg:cursor-crosshair"
                     onMouseMove={handleMouseMove}
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
@@ -457,19 +461,19 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         alt={product.name}
                         width={600}
                         height={600}
-                        className="object-cover transition-opacity duration-300"
+                        className="w-full h-full object-cover transition-opacity duration-300"
                         style={{ opacity: isImageHovered ? 0.8 : 1 }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <Package className="w-24 h-24 text-gray-400" />
+                        <Package className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 text-gray-400" />
                       </div>
                     )}
 
-                    {/* Lens overlay */}
+                    {/* Lens overlay — desktop only */}
                     {isImageHovered && currentImageUrl && (
                       <div
-                        className="absolute w-24 h-24 border-2 border-blue-500 bg-transparent bg-opacity-30 pointer-events-none rounded-lg"
+                        className="hidden lg:block absolute w-24 h-24 border-2 border-blue-500 bg-transparent bg-opacity-30 pointer-events-none rounded-lg"
                         style={{
                           left: `${mousePosition.x}%`,
                           top: `${mousePosition.y}%`,
@@ -479,16 +483,16 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     )}
                   </div>
 
-                  {/* Image Thumbnails with Enhanced Hover */}
+                  {/* Image Thumbnails — horizontal scroll on mobile */}
                   {displayImages.length > 1 && (
-                    <div className="flex space-x-4 justify-center">
+                    <div className="flex gap-2 sm:gap-3 lg:gap-4 lg:justify-center overflow-x-auto scrollbar-hide -mx-1 px-1">
                       {displayImages.map((image: any, index: number) => (
                         <button
                           key={index}
                           onClick={() => setSelectedImage(index)}
                           onMouseEnter={() => setSelectedImage(index)}
-                          className={`w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all duration-300 transform hover:scale-105 ${selectedImage === index
-                            ? 'border-blue-500 ring-4 ring-blue-200 shadow-lg'
+                          className={`w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-xl sm:rounded-2xl overflow-hidden border-2 transition-all duration-300 shrink-0 lg:hover:scale-105 ${selectedImage === index
+                            ? 'border-blue-500 ring-2 sm:ring-4 ring-blue-200 shadow-lg'
                             : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                             }`}
                         >
@@ -502,7 +506,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                              <Package className="w-8 h-8 text-gray-400" />
+                              <Package className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
                             </div>
                           )}
                         </button>
@@ -512,12 +516,12 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                 </div>
               </div>
 
-              {/* Product Info - Shows magnified image when hovering */}
-              <div className="product-info-container relative p-8 lg:p-12">
-                {/* Magnified Image Overlay - Shows when image is hovered */}
-                {isImageHovered && currentImageUrl ? (
-                  <div className="w-full h-full flex items-center justify-center bg-white rounded-r-2xl">
-                    <div className="w-full max-w-lxl h-160 bg-white rounded-xl border-2 border-gray-200 shadow-2xl overflow-hidden">
+              {/* Product Info - Shows magnified image when hovering (desktop only) */}
+              <div className="product-info-container relative p-4 sm:p-6 lg:p-12">
+                {/* Magnified Image Overlay - Desktop only (hover-driven). lg:hidden on mobile so info always shows. */}
+                {isImageHovered && currentImageUrl && (
+                  <div className="hidden lg:flex w-full h-full items-center justify-center bg-white rounded-r-2xl">
+                    <div className="w-full h-160 bg-white rounded-xl border-2 border-gray-200 shadow-2xl overflow-hidden">
                       <div
                         className="w-full h-full bg-cover bg-no-repeat transition-all duration-150"
                         style={{
@@ -528,29 +532,30 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       />
                     </div>
                   </div>
-                ) : (
-                  /* Normal Product Info Content */
-                  <div className="space-y-8">
+                )}
+                {/* Normal Product Info Content — always shown on mobile; hidden on lg when hovering */}
+                <div className={`space-y-5 sm:space-y-6 lg:space-y-8 ${isImageHovered ? 'lg:hidden' : ''}`}>
                     {/* Header Section */}
-                    <div className="border-b border-gray-100 pb-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-3 leading-tight">{product.name}</h1>
+                    <div className="border-b border-gray-100 pb-4 sm:pb-6">
+                      <div className="flex items-start justify-between gap-3 mb-3 sm:mb-4">
+                        <div className="flex-1 min-w-0">
+                          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-2 sm:mb-3 leading-tight break-words">{product.name}</h1>
                         </div>
                         <button
                           onClick={handleWishlistToggle}
-                          className={`p-3 rounded-full transition-colors ${isWishlisted ? 'bg-red-50 hover:bg-red-100' : 'bg-gray-50 hover:bg-gray-100'}`}
+                          aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                          className={`p-2 sm:p-3 rounded-full transition-colors shrink-0 ${isWishlisted ? 'bg-red-50 hover:bg-red-100' : 'bg-gray-50 hover:bg-gray-100'}`}
                         >
-                          <Heart className={`w-6 h-6 ${isWishlisted ? 'fill-current text-red-500' : 'text-gray-400'}`} />
+                          <Heart className={`w-5 h-5 sm:w-6 sm:h-6 ${isWishlisted ? 'fill-current text-red-500' : 'text-gray-400'}`} />
                         </button>
                       </div>
 
                       {/* Rating */}
-                      <div className="flex items-center space-x-4 mb-6">
-                        <div className="flex items-center space-x-1">
+                      <div className="flex items-center flex-wrap gap-2 sm:gap-x-4 sm:gap-y-2 mb-4 sm:mb-6">
+                        <div className="flex items-center space-x-0.5 sm:space-x-1">
                           {renderStars(product.rating || 0)}
                         </div>
-                        <span className="text-sm text-gray-600 font-medium">
+                        <span className="text-xs sm:text-sm text-gray-600 font-medium">
                           {product.rating || 0} ({product.reviews || 0} reviews)
                         </span>
                         {product.reviews != null && product.reviews > 0 ? (
@@ -562,7 +567,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 fetchReviews();
                               }
                             }}
-                            className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
+                            className="text-xs sm:text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
                           >
                             {showReviews ? 'Hide reviews' : 'See all reviews'}
                           </button>
@@ -570,19 +575,19 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       </div>
 
                       {/* Price */}
-                      <div className="bg-[#fdfdfd] rounded-2xl shadow-md p-6">
-                        <div className="flex items-baseline space-x-3 mb-2">
-                          <span className="text-4xl font-bold text-gray-900">{formatPrice(currentPrice || 0)}</span>
+                      <div className="bg-[#fdfdfd] rounded-xl sm:rounded-2xl shadow-md p-4 sm:p-5 lg:p-6">
+                        <div className="flex items-baseline flex-wrap gap-x-2 sm:gap-x-3 gap-y-1 mb-1 sm:mb-2">
+                          <span className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{formatPrice(currentPrice || 0)}</span>
                           {originalPrice && originalPrice > currentPrice && (
                             <>
-                              <span className="text-xl text-gray-500 line-through">{formatPrice(originalPrice)}</span>
-                              <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">
+                              <span className="text-base sm:text-lg lg:text-xl text-gray-500 line-through">{formatPrice(originalPrice)}</span>
+                              <span className="bg-gray-100 text-gray-800 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-semibold">
                                 Save {formatPrice(originalPrice - currentPrice)}
                               </span>
                             </>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600">Price includes all taxes</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Price includes all taxes</p>
                       </div>
                     </div>
 
@@ -590,9 +595,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                     <div className="space-y-4">
                       {/* Variants Section */}
                       {product.hasVariants && visibleVariants.length > 0 && (
-                        <div className="max-w-md">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                            Select Variant: {selectedVariant ? `${selectedVariant.size} - ${selectedVariant.color}` : 
+                        <div>
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3 break-words">
+                            Select Variant: {selectedVariant ? `${selectedVariant.size} - ${selectedVariant.color}` :
                               ([product.singleUnitSize, product.singleUnitColor].filter(Boolean).join(' - ') || 'Base Variant')}
                           </h3>
                           <div className="grid grid-cols-2 gap-2">
@@ -603,15 +608,15 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                 setSelectedImage(0);
                                 setQuantity(1);
                               }}
-                              className={`p-3 border-2 rounded-lg transition-all duration-300 text-left transform hover:scale-105 ${!selectedVariant
+                              className={`p-2.5 sm:p-3 border-2 rounded-lg transition-all duration-300 text-left transform hover:scale-105 overflow-hidden ${!selectedVariant
                                 ? 'border-blue-500 shadow-lg ring-2 ring-blue-200'
                                 : 'border-gray-200 hover:border-gray-300 hover:shadow-md bg-white'
                                 }`}
                             >
-                              <div className="flex items-start gap-3">
+                              <div className="flex items-start gap-2 sm:gap-3 min-w-0">
                                 {/* Product Main Image Preview */}
                                 {product.images && product.images.length > 0 && (
-                                  <div className="w-12 h-12 rounded-md overflow-hidden border border-gray-200 shrink-0">
+                                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden border border-gray-200 shrink-0">
                                     <Image
                                       src={product.images.find(img => img.isPrimary)?.url || product.images[0].url}
                                       alt="Default"
@@ -622,27 +627,27 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                   </div>
                                 )}
 
-                                <div>
-                                  <div className="font-semibold text-gray-900 text-sm">
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-semibold text-gray-900 text-sm break-words">
                                     {product.singleUnitSize ? product.singleUnitSize : (product.singleUnitColor ? product.singleUnitColor : 'Base Variant')}
                                   </div>
-                                  <div className="flex items-center flex-wrap gap-2 mt-1">
+                                  <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mt-1">
                                     {product.singleUnitColorHex && (
                                       <div
-                                        className="w-4 h-4 rounded-full border border-gray-300 shrink-0"
+                                        className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-gray-300 shrink-0"
                                         style={{ backgroundColor: product.singleUnitColorHex }}
                                         title={product.singleUnitColor}
                                       />
                                     )}
                                     {product.singleUnitColor && (
-                                      <span className="text-xs text-gray-600">{product.singleUnitColor}</span>
+                                      <span className="text-xs text-gray-600 break-words">{product.singleUnitColor}</span>
                                     )}
                                   </div>
-                                  <div className="text-lg font-bold text-gray-900 mt-1">{formatPrice(getRegionalPrice(product))}</div>
+                                  <div className="text-base sm:text-lg font-bold text-gray-900 mt-1">{formatPrice(getRegionalPrice(product))}</div>
                                   {getRegionalOriginalPrice(product) && getRegionalOriginalPrice(product)! > getRegionalPrice(product) && (
                                     <span className="text-xs text-gray-400 line-through">{formatPrice(getRegionalOriginalPrice(product)!)}</span>
                                   )}
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-gray-500 mt-0.5">
                                     {(product.inventory?.baseStock ?? product.totalStock ?? 0) > 0
                                       ? `${product.inventory?.baseStock ?? product.totalStock} in stock`
                                       : 'Out of stock'}
@@ -662,15 +667,15 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                   setSelectedImage(0); // Reset to first image
                                   setQuantity(1); // Reset quantity on variant change
                                 }}
-                                className={`p-3 border-2 rounded-lg transition-all duration-300 text-left transform hover:scale-105 ${selectedVariant?.id === variant.id
+                                className={`p-2.5 sm:p-3 border-2 rounded-lg transition-all duration-300 text-left transform hover:scale-105 overflow-hidden ${selectedVariant?.id === variant.id
                                   ? 'border-blue-500 shadow-lg ring-2 ring-blue-200'
                                   : 'border-gray-200 hover:border-gray-300 hover:shadow-md bg-white'
                                   }`}
                               >
-                                <div className="flex items-start gap-3">
+                                <div className="flex items-start gap-2 sm:gap-3 min-w-0">
                                   {/* Variant Image Preview in Selector */}
                                   {variant.images && variant.images.length > 0 && (
-                                    <div className="w-12 h-12 rounded-md overflow-hidden border border-gray-200 shrink-0">
+                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden border border-gray-200 shrink-0">
                                       <Image
                                         src={variant.images[0]}
                                         alt={`${variant.size} ${variant.color}`}
@@ -680,27 +685,30 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                                       />
                                     </div>
                                   )}
-                                  <div>
-                                    <div className="font-semibold text-gray-900 text-sm">{variant.size}</div>
-                                    <div className="flex items-center space-x-2 mt-1">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-semibold text-gray-900 text-sm break-words">{variant.size}</div>
+                                    <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mt-1">
                                       {variant.colorHex && (
                                         <div
-                                          className="w-4 h-4 rounded-full border border-gray-300"
+                                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border border-gray-300 shrink-0"
                                           style={{ backgroundColor: variant.colorHex }}
                                         />
                                       )}
-                                      <span className="text-xs text-gray-600">{variant.color}</span>
+                                      <span className="text-xs text-gray-600 break-words">{variant.color}</span>
                                     </div>
-                                    <div className="flex items-center gap-1 mt-1">
-                                      <span className="text-lg font-bold text-gray-900">{formatPrice(getRegionalPrice(variant))}</span>
-                                      {getRegionalOriginalPrice(variant) && getRegionalOriginalPrice(variant)! > getRegionalPrice(variant) && (
-                                        <span className="text-xs text-gray-400 line-through">{formatPrice(getRegionalOriginalPrice(variant)!)}</span>
-                                      )}
-                                      {variant.discount && variant.discount > 0 && (
-                                        <span className="text-xs text-green-600 font-medium">{variant.discount}% off</span>
-                                      )}
+                                    {/* Price line — wraps cleanly so badge can't overflow */}
+                                    <div className="mt-1">
+                                      <div className="text-base sm:text-lg font-bold text-gray-900">{formatPrice(getRegionalPrice(variant))}</div>
+                                      <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5">
+                                        {getRegionalOriginalPrice(variant) && getRegionalOriginalPrice(variant)! > getRegionalPrice(variant) && (
+                                          <span className="text-xs text-gray-400 line-through">{formatPrice(getRegionalOriginalPrice(variant)!)}</span>
+                                        )}
+                                        {variant.discount && variant.discount > 0 && (
+                                          <span className="text-xs text-green-600 font-medium whitespace-nowrap">{variant.discount}% off</span>
+                                        )}
+                                      </div>
                                     </div>
-                                    <div className="text-xs text-gray-500">
+                                    <div className="text-xs text-gray-500 mt-0.5">
                                       {variant.stock > 0 ? `${variant.stock} in stock` : 'Out of stock'}
                                     </div>
                                   </div>
@@ -713,7 +721,7 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
                       {/* Single Unit Size and Color - Show only if NO variants */}
                       {!product.hasVariants && (product.singleUnitSize || product.singleUnitColor) && (
-                        <div className="max-w-md bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                           <h3 className="text-lg font-semibold text-gray-900 mb-3">Product Details</h3>
                           <div className="space-y-2">
                             {product.singleUnitSize && (
@@ -884,28 +892,32 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                         {availableStock > 0 && (
                           <>
                             {/* Quantity Selector */}
-                            <div className="flex items-center justify-center gap-3 mb-3">
+                            <div className="flex items-center justify-center flex-wrap gap-2 sm:gap-3 mb-3">
                               <span className="text-sm font-semibold text-gray-700">Quantity:</span>
                               <button
                                 onClick={handleDecrement}
                                 disabled={quantity <= 1}
-                                className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                aria-label="Decrease quantity"
+                                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                               >
                                 <span className="text-xl font-semibold">−</span>
                               </button>
                               <input
                                 type="number"
+                                inputMode="numeric"
                                 min={1}
                                 max={availableStock}
                                 value={quantity || ''}
                                 onChange={handleQuantityChange}
                                 onBlur={handleQuantityBlur}
-                                className="w-20 text-center font-bold text-lg border-2 border-gray-300 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                aria-label="Quantity"
+                                className="w-16 sm:w-20 text-center font-bold text-base sm:text-lg border-2 border-gray-300 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                               <button
                                 onClick={handleIncrement}
                                 disabled={quantity >= availableStock}
-                                className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                aria-label="Increase quantity"
+                                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                               >
                                 <span className="text-xl font-semibold">+</span>
                               </button>
@@ -925,15 +937,14 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
                       </div>
                     </div>
                   </div>
-                )}
-              </div >
-            </div >
-          </div >
+              </div>
+            </div>
+          </div>
 
           {/* Product Details Section */}
-          < div className="mt-12 bg-white rounded-2xl shadow-lg p-8" >
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Product details</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="mt-6 sm:mt-8 lg:mt-12 bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Product details</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
               <div className="space-y-4">
                 {/* Always show available details */}
                 {product.category && (
@@ -1060,9 +1071,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
             'careInstructions' in product.fabricSpecifications &&
             Array.isArray((product.fabricSpecifications as any).careInstructions) &&
             (product.fabricSpecifications as any).careInstructions.length > 0 && (
-              <div className="mt-8 bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">Care Instructions</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="mt-6 sm:mt-8 bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Care Instructions</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {(product.fabricSpecifications as any).careInstructions.map((instruction: string, index: number) => (
                     <div key={index} className="flex items-start space-x-3 p-4 bg-gray-50 rounded-xl">
                       <span className="w-6 h-6 bg-gray-700 text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0">
@@ -1078,8 +1089,8 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
 
           {/* Customer Reviews */}
           {showReviews && (
-            <div id="customer-reviews" ref={(el) => { if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }} className="mt-8 bg-white rounded-2xl shadow-lg p-8 scroll-mt-48">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">Customer Reviews</h3>
+            <div id="customer-reviews" ref={(el) => { if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }} className="mt-6 sm:mt-8 bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 scroll-mt-48">
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Customer Reviews</h3>
               {loadingReviews ? (
                 /* Skeleton mirrors the review list — 3 review-row placeholders. */
                 <div className="space-y-4">
@@ -1145,9 +1156,9 @@ const ProductDetail = ({ productSlug }: ProductDetailProps) => {
           )}
 
           {/* Features */}
-          <div className="mt-8 bg-white rounded-2xl shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Why choose this product?</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="mt-6 sm:mt-8 bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Why choose this product?</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
               <div className="flex items-center space-x-4 p-4 bg-green-50 rounded-xl">
                 <Truck className="w-8 h-8 text-green-600" />
                 <div>

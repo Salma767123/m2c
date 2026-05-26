@@ -168,18 +168,19 @@ export default function PaymentMethods() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <CreditCard className="w-6 h-6 text-gray-600" />
-          <h2 className="text-xl font-bold text-slate-900">Payment Methods</h2>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-5 sm:mb-6">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 shrink-0" />
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900">Payment Methods</h2>
         </div>
         <button
           onClick={() => setShowAddCard(true)}
-          className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          className="flex items-center gap-2 bg-gray-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-gray-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Add Payment Method
+          <span className="hidden sm:inline">Add Payment Method</span>
+          <span className="sm:hidden">Add</span>
         </button>
       </div>
 
@@ -242,8 +243,8 @@ export default function PaymentMethods() {
 
       {/* Add New Card Form */}
       {showAddCard && (
-        <div className="border border-slate-200 rounded-lg p-6 bg-slate-50">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Add New Payment Method</h3>
+        <div className="border border-slate-200 rounded-lg p-4 sm:p-5 lg:p-6 bg-slate-50">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">Add New Payment Method</h3>
           
           {/* Payment Type Selector */}
           <div className="mb-6">

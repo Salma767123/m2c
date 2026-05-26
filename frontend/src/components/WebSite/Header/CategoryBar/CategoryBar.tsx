@@ -49,9 +49,9 @@ const Category = () => {
     return (
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="h-12 flex items-center justify-center gap-3">
+          <div className="h-10 sm:h-12 flex items-center gap-2 sm:gap-3 overflow-x-auto scrollbar-hide">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-7 rounded-lg bg-gray-100 animate-pulse shrink-0" style={{ width: `${60 + (i % 3) * 20}px` }} />
+              <div key={i} className="h-6 sm:h-7 rounded-lg bg-gray-100 animate-pulse shrink-0" style={{ width: `${60 + (i % 3) * 20}px` }} />
             ))}
           </div>
         </div>
@@ -62,7 +62,7 @@ const Category = () => {
   return (
     <div className="bg-white shadow-sm">
       <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        <div className="h-12 flex items-center justify-center mx-auto overflow-x-auto scrollbar-hide">
+        <div className="h-10 sm:h-12 flex items-center gap-1 sm:gap-2 md:justify-center overflow-x-auto scrollbar-hide scroll-smooth">
 
           {categories.slice(0, 8).map((category) => (
             <Link
@@ -70,8 +70,8 @@ const Category = () => {
               href={`/categories/${category.slug}`}
               className={`px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap transition-all duration-200 shrink-0 ${
                 isActiveCategory(category.slug)
-                  ? 'text-white bg-[#222222] shadow-sm text-lg font-semibold transform scale-105'
-                  : 'text-[#444444] hover:text-white hover:bg-[#212121] text-base'
+                  ? 'text-white bg-[#222222] shadow-sm text-sm sm:text-base md:text-lg font-semibold transform scale-105'
+                  : 'text-[#444444] hover:text-white hover:bg-[#212121] text-sm sm:text-base'
               }`}
             >
               {category.name}
@@ -81,7 +81,7 @@ const Category = () => {
           {categories.length > 8 && (
             <Link
               href="/categories"
-              className="flex items-center gap-1 px-3 sm:px-4 py-2 rounded-lg font-medium text-sm sm:text-base text-[#330b03] hover:text-[#3c2415] hover:bg-[#ddd9ce] whitespace-nowrap transition-all duration-200 shrink-0"
+              className="flex items-center gap-1 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-sm sm:text-base text-[#330b03] hover:text-[#3c2415] hover:bg-[#ddd9ce] whitespace-nowrap transition-all duration-200 shrink-0"
             >
               More
               <ChevronRight className="w-4 h-4" />

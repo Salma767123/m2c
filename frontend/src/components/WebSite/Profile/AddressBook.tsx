@@ -131,13 +131,13 @@ export default function AddressBook() {
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-3">
-            <MapPin className="w-6 h-6 text-gray-600" />
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Saved Addresses</h2>
-              <p className="text-sm text-slate-500 mt-0.5">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 shrink-0" />
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900">Saved Addresses</h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                 {addresses.length} of {MAX_SAVED_ADDRESSES} addresses used
               </p>
             </div>
@@ -146,7 +146,7 @@ export default function AddressBook() {
             type="button"
             onClick={openAdd}
             disabled={atLimit}
-            className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             title={atLimit ? `Limit of ${MAX_SAVED_ADDRESSES} addresses reached` : "Add new address"}
           >
             <Plus className="w-4 h-4" />

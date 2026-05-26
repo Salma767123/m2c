@@ -111,13 +111,13 @@ const Contact = () => {
   return (
     <div className="bg-white font-sans" >
       {/* Hero Section */}
-      <section className="relative bg-gray-50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative bg-gray-50 py-10 sm:py-12 lg:py-16">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3 sm:mb-6">
               Get in Touch
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
               Have questions about our products or want to learn more about our artisans?
               We'd love to hear from you.
             </p>
@@ -125,12 +125,12 @@ const Contact = () => {
         </div>
       </section>
 
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+      <section className="py-10 sm:py-12 lg:py-16">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             {/* Contact Information */}
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-8">Contact Information</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-5 sm:mb-6 lg:mb-8">Contact Information</h2>
 
               <div className="space-y-6 font-medium">
                 <div className="flex items-start">
@@ -276,38 +276,38 @@ const Contact = () => {
       </section>
 
       {/* Vendor Invitation Section */}
-      <section className="py-16 bg-gradient-to-br from-gray-900 to-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-10 sm:py-12 lg:py-16 bg-gradient-to-br from-gray-900 to-gray-800">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full mb-6">
-              <Store className="w-8 h-8 text-gray-900" />
+            <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-full mb-4 sm:mb-6">
+              <Store className="w-6 h-6 sm:w-8 sm:h-8 text-gray-900" />
             </div>
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3 sm:mb-4">
               Become a Vendor Partner
             </h2>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
+            <p className="text-base sm:text-lg lg:text-xl text-gray-300 max-w-3xl mx-auto mb-6 sm:mb-8">
               Join our marketplace and showcase your products to thousands of customers.
               We're looking for quality vendors who share our commitment to excellence.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-10">
-              <div className="bg-white/10 backdrop-blur-sm p-6 rounded-lg">
-                <div className="text-3xl font-bold text-white mb-2">10K+</div>
-                <div className="text-gray-300">Active Customers</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 max-w-4xl mx-auto mb-8 sm:mb-10">
+              <div className="bg-white/10 backdrop-blur-sm p-4 sm:p-5 lg:p-6 rounded-lg">
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">10K+</div>
+                <div className="text-sm sm:text-base text-gray-300">Active Customers</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-sm p-6 rounded-lg">
-                <div className="text-3xl font-bold text-white mb-2">500+</div>
-                <div className="text-gray-300">Vendor Partners</div>
+              <div className="bg-white/10 backdrop-blur-sm p-4 sm:p-5 lg:p-6 rounded-lg">
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">500+</div>
+                <div className="text-sm sm:text-base text-gray-300">Vendor Partners</div>
               </div>
-              <div className="bg-white/10 backdrop-blur-sm p-6 rounded-lg">
-                <div className="text-3xl font-bold text-white mb-2">24/7</div>
-                <div className="text-gray-300">Support Available</div>
+              <div className="bg-white/10 backdrop-blur-sm p-4 sm:p-5 lg:p-6 rounded-lg">
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">24/7</div>
+                <div className="text-sm sm:text-base text-gray-300">Support Available</div>
               </div>
             </div>
 
             <button
               onClick={() => setShowVendorModal(true)}
-              className="bg-white text-gray-900 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-all transform hover:scale-105 shadow-xl inline-flex items-center gap-2"
+              className="bg-white text-gray-900 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-gray-100 transition-all transform hover:scale-105 shadow-xl inline-flex items-center gap-2"
             >
               <Store className="w-5 h-5" />
               Join Us as a Vendor
@@ -318,32 +318,33 @@ const Contact = () => {
 
       {/* Vendor Application Modal */}
       {showVendorModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center">
-                  <Store className="w-5 h-5 text-white" />
+            <div className="flex items-center justify-between p-4 sm:p-5 lg:p-6 border-b border-gray-200 bg-gray-50 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-900 rounded-full flex items-center justify-center shrink-0">
+                  <Store className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Vendor Application</h2>
-                  <p className="text-sm text-gray-600">Fill in your details to join our marketplace</p>
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">Vendor Application</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">Fill in your details to join our marketplace</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowVendorModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+                className="text-gray-400 hover:text-gray-600 transition-colors shrink-0 p-1"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-              <form onSubmit={handleVendorSubmit} className="space-y-5">
+            <div className="p-4 sm:p-5 lg:p-6 overflow-y-auto flex-1">
+              <form onSubmit={handleVendorSubmit} className="space-y-4 sm:space-y-5">
                 {/* Row 1: Full Name | Company Name */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                   <div>
                     <label htmlFor="vendor-name" className="block text-sm font-semibold text-gray-700 mb-2">
                       Full Name <span className="text-red-500">*</span>
@@ -474,19 +475,19 @@ const Contact = () => {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3 pt-4">
+                <div className="flex items-center gap-2 sm:gap-3 pt-4">
                   <button
                     type="button"
                     onClick={() => setShowVendorModal(false)}
                     disabled={isSubmittingVendor}
-                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold disabled:opacity-50"
+                    className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold disabled:opacity-50 text-sm sm:text-base"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmittingVendor}
-                    className="flex-1 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-sm sm:text-base"
                   >
                     {isSubmittingVendor ? (
                       <>

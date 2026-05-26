@@ -323,7 +323,7 @@ const Header = () => {
             </div>
 
             {/* Section 3: Action Icons (30% on desktop, 50% on mobile/tablet) */}
-            <div className="w-[50%] md:w-[30%] flex items-center justify-end gap-1 sm:gap-2 md:gap-3 shrink-0">
+            <div className="w-[50%] md:w-[30%] flex items-center justify-end gap-0.5 sm:gap-1.5 md:gap-3 shrink-0">
               {/* Notifications (logged-in users only) */}
               {isUserLoggedIn && <NotificationDropdown />}
 
@@ -378,7 +378,7 @@ const Header = () => {
                 {isLanguageCurrencyOpen && (
                   <div
                     ref={modalRef}
-                    className="absolute top-full -right-2 sm:-right-4 mt-2 w-72 sm:w-80 bg-white rounded-xl shadow-xl z-50 overflow-visible animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="absolute top-full right-0 sm:-right-4 mt-2 w-[calc(100vw-1.5rem)] max-w-xs sm:w-80 bg-white rounded-xl shadow-xl z-50 overflow-visible animate-in fade-in slide-in-from-top-2 duration-200"
                   >
                     {/* Triangle indicator pointing to Globe icon */}
                     <div className="absolute -top-2 right-4 sm:right-6 w-4 h-4 bg-gray-50 transform rotate-45 z-10"></div>

@@ -2,13 +2,13 @@ import { RotateCcw, Clock, Package, CheckCircle, XCircle, AlertCircle } from 'lu
 
 const Returns = () => {
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-8">
-            <RotateCcw className="mx-auto h-12 w-12 text-blue-600 mb-4" />
-            <h1 className="text-3xl font-bold text-gray-900">Returns & Exchanges</h1>
-            <p className="text-gray-600 mt-2">Easy returns within 30 days</p>
+    <div className="min-h-screen bg-gray-50 py-8 sm:py-10 lg:py-12">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
+          <div className="text-center mb-6 sm:mb-8">
+            <RotateCcw className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-blue-600 mb-3 sm:mb-4" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Returns & Exchanges</h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-2">Easy returns within 30 days</p>
           </div>
 
           <div className="space-y-8">
@@ -126,13 +126,13 @@ const Returns = () => {
               </div>
             </section>
 
-            <section className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Need Help?</h2>
-              <p className="text-gray-700 mb-4">
+            <section className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-5 lg:p-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Need Help?</h2>
+              <p className="text-sm sm:text-base text-gray-700 mb-3 sm:mb-4">
                 Our customer service team is here to help with your return.
               </p>
-              <div className="space-y-2">
-                <p className="text-gray-700">Email: returns@yourstore.com</p>
+              <div className="space-y-1.5 sm:space-y-2 text-sm sm:text-base">
+                <p className="text-gray-700 break-all">Email: returns@yourstore.com</p>
                 <p className="text-gray-700">Phone: (555) 123-4567</p>
                 <p className="text-gray-700">Hours: Monday-Friday, 9 AM - 6 PM EST</p>
               </div>

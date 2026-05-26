@@ -29,19 +29,19 @@ export default function ProfileTab({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <User className="w-6 h-6 text-gray-600" />
-        <h2 className="text-xl font-bold text-slate-900">Profile Information</h2>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+      <div className="flex items-center gap-2 sm:gap-3 mb-5 sm:mb-6">
+        <User className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900">Profile Information</h2>
       </div>
 
-      <div className="border-2 border-dashed border-slate-200 p-5 rounded-lg">
-        <div className="flex items-center gap-2 mb-4">
+      <div className="border-2 border-dashed border-slate-200 p-4 sm:p-5 rounded-lg">
+        <div className="flex items-center gap-2 mb-3 sm:mb-4">
           <User2 className="w-5 h-5 text-gray-600" />
-          <h3 className="text-lg font-semibold text-slate-900">Personal Information</h3>
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900">Personal Information</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">First Name</label>
             <input

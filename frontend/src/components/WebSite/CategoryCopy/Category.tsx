@@ -242,7 +242,7 @@ export default function Category() {
                   </div>
 
                   {/* Category Name */}
-                  <h3 className="text-xs sm:text-sm md:text-base font-semibold text-gray-700 group-hover:text-[#313131] group-focus:text-[#313131] transition-colors duration-200 px-1 leading-tight line-clamp-2">
+                  <h3 className="text-xs sm:text-sm md:text-base font-semibold text-gray-700 group-hover:text-[#313131] group-focus:text-[#313131] transition-colors duration-200 px-1 leading-tight break-words">
                     {category.name}
                   </h3>
                 </Link>

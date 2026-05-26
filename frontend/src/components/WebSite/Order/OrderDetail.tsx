@@ -236,24 +236,27 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
   const shippingAddr = orderDetails.shippingAddress || {}
 
   return (
-    <div className="min-h-screen bg-white py-8 font-sans">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white py-4 sm:py-6 lg:py-8 font-sans">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         <Link href="/order">
-          <button className="flex items-center gap-2 text-white bg-[#222222] p-3 rounded-md mb-4 transition-colors">
+          <button className="flex items-center gap-2 text-white bg-[#222222] px-3 py-2 sm:p-3 text-sm sm:text-base rounded-md mb-4 transition-colors">
             <ArrowLeft className="w-4 h-4" />
             Back to Orders
           </button>
         </Link>
 
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-1">Order Details</h1>
-              <p className="text-slate-600">Order #{orderDetails.orderId}</p>
+        {/* Header — Order-page style with icon */}
+        <div className="mb-5 sm:mb-6 lg:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <Package className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1">Order Details</h1>
+                <p className="text-xs sm:text-sm text-slate-600 break-all">Order #{orderDetails.orderId}</p>
+              </div>
             </div>
-            <div>
-              <div className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-medium ${getStatusColorClass(orderDetails.status)}`}>
+            <div className="shrink-0">
+              <div className={`inline-flex items-center px-3 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium ${getStatusColorClass(orderDetails.status)}`}>
                 <Package className="w-4 h-4 mr-1" />
                 {formatStatus(getNormalizedStatus(orderDetails.status))}
               </div>
@@ -261,57 +264,57 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
           {/* Order Items */}
           <div className="lg:col-span-2 space-y-6">
             {/* Order Status Timeline */}
             <Card className="border">
               <CardHeader>
-                <CardTitle className="text-xl">Order Status</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">Order Status</CardTitle>
               </CardHeader>
               <CardContent>
                 {normalizedStatus === 'cancelled' ? (
                   <div className="flex flex-col items-center justify-center p-4">
-                    <AlertCircle className="w-12 h-12 text-red-500 mb-2" />
-                    <span className="text-lg font-medium text-red-600">Order Cancelled</span>
-                    <span className="text-sm text-slate-500">{new Date(orderDetails.createdAt).toLocaleDateString()}</span>
+                    <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-500 mb-2" />
+                    <span className="text-base sm:text-lg font-medium text-red-600">Order Cancelled</span>
+                    <span className="text-xs sm:text-sm text-slate-500">{new Date(orderDetails.createdAt).toLocaleDateString()}</span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'processing') ? "bg-yellow-500" : "bg-slate-300"
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col items-center min-w-0 shrink-0">
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-2 ${isStatusReached(orderDetails.status, 'processing') ? "bg-yellow-500" : "bg-slate-300"
                         }`}>
-                        <Package className="w-5 h-5 text-white" />
+                        <Package className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                       </div>
-                      <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'processing') ? "text-yellow-600" : "text-slate-500"
+                      <span className={`text-xs sm:text-sm font-medium text-center ${isStatusReached(orderDetails.status, 'processing') ? "text-yellow-600" : "text-slate-500"
                         }`}>Processing</span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-[10px] sm:text-xs text-slate-500">
                         {isStatusCurrent(orderDetails.status, 'processing') ? "Current" : isStatusReached(orderDetails.status, 'shipped') ? "Complete" : "Pending"}
                       </span>
                     </div>
-                    <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-300" : "bg-slate-300"
+                    <div className={`flex-1 h-0.5 mt-4 sm:mt-5 mx-1 sm:mx-4 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-300" : "bg-slate-300"
                       }`}></div>
-                    <div className="flex flex-col items-center">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-500" : "bg-slate-300"
+                    <div className="flex flex-col items-center min-w-0 shrink-0">
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-2 ${isStatusReached(orderDetails.status, 'shipped') ? "bg-blue-500" : "bg-slate-300"
                         }`}>
-                        <Truck className="w-5 h-5 text-white" />
+                        <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                       </div>
-                      <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'shipped') ? "text-blue-600" : "text-slate-500"
+                      <span className={`text-xs sm:text-sm font-medium text-center ${isStatusReached(orderDetails.status, 'shipped') ? "text-blue-600" : "text-slate-500"
                         }`}>Shipped</span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-[10px] sm:text-xs text-slate-500">
                         {isStatusCurrent(orderDetails.status, 'shipped') ? "Current" : isStatusReached(orderDetails.status, 'received') ? "Complete" : "Pending"}
                       </span>
                     </div>
-                    <div className={`flex-1 h-0.5 mx-4 ${isStatusReached(orderDetails.status, 'received') ? "bg-green-300" : "bg-slate-300"
+                    <div className={`flex-1 h-0.5 mt-4 sm:mt-5 mx-1 sm:mx-4 ${isStatusReached(orderDetails.status, 'received') ? "bg-green-300" : "bg-slate-300"
                       }`}></div>
-                    <div className="flex flex-col items-center">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${isStatusReached(orderDetails.status, 'received') ? "bg-green-500" : "bg-slate-300"
+                    <div className="flex flex-col items-center min-w-0 shrink-0">
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mb-1.5 sm:mb-2 ${isStatusReached(orderDetails.status, 'received') ? "bg-green-500" : "bg-slate-300"
                         }`}>
-                        <CheckCircle className="w-5 h-5 text-white" />
+                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                       </div>
-                      <span className={`text-sm font-medium ${isStatusReached(orderDetails.status, 'received') ? "text-green-600" : "text-slate-500"
+                      <span className={`text-xs sm:text-sm font-medium text-center ${isStatusReached(orderDetails.status, 'received') ? "text-green-600" : "text-slate-500"
                         }`}>Received</span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-[10px] sm:text-xs text-slate-500">
                         {isStatusCurrent(orderDetails.status, 'received') ? "Complete" : "Pending"}
                       </span>
                     </div>
@@ -323,13 +326,13 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
             {/* Ordered Items */}
             <Card className="border overflow-hidden">
               <CardHeader className="border-b bg-slate-50">
-                <CardTitle className="text-xl">Ordered Items</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">Ordered Items</CardTitle>
               </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-6">
+              <CardContent className="p-4 sm:p-5 lg:p-6">
+                <div className="space-y-4 sm:space-y-6">
                   {orderDetails.items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:shadow-md transition-shadow">
-                      <div className="relative w-20 h-20 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center">
+                    <div key={item.id} className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 border border-slate-200 rounded-xl hover:shadow-md transition-shadow">
+                      <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
                         {item.productImage ? (
                           <Image
                             src={item.productImage}
@@ -339,26 +342,21 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                             className="object-cover"
                           />
                         ) : (
-                          <Package className="w-10 h-10 text-slate-400" />
+                          <Package className="w-8 h-8 sm:w-10 sm:h-10 text-slate-400" />
                         )}
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-slate-900 mb-1">{item.productName}</h3>
-                        <div className="flex items-center gap-4 text-sm text-slate-600 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-slate-900 mb-1 text-sm sm:text-base break-words">{item.productName}</h3>
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-600 mb-2">
                           <span>Qty: {item.quantity}</span>
-                          {(item.color || item.size) && (
-                            <div className="flex items-center gap-2 border-l border-slate-300 pl-3 ml-3">
-                              {item.color && <span>{item.color}</span>}
-                              {item.color && item.size && <span>|</span>}
-                              {item.size && <span>Size: {item.size}</span>}
-                            </div>
-                          )}
+                          {item.color && <span>{item.color}</span>}
+                          {item.size && <span>Size: {item.size}</span>}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg font-bold text-slate-900">
+                        <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                          <span className="text-base sm:text-lg font-bold text-slate-900">
                             {formatPrice(item.totalPrice)}
                           </span>
-                          <span className="text-sm text-slate-500">
+                          <span className="text-xs sm:text-sm text-slate-500">
                             {formatPrice(item.unitPrice)} each
                           </span>
                         </div>
@@ -379,27 +377,27 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="mt-6 pt-6 border-t border-slate-200">
-                  <div className="flex flex-wrap gap-3">
+                <div className="mt-5 sm:mt-6 pt-5 sm:pt-6 border-t border-slate-200">
+                  <div className="flex flex-wrap gap-2 sm:gap-3">
                     <button
                       onClick={handleDownloadInvoice}
-                      className="flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border border-slate-300 text-slate-700 rounded-lg sm:rounded-xl hover:bg-slate-50 transition-colors text-sm sm:text-base"
                     >
-                      <Download className="w-4 h-4" />
+                      <Download className="w-4 h-4 shrink-0" />
                       Download Invoice
                     </button>
                     {normalizedStatus === "received" && (
                       hasReviewed ? (
-                        <div className="flex items-center gap-2 px-4 py-3 bg-green-50 text-green-600 rounded-xl">
-                          <CheckCircle className="w-4 h-4" />
+                        <div className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-green-50 text-green-600 rounded-lg sm:rounded-xl">
+                          <CheckCircle className="w-4 h-4 shrink-0" />
                           <span className="font-medium text-sm">Review Submitted</span>
                         </div>
                       ) : (
                         <button
                           onClick={() => setReviewModalState({ isOpen: true, orderId: orderDetails.id, items: orderDetails.items })}
-                          className="flex items-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors"
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-900 text-white rounded-lg sm:rounded-xl hover:bg-gray-800 transition-colors"
                         >
-                          <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                          <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
                           <span className="font-medium text-sm">Write a Review</span>
                         </button>
                       )
@@ -416,9 +414,9 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
               {/* Order Summary */}
               <Card className="border overflow-hidden">
                 <CardHeader className="border-b bg-slate-100">
-                  <CardTitle className="text-xl">Order Summary</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl">Order Summary</CardTitle>
                 </CardHeader>
-                <CardContent className="p-6 space-y-4">
+                <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Subtotal</span>
                     <span className="font-medium">{formatPrice(orderDetails.subtotal)}</span>
@@ -457,9 +455,9 @@ export default function OrderDetail({ orderId }: OrderDetailProps) {
               {/* Delivery Information */}
               <Card className="border overflow-hidden">
                 <CardHeader className="border-b bg-slate-100">
-                  <CardTitle className="text-xl">Delivery Info</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl">Delivery Info</CardTitle>
                 </CardHeader>
-                <CardContent className="p-6 space-y-4">
+                <CardContent className="p-4 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
                     <Calendar className="w-5 h-5 text-blue-600 shrink-0" />
                     <div>

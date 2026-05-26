@@ -73,11 +73,11 @@ export default function PromotionalPopup({ category }: PromotionalPopupProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300"
       onClick={handleClose}
     >
       <div
-        className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-300"
+        className="relative bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-md w-full max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-300"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -100,22 +100,22 @@ export default function PromotionalPopup({ category }: PromotionalPopupProps) {
         )}
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4 sm:p-5 lg:p-6">
           {/* Discount Badge */}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full text-sm font-bold">
-              <Tag className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-2 mb-2 sm:mb-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 bg-red-50 text-red-600 rounded-full text-xs sm:text-sm font-bold">
+              <Tag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               {discountText}
             </span>
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2 break-words">
             {coupon.popupTitle || `${discountText} on ${category}!`}
           </h2>
 
           {/* Message */}
-          <p className="text-sm text-gray-600 mb-5">
+          <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-5">
             {coupon.popupMessage || coupon.description || `Use code below to get ${discountText.toLowerCase()} on your purchase.`}
           </p>
 

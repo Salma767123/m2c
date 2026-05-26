@@ -63,10 +63,10 @@ export default function Notifications({ editedProfile, setEditedProfile }: Notif
   ]
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Bell className="w-6 h-6 text-gray-600" />
-        <h2 className="text-xl font-bold text-slate-900">Notification Preferences</h2>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+      <div className="flex items-center gap-2 sm:gap-3 mb-5 sm:mb-6">
+        <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900">Notification Preferences</h2>
       </div>
 
       {/* Global Settings */}

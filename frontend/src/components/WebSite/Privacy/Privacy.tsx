@@ -3,13 +3,13 @@ import { Shield, Eye, Lock, Users, Mail } from 'lucide-react';
 
 function Privacy() {
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-[89%] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-8">
-            <Shield className="mx-auto h-12 w-12 text-blue-600 mb-4" />
-            <h1 className="text-3xl font-bold text-gray-900">Privacy Policy</h1>
-            <p className="text-gray-600 mt-2">Last updated: December 2024</p>
+    <div className="min-h-screen bg-gray-50 py-8 sm:py-10 lg:py-12">
+      <div className="max-w-[95%] sm:max-w-[92%] lg:max-w-[89%] mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
+          <div className="text-center mb-6 sm:mb-8">
+            <Shield className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-blue-600 mb-3 sm:mb-4" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Privacy Policy</h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-2">Last updated: December 2024</p>
           </div>
 
           <div className="space-y-8">

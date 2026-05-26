@@ -334,16 +334,23 @@ export default function Order() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen bg-slate-50 py-8 font-sans">
-        <div className="max-w-7xl xl:max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">Shopping Cart</h1>
-            <p className="text-slate-600">Review your items and proceed to checkout</p>
+      <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
+        <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="mb-5 sm:mb-6 lg:mb-8">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+                <div className="min-w-0">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">Shopping Cart</h1>
+                  <p className="text-sm sm:text-base text-slate-600">Review your items and proceed to checkout</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="animate-pulse">
-            <div className="h-32 bg-slate-200 rounded-2xl mb-4"></div>
-            <div className="h-32 bg-slate-200 rounded-2xl mb-4"></div>
-            <div className="h-32 bg-slate-200 rounded-2xl"></div>
+          <div className="animate-pulse space-y-3 sm:space-y-4">
+            <div className="h-24 sm:h-32 bg-slate-200 rounded-xl sm:rounded-2xl"></div>
+            <div className="h-24 sm:h-32 bg-slate-200 rounded-xl sm:rounded-2xl"></div>
+            <div className="h-24 sm:h-32 bg-slate-200 rounded-xl sm:rounded-2xl"></div>
           </div>
         </div>
       </div>
@@ -498,31 +505,33 @@ export default function Order() {
   const summary = calculateSummary()
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 font-sans">
-      <div className="max-w-7xl xl:max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Shopping Cart</h1>
-          <p className="text-slate-600">Review your items and proceed to checkout</p>
+    <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
+      <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+        {/* Header — Order-page style with icon + count */}
+        <div className="mb-5 sm:mb-6 lg:mb-8">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <ShoppingCart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">Shopping Cart</h1>
+                <p className="text-sm sm:text-base text-slate-600">Review your items and proceed to checkout</p>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-xl sm:text-2xl font-bold text-slate-900">{cartItems.length}</p>
+              <p className="text-xs sm:text-sm text-slate-600">Items</p>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cart Items */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
+          {/* Cart Items — Order-page style: each item its own card with gaps between */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 bg-[#222222]">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-[#fffff4]">Cart Items</h2>
-                  <span className="bg-white text-[#313131] text-sm font-medium px-3 py-1 rounded-full">
-                    {cartItems.length} items
-                  </span>
-                </div>
-              </div>
-
-              <div className="divide-y divide-slate-200">
+            {cartItems.length > 0 && (
+              <div className="space-y-3 sm:space-y-4 lg:space-y-6">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="p-6">
-                    <div className="flex items-start gap-4">
+                  <div key={item.id} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow">
+                    <div className="flex items-start gap-3 sm:gap-4">
                       {/* Product Image */}
                       <div className="shrink-0">
                         {item.images && item.images.length > 0 ? (
@@ -531,11 +540,11 @@ export default function Order() {
                             alt={item.name}
                             width={96}
                             height={96}
-                            className="w-24 h-24 object-cover rounded-xl border border-slate-200"
+                            className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg sm:rounded-xl border border-slate-200"
                           />
                         ) : (
-                          <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-xl border border-slate-200">
-                            <Package className="w-8 h-8 text-gray-400" />
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 flex items-center justify-center bg-gray-100 rounded-lg sm:rounded-xl border border-slate-200">
+                            <Package className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-gray-400" />
                           </div>
                         )}
                       </div>
@@ -555,30 +564,30 @@ export default function Order() {
                           </div>
                         ) : null}
 
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="text-lg font-semibold text-slate-900 mb-1">{item.name}</h3>
-                            <p className="text-sm text-slate-600 mb-2">{item.description}</p>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-1 break-words">{item.name}</h3>
+                            <p className="hidden sm:block text-sm text-slate-600 mb-2 line-clamp-2">{item.description}</p>
+                            <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-2">
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 sm:py-1 rounded-full">
                                 {item.category}
                               </span>
                               {item.rating !== undefined && (
                                 <div className="flex items-center gap-1">
-                                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                  <span className="text-sm text-slate-600">{item.rating}</span>
-                                  <span className="text-sm text-slate-500">({item.reviews || 0})</span>
+                                  <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400 fill-current" />
+                                  <span className="text-xs sm:text-sm text-slate-600">{item.rating}</span>
+                                  <span className="text-xs sm:text-sm text-slate-500">({item.reviews || 0})</span>
                                 </div>
                               )}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
                               {item.material && (
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 sm:py-1 rounded-full">
                                   {item.material}
                                 </span>
                               )}
                               {item.discount != null && item.discount > 0 ? (
-                                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full font-semibold">
+                                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 sm:py-1 rounded-full font-semibold">
                                   Save {item.discount}%
                                 </span>
                               ) : null}
@@ -610,44 +619,47 @@ export default function Order() {
                           </div>
                           <button
                             onClick={() => removeItem(item.id)}
-                            className="p-2 text-slate-400 hover:text-gray-500 transition-colors"
+                            aria-label="Remove item"
+                            className="p-1.5 sm:p-2 text-slate-400 hover:text-gray-500 transition-colors shrink-0"
                           >
-                            <Trash2 className="w-5 h-5" />
+                            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                         </div>
 
                         {/* Price and Quantity */}
-                        <div className="flex items-center justify-between mt-4">
+                        <div className="flex items-center justify-between flex-wrap gap-3 mt-3 sm:mt-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-slate-900">{formatPrice(item.price)}</span>
+                            <span className="text-lg sm:text-xl font-bold text-slate-900">{formatPrice(item.price)}</span>
                             {item.originalPrice && (
-                              <span className="text-sm text-slate-500 line-through">{formatPrice(item.originalPrice)}</span>
+                              <span className="text-xs sm:text-sm text-slate-500 line-through">{formatPrice(item.originalPrice)}</span>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center flex-wrap gap-2 sm:gap-3">
                             {!item.inStock ? (
-                              <span className="text-sm text-red-600 font-medium bg-red-50 px-2 py-1 rounded">Out of Stock</span>
+                              <span className="text-xs sm:text-sm text-red-600 font-medium bg-red-50 px-2 py-1 rounded">Out of Stock</span>
                             ) : (item.availableStock !== undefined && item.quantity > item.availableStock) ? (
-                              <span className="text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
+                              <span className="text-xs sm:text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
                                 Only {item.availableStock} in stock
                               </span>
                             ) : null}
                             <div className="flex items-center border border-slate-300 rounded-lg">
                               <button
                                 onClick={() => updateQuantity(item.id, item.productId, item.quantity - 1)}
-                                className="p-2 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                aria-label="Decrease quantity"
+                                className="p-1.5 sm:p-2 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 disabled={!item.inStock || item.quantity <= 1}
                               >
-                                <Minus className="w-4 h-4" />
+                                <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </button>
-                              <span className="px-4 py-2 font-medium">{item.quantity}</span>
+                              <span className="px-3 sm:px-4 py-1 sm:py-2 font-medium text-sm sm:text-base">{item.quantity}</span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.productId, item.quantity + 1)}
-                                className="p-2 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                aria-label="Increase quantity"
+                                className="p-1.5 sm:p-2 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 disabled={!item.inStock || (item.availableStock != null && item.quantity >= item.availableStock)}
                               >
-                                <Plus className="w-4 h-4" />
+                                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </button>
                             </div>
                           </div>
@@ -657,39 +669,40 @@ export default function Order() {
                   </div>
                 ))}
               </div>
+            )}
 
-              {cartItems.length === 0 && (
-                <div className="p-12 text-center">
-                  <ShoppingCart className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-900 mb-2">Your cart is empty</h3>
-                  <p className="text-slate-600 mb-6">Add some items to get started</p>
-                  <Link href="/products">
-                    <button className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
-                      Continue Shopping
-                    </button>
-                  </Link>
-                </div>
-              )}
-            </div>
+            {/* Empty State — Order-page style polished card */}
+            {cartItems.length === 0 && (
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 lg:p-12 text-center">
+                <ShoppingCart className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 text-slate-300 mx-auto mb-3 sm:mb-4" />
+                <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">Your cart is empty</h3>
+                <p className="text-sm sm:text-base text-slate-600 mb-5 sm:mb-6">Add some items to get started</p>
+                <Link href="/products">
+                  <button className="bg-blue-600 text-white px-5 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+                    Continue Shopping
+                  </button>
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Order Summary */}
           {cartItems.length > 0 && (
             <div className="lg:col-span-1">
               {/* Promo Code */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Promo Code</h3>
-                <div className="flex gap-3">
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 mb-4 sm:mb-6">
+                <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">Promo Code</h3>
+                <div className="flex gap-2 sm:gap-3">
                   <input
                     type="text"
                     placeholder="Enter promo code"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
-                    className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                    className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-slate-300 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
                   />
                   <button
                     onClick={applyPromoCode}
-                    className="px-6 py-3 bg-[#222222] hover:bg-[#313131] text-white font-medium rounded-xl transition-colors"
+                    className="px-4 sm:px-6 py-2.5 sm:py-3 bg-[#222222] hover:bg-[#313131] text-white font-medium rounded-lg sm:rounded-xl transition-colors text-sm sm:text-base shrink-0"
                   >
                     Apply
                   </button>
@@ -728,10 +741,10 @@ export default function Order() {
 
               {/* Bag Add-on */}
               {availableBagTypes.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <ShoppingBag className="w-5 h-5 text-slate-700" />
-                    <h3 className="text-lg font-semibold text-slate-900">Add a Bag ({availableBagTypes.length})</h3>
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 mb-4 sm:mb-6">
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                    <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-slate-700" />
+                    <h3 className="text-base sm:text-lg font-semibold text-slate-900">Add a Bag ({availableBagTypes.length})</h3>
                   </div>
                   <div className="space-y-3 max-h-[280px] overflow-y-auto">
                     {/* No bag option */}
@@ -785,12 +798,12 @@ export default function Order() {
                 </div>
               )}
 
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden sticky top-8">
-                <div className="px-6 py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
-                  <h2 className="text-xl font-bold text-slate-900">Order Summary</h2>
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden lg:sticky lg:top-8">
+                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900">Order Summary</h2>
                 </div>
 
-                <div className="p-6">
+                <div className="p-4 sm:p-5 lg:p-6">
                   <div className="space-y-4 mb-6">
                     <div className="flex justify-between">
                       <span className="text-slate-600">Subtotal</span>

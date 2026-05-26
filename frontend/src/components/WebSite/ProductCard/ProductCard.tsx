@@ -239,7 +239,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
               <span className="text-xs text-gray-600 font-medium">{product.category}</span>
             </div>
 
-            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-2 break-words">
               {product.name}
             </h3>
 
