@@ -325,7 +325,7 @@ export default function ShippingForm({ formData, updateFormData, disabled = fals
         {renderError("addressLine2")}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">City <span className="text-red-500">*</span></label>
           <input

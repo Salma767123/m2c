@@ -7,6 +7,19 @@ import orderService, { Order as APIOrder } from '@/services/orderService'
 
 const ORDERS_PER_PAGE = 5
 
+/** Smart pagination range builder — collapses long page lists to "1 … 4 5 6 … 20". */
+function getPageRange(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | '…'> = [1];
+  if (current > 4) pages.push('…');
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (current < total - 3) pages.push('…');
+  pages.push(total);
+  return pages;
+}
+
 export default function OrderHistory() {
   const [orders, setOrders] = useState<APIOrder[]>([])
   const [loading, setLoading] = useState(true)
@@ -168,25 +181,25 @@ export default function OrderHistory() {
             <span>Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(currentPage * ORDERS_PER_PAGE, orders.length)} of {orders.length}</span>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {paginatedOrders.map((order) => (
-              <div key={order.id} className="border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+              <div key={order.id} className="border border-slate-200 rounded-lg p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow">
                 {/* Order Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(order.status)}
-                      <div>
-                        <h3 className="font-semibold text-slate-900">{order.orderId}</h3>
-                        <p className="text-sm text-slate-600">Placed on {new Date(order.createdAt).toLocaleDateString()}</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 sm:gap-4">
+                  <div className="flex items-start sm:items-center flex-wrap gap-2 sm:gap-4 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="shrink-0">{getStatusIcon(order.status)}</span>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-slate-900 text-sm sm:text-base break-all">{order.orderId}</h3>
+                        <p className="text-xs sm:text-sm text-slate-600">Placed on {new Date(order.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
+                    <span className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium border whitespace-nowrap ${getStatusColor(order.status)}`}>
                       {formatStatus(order.status)}
                     </span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-slate-900">${order.totalAmount.toFixed(2)}</p>
+                  <div className="text-left sm:text-right shrink-0">
+                    <p className="text-base sm:text-lg font-bold text-slate-900">${order.totalAmount.toFixed(2)}</p>
                     <p className="text-xs text-slate-500">{order.paymentStatus}</p>
                   </div>
                 </div>
@@ -194,34 +207,29 @@ export default function OrderHistory() {
                 {/* Order Items */}
                 <div className="space-y-3 mb-4">
                   {order.items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg">
+                    <div key={item.id} className="flex items-start gap-3 sm:gap-4 p-3 bg-slate-50 rounded-lg">
                       {item.productImage ? (
                         <img
                           src={item.productImage}
                           alt={item.productName}
-                          className="w-16 h-16 object-cover rounded-lg border border-slate-200"
+                          className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-slate-200 shrink-0"
                         />
                       ) : (
-                        <div className="w-16 h-16 bg-slate-200 rounded-lg border border-slate-200 flex items-center justify-center">
-                          <Package className="w-8 h-8 text-slate-400" />
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-200 rounded-lg border border-slate-200 flex items-center justify-center shrink-0">
+                          <Package className="w-6 h-6 sm:w-8 sm:h-8 text-slate-400" />
                         </div>
                       )}
-                      <div className="flex-1">
-                        <h4 className="font-medium text-slate-900">{item.productName}</h4>
-                        <div className="flex items-center gap-4 text-sm text-slate-600 mt-1">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-slate-900 text-sm sm:text-base break-words">{item.productName}</h4>
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-600 mt-1">
                           <span>Qty: {item.quantity}</span>
-                          {(item.color || item.size) && (
-                            <div className="flex items-center gap-2 border-l border-slate-300 pl-3 ml-3">
-                              {item.color && <span>{item.color}</span>}
-                              {item.color && item.size && <span>|</span>}
-                              {item.size && <span>Size: {item.size}</span>}
-                            </div>
-                          )}
+                          {item.color && <span>{item.color}</span>}
+                          {item.size && <span>Size: {item.size}</span>}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-slate-900">${(item.totalPrice).toFixed(2)}</p>
-                        <p className="text-sm text-slate-600">${item.unitPrice.toFixed(2)} each</p>
+                      <div className="text-right shrink-0">
+                        <p className="font-semibold text-slate-900 text-sm sm:text-base">${(item.totalPrice).toFixed(2)}</p>
+                        <p className="text-xs sm:text-sm text-slate-600">${item.unitPrice.toFixed(2)} each</p>
                       </div>
                     </div>
                   ))}
@@ -239,22 +247,22 @@ export default function OrderHistory() {
                 </div>
 
                 {/* Order Actions */}
-                <div className="flex flex-wrap gap-3 pt-4 border-t border-slate-200">
-                  <Link href={`/order/${order.orderId}`}>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <div className="flex flex-wrap gap-2 sm:gap-3 pt-4 border-t border-slate-200">
+                  <Link href={`/order/${order.orderId}`} className="flex-1 sm:flex-none">
+                    <button className="w-full flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                       <Eye className="w-4 h-4" />
                       View Details
                     </button>
                   </Link>
                   {formatStatus(order.status) === 'Delivered' && (
-                    <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
                       <Star className="w-4 h-4" />
                       Write Review
                     </button>
                   )}
                   <button
                     onClick={() => handleDownloadInvoice(order.id)}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Invoice
@@ -264,39 +272,46 @@ export default function OrderHistory() {
             ))}
           </div>
 
-          {/* Pagination */}
+          {/* Pagination — responsive: icon-only on mobile, smart range, label on sm+ */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-6 mt-6 border-t border-slate-200">
+            <div className="flex items-center justify-between gap-2 pt-6 mt-6 border-t border-slate-200">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Previous page"
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
               >
                 <ChevronLeft className="w-4 h-4" />
-                Previous
+                <span className="hidden sm:inline">Previous</span>
               </button>
 
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`w-9 h-9 text-sm font-medium rounded-lg transition-colors ${currentPage === page
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
-                      }`}
-                  >
-                    {page}
-                  </button>
-                ))}
+              <div className="flex items-center gap-0.5 sm:gap-1 overflow-hidden">
+                {getPageRange(currentPage, totalPages).map((page, i) =>
+                  page === '…' ? (
+                    <span key={`oh-e-${i}`} className="px-1 sm:px-2 text-slate-400 text-sm">…</span>
+                  ) : (
+                    <button
+                      key={`oh-p-${page}`}
+                      onClick={() => setCurrentPage(page as number)}
+                      aria-current={page === currentPage ? 'page' : undefined}
+                      className={`min-w-8 h-8 sm:min-w-9 sm:h-9 px-1.5 sm:px-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
+                        }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
               </div>
 
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Next page"
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
               >
-                Next
+                <span className="hidden sm:inline">Next</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

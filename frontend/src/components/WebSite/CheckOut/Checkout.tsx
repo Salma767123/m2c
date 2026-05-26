@@ -662,25 +662,25 @@ export default function Checkout() {
   ]
 
   const renderStepIndicator = () => (
-    <div className="max-w-2xl mx-auto flex items-center justify-center mb-8 bg-[#fdfdfd] px-4 py-4 rounded-xl shadow-sm border border-slate-200">
+    <div className="max-w-2xl mx-auto flex items-center justify-between sm:justify-center mb-5 sm:mb-6 lg:mb-8 bg-[#fdfdfd] px-3 sm:px-4 py-3 sm:py-4 rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       {steps.map((step, index) => (
-        <div key={step.id} className="flex items-center">
-          <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${currentStep >= step.id
+        <div key={step.id} className="flex items-center min-w-0">
+          <div className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 shrink-0 ${currentStep >= step.id
             ? "bg-gray-800 border-gray-800 text-white"
             : "border-slate-300 text-slate-400"
             }`}>
             {currentStep > step.id ? (
-              <CheckCircle className="w-5 h-5" />
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             ) : (
-              <step.icon className="w-5 h-5" />
+              <step.icon className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
           </div>
-          <span className={`ml-2 text-sm font-medium ${currentStep >= step.id ? "text-gray-800" : "text-slate-400"
-            }`}>
+          {/* Label: hidden on mobile, shown sm+; on mobile only show label for the active step */}
+          <span className={`ml-2 text-xs sm:text-sm font-medium truncate ${currentStep >= step.id ? "text-gray-800" : "text-slate-400"} ${currentStep === step.id ? "inline" : "hidden sm:inline"}`}>
             {step.name}
           </span>
           {index < steps.length - 1 && (
-            <div className={`w-16 h-0.5 mx-4 ${currentStep > step.id ? "bg-gray-800" : "bg-slate-300"
+            <div className={`flex-1 sm:flex-none sm:w-16 h-0.5 mx-2 sm:mx-4 min-w-4 ${currentStep > step.id ? "bg-gray-800" : "bg-slate-300"
               }`} />
           )}
         </div>
@@ -777,11 +777,11 @@ export default function Checkout() {
   if (loading) {
     /* Skeleton mirrors the checkout layout (form on left, order summary on right). */
     return (
-      <div className="min-h-screen bg-slate-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           <div className="lg:col-span-2 space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl border border-slate-200 p-6 space-y-3">
+              <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 lg:p-6 space-y-3">
                 <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                   {Array.from({ length: 4 }).map((_, j) => (
@@ -794,7 +794,7 @@ export default function Checkout() {
               </div>
             ))}
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4 h-fit">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 lg:p-6 space-y-4 h-fit">
             <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="flex gap-3 items-center">
@@ -838,37 +838,42 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 font-sans">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
+    <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+        {/* Header — Order-page style with icon */}
+        <div className="mb-5 sm:mb-6 lg:mb-8">
           <Link href="/cart">
-            <button className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-4">
+            <button className="flex items-center gap-2 text-sm sm:text-base text-slate-600 hover:text-slate-900 mb-3 sm:mb-4">
               <ArrowLeft className="w-4 h-4" />
               Back to Cart
             </button>
           </Link>
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Checkout</h1>
-          <p className="text-slate-600">Complete your purchase securely</p>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Lock className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">Checkout</h1>
+              <p className="text-sm sm:text-base text-slate-600">Complete your purchase securely</p>
+            </div>
+          </div>
         </div>
 
         {renderStepIndicator()}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
           {/* Checkout Form */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 bg-linear-to-r from-gray-700 to-gray-800">
-                <h2 className="text-xl font-bold text-[#fffff4]">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-linear-to-r from-gray-700 to-gray-800">
+                <h2 className="text-lg sm:text-xl font-bold text-[#fffff4]">
                   {currentStep === 1 && "Shipping Information"}
                   {currentStep === 2 && "Payment Information"}
                   {currentStep === 3 && "Review Your Order"}
                 </h2>
               </div>
 
-              <div className="p-6">
+              <div className="p-4 sm:p-5 lg:p-6">
                 {error && (
-                  <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg border border-red-200 text-sm">
+                  <div className="mb-4 p-3 sm:p-4 bg-red-50 text-red-600 rounded-lg border border-red-200 text-sm">
                     {error}
                   </div>
                 )}
@@ -878,11 +883,11 @@ export default function Checkout() {
                 {currentStep === 3 && renderReview()}
 
                 {/* Navigation Buttons */}
-                <div className="flex justify-between mt-8 pt-6 border-t border-slate-200">
+                <div className="flex justify-between gap-3 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-slate-200">
                   <button
                     onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
                     disabled={currentStep === 1 || placingOrder}
-                    className="px-6 py-3 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 sm:px-6 py-2.5 sm:py-3 border border-slate-300 text-slate-700 font-medium rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
                   >
                     Previous
                   </button>
@@ -909,7 +914,7 @@ export default function Checkout() {
                       ) ||
                       (currentStep === 1 && !canAdvanceShipping)
                     }
-                    className="px-8 py-3 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-5 sm:px-6 lg:px-8 py-2.5 sm:py-3 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-semibold rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2 text-sm sm:text-base"
                   >
                     {placingOrder && <Loader2 className="w-4 h-4 animate-spin" />}
                     {currentStep === 3 ? (placingOrder ? "Placing Order..." : "Place Order") : "Continue"}
@@ -921,12 +926,12 @@ export default function Checkout() {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden sticky top-8">
-              <div className="px-6 py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
-                <h2 className="text-xl font-bold text-slate-900">Order Summary</h2>
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 overflow-hidden lg:sticky lg:top-8">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 bg-linear-to-r from-slate-50 to-white">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900">Order Summary</h2>
               </div>
 
-              <div className="p-6">
+              <div className="p-4 sm:p-5 lg:p-6">
 
                 {/* Cart Items Preview (Optional) */}
                 <div className="mb-6 space-y-4 max-h-60 overflow-y-auto pr-2">
@@ -950,7 +955,7 @@ export default function Checkout() {
                           )}
                         </div>
                         <div className="flex-1 flex flex-col justify-between">
-                          <p className="font-medium text-slate-900 line-clamp-1">{item.product?.name || "Product"}</p>
+                          <p className="font-medium text-slate-900 break-words">{item.product?.name || "Product"}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-slate-500">Qty: {item.quantity}</span>
                             {(itemColor || itemSize) && (

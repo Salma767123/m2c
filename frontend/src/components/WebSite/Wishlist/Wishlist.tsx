@@ -114,24 +114,29 @@ const Wishlist = () => {
   };
 
   if (isLoading) {
-    /* Skeleton mirrors the loaded wishlist (header + 1/2/3/4-col card grid). */
+    /* Skeleton mirrors the Order-style list layout */
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="mb-8 space-y-3">
-          <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
-          <div className="h-4 w-64 bg-gray-100 rounded animate-pulse" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="h-64 bg-gray-200 animate-pulse" />
-              <div className="p-4 space-y-3">
-                <div className="h-5 w-3/4 bg-gray-200 rounded animate-pulse" />
-                <div className="h-4 w-1/2 bg-gray-100 rounded animate-pulse" />
-                <div className="h-9 w-full bg-gray-200 rounded animate-pulse mt-3" />
+      <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
+        <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="mb-5 sm:mb-6 lg:mb-8 space-y-2">
+            <div className="h-8 sm:h-10 w-40 sm:w-56 bg-gray-200 rounded animate-pulse" />
+            <div className="h-4 w-64 bg-gray-100 rounded animate-pulse" />
+          </div>
+          <div className="space-y-4 sm:space-y-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 bg-gray-200 rounded-lg animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-2 sm:space-y-3">
+                    <div className="h-5 w-3/4 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-4 w-1/2 bg-gray-100 rounded animate-pulse" />
+                    <div className="h-6 w-24 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-9 w-full bg-gray-200 rounded animate-pulse mt-3" />
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -139,201 +144,215 @@ const Wishlist = () => {
 
   if (wishlistItems.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center">
-          <div className="text-gray-400 mb-6">
-            <Heart className="w-24 h-24 mx-auto" />
+      <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
+        <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+          {/* Header */}
+          <div className="mb-5 sm:mb-6 lg:mb-8">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <Heart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-red-500 fill-current shrink-0" />
+                <div className="min-w-0">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">My Wishlist</h1>
+                  <p className="text-sm sm:text-base text-slate-600">Items you've saved for later</p>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-xl sm:text-2xl font-bold text-slate-900">0</p>
+                <p className="text-xs sm:text-sm text-slate-600">Total Items</p>
+              </div>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Your Wishlist is Empty</h1>
-          <p className="text-gray-600 mb-8">
-            Save items you love to your wishlist and never lose track of them.
-          </p>
-          <Link
-            href="/products"
-            className="bg-gray-800 text-white px-8 py-3 rounded-lg hover:bg-gray-900 transition-colors font-semibold inline-flex items-center"
-          >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Start Shopping
-          </Link>
+
+          {/* Empty State */}
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 lg:p-12 text-center">
+            <Heart className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 text-slate-300 mx-auto mb-4 sm:mb-6" />
+            <h3 className="text-lg sm:text-xl lg:text-2xl font-semibold text-slate-900 mb-2">Your Wishlist is Empty</h3>
+            <p className="text-sm sm:text-base text-slate-600 mb-5 sm:mb-6 max-w-md mx-auto">
+              Save items you love to your wishlist and never lose track of them.
+            </p>
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-2 bg-gray-800 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl hover:bg-gray-900 transition-colors font-semibold text-sm sm:text-base"
+            >
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              Start Shopping
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className='bg-white font-sans'>
-      {/* Hero Section */}
-      <section className="relative py-42" style={{ backgroundImage: 'url(/assets/images/categories/cb7.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">
-              My Wishlist
-            </h1>
-            <p className="text-xl text-white/90">
-              Your saved items ({wishlistItems.length})
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Wishlist Actions */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-              Saved Items
-            </h2>
-            <p className="text-gray-600">
-              Items you've saved for later
-            </p>
-          </div>
-
-          <div className="flex space-x-4 mt-4 sm:mt-0">
-            <button
-              onClick={shareWishlist}
-              disabled={isSharing || wishlistItems.length === 0}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSharing ? 'Generating Link...' : 'Share Wishlist'}
-            </button>
-            <Link
-              href="/products"
-              className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
-            >
-              Continue Shopping
-            </Link>
+    <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans">
+      <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+        {/* Header — Order-page style */}
+        <div className="mb-5 sm:mb-6 lg:mb-8">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <Heart className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-red-500 fill-current shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2 truncate">My Wishlist</h1>
+                <p className="text-sm sm:text-base text-slate-600">Items you've saved for later</p>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-xl sm:text-2xl font-bold text-slate-900">{wishlistItems.length}</p>
+              <p className="text-xs sm:text-sm text-slate-600">Total Items</p>
+            </div>
           </div>
         </div>
 
-        {/* Wishlist Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {/* Top Actions */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-5 sm:mb-6 lg:mb-8">
+          <button
+            onClick={shareWishlist}
+            disabled={isSharing || wishlistItems.length === 0}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 text-sm sm:text-base bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Share2 className="w-4 h-4" />
+            {isSharing ? 'Generating Link...' : 'Share Wishlist'}
+          </button>
+          <Link
+            href="/products"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 text-sm sm:text-base bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            Continue Shopping
+          </Link>
+        </div>
+
+        {/* Wishlist Items — Order-style list */}
+        <div className="space-y-4 sm:space-y-6">
           {wishlistItems.map((item) => {
             if (!item.product) return null;
+            const inStock = item.product.inStock;
+            const productHref = `/products/${item.product?.slug || item.productId}`;
+            const regionalPrice = getRegionalPrice(item.product);
+            const regionalOriginalPrice = getRegionalOriginalPrice(item.product) || item.product.originalPrice;
 
             return (
-              <div key={item.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
-                {/* Product Image */}
-                <div className="relative h-64 shrink-0">
-                  <Link href={`/products/${item.product?.slug || item.productId}`} className="block h-full">
+              <div key={item.id} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  {/* Product Image */}
+                  <Link
+                    href={productHref}
+                    className="relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0"
+                  >
                     <Image
                       src={item.product.image || '/placeholder.png'}
                       alt={item.product.name}
                       fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                      sizes="(max-width: 640px) 96px, (max-width: 1024px) 112px, 128px"
                       className="object-cover"
                     />
+                    {item.product.discount ? (
+                      <div className="absolute top-1 left-1 bg-gray-800 text-white px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-semibold">
+                        {item.product.discount}% OFF
+                      </div>
+                    ) : null}
                   </Link>
-                  {item.product.discount ? (
-                    <div className="absolute top-2 left-2 bg-gray-800 text-white px-2 py-1 rounded text-sm font-semibold">
-                      {item.product.discount}% OFF
-                    </div>
-                  ) : null}
-                  {!item.product.inStock ? (
-                    <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
-                      Out of Stock
-                    </div>
-                  ) : null}
 
-                  {/* Remove from Wishlist */}
-                  <button
-                    onClick={() => removeFromWishlist(item.productId)}
-                    className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors"
-                  >
-                    <Heart className="w-5 h-5 text-red-500 fill-current" />
-                  </button>
-                </div>
+                  {/* Product Details */}
+                  <div className="flex-1 min-w-0">
+                    {/* Status badge — Out of Stock, only if applicable */}
+                    {!inStock && (
+                      <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1 bg-red-50 rounded-lg w-fit">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        <span className="text-xs font-semibold text-red-600">Out of Stock</span>
+                      </div>
+                    )}
 
-                {/* Product Info */}
-                <div className="p-4 flex flex-col flex-1">
-                  <div className="flex-1">
-                    <div className="mb-2">
-                      <span className="text-sm text-gray-600 font-medium">{item.product.category}</span>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0 flex-1">
+                        <span className="inline-block text-xs bg-blue-100 text-blue-700 px-2 py-0.5 sm:py-1 rounded-full mb-1.5">
+                          {item.product.category}
+                        </span>
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-900 break-words">
+                          <Link href={productHref} className="hover:text-gray-600 transition-colors">
+                            {item.product.name}
+                          </Link>
+                        </h3>
+                      </div>
                     </div>
 
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                    <Link href={`/products/${item.product?.slug || item.productId}`} className="hover:text-gray-600 transition-colors">
-                      {item.product.name}
-                    </Link>
-                  </h3>
-
-                  {/* Rating */}
-                  {item.product.rating != null && item.product.rating > 0 ? (
-                    <div className="flex items-center mb-2">
-                      <div className="flex items-center">
+                    {/* Rating */}
+                    {item.product.rating != null && item.product.rating > 0 ? (
+                      <div className="flex items-center gap-1 mb-2">
                         {[...Array(5)].map((_, i) => (
                           <span
                             key={i}
-                            className={`text-sm ${i < Math.floor(item.product!.rating || 0) ? 'text-yellow-400' : 'text-gray-300'
-                              }`}
+                            className={`text-sm ${i < Math.floor(item.product!.rating || 0) ? 'text-yellow-400' : 'text-gray-300'}`}
                           >
                             ★
                           </span>
                         ))}
-                        <span className="ml-2 text-sm text-gray-600">
+                        <span className="ml-1 text-xs sm:text-sm text-slate-600">
                           {item.product.rating} ({item.product.reviews || 0})
                         </span>
                       </div>
-                    </div>
-                  ) : null}
+                    ) : null}
 
-                  {/* Price */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xl font-bold text-gray-900">
-                        {formatPrice(getRegionalPrice(item.product))}
+                    {/* Price */}
+                    <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 mb-2">
+                      <span className="text-lg sm:text-xl font-bold text-slate-900">
+                        {formatPrice(regionalPrice)}
                       </span>
-                      {(getRegionalOriginalPrice(item.product) || item.product.originalPrice) ? (
-                        <span className="text-sm text-gray-500 line-through">
-                          {formatPrice(getRegionalOriginalPrice(item.product) || item.product.originalPrice || 0)}
+                      {regionalOriginalPrice && regionalOriginalPrice > regionalPrice ? (
+                        <span className="text-xs sm:text-sm text-slate-500 line-through">
+                          {formatPrice(regionalOriginalPrice)}
                         </span>
                       ) : null}
                     </div>
-                  </div>
 
-                  {/* Date Added */}
-                  <p className="text-xs text-gray-500 mb-3">
-                    Added on {new Date(item.createdAt).toLocaleDateString()}
-                  </p>
-                  </div>
+                    {/* Date Added */}
+                    <p className="text-xs text-slate-500 mb-3 sm:mb-4">
+                      Added on {new Date(item.createdAt).toLocaleDateString()}
+                    </p>
 
-                  {/* Action Buttons */}
-                  <div className="flex space-x-2 mt-auto pt-3">
-                    {item.product.hasVariants ? (
-                      <Link
-                        href={`/products/${item.productId}`}
-                        className="flex-1 py-2 px-3 rounded text-sm font-medium transition-colors bg-gray-800 text-white hover:bg-gray-900 text-center"
-                      >
-                        <ShoppingCart className="w-4 h-4 inline mr-1" />
-                        Choose Options
-                      </Link>
-                    ) : (
-                      <button
-                        onClick={() => addToCart(item.productId, item.product!.name)}
-                        disabled={!item.product.inStock}
-                        className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${item.product.inStock
-                          ? 'bg-gray-800 text-white hover:bg-gray-900'
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          }`}
-                      >
-                        <ShoppingCart className="w-4 h-4 inline mr-1" />
-                        {item.product.inStock ? 'Add to Cart' : 'Out of Stock'}
-                      </button>
-                    )}
+                    {/* Action Buttons — Add to Cart on its own row on mobile, then Share + Remove paired */}
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-slate-200">
+                      {item.product.hasVariants ? (
+                        <Link href={productHref} className="w-full sm:w-auto">
+                          <button className="w-full flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors whitespace-nowrap">
+                            <ShoppingCart className="w-4 h-4" />
+                            Choose Options
+                          </button>
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => addToCart(item.productId, item.product!.name)}
+                          disabled={!inStock}
+                          className={`w-full sm:w-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm rounded-lg transition-colors whitespace-nowrap ${inStock
+                            ? 'bg-gray-800 text-white hover:bg-gray-900'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          {inStock ? 'Add to Cart' : 'Out of Stock'}
+                        </button>
+                      )}
 
-                    <button
-                      onClick={() => shareProduct(item.productId, item.product!.name)}
-                      className="p-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                    >
-                      <Share2 className="w-4 h-4 text-gray-600" />
-                    </button>
+                      {/* Share + Remove — paired in a row on mobile, then `contents` flattens at sm: so they sit beside Add to Cart on desktop */}
+                      <div className="flex gap-2 sm:contents">
+                        <button
+                          onClick={() => shareProduct(item.productId, item.product!.name)}
+                          aria-label="Share product"
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                        >
+                          <Share2 className="w-4 h-4" />
+                          <span>Share</span>
+                        </button>
 
-                    <button
-                      onClick={() => removeFromWishlist(item.productId)}
-                      className="p-2 border border-gray-300 rounded hover:bg-gray-50 hover:border-gray-300 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4 text-gray-600 hover:text-gray-600" />
-                    </button>
+                        <button
+                          onClick={() => removeFromWishlist(item.productId)}
+                          aria-label="Remove from wishlist"
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -342,33 +361,33 @@ const Wishlist = () => {
         </div>
 
         {/* Wishlist Tips */}
-        <div className="mt-12 bg-white rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Wishlist Tips</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="mt-6 sm:mt-8 lg:mt-12 bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-3 sm:mb-4">Wishlist Tips</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
             <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Heart className="w-6 h-6 text-gray-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600" />
               </div>
-              <h4 className="font-medium text-gray-900 mb-2">Save for Later</h4>
-              <p className="text-sm text-gray-600">
+              <h4 className="font-medium text-slate-900 mb-1 sm:mb-2 text-sm sm:text-base">Save for Later</h4>
+              <p className="text-xs sm:text-sm text-slate-600">
                 Click the heart icon on any product to save it to your wishlist
               </p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Share2 className="w-6 h-6 text-gray-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Share2 className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600" />
               </div>
-              <h4 className="font-medium text-gray-900 mb-2">Share with Friends</h4>
-              <p className="text-sm text-gray-600">
+              <h4 className="font-medium text-slate-900 mb-1 sm:mb-2 text-sm sm:text-base">Share with Friends</h4>
+              <p className="text-xs sm:text-sm text-slate-600">
                 Share your wishlist with family and friends for gift ideas
               </p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <ShoppingCart className="w-6 h-6 text-gray-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600" />
               </div>
-              <h4 className="font-medium text-gray-900 mb-2">Quick Add to Cart</h4>
-              <p className="text-sm text-gray-600">
+              <h4 className="font-medium text-slate-900 mb-1 sm:mb-2 text-sm sm:text-base">Quick Add to Cart</h4>
+              <p className="text-xs sm:text-sm text-slate-600">
                 Easily move items from your wishlist to your shopping cart
               </p>
             </div>

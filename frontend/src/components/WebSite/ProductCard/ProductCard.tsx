@@ -239,7 +239,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
               <span className="text-xs text-gray-600 font-medium">{product.category}</span>
             </div>
 
-            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-2 break-words">
               {product.name}
             </h3>
 
@@ -272,8 +272,9 @@ const ProductCard = ({ product }: ProductCardProps) => {
                   </span>
                 ) : null}
               </div>
+              {/* Inline discount badge — hidden on mobile (top-left image badge already conveys this) */}
               {product.discount ? (
-                <span className="text-xs bg-[#1A2830] text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md font-semibold">
+                <span className="hidden sm:inline-block text-xs bg-[#1A2830] text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md font-semibold">
                   {product.discount}% OFF
                 </span>
               ) : null}

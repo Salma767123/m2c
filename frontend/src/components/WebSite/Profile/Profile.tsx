@@ -174,7 +174,7 @@ const Profile = () => {
                 <div key={i} className="h-12 w-full bg-gray-100 rounded-lg animate-pulse" />
               ))}
             </div>
-            <div className="flex-1 bg-white rounded-xl border border-slate-200 p-8 space-y-4">
+            <div className="flex-1 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 lg:p-8 space-y-4">
               <div className="h-6 w-40 bg-gray-200 rounded animate-pulse" />
               <div className="h-4 w-2/3 bg-gray-100 rounded animate-pulse" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
@@ -193,18 +193,25 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 font-sans ">
-      <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">My Account</h1>
-          <p className="text-slate-600 mt-2">Manage your profile and account settings</p>
+    <div className="min-h-screen bg-slate-50 py-4 sm:py-6 lg:py-8 font-sans ">
+      <div className="max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+        {/* Page Header — Order-page style with icon + count */}
+        <div className="mb-5 sm:mb-6 lg:mb-8">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <User className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600 shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">My Account</h1>
+                <p className="text-sm sm:text-base text-slate-600">Manage your profile and account settings</p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col lg:flex-row gap-5 sm:gap-6 lg:gap-8">
           {/* Sidebar */}
           <div className="lg:w-64 shrink-0">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4">
               {/* User Profile Card in Sidebar */}
               <div className="bg-linear-to-b from-gray-50 to-gray-100 rounded-lg p-4 mb-6 border border-gray-200">
                 <div className="mb-3">

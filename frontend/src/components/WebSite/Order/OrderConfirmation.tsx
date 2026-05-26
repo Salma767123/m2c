@@ -57,8 +57,8 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
   if (loading) {
     /* Skeleton mirrors the confirmation card (success icon + heading + totals). */
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm p-8 space-y-6">
+      <div className="min-h-screen bg-gray-50 py-8 sm:py-12 px-3 sm:px-4">
+        <div className="max-w-2xl mx-auto bg-white rounded-xl sm:rounded-2xl shadow-sm p-5 sm:p-6 lg:p-8 space-y-5 sm:space-y-6">
           <div className="w-16 h-16 bg-gray-200 rounded-full animate-pulse mx-auto" />
           <div className="space-y-3 text-center">
             <div className="h-7 w-64 bg-gray-200 rounded animate-pulse mx-auto" />
@@ -157,16 +157,16 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
           <div className="lg:col-span-2 space-y-6">
 
             {/* Order Information Card */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-              <div className="px-6 py-4 bg-black border-b border-gray-200">
-                <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-                  <Package className="w-6 h-6 text-white" />
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-black border-b border-gray-200">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+                  <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                   Order Information
                 </h2>
               </div>
 
-              <div className="p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+              <div className="p-4 sm:p-5 lg:p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
                   <div className="space-y-2">
                     <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Order Number</h3>
                     <div className="bg-gray-50 border border-gray-300 rounded-lg p-3">
@@ -206,14 +206,14 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
             </div>
 
             {/* Shipping Address */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-              <div className="px-6 py-4 bg-black border-b border-gray-200">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-black border-b border-gray-200">
+                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-white" />
                   Shipping Address
                 </h2>
               </div>
-              <div className="p-6">
+              <div className="p-4 sm:p-5 lg:p-6">
                 <div className="space-y-1">
                   <p className="font-semibold text-gray-900 border-b border-gray-100 pb-1 mb-2">
                     {order.shippingAddress?.firstName} {order.shippingAddress?.lastName}
@@ -241,12 +241,12 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
 
           {/* Order Summary - Right Column */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden sticky top-8">
-              <div className="px-6 py-4 bg-black border-b border-gray-200">
-                <h2 className="text-xl font-bold text-white">Order Summary</h2>
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 overflow-hidden lg:sticky lg:top-8">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 bg-black border-b border-gray-200">
+                <h2 className="text-lg sm:text-xl font-bold text-white">Order Summary</h2>
               </div>
 
-              <div className="p-6">
+              <div className="p-4 sm:p-5 lg:p-6">
                 <div className="space-y-4 mb-6 cursor-default max-h-96 overflow-y-auto">
                   {order.items.map((item, index) => (
                     <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
@@ -336,10 +336,10 @@ export default function OrderConfirmation({ initialOrder }: OrderConfirmationPro
         </div>
 
         {/* Action Buttons */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-6 lg:p-8">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
             <Link href="/" className="w-full sm:w-auto">
-              <button className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg">
+              <button className="w-full flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-black hover:bg-gray-800 text-white font-semibold rounded-lg sm:rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg text-sm sm:text-base">
                 Continue Shopping
                 <ArrowRight className="w-4 h-4" />
               </button>

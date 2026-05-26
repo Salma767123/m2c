@@ -213,25 +213,25 @@ export default function AddressFormModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-linear-to-r from-gray-700 to-gray-800">
-          <h3 className="text-lg font-bold text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl w-full max-w-2xl max-h-[95vh] sm:max-h-[92vh] overflow-hidden flex flex-col">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-linear-to-r from-gray-700 to-gray-800 shrink-0">
+          <h3 className="text-base sm:text-lg font-bold text-white truncate pr-2">
             {editing ? "Edit Address" : "Add New Address"}
           </h3>
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="p-1.5 text-white/80 hover:bg-white/10 rounded transition-colors disabled:opacity-50"
+            className="p-1.5 text-white/80 hover:bg-white/10 rounded transition-colors disabled:opacity-50 shrink-0"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
+          <div className="p-4 sm:p-5 lg:p-6 space-y-4 sm:space-y-5 flex-1">
             {/* Type */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -482,19 +482,19 @@ export default function AddressFormModal({
             )}
           </div>
 
-          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-5 py-2.5 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-50"
+              className="flex-1 sm:flex-none px-4 sm:px-5 py-2 sm:py-2.5 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-white transition-colors disabled:opacity-50 text-sm sm:text-base"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || !isValid}
-              className="px-6 py-2.5 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-semibold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+              className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white font-semibold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm text-sm sm:text-base"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               {editing ? "Save Changes" : "Add Address"}
