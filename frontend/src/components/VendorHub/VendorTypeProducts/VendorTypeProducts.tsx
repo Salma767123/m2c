@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
-import { Package, Globe, ChevronDown, ChevronRight, Loader2, Upload, X, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Package, Globe, ChevronDown, ChevronRight, Loader2, Upload, X, ArrowLeft, ArrowRight, Briefcase, ListTree, FolderPlus } from 'lucide-react';
 import Image from 'next/image';
 import { categoryService, Category } from '@/services/categoryService';
+import { AccordionSection } from '@/components/VendorHub/FormUI';
 
 interface VendorTypeProductsProps {
   onNext: () => void;
@@ -205,6 +206,74 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Accordion: single-active-section pattern matching Step 1 / Step 3.
+  // 4 sections: vendorType, marketType, categories, additional. Default
+  // open = vendorType (the first thing to decide before anything else
+  // makes sense).
+  type SectionKey = 'vendorType' | 'marketType' | 'categories' | 'additional';
+  const [activeSection, setActiveSection] = useState<SectionKey>('vendorType');
+
+  // Map error key → section so handleNext can auto-open the first failing
+  // section after a failed Save & Continue (mirrors Step 1's behaviour).
+  const FIELD_SECTION_MAP: Record<string, SectionKey> = {
+    vendorType: 'vendorType',
+    marketType: 'marketType',
+    selectedCategories: 'categories',
+    additionalCategories: 'additional',
+  };
+
+  // Returns 'complete' | 'partial' | 'empty' per section — drives the
+  // colored status badge in the section header. Required fields per section:
+  //   vendorType:   at least 1 vendor-type chip selected
+  //   marketType:   at least 1 market-focus chip selected
+  //   categories:   at least 1 catalog category with at least 1 named product
+  //   additional:   optional (purely partial/complete on entries)
+  const getSectionStatus = (section: SectionKey): 'complete' | 'partial' | 'empty' => {
+    if (section === 'vendorType') {
+      if (formData.vendorType.length > 0) return 'complete';
+      return 'empty';
+    }
+    if (section === 'marketType') {
+      if (formData.marketType.length > 0) return 'complete';
+      return 'empty';
+    }
+    if (section === 'categories') {
+      const selectedCatIds = Object.keys(formData.selectedCategories).filter(
+        (id) => formData.selectedCategories[id]
+      );
+      if (selectedCatIds.length === 0) return 'empty';
+      const allHaveProducts = selectedCatIds.every((id) => {
+        const prods = categoryProducts[id];
+        return prods && prods.length > 0 && prods.every((p) => p.name.trim());
+      });
+      return allHaveProducts ? 'complete' : 'partial';
+    }
+    if (section === 'additional') {
+      if (additionalCategories.length === 0) return 'empty';
+      const allValid = additionalCategories.every(
+        (c) => c.name.trim() && c.products.every((p) => p.name.trim())
+      );
+      return allValid ? 'complete' : 'partial';
+    }
+    return 'empty';
+  };
+
+  // Spread into each AccordionSection call — keeps the JSX terse while
+  // the per-section state stays consistent across the file.
+  const sectionProps = (id: SectionKey) => ({
+    id,
+    isOpen: activeSection === id,
+    status: getSectionStatus(id),
+    hasErrors: Boolean(
+      id === 'vendorType' ? errors.vendorType :
+      id === 'marketType' ? errors.marketType :
+      id === 'categories' ? errors.selectedCategories :
+      id === 'additional' ? errors.additionalCategories :
+      false
+    ),
+    onActivate: () => setActiveSection(id),
+  });
 
   // Sync formData with data prop when it changes (for edit mode)
   useEffect(() => {
@@ -409,8 +478,13 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
       });
       setTouched(allTouched);
 
-      // Scroll to first error section
+      // Auto-open the section containing the first error so the user
+      // lands inside the failing accordion section (Step 1 / Step 3 parity).
       const firstErrorField = Object.keys(newErrors)[0];
+      const targetSection = FIELD_SECTION_MAP[firstErrorField];
+      if (targetSection) setActiveSection(targetSection);
+
+      // Scroll to first error section
       const element = document.querySelector(`[data-section="${firstErrorField}"]`);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -482,15 +556,19 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
         </div>
       </div>
 
-      {/* Vendor Type */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden" data-section="vendorType">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Vendor Type <span className="text-red-500">*</span>
-          </h2>
-          <p className="text-sm text-slate-600 mt-1">What is your primary business model?</p>
-        </div>
-        <div className="p-6">
+      {/* ── Accordion Sections ──────────────────────────────────────────
+          Same single-active-section pattern as Step 1 (CompanyDetails)
+          and Step 3 (OwnerProfile) for visual + UX parity across the
+          wizard. */}
+      <div className="space-y-3" data-section-list>
+
+      <AccordionSection
+        {...sectionProps('vendorType')}
+        icon={<Briefcase className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Vendor Type"
+        subtitle="What is your primary business model?"
+      >
+        <div data-section="vendorType">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {vendorTypes.map((type) => {
               const isSelected = (formData.vendorType || []).includes(type.id);
@@ -519,18 +597,15 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
             <p className="text-red-500 text-sm mt-3">{errors.vendorType}</p>
           )}
         </div>
-      </section>
+      </AccordionSection>
 
-      {/* Market Type */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden" data-section="marketType">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-900 flex items-center">
-            <Globe className="w-5 h-5 mr-2" />
-            Market Focus <span className="text-red-500 ml-1">*</span>
-          </h2>
-          <p className="text-sm text-slate-600 mt-1">Which markets do you primarily serve?</p>
-        </div>
-        <div className="p-6">
+      <AccordionSection
+        {...sectionProps('marketType')}
+        icon={<Globe className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Market Focus"
+        subtitle="Which markets do you primarily serve?"
+      >
+        <div data-section="marketType">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {marketTypes.map((type) => {
               const isSelected = (formData.marketType || []).includes(type.id);
@@ -559,18 +634,18 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
             <p className="text-red-500 text-sm mt-3">{errors.marketType}</p>
           )}
         </div>
-      </section>
+      </AccordionSection>
 
-      {/* Product Categories */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden" data-section="selectedCategories">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Product Categories & Offerings <span className="text-red-500">*</span>
-          </h2>
-          <p className="text-sm text-slate-600 mt-1">Select your categories and manually add your products with photos.</p>
-        </div>
-        
-        <div className={`p-6 ${errors.selectedCategories && touched.selectedCategories ? 'bg-red-50/50' : ''}`}>
+      <AccordionSection
+        {...sectionProps('categories')}
+        icon={<ListTree className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Product Categories & Offerings"
+        subtitle="Select your categories and manually add your products with photos"
+      >
+        <div
+          data-section="selectedCategories"
+          className={errors.selectedCategories && touched.selectedCategories ? 'bg-red-50/50 -mx-5 px-5 -mb-6 pb-6 rounded-b-lg' : ''}
+        >
           <div className="space-y-4">
             {categories.map((category) => {
               const isCategorySelected = !!formData.selectedCategories[category.id];
@@ -690,25 +765,15 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
             <p className="text-red-500 text-sm mt-3">{errors.selectedCategories}</p>
           )}
         </div>
-      </section>
+      </AccordionSection>
 
-      {/* Additional Categories & Remarks */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Additional Categories & Remarks</h2>
-            <p className="text-sm text-slate-600 mt-1">If your products don't fit into the standard categories above, add them here.</p>
-          </div>
-          <button
-            type="button"
-            onClick={addAdditionalCategory}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-md transition-colors border border-brand-200 whitespace-nowrap"
-          >
-            + Add Custom Category
-          </button>
-        </div>
-        
-        <div className="p-6 space-y-6">
+      <AccordionSection
+        {...sectionProps('additional')}
+        icon={<FolderPlus className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Additional Categories & Remarks"
+        subtitle="If your products don't fit into the standard categories above, add them here."
+      >
+        <div className="space-y-6">
           {errors.additionalCategories && (
             <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-600 text-sm">
               {errors.additionalCategories}
@@ -811,6 +876,17 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
             </div>
           )}
 
+          <div>
+            <button
+              type="button"
+              onClick={addAdditionalCategory}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-md transition-colors border border-brand-200"
+            >
+              <FolderPlus className="w-4 h-4 mr-2" aria-hidden="true" />
+              Add Custom Category
+            </button>
+          </div>
+
           {/* Fallback to simple remarks */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">General Remarks</label>
@@ -823,7 +899,9 @@ export default function VendorTypeProducts({ onNext, onPrev, onUpdateData, data 
             />
           </div>
         </div>
-      </section>
+      </AccordionSection>
+
+      </div>
 
       {/* Navigation */}
       <div className="flex items-center justify-between pt-4 gap-3">

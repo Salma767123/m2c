@@ -646,12 +646,37 @@ class VendorService {
       // Prepare FormData for file uploads
       const formData = new FormData();
 
-      // Fields to skip (handled separately or not needed in API)
+      // Fields to skip (handled separately or not needed in API).
+      // - *File / certificationFiles / factoryImages / productPhotos /
+      //   contactPhoto*: File objects are appended below via the named
+      //   multer fields; sending them as form fields too would just
+      //   stringify them as "[object Object]".
+      // - logo / gstDocument: the *URL* form fields; the actual File is
+      //   sent under those same multer field names below.
+      // - panCardDocument / typeCertDocument: same shape — local blob:
+      //   preview URLs that should never reach the backend.
+      // - sameAsWarehouse / expandedCategories: UI-only flags.
+      // - companyIdByType / typeCertByType: per-type stash used to
+      //   preserve dynamic Business Type values across chip switches;
+      //   the active type's values are already in
+      //   companyIdNumber / typeCertFile / typeCertDocument.
       const skipFields = [
         'certificationFiles', 'logoFile', 'gstFile', 'contactPhotoFile',
         'productPhotos', 'contactPhoto', 'logo', 'gstDocument',
+        // panCardDocument / typeCertDocument are LOCAL blob: preview
+        // URLs the form created when the admin selected files. They
+        // must never reach the backend — the real files flow via the
+        // panCardFile / typeCertFile multer field names below (those
+        // ARE kept out of the skip list so the Object.keys loop appends
+        // each File instance under its own field name).
+        'panCardDocument', 'typeCertDocument',
         'sameAsWarehouse', 'expandedCategories', 'factoryImages',
-        'existingProductPhotos'
+        'existingProductPhotos',
+        // Per-Business-Type stash maps used to preserve dynamic values
+        // across chip switches. Form-runtime only; the active type's
+        // values already live in companyIdNumber / typeCertFile /
+        // typeCertDocument so the stash itself is pure noise on the wire.
+        'companyIdByType', 'typeCertByType',
       ];
 
       // Add all form fields

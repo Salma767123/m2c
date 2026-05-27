@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { Button } from '@/components/UI/Button';
 import { Factory, Settings, Palette, Printer, Scissors, Shirt, ArrowLeft, ArrowRight } from 'lucide-react';
-import { Grid3, Field, Input, Textarea } from '../FormUI';
+import { Grid3, Field, Input, Textarea, AccordionSection } from '../FormUI';
 import { scrollToFirstError } from '@/lib/formErrorScroll';
 import { showErrorToast } from '@/lib/toast-utils';
 
@@ -173,6 +173,45 @@ export default function ManufacturingFacilities({ onNext, onPrev, onUpdateData, 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // Accordion: matches the visual + status-badge contract of Steps 3/4/6.
+  // Step 5 only has ONE logical section (the facility list), so this is
+  // essentially decorative — but keeping the same chrome (icon bubble,
+  // gradient header, status badge) avoids the "this step looks different
+  // from the others" jolt. Default open.
+  type SectionKey = 'facilities';
+  const [activeSection, setActiveSection] = useState<SectionKey>('facilities');
+
+  // Aggregate status across all facilities:
+  //   - 'empty'    → no facilities enabled
+  //   - 'partial'  → at least one enabled but some required field still empty
+  //   - 'complete' → every enabled facility has all required fields filled
+  const getFacilitiesStatus = (): 'complete' | 'partial' | 'empty' => {
+    const enabledIds = Object.keys(formData.enabledFacilities).filter(
+      (id) => formData.enabledFacilities[id]
+    );
+    if (enabledIds.length === 0) return 'empty';
+    const allValid = enabledIds.every((facilityId) => {
+      const facility = facilityTypes.find((f) => f.id === facilityId);
+      if (!facility) return true;
+      const details = formData.facilityDetails[facilityId] || {};
+      return facility.fields
+        .filter((f) => f.kind !== 'text') // text (Remarks) is always optional
+        .every((f) => {
+          const v = String(details[f.id] ?? '').trim();
+          return v.length > 0;
+        });
+    });
+    return allValid ? 'complete' : 'partial';
+  };
+
+  const sectionProps = (id: SectionKey) => ({
+    id,
+    isOpen: activeSection === id,
+    status: getFacilitiesStatus(),
+    hasErrors: Object.keys(errors).some((k) => Boolean(errors[k])),
+    onActivate: () => setActiveSection(id),
+  });
+
   // Render-phase sync (Vercel §5.1) — same pattern as the other steps.
   // Replaces the previous `useEffect(() => setFormData(...), [data])` which
   // tripped the `react-hooks/set-state-in-effect` rule.
@@ -337,7 +376,19 @@ export default function ManufacturingFacilities({ onNext, onPrev, onUpdateData, 
         </div>
       </div>
 
-      {/* Facilities */}
+      {/* ── Accordion Section ──────────────────────────────────────────
+          Same chrome as Steps 3/4/6 (icon bubble, gradient header, status
+          badge). Step 5 only has one logical group — the facility list —
+          so this is a single-section accordion. The Yes/No toggle on each
+          facility card inside continues to act as the per-facility
+          "open/close" affordance (revealing the field grid). */}
+      <div className="space-y-3">
+      <AccordionSection
+        {...sectionProps('facilities')}
+        icon={<Factory className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Manufacturing Facilities"
+        subtitle="Toggle the stages you operate on-site and fill in capacity per facility."
+      >
       <div className="space-y-4">
         {facilityTypes.map((facility) => {
           const Icon = facility.icon;
@@ -465,6 +516,8 @@ export default function ManufacturingFacilities({ onNext, onPrev, onUpdateData, 
             </section>
           );
         })}
+      </div>
+      </AccordionSection>
       </div>
 
 

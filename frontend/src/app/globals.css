@@ -71,7 +71,8 @@ html, body {
        Document any new layer here before introducing it. */
     --z-base: 0;
     --z-dropdown: 100;        /* CountryDialPicker, CountrySelect, etc. */
-    --z-sticky: 200;          /* VendorHeader, table sticky rows */
+    --z-sticky: 200;          /* sticky sidebars (VendorPanel aside, table sticky rows) */
+    --z-sticky-header: 250;   /* page headers — must paint on top of sticky sidebars when they share an edge */
     --z-modal-backdrop: 300;
     --z-modal: 400;
     --z-toast: 500;           /* Toaster — global toast layer */

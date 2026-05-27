@@ -442,12 +442,33 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 
       // Custom certs (Step 6 "other certifications"). Carry the vendor-typed
       // name + description back into the form so admins see what was originally
-      // submitted instead of an empty list.
-      const reloadedOtherCertifications = customCerts.map((c: any, i: number) => ({
-        id: c.id || `custom-${i}`,
-        name: c.name,
-        description: c.description || '',
-      }));
+      // submitted instead of an empty list. The certificate FILE and
+      // EXPIRY DATE for each custom cert also need to land in the shared
+      // `certificationFiles` and `certificationExpiryDates` maps — those
+      // are keyed by `cert.id` (not chip id) for custom rows; the form's
+      // JSX looks them up via `formData.certificationFiles[other.id]` etc.
+      // Without this, custom certs reloaded with the upload tile empty and
+      // the expiry date blank even though both were saved to the DB.
+      const reloadedOtherCertifications = customCerts.map((c: any, i: number) => {
+        const certId = c.id || `custom-${i}`;
+        if (c.documentUrl) {
+          reloadedCertificationFiles[certId] = {
+            url: c.documentUrl,
+            name: c.documentUrl.split('/').pop() || `${c.name} Certificate`,
+            size: 0,
+            type: c.documentUrl.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg',
+            isExisting: true,
+          };
+        }
+        if (c.expiryDate) {
+          reloadedCertificationExpiryDates[certId] = new Date(c.expiryDate).toISOString().split('T')[0];
+        }
+        return {
+          id: certId,
+          name: c.name,
+          description: c.description || '',
+        };
+      });
 
       // Map vendor data to form structure
       setFormData({
@@ -475,7 +496,28 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         zipCode: vendor.businessZipCode || '',
         country: vendor.businessCountry || 'India',
         factoryOwnershipType: vendor.factoryOwnershipType || '',
-        sameAsWarehouse: false,
+        // `sameAsWarehouse` has no DB column — it's a UI-only mirror flag
+        // captured at registration time. Restore it for the edit form by
+        // comparing the company-address columns against the warehouse-address
+        // columns: when every field matches, the vendor effectively had the
+        // box ticked during registration. If the admin later changes any
+        // warehouse field to differ from the company address, the derived
+        // flag will (correctly) come back as false on the next reload.
+        sameAsWarehouse: (() => {
+          const eq = (a: any, b: any) => (a || '') === (b || '');
+          return (
+            !!vendor.businessAddress &&
+            eq(vendor.businessAddress, vendor.warehouseAddress) &&
+            eq((vendor as any).addressLine2, (vendor as any).warehouseAddressLine2) &&
+            eq((vendor as any).addressLine3, (vendor as any).warehouseAddressLine3) &&
+            eq((vendor as any).landmark, (vendor as any).warehouseLandmark) &&
+            eq(vendor.businessCity, vendor.warehouseCity) &&
+            eq(vendor.businessState, vendor.warehouseState) &&
+            eq(vendor.businessZipCode, vendor.warehouseZipCode) &&
+            eq(vendor.businessCountry, vendor.warehouseCountry) &&
+            eq((vendor as any).factoryOwnershipType, vendor.ownershipType)
+          );
+        })(),
         logo: vendor.companyLogo || null,
         logoFile: null,
         gstDocument: findDocUrl('GST_CERTIFICATE'),
@@ -790,7 +832,14 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    // The admin dashboard layout (frontend/src/app/admin/dashboard/layout.tsx)
+    // already provides a scrollable `<main className="flex-1 overflow-y-auto">`
+    // for the page content; no extra `min-h-screen` or `overflow-*` is needed
+    // here. NOTE: setting `overflow-x-hidden` on this div looks defensive but
+    // is actually harmful — when only one axis is explicitly `hidden`, the
+    // browser implicitly switches the other axis to `auto`, which adds a
+    // SECOND vertical scrollbar inside the already-scrolling admin <main>.
+    <div className="bg-gray-50">
       {isLoadingVendorData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-(--z-modal-backdrop)">
           <div className="bg-white rounded-lg p-6 flex flex-col items-center">
@@ -799,145 +848,206 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           </div>
         </div>
       )}
-      <div className="flex h-full">
-        {/* Left Sidebar — Progress Steps. Fixed 272px width per DESIGN.md
-            sidebar spec, matching VendorPanel (public registration flow). */}
-        <div className="w-68 bg-white shadow-lg border-r border-gray-200 rounded-lg">
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-6">
+      {/* `items-start` so the sidebar doesn't stretch to match the (usually
+          much taller) form content — that's what caused a giant empty white
+          band BELOW the sidebar's actual content. `h-full` was removed because
+          the parent no longer has a height (we dropped min-h-screen) and a
+          stretched-to-zero flex container would otherwise collapse the steps
+          sidebar height. */}
+      <div className="flex items-start">
+        {/* Left Sidebar — Progress Steps. Styled to match the public
+            registration flow (VendorPanel.tsx) so admin Add/Edit feels like
+            the same wizard, with the admin-specific Back button + title
+            wired in at the top. Sticky to the admin <main>'s scroll edge
+            so the steps stay visible while the form scrolls. */}
+        {(() => {
+          const visibleStepCount = steps.filter((_, i) => !isStepSkipped(i)).length
+          const completedVisibleCount = completedSteps.filter(i => !isStepSkipped(i)).length
+          const inProgressCredit =
+            !isStepSkipped(currentStep) && !completedSteps.includes(currentStep) ? 0.4 : 0
+          const progressPercent = Math.min(
+            100,
+            Math.round(((completedVisibleCount + inProgressCredit) / visibleStepCount) * 100),
+          )
+          return (
+        <aside className="hidden md:flex flex-col w-68 bg-white border-r border-gray-100 sticky top-0 self-start h-screen shrink-0 z-(--z-sticky) shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
+          {/* Header — admin-specific Back button + Add/Edit title.
+              Sits above the steps in the same chrome as VendorPanel's
+              "Registration Progress" header for visual parity. */}
+          <div className="px-6 py-6 border-b border-gray-100 shrink-0">
+            <div className="flex items-center gap-2 mb-1.5">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push('/admin/dashboard/vendors')}
-                className="p-2"
+                className="p-1.5 h-8 w-8"
+                aria-label="Back to vendors"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <h2 className="text-lg font-semibold text-gray-900">
-                {mode === 'add' ? 'Add New Vendor' : 'Edit Vendor'}
+              <h2 className="text-xs font-bold text-gray-900 tracking-widest uppercase">
+                {mode === 'add' ? 'Add Vendor' : 'Edit Vendor'}
               </h2>
             </div>
+            <p className="text-[11px] text-gray-400 font-medium">
+              {mode === 'add' ? 'Complete all steps to create a vendor' : 'Update any step and save'}
+            </p>
+          </div>
 
-            <div className="space-y-4">
+          {/* Navigation Steps */}
+          <nav aria-label={mode === 'add' ? 'Add vendor steps' : 'Edit vendor steps'} className="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin">
+            <ul className="space-y-1 relative" role="list">
               {steps.map((step, index) => {
-                const Icon = step.icon
                 const skipped = isStepSkipped(index)
                 const isCompleted = completedSteps.includes(index) && !skipped
                 const isCurrent = index === currentStep && !skipped
-                const isAccessible = !skipped && (isCurrent || isCompleted)
-                const isLocked = !skipped && !isAccessible
+                const isAccessible =
+                  !skipped &&
+                  (index <= currentStep ||
+                    isCompleted ||
+                    (index > 0 && completedSteps.includes(index - 1)))
 
                 return (
-                  <div
-                    key={index}
-                    className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
-                      skipped
-                        ? 'bg-gray-50 opacity-50 cursor-not-allowed'
-                        : isCurrent
-                          ? 'bg-brand-50/50 border-r-4 border-brand-500 cursor-pointer'
-                          : isCompleted
-                            ? 'bg-success-50 hover:bg-success-50/70 cursor-pointer'
-                            : 'bg-gray-50 opacity-60 cursor-not-allowed'
-                      }`}
-                    onClick={() => !skipped && goToStep(index)}
-                  >
-                    <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-                        skipped
-                          ? 'bg-gray-100 text-gray-400 border border-dashed border-gray-300'
-                          : isCurrent
-                            ? 'bg-brand-500 text-white'
-                            : isCompleted
-                              ? 'bg-success-500 text-white'
-                              : 'bg-gray-300 text-gray-500'
+                  <li key={index} className="relative flex items-start gap-4 pb-6 last:pb-0">
+                    {/* Vertical Connector Line */}
+                    {index < steps.length - 1 && (
+                      <div
+                        className="absolute left-6 top-8 bottom-0 w-0.5 -ml-px transition-colors duration-300"
+                        style={{
+                          backgroundColor: isCompleted ? 'var(--color-success-500)' : 'var(--color-outline)',
+                        }}
+                      />
+                    )}
+
+                    {/* Button */}
+                    <button
+                      type="button"
+                      disabled={!isAccessible}
+                      onClick={() => isAccessible && goToStep(index)}
+                      aria-current={isCurrent ? 'step' : undefined}
+                      aria-label={`Step ${index + 1}: ${step.title}${skipped ? ', not applicable' : isCompleted ? ', completed' : isCurrent ? ', current' : ''}`}
+                      className={`flex items-start gap-3.5 p-2 rounded-xl w-full text-left transition-all duration-200 group relative
+                        ${
+                          skipped
+                            ? 'opacity-50 cursor-not-allowed'
+                            : isCurrent
+                              ? 'bg-brand-50/50'
+                              : isAccessible && !isCompleted
+                                ? 'hover:bg-gray-50/60 cursor-pointer'
+                                : isCompleted
+                                  ? 'hover:bg-success-50/30 cursor-pointer'
+                                  : 'opacity-60 cursor-not-allowed'
                         }`}
                     >
-                      {skipped ? (
-                        <span>&mdash;</span>
-                      ) : isCompleted ? (
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      ) : isLocked ? (
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                        </svg>
-                      ) : (
-                        <Icon className="w-4 h-4" />
-                      )}
-                    </div>
+                      {/* Step Indicator Dot */}
+                      <div className="relative shrink-0 z-10 flex items-center justify-center w-8 h-8">
+                        {skipped ? (
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full border border-dashed border-gray-300 bg-gray-50 text-gray-400 text-xs font-medium">
+                            &mdash;
+                          </div>
+                        ) : isCompleted ? (
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success-500 text-white shadow-[0_0_0_4px_rgba(22,163,74,0.1)] transition-transform duration-200 group-hover:scale-105">
+                            <svg className="w-4 h-4 stroke-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        ) : isCurrent ? (
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full border-2 border-brand-500 bg-white shadow-[0_0_0_4px_rgba(224,26,27,0.12)]">
+                            <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse" />
+                          </div>
+                        ) : isAccessible ? (
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 bg-white text-gray-600 text-xs font-semibold group-hover:border-brand-400 group-hover:text-brand-500 transition-colors duration-150">
+                            {index + 1}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-200 bg-gray-50 text-gray-400 text-xs font-medium">
+                            {index + 1}
+                          </div>
+                        )}
+                      </div>
 
-                    <div className="flex-1">
-                      <p
-                        className={`text-sm font-medium ${
-                          skipped
-                            ? 'text-gray-400 line-through decoration-gray-300'
-                            : isCurrent
-                              ? 'text-brand-700'
-                              : isCompleted
-                                ? 'text-success-700'
-                                : 'text-gray-400'
+                      {/* Text */}
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <p
+                          className={`text-sm font-semibold leading-tight truncate transition-colors duration-150 ${
+                            skipped
+                              ? 'text-gray-400 line-through decoration-gray-300'
+                              : isCurrent
+                                ? 'text-brand-700 font-bold'
+                                : isCompleted
+                                  ? 'text-gray-700 group-hover:text-success-700'
+                                  : 'text-gray-500 group-hover:text-gray-900'
                           }`}
-                      >
-                        {step.title}
-                      </p>
-                      {skipped && (
-                        <p className="text-xs text-gray-400 mt-1">Not applicable</p>
-                      )}
-                      {!skipped && isCurrent && (
-                        <p className="text-xs text-brand-600 mt-1">Current Step</p>
-                      )}
-                      {!skipped && isCompleted && (
-                        <p className="text-xs text-success-500 mt-1">Completed</p>
-                      )}
-                      {!skipped && isLocked && (
-                        <p className="text-xs text-gray-400 mt-1">Locked</p>
-                      )}
-                    </div>
-                  </div>
+                        >
+                          {step.title}
+                        </p>
+                        {skipped ? (
+                          <span className="text-[10px] text-gray-400 mt-0.5">Not applicable</span>
+                        ) : isCurrent ? (
+                          <span className="text-[10px] text-brand-600 font-bold tracking-wide uppercase mt-0.5 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
+                            In Progress
+                          </span>
+                        ) : isCompleted ? (
+                          <span className="text-[10px] text-success-500 font-medium tracking-wide uppercase mt-0.5 flex items-center gap-1">
+                            Completed
+                          </span>
+                        ) : isAccessible ? (
+                          <span className="text-[10px] text-gray-400 mt-0.5">Available</span>
+                        ) : (
+                          <span className="text-[10px] text-gray-300 mt-0.5">Locked</span>
+                        )}
+                      </div>
+                    </button>
+                  </li>
                 )
               })}
+            </ul>
+          </nav>
+
+          {/* Progress Summary Pinned to Bottom */}
+          <div className="p-5 border-t border-gray-100 shrink-0 bg-gray-50/50">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                Overall Progress
+              </span>
+              <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full tabular-nums">
+                {progressPercent}%
+              </span>
             </div>
-
-            {/* Progress Summary — skipped steps excluded from both numerator
-                and denominator; current in-progress step earns partial
-                credit so the bar moves before Save & Continue is hit. */}
-            {(() => {
-              const visibleStepCount = steps.filter((_, i) => !isStepSkipped(i)).length
-              const completedVisibleCount = completedSteps.filter(i => !isStepSkipped(i)).length
-              const inProgressCredit =
-                !isStepSkipped(currentStep) && !completedSteps.includes(currentStep) ? 0.4 : 0
-              const progressPercent = Math.min(
-                100,
-                Math.round(((completedVisibleCount + inProgressCredit) / visibleStepCount) * 100),
-              )
-              return (
-                <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Progress</span>
-                    <span className="text-sm font-medium text-gray-900">
-                      {progressPercent}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-linear-to-r from-brand-500 to-brand-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${progressPercent}%` }}
-                    ></div>
-                  </div>
-                  <div className="mt-2 text-[10px] text-gray-500 font-medium tabular-nums">
-                    {completedVisibleCount} of {visibleStepCount} completed
-                  </div>
-                </div>
-              )
-            })()}
+            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="h-1.5 rounded-full bg-linear-to-r from-brand-500 to-brand-600 transition-[width] duration-500 ease-out shadow-[0_0_8px_rgba(224,26,27,0.15)]"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="flex justify-between items-center mt-2.5">
+              <span className="text-[10px] text-gray-400 font-medium tabular-nums">
+                {completedVisibleCount} of {visibleStepCount} completed
+              </span>
+              {progressPercent === 100 && (
+                <span className="text-[10px] text-success-500 font-bold flex items-center gap-0.5">
+                  <svg className="w-3.5 h-3.5 fill-success-500" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Ready!
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        </aside>
+          )
+        })()}
 
-        {/* Right Content Area */}
-        <div className="flex-1 w-3/4">
-          <div className="p-8">
-            <div className="max-w-6xl mx-auto">
+        {/* Right Content Area. `flex-1 min-w-0` lets the content grow to
+            fill the space the 272px sidebar doesn't use AND allows flex
+            shrinking when the viewport gets narrow (without min-w-0,
+            flex children with wide content force overflow). The previous
+            `w-3/4` was capping the area at 75% of parent width, which
+            left a visible empty band on the right at desktop widths. */}
+        <div className="flex-1 min-w-0">
+          <div className="p-4 md:p-8">
+            <div className="max-w-7xl mx-auto">
               {/* Step Header */}
               <div className="mb-8">
                 <div className="flex items-center space-x-4 mb-4">

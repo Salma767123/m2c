@@ -5,7 +5,7 @@ import CompanyLogo from '@/components/Shared/CompanyLogo';
 
 const VendorHeader = () => {
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-(--z-sticky)">
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-(--z-sticky-header)">
       {/* Thin brand-red accent line — single visible cue that this is an
           official M2C portal without dominating the chrome. */}
       <div className="h-1 bg-brand-500" />

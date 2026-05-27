@@ -60,6 +60,15 @@ interface FormData {
    *  approval generates a new temporary password (overrides this) and
    *  emails it to the vendor — until then, this is the working password. */
   password: string;
+  /** Per-business-type bucket of regulatory-ID values. The active
+   *  type's value lives in `companyIdNumber`; this map remembers what
+   *  the vendor previously typed for each OTHER type so toggling chips
+   *  doesn't erase data. Not persisted to the backend — it's a
+   *  form-runtime convenience that rides through VendorPanel state. */
+  companyIdByType: Record<string, string>;
+  /** Per-business-type bucket of the type-specific certificate (file +
+   *  preview URL). Same role as `companyIdByType` but for the upload. */
+  typeCertByType: Record<string, { file: File | null; document: string | null }>;
   // Warehouse fields (populated when sameAsWarehouse is true)
   warehouseAddress?: string;
   warehouseCity?: string;
@@ -214,19 +223,75 @@ export default function CompanyDetails({
     country: data.country || "India",
     factoryOwnershipType: data.factoryOwnershipType || "",
     sameAsWarehouse: data.sameAsWarehouse || false,
+    // Preserve File refs across re-mounts / render-phase resyncs. The old
+    // hardcoded `null` was nuking uploaded Files every time the user
+    // navigated back to Step 1 (sidebar or edit-from-review), then the
+    // next Save & Continue pushed `null` back to the parent — so the
+    // backend received no req.files.* and the document was never saved.
     logo: data.logo || null,
-    logoFile: null,
+    logoFile: data.logoFile || null,
     gstDocument: data.gstDocument || null,
-    gstFile: null,
+    gstFile: data.gstFile || null,
     panCardDocument: data.panCardDocument || null,
-    panCardFile: null,
+    panCardFile: data.panCardFile || null,
     typeCertDocument: data.typeCertDocument || null,
-    typeCertFile: null,
+    typeCertFile: data.typeCertFile || null,
+    // Per-business-type stash for the type-specific regulatory ID +
+    // certificate. The active type's values live in
+    // `companyIdNumber` / `typeCertFile` / `typeCertDocument` (which is
+    // what the backend persists). When the user switches Business Type,
+    // we save the current values into the bucket keyed by the OLD type
+    // and restore the bucket for the NEW type — so switching back later
+    // brings the previously-entered values back instead of erasing them.
+    // Seeded from any existing `*ByType` payload (carried through parent
+    // state) and falls back to seeding the currently-active type's value
+    // so legacy callers without the bucket still work.
+    companyIdByType: data.companyIdByType || (
+      data.businessType && data.companyIdNumber
+        ? { [data.businessType]: data.companyIdNumber }
+        : {}
+    ),
+    typeCertByType: data.typeCertByType || (
+      data.businessType && (data.typeCertFile || data.typeCertDocument)
+        ? { [data.businessType]: { file: data.typeCertFile || null, document: data.typeCertDocument || null } }
+        : {}
+    ),
     password: data.password || "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // ── Accordion Section State ────────────────────────────────────────
+  // Tracks which of the 4 logical subsections is currently expanded.
+  type SectionKey = 'profile' | 'contact' | 'address' | 'documents';
+  const [activeSection, setActiveSection] = useState<SectionKey>('profile');
+
+  // Maps validation error field names → their parent accordion section.
+  // Used in handleNext to auto-expand the first failing section.
+  const FIELD_SECTION_MAP: Record<string, SectionKey> = {
+    businessType: 'profile',
+    companyName: 'profile',
+    gstNumber: 'profile',
+    companyIdNumber: 'profile',
+    panNumber: 'profile',
+    password: 'profile',
+    email: 'contact',
+    email2: 'contact',
+    phone: 'contact',
+    phoneNumber2: 'contact',
+    landlineNumber: 'contact',
+    address: 'address',
+    city: 'address',
+    state: 'address',
+    zipCode: 'address',
+    country: 'address',
+    factoryOwnershipType: 'address',
+    logo: 'documents',
+    gstDocument: 'documents',
+    panCardDocument: 'documents',
+    typeCertDocument: 'documents',
+  };
 
   // ── ZIP / postal-code auto-fill ─────────────────────────────────
   // When the user finishes typing a ZIP, we look it up via zippopotam.us
@@ -315,14 +380,28 @@ export default function CompanyDetails({
       country: data.country || "India",
       factoryOwnershipType: data.factoryOwnershipType || "",
       sameAsWarehouse: data.sameAsWarehouse || false,
+      // Same File-preservation as the init block above — render-phase sync
+      // must not clobber Files held in parent state. (See comment on the
+      // useState init for the exact bug this prevents.)
       logo: data.logo || null,
-      logoFile: null,
+      logoFile: data.logoFile || null,
       gstDocument: data.gstDocument || null,
-      gstFile: null,
+      gstFile: data.gstFile || null,
       panCardDocument: data.panCardDocument || null,
-      panCardFile: null,
+      panCardFile: data.panCardFile || null,
       typeCertDocument: data.typeCertDocument || null,
-      typeCertFile: null,
+      typeCertFile: data.typeCertFile || null,
+      // See useState init for the rationale on these per-type buckets.
+      companyIdByType: data.companyIdByType || (
+        data.businessType && data.companyIdNumber
+          ? { [data.businessType]: data.companyIdNumber }
+          : {}
+      ),
+      typeCertByType: data.typeCertByType || (
+        data.businessType && (data.typeCertFile || data.typeCertDocument)
+          ? { [data.businessType]: { file: data.typeCertFile || null, document: data.typeCertDocument || null } }
+          : {}
+      ),
       password: data.password || "",
     });
   }
@@ -334,22 +413,45 @@ export default function CompanyDetails({
   const handleInputChange = useCallback((field: string, value: any) => {
     setFormData((prev) => {
       // Switching business type changes the *meaning* of the type-specific ID
-      // field AND certificate (IEC → CIN → deed → LLPIN). Clear both on change
-      // so a previously entered IEC code doesn't get re-validated as a CIN and
-      // an IEC certificate isn't re-presented as a CIN certificate. PAN (both
-      // the number and the upload) is preserved — it's the same regulatory ID
-      // across all four types.
+      // field AND certificate (IEC → CIN → deed → LLPIN). Instead of wiping
+      // the prior values (the old behaviour, which lost data on every toggle),
+      // we STASH the outgoing type's values in `companyIdByType` /
+      // `typeCertByType` and RESTORE the incoming type's values from the same
+      // buckets. PAN (both the number and the upload) is type-agnostic and
+      // stays put outside the bucket. "Others" has no dynamic ID field, so we
+      // skip both stashing and restoring for it.
       if (field === 'businessType' && value !== prev.businessType) {
-        // Revoke the now-orphaned blob URL so we don't leak memory
-        if (prev.typeCertFile && typeof prev.typeCertDocument === 'string') {
-          URL.revokeObjectURL(prev.typeCertDocument);
+        const oldType = prev.businessType;
+        const newType = value;
+
+        const nextCompanyIdByType = { ...prev.companyIdByType };
+        const nextTypeCertByType = { ...prev.typeCertByType };
+
+        // Stash current values under the OLD type — only when oldType is
+        // one of the four canonical chip ids (proprietorship / pvt-ltd /
+        // partnership-firm / llp). The 'others' placeholder and any custom
+        // string typed under Others have no dynamic ID field, so there's
+        // nothing meaningful to stash for them.
+        if (oldType && BUSINESS_TYPE_IDS.has(oldType)) {
+          nextCompanyIdByType[oldType] = prev.companyIdNumber || '';
+          nextTypeCertByType[oldType] = {
+            file: prev.typeCertFile,
+            document: prev.typeCertDocument,
+          };
         }
+
+        // Restore from stash for the NEW type (empty if never visited).
+        const restoredId = nextCompanyIdByType[newType] ?? '';
+        const restoredCert = nextTypeCertByType[newType];
+
         return {
           ...prev,
-          businessType: value,
-          companyIdNumber: '',
-          typeCertFile: null,
-          typeCertDocument: null,
+          businessType: newType,
+          companyIdNumber: restoredId,
+          typeCertFile: restoredCert?.file ?? null,
+          typeCertDocument: restoredCert?.document ?? null,
+          companyIdByType: nextCompanyIdByType,
+          typeCertByType: nextTypeCertByType,
         };
       }
       return { ...prev, [field]: value };
@@ -756,9 +858,7 @@ export default function CompanyDetails({
     // regardless of business type. The type-specific certificate (IEC /
     // CIN / Deed / LLPIN) is only required when one of the four supported
     // types is selected — "Other" vendors aren't blocked on this.
-    if (!currentFormData.logo) {
-      newErrors.logo = 'Company Logo is required';
-    }
+
     if (!currentFormData.gstDocument) {
       newErrors.gstDocument = 'GST Certificate upload is required';
     }
@@ -773,9 +873,16 @@ export default function CompanyDetails({
     // Required min-8-char password. Backend bcrypts it before storing.
     // Admin approval generates a new temporary password and emails the
     // vendor — until then, this is the working credential.
-    if (!currentFormData.password) {
+    //
+    // In edit mode (existing vendor — detected via `data.status`), an empty
+    // password is valid and means "keep the current password". The backend's
+    // updateVendorById doesn't include `password` in its persistence object
+    // when the value is empty, so the bcrypt hash stays untouched. Only
+    // enforce length when the admin DID type something.
+    const isExistingVendor = Boolean(data?.status);
+    if (!isExistingVendor && !currentFormData.password) {
       newErrors.password = 'Password is required';
-    } else if (currentFormData.password.length < 8) {
+    } else if (currentFormData.password && currentFormData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters';
     }
 
@@ -788,11 +895,39 @@ export default function CompanyDetails({
       });
       setTouched(allTouched);
 
-      // ── Validation-failure UX (Change 9) ────────────────────────────
-      // 1. Top-level toast tells the user *how many* fields need fixing.
-      // 2. Smooth-scroll to the first invalid field in DOM order.
-      // 3. Move keyboard focus to a control inside that field so the
-      //    user can fix it immediately (no extra click required).
+      // ── Auto-expand the first failing accordion section ──────────────
+      // Priority order mirrors the FIELD_ORDER below. Find which section
+      // the first error belongs to and expand it so the user sees it.
+      const FIELD_ORDER = [
+        'businessType',
+        'companyName',
+        'gstNumber',
+        'companyIdNumber',
+        'panNumber',
+        'password',
+        'email',
+        'email2',
+        'phone',
+        'phoneNumber2',
+        'landlineNumber',
+        'address',
+        'city',
+        'state',
+        'zipCode',
+        'country',
+        'factoryOwnershipType',
+        'logo',
+        'gstDocument',
+        'panCardDocument',
+        'typeCertDocument',
+      ];
+
+      const firstErrorField = FIELD_ORDER.find(f => newErrors[f]);
+      if (firstErrorField) {
+        const targetSection = FIELD_SECTION_MAP[firstErrorField];
+        if (targetSection) setActiveSection(targetSection);
+      }
+
       const errorCount = Object.keys(newErrors).length;
       showErrorToast(
         errorCount === 1
@@ -801,44 +936,10 @@ export default function CompanyDetails({
         'Scroll down to the highlighted field and fix it to continue.',
       );
 
-      // DOM ordering of CompanyDetails fields. The errors object's own
-      // iteration order can drift across edits, so be explicit about
-      // which field is "first" visually.
-      const FIELD_ORDER = [
-        'businessType',
-        'companyName',
-        'gstNumber',
-        'companyIdNumber',
-        'panNumber',
-        'email',
-        'email2',
-        'phone',
-        'phoneNumber2',
-        'landlineNumber',
-        'logo',
-        'gstDocument',
-        'panCardDocument',
-        'typeCertDocument',
-        'address',
-        'city',
-        'state',
-        'zipCode',
-        'country',
-        'factoryOwnershipType',
-        'password',
-      ];
-
-      // Wait one tick for React to commit the new error state so the
-      // invalid styling is on-screen before we measure the scroll target.
       requestAnimationFrame(() => {
         scrollToFirstError(newErrors, {
           fieldOrder: FIELD_ORDER,
           selectorMap: {
-            // Only override for fields whose visible control isn't a
-            // plain `<input name="...">`. Everything else falls through to
-            // the helper's default `[name="..."]` lookup, which finds the
-            // input directly (inputs inside PhoneInput have `name=` too,
-            // so phone fields work via the default).
             businessType: '[data-field="businessType"]',
             factoryOwnershipType: '[data-field="factoryOwnershipType"]',
             country: '[data-field="country"]',
@@ -878,43 +979,217 @@ export default function CompanyDetails({
     onNext();
   }, [onNext, onUpdateData]);
 
+  // ── Section Completion Status Helpers ────────────────────────────
+  // Returns 'complete' | 'partial' | 'empty' for each section.
+  const isExistingVendor = Boolean(data?.status);
+  const typeMeta = COMPANY_TYPE_META[formData.businessType as CompanyTypeId];
+
+  const getSectionStatus = (section: SectionKey): 'complete' | 'partial' | 'empty' => {
+    if (section === 'profile') {
+      const required = [
+        formData.businessType,
+        formData.companyName,
+        formData.gstNumber,
+        ...(typeMeta ? [formData.companyIdNumber, formData.panNumber] : []),
+        ...(isExistingVendor ? [] : [formData.password]),
+      ];
+      const optional = [formData.website];
+      const filled = required.filter(Boolean).length;
+      if (filled === required.length) return 'complete';
+      if (filled > 0 || optional.some(Boolean)) return 'partial';
+      return 'empty';
+    }
+    if (section === 'contact') {
+      const required = [formData.email, formData.phone];
+      const optional = [formData.email2, formData.phoneNumber2, formData.landlineNumber];
+      if (required.every(Boolean)) return 'complete';
+      if (required.some(Boolean) || optional.some(Boolean)) return 'partial';
+      return 'empty';
+    }
+    if (section === 'address') {
+      const required = [formData.address, formData.city, formData.state, formData.zipCode, formData.country, formData.factoryOwnershipType];
+      const filled = required.filter(Boolean).length;
+      if (filled === required.length) return 'complete';
+      if (filled > 0) return 'partial';
+      return 'empty';
+    }
+    if (section === 'documents') {
+      const required = [
+        formData.gstDocument,
+        formData.panCardDocument,
+        ...(typeMeta ? [formData.typeCertDocument] : []),
+      ];
+      const filled = required.filter(Boolean).length;
+      if (filled === required.length) return 'complete';
+      if (filled > 0 || formData.logo) return 'partial';
+      return 'empty';
+    }
+    return 'empty';
+  };
+
+  // ── Accordion Section Component ────────────────────────────────────
+  const AccordionSection = ({
+    id,
+    icon,
+    title,
+    subtitle,
+    children,
+  }: {
+    id: SectionKey;
+    icon: React.ReactNode;
+    title: string;
+    subtitle: string;
+    children: React.ReactNode;
+  }) => {
+    const isOpen = activeSection === id;
+    const status = getSectionStatus(id);
+    const sectionErrors = Object.keys(errors).filter(
+      k => FIELD_SECTION_MAP[k] === id && errors[k]
+    );
+    const hasErrors = sectionErrors.length > 0;
+
+    return (
+      <div
+        className={`rounded-xl border transition-all duration-300 ${!isOpen ? 'overflow-hidden' : ''} ${
+          isOpen
+            ? 'border-brand-300 shadow-md shadow-brand-500/8'
+            : hasErrors
+            ? 'border-red-300 bg-red-50/30'
+            : 'border-slate-200 hover:border-slate-300'
+        }`}
+      >
+        {/* Section Header — click to toggle */}
+        <button
+          type="button"
+          onClick={() => setActiveSection(isOpen ? id : id)}
+          className={`w-full rounded-t-xl flex items-center gap-4 px-5 py-4 text-left transition-colors duration-200 ${
+            isOpen ? 'bg-gradient-to-r from-brand-50/80 to-white' : 'bg-white hover:bg-slate-50/60'
+          }`}
+          aria-expanded={isOpen}
+          aria-controls={`section-${id}`}
+        >
+          {/* Icon bubble */}
+          <div
+            className={`flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-200 ${
+              isOpen
+                ? 'bg-brand-500 text-white'
+                : hasErrors
+                ? 'bg-red-100 text-red-600'
+                : status === 'complete'
+                ? 'bg-emerald-100 text-emerald-600'
+                : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {icon}
+          </div>
+
+          {/* Title + subtitle */}
+          <div className="flex-1 min-w-0">
+            <p className={`font-semibold text-sm leading-tight ${
+              isOpen ? 'text-brand-700' : 'text-slate-800'
+            }`}>{title}</p>
+            <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>
+          </div>
+
+          {/* Status badge */}
+          <div className="flex-shrink-0 flex items-center gap-2">
+            {hasErrors && !isOpen && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Fix required
+              </span>
+            )}
+            {!hasErrors && status === 'complete' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Done
+              </span>
+            )}
+            {!hasErrors && status === 'partial' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                In progress
+              </span>
+            )}
+            {/* Chevron */}
+            <svg
+              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                isOpen ? 'rotate-180' : ''
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+
+        {/* Section Content */}
+        <div
+          id={`section-${id}`}
+          className={`transition-all duration-300 ${
+            isOpen ? 'max-h-[9999px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+          }`}
+          aria-hidden={!isOpen}
+        >
+          <div className="px-5 pb-6 pt-2 space-y-5 border-t border-slate-100">
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-2">
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-50 text-brand-600 shrink-0">
+    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6 sm:py-6 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      {/* ── Page Header ───────────────────────────────────────────────── */}
+      <div className="flex items-start gap-4 pb-5 border-b border-slate-100 mb-5">
+        <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-brand-500 text-white shrink-0 shadow-sm">
           <Building className="w-5 h-5" aria-hidden="true" />
         </div>
-        <div className="min-w-0">
-          <h2 className="text-headline-md text-gray-900 leading-tight" style={{ textWrap: "balance" as any }}>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-bold text-slate-900 leading-tight">
             Company Details
           </h2>
-          <p className="text-sm text-gray-600 mt-0.5">
-            Tell us about your business entity and legal information
+          <p className="text-sm text-slate-500 mt-0.5">
+            Complete all 4 sections below to save and continue your registration.
           </p>
+        </div>
+        {/* Overall completion badge */}
+        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-600 shrink-0">
+          <span className="w-2 h-2 rounded-full bg-brand-500 animate-pulse" />
+          Step 1 of 8
         </div>
       </div>
 
-      {/* Business Type Selection */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Business Structure
-          </h3>
-        </div>
-        <div className="px-6 py-6 space-y-6">
+      {/* ── Accordion Sections ─────────────────────────────────────────── */}
+      <div className="space-y-3">
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 1 — Business Profile & Security
+            Fields: Business Type, Company Name, GST, ID Number, PAN, Password
+            ═══════════════════════════════════════════════════════════════ */}
+        <AccordionSection
+          id="profile"
+          icon={<Briefcase className="w-4.5 h-4.5" aria-hidden="true" />}
+          title="Business Profile & Security"
+          subtitle="Business type, company identity, regulatory IDs, and account password"
+        >
+          {/* Business Type */}
           <div>
-            <label className="block text-base font-medium text-gray-700 mb-2">
-              Business Type <span className="text-red-500 text-lg">*</span>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">
+              Business Type <span className="text-brand-500 ml-0.5" aria-hidden="true">*</span>
             </label>
-            <p className="text-sm text-gray-500 -mt-1 mb-4">
+            <p className="text-xs text-slate-500 mb-3">
               Select the legal structure under which your business is registered
             </p>
             {(() => {
               const bt = formData.businessType;
-              // Treat any non-empty value that isn't one of the predefined
-              // ids as a vendor-typed "Others" value.
               const isOthersTyped = !!bt && bt !== OTHERS_PLACEHOLDER && !BUSINESS_TYPE_IDS.has(bt);
               const othersSelected = bt === OTHERS_PLACEHOLDER || isOthersTyped;
               const othersValue = isOthersTyped ? bt : '';
@@ -922,7 +1197,7 @@ export default function CompanyDetails({
 
               return (
                 <>
-                  <div className="flex flex-wrap gap-3" data-field="businessType">
+                  <div className="flex flex-wrap gap-2.5" data-field="businessType">
                     {businessTypes.map((type) => {
                       const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
                         'proprietorship': User,
@@ -947,8 +1222,6 @@ export default function CompanyDetails({
                       invalid={invalid && !bt}
                       icon={HelpCircle}
                       onClick={() => {
-                        // Toggle into Others mode without wiping a previously
-                        // typed value the user might be editing.
                         if (!othersSelected) handleInputChange("businessType", OTHERS_PLACEHOLDER);
                       }}
                     >
@@ -957,20 +1230,16 @@ export default function CompanyDetails({
                   </div>
 
                   {othersSelected && (
-                    <div className="mt-4 max-w-md">
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <div className="mt-3 max-w-md">
+                      <label className="block text-xs font-medium text-slate-600 mb-1.5">
                         Please specify your business type
-                        <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                        <span className="text-brand-500 ml-1" aria-hidden="true">*</span>
                       </label>
                       <input
                         type="text"
                         name="businessTypeOther"
                         value={othersValue}
                         onChange={(e) => {
-                          // Store the typed value directly so the rest of the
-                          // form (and the backend) get the user's wording.
-                          // Empty input falls back to the OTHERS_PLACEHOLDER
-                          // so the chip stays visually selected.
                           const v = e.target.value;
                           handleInputChange("businessType", v.trim() === '' ? OTHERS_PLACEHOLDER : v);
                         }}
@@ -983,761 +1252,400 @@ export default function CompanyDetails({
                     </div>
                   )}
 
-                  {invalid ? (
-                    <p className="text-red-600 text-sm mt-3 font-medium">
-                      {errors.businessType}
-                    </p>
-                  ) : null}
+                  {invalid && (
+                    <p className="text-red-600 text-xs mt-2 font-medium">{errors.businessType}</p>
+                  )}
                 </>
               );
             })()}
           </div>
-        </div>
-      </section>
 
-        {/* Company Information */}
-        <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-              Company Information
-            </h3>
-          </div>
-          <div className="px-6 py-6 space-y-6">
+          {/* Company Name + GST Number — 2-col grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
-                Company Name <span className="text-red-500 text-lg">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  name="companyName"
-                  value={formData.companyName}
-                  onChange={(e) =>
-                    handleInputChange("companyName", e.target.value)
-                  }
-                  onBlur={() => handleBlur("companyName")}
-                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                    errors.companyName && touched.companyName
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-gray-300'
-                  }`}
-                  placeholder="Enter Company Name…"
-                />
-              </div>
-              {errors.companyName && touched.companyName ? (
-                <p className="text-red-500 text-sm mt-1">{errors.companyName}</p>
-              ) : null}
-            </div>
-
-            <div>
-              <label className="block text-base font-medium text-gray-700 mb-2">
-                GST Number <span className="text-red-500 text-lg">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  name="gstNumber"
-                  value={formData.gstNumber}
-                  onChange={(e) => handleInputChange("gstNumber", e.target.value.toUpperCase())}
-                  onBlur={() => handleBlur("gstNumber")}
-                  maxLength={15}
-                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                    errors.gstNumber && touched.gstNumber
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-gray-300'
-                  }`}
-                  placeholder="22AAAAA0000A1Z5"
-                />
-              </div>
-              {errors.gstNumber && touched.gstNumber ? (
-                <p className="text-red-500 text-sm mt-1">{errors.gstNumber}</p>
-              ) : null}
-            </div>
-
-            {/* ── Dynamic regulatory fields driven by Business Type ───────
-               Only render the type-specific ID + PAN when one of the four
-               supported types is selected. We render the container (with
-               reserved space) only when a type is picked, so switching
-               between types doesn't cause the form to jump — fields swap
-               in place. */}
-            {(() => {
-              const meta = COMPANY_TYPE_META[formData.businessType as CompanyTypeId];
-              if (!meta) return null;
-              const idErr = !!(errors.companyIdNumber && touched.companyIdNumber);
-              const panErr = !!(errors.panNumber && touched.panNumber);
-              const idDescId = `companyIdNumber-${idErr ? 'error' : 'hint'}`;
-              return (
-                <>
-                  {/* Type-specific regulatory ID (IEC / CIN / Deed / LLPIN) */}
-                  <div>
-                    <label
-                      htmlFor="companyIdNumber"
-                      className="block text-base font-medium text-gray-700 mb-2"
-                    >
-                      {meta.idLabel} <span className="text-red-500 text-lg" aria-hidden="true">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="companyIdNumber"
-                        type="text"
-                        name="companyIdNumber"
-                        value={formData.companyIdNumber}
-                        onChange={(e) => {
-                          const v = meta.uppercase ? e.target.value.toUpperCase() : e.target.value;
-                          handleInputChange('companyIdNumber', v);
-                        }}
-                        onBlur={() => handleBlur('companyIdNumber')}
-                        maxLength={meta.maxLength}
-                        spellCheck={false}
-                        autoComplete="off"
-                        aria-describedby={idDescId}
-                        aria-invalid={idErr}
-                        className={`w-full text-base font-medium px-4 py-3 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                          idErr ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                        }`}
-                        placeholder={meta.idPlaceholder}
-                        style={meta.uppercase ? { fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' } : undefined}
-                      />
-                    </div>
-                    {idErr ? (
-                      <p id={idDescId} className="text-red-500 text-sm mt-1" role="alert">
-                        {errors.companyIdNumber}
-                      </p>
-                    ) : (
-                      <p id={idDescId} className="text-gray-500 text-xs mt-1">
-                        {meta.idHint}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* PAN Number — same field across all four types */}
-                  <div>
-                    <label
-                      htmlFor="panNumber"
-                      className="block text-base font-medium text-gray-700 mb-2"
-                    >
-                      PAN Number <span className="text-red-500 text-lg" aria-hidden="true">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="panNumber"
-                        type="text"
-                        name="panNumber"
-                        value={formData.panNumber}
-                        onChange={(e) => handleInputChange('panNumber', e.target.value.toUpperCase())}
-                        onBlur={() => handleBlur('panNumber')}
-                        maxLength={10}
-                        spellCheck={false}
-                        autoComplete="off"
-                        aria-describedby={`panNumber-${panErr ? 'error' : 'hint'}`}
-                        aria-invalid={panErr}
-                        className={`w-full text-base font-medium px-4 py-3 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                          panErr ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                        }`}
-                        placeholder="AAAAA0000A"
-                        style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
-                      />
-                    </div>
-                    {panErr ? (
-                      <p id="panNumber-error" className="text-red-500 text-sm mt-1" role="alert">
-                        {errors.panNumber}
-                      </p>
-                    ) : (
-                      <p id="panNumber-hint" className="text-gray-500 text-xs mt-1">
-                        10-character Permanent Account Number
-                      </p>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-
-            {/* Divider & Contact Sub-heading */}
-            <div className="pt-6 border-t border-gray-100 mt-6">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-slate-400" />
-                Contact & Communication
-              </h3>
-            </div>
-
-            {/* Emails Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Email 1 */}
-              <div>
-                <label className="block text-base font-medium text-gray-700 mb-2 flex items-center gap-1.5">
-                  <Mail className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>Email 1</span>
-                  <span className="text-red-500 text-lg">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange("email", e.target.value)}
-                    onBlur={() => handleBlur("email")}
-                    className={`w-full text-base font-medium px-4 py-3 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                      errors.email && touched.email
-                        ? 'border-red-500 bg-red-50'
-                        : 'border-gray-300'
-                    }`}
-                    placeholder="company@example.com…"
-                    autoComplete="email"
-                  />
-                </div>
-                {errors.email && touched.email ? (
-                  <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-                ) : null}
-              </div>
-
-              {/* Email 2 */}
-              <div>
-                <label className="block text-base font-medium text-gray-700 mb-2 flex items-center gap-1.5">
-                  <Mail className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>Email 2</span>
-                  <span className="text-gray-400 text-xs font-normal">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    name="email2"
-                    value={formData.email2}
-                    onChange={(e) => handleInputChange("email2", e.target.value)}
-                    onBlur={() => handleBlur("email2")}
-                    className={`w-full text-base font-medium px-4 py-3 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                      errors.email2 && touched.email2
-                        ? 'border-red-500 bg-red-50'
-                        : 'border-gray-300'
-                    }`}
-                    placeholder="optional secondary email…"
-                    autoComplete="off"
-                  />
-                </div>
-                {errors.email2 && touched.email2 ? (
-                  <p className="text-red-500 text-sm mt-1">{errors.email2}</p>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Phones Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Phone 1 */}
-              <div>
-                <label className="block text-base font-medium text-gray-700 mb-2 flex items-center gap-1.5">
-                  <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>Phone Number 1</span>
-                  <span className="text-red-500 text-lg">*</span>
-                </label>
-                <PhoneInput
-                  name="phone"
-                  value={formData.phone}
-                  onChange={(v) => handleInputChange("phone", v)}
-                  onBlur={() => handleBlur("phone")}
-                  invalid={!!(errors.phone && touched.phone)}
-                  placeholder="9876543210"
-                  autoComplete="tel"
-                />
-                {errors.phone && touched.phone ? (
-                  <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
-                ) : null}
-              </div>
-
-              {/* Phone 2 */}
-              <div>
-                <label className="block text-base font-medium text-gray-700 mb-2 flex items-center gap-1.5">
-                  <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>Phone Number 2</span>
-                  <span className="text-gray-400 text-xs font-normal">(Optional)</span>
-                </label>
-                <PhoneInput
-                  name="phoneNumber2"
-                  value={formData.phoneNumber2}
-                  onChange={(v) => handleInputChange("phoneNumber2", v)}
-                  onBlur={() => handleBlur("phoneNumber2")}
-                  invalid={!!(errors.phoneNumber2 && touched.phoneNumber2)}
-                  placeholder="9876543210"
-                  autoComplete="off"
-                />
-                {errors.phoneNumber2 && touched.phoneNumber2 ? (
-                  <p className="text-red-500 text-sm mt-1">{errors.phoneNumber2}</p>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Landline & Website Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Landline Number */}
-              <div>
-                <label className="block text-base font-medium text-gray-700 mb-2 flex items-center gap-1.5">
-                  <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>Landline Number</span>
-                  <span className="text-gray-400 text-xs font-normal">(Optional)</span>
-                </label>
-                <PhoneInput
-                  name="landlineNumber"
-                  value={formData.landlineNumber}
-                  onChange={(v) => handleInputChange("landlineNumber", v)}
-                  onBlur={() => handleBlur("landlineNumber")}
-                  invalid={!!(errors.landlineNumber && touched.landlineNumber)}
-                  placeholder="2228175000"
-                  autoComplete="off"
-                />
-                {errors.landlineNumber && touched.landlineNumber ? (
-                  <p className="text-red-500 text-sm mt-1">{errors.landlineNumber}</p>
-                ) : null}
-              </div>
-
-              {/* Website */}
-              <div>
-                <label className="block text-base font-medium text-gray-700 mb-2 flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span>Website</span>
-                  <span className="text-gray-400 text-xs font-normal">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="url"
-                    name="website"
-                    value={formData.website}
-                    onChange={(e) => handleInputChange("website", e.target.value)}
-                    className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
-                    placeholder="www.company.com…"
-                    autoComplete="url"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Required Document Uploads */}
-        <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <IconFileText className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-              Required Document Uploads
-            </h3>
-            <p className="text-slate-500 text-sm mt-1">
-              Please upload clear copies of the following documents to verify your business identity.
-            </p>
-          </div>
-          <div className="px-6 py-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Card 1: Company Logo */}
-              <div className="flex flex-col bg-slate-50/50 rounded-xl p-5 border border-slate-100">
-                <div className="mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                    <span>Company Logo</span>
-                    <span className="text-gray-400 text-xs font-normal">(Optional)</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Upload your company logo (PNG, JPG, WEBP, SVG). Max 2,048 KB.
-                  </p>
-                </div>
-                
-                <div
-                  className="w-full h-44 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 bg-white rounded-lg p-4 hover:border-brand-500/40 hover:bg-slate-50/20 transition-all duration-200"
-                  onDragOver={handleDragOver}
-                  onDrop={handleLogoDrop}
-                  role="region"
-                  aria-label="Logo upload dropzone"
-                  data-field="logo"
-                  tabIndex={-1}
-                >
-                  {formData.logo ? (
-                    <div className="flex flex-col items-center justify-center w-full h-full">
-                      <div className="w-20 h-20 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
-                        <img
-                          src={formData.logo as string}
-                          alt="Company Logo"
-                          width={80}
-                          height={80}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                      <div className="mt-2 text-xs text-gray-600 truncate max-w-xs text-center">
-                        {formData.logoFile?.name || "logo.png"}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <Image className="w-8 h-8 text-gray-400 mb-2 shrink-0" />
-                      <span className="text-xs font-medium text-slate-500">
-                        Drag & drop your logo here or browse
-                      </span>
-                    </div>
-                  )}
-
-                  <input
-                    id="logoUpload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoChange}
-                    className="hidden"
-                  />
-                  <div className="mt-3 flex items-center gap-2">
-                    <label
-                      htmlFor="logoUpload"
-                      className="inline-flex items-center justify-center px-4 py-1.5 min-h-[36px] bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow cursor-pointer transition-colors duration-200"
-                    >
-                      Browse
-                    </label>
-                    {formData.logo && (
-                      <button
-                        type="button"
-                        onClick={handleRemoveLogo}
-                        className="px-3 py-1.5 min-h-[36px] text-xs font-semibold rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 transition-colors duration-200"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-
-                  {logoError && (
-                    <div className="mt-2 text-xs text-red-600 font-medium">{logoError}</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Card 2: GST Certificate */}
-              <div className="flex flex-col bg-slate-50/50 rounded-xl p-5 border border-slate-100">
-                <div className="mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                    <span>GST Certificate</span>
-                    <span className="text-red-500">*</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Upload your GST document (PDF, PNG, JPG, WEBP, DOC). Max 5,120 KB.
-                  </p>
-                </div>
-                
-                <div
-                  className="w-full h-44 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 bg-white rounded-lg p-4 hover:border-brand-500/40 hover:bg-slate-50/20 transition-all duration-200"
-                  onDragOver={handleDragOver}
-                  onDrop={handleGstDrop}
-                  role="region"
-                  aria-label="GST document upload dropzone"
-                  data-field="gstDocument"
-                  tabIndex={-1}
-                >
-                  {formData.gstDocument ? (
-                    <div className="flex flex-col items-center justify-center w-full h-full">
-                      <div className="w-20 h-20 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
-                        {formData.gstFile?.type.startsWith("image/") ? (
-                          <img
-                            src={formData.gstDocument as string}
-                            alt="GST Certificate"
-                            width={80}
-                            height={80}
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <IconFileText className="w-10 h-10 text-brand-500 shrink-0" />
-                        )}
-                      </div>
-                      <div className="mt-2 text-xs text-gray-600 truncate max-w-xs text-center">
-                        {formData.gstFile?.name || "gst_certificate.pdf"}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <IconFileText className="w-8 h-8 text-gray-400 mb-2 shrink-0" />
-                      <span className="text-xs font-medium text-slate-500">
-                        Drag & drop certificate here or browse
-                      </span>
-                    </div>
-                  )}
-
-                  <input
-                    id="gstUpload"
-                    type="file"
-                    accept="application/pdf,image/*,.doc,.docx"
-                    onChange={handleGstChange}
-                    className="hidden"
-                  />
-                  <div className="mt-3 flex items-center gap-2">
-                    <label
-                      htmlFor="gstUpload"
-                      className="inline-flex items-center justify-center px-4 py-1.5 min-h-[36px] bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow cursor-pointer transition-colors duration-200"
-                    >
-                      Browse
-                    </label>
-                    {formData.gstDocument && (
-                      <button
-                        type="button"
-                        onClick={handleRemoveGst}
-                        className="px-3 py-1.5 min-h-[36px] text-xs font-semibold rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 transition-colors duration-200"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-
-                  {gstError && (
-                    <div className="mt-2 text-xs text-red-600 font-medium">{gstError}</div>
-                  )}
-                  {errors.gstDocument && (
-                    <p className="mt-2 text-xs font-semibold text-red-600" role="alert">
-                      {errors.gstDocument}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Card 3: PAN Card */}
-              <div className="flex flex-col bg-slate-50/50 rounded-xl p-5 border border-slate-100">
-                <div className="mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                    <span>PAN Card</span>
-                    <span className="text-red-500">*</span>
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Upload your PAN card ({ALLOWED_DOC_LABEL}). Max {MAX_DOC_LABEL}.
-                  </p>
-                </div>
-                
-                <div
-                  className="w-full h-44 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 bg-white rounded-lg p-4 hover:border-brand-500/40 hover:bg-slate-50/20 transition-all duration-200"
-                  onDragOver={handleDragOver}
-                  onDrop={handlePanCardDrop}
-                  role="region"
-                  aria-label="PAN Card upload dropzone"
-                  data-field="panCardDocument"
-                  tabIndex={-1}
-                >
-                  {formData.panCardDocument ? (
-                    <div className="flex flex-col items-center justify-center w-full h-full">
-                      <div className="w-20 h-20 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
-                        {formData.panCardFile?.type.startsWith("image/") ? (
-                          <img
-                            src={formData.panCardDocument as string}
-                            alt="PAN Card preview"
-                            width={80}
-                            height={80}
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <IconFileText className="w-10 h-10 text-brand-500 shrink-0" />
-                        )}
-                      </div>
-                      <div className="mt-2 text-xs text-gray-600 truncate max-w-xs text-center">
-                        {formData.panCardFile?.name || "pan_card.pdf"}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <IconFileText className="w-8 h-8 text-gray-400 mb-2 shrink-0" />
-                      <span className="text-xs font-medium text-slate-500">
-                        Drag & drop PAN card here or browse
-                      </span>
-                    </div>
-                  )}
-
-                  <input
-                    id="panCardUpload"
-                    type="file"
-                    accept="application/pdf,image/*,.doc,.docx"
-                    onChange={handlePanCardChange}
-                    className="hidden"
-                  />
-                  <div className="mt-3 flex items-center gap-2">
-                    <label
-                      htmlFor="panCardUpload"
-                      className="inline-flex items-center justify-center px-4 py-1.5 min-h-[36px] bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow cursor-pointer transition-colors duration-200"
-                    >
-                      Browse
-                    </label>
-                    {formData.panCardDocument && (
-                      <button
-                        type="button"
-                        onClick={handleRemovePanCard}
-                        className="px-3 py-1.5 min-h-[36px] text-xs font-semibold rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 transition-colors duration-200"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-
-                  {panCardError && (
-                    <div className="mt-2 text-xs text-red-600 font-medium">{panCardError}</div>
-                  )}
-                  {errors.panCardDocument && (
-                    <p className="mt-2 text-xs font-semibold text-red-600" role="alert">
-                      {errors.panCardDocument}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Card 4: Type-Specific Business Certificate (Conditional) */}
-              {(() => {
-                const meta = COMPANY_TYPE_META[formData.businessType as CompanyTypeId];
-                if (!meta) return null;
-                return (
-                  <div className="flex flex-col bg-slate-50/50 rounded-xl p-5 border border-slate-100">
-                    <div className="mb-3">
-                      <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                        <span>{meta.certLabel}</span>
-                        <span className="text-red-500">*</span>
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Upload your {meta.certLabel.toLowerCase()} ({ALLOWED_DOC_LABEL}). Max {MAX_DOC_LABEL}.
-                      </p>
-                    </div>
-                    
-                    <div
-                      className="w-full h-44 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 bg-white rounded-lg p-4 hover:border-brand-500/40 hover:bg-slate-50/20 transition-all duration-200"
-                      onDragOver={handleDragOver}
-                      onDrop={handleTypeCertDrop}
-                      role="region"
-                      aria-label={`${meta.certLabel} upload dropzone`}
-                      data-field="typeCertDocument"
-                      tabIndex={-1}
-                    >
-                      {formData.typeCertDocument ? (
-                        <div className="flex flex-col items-center justify-center w-full h-full">
-                          <div className="w-20 h-20 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
-                            {formData.typeCertFile?.type.startsWith("image/") ? (
-                              <img
-                                src={formData.typeCertDocument as string}
-                                alt={`${meta.certLabel} preview`}
-                                width={80}
-                                height={80}
-                                className="w-full h-full object-contain"
-                              />
-                            ) : (
-                              <IconFileText className="w-10 h-10 text-brand-500 shrink-0" />
-                            )}
-                          </div>
-                          <div className="mt-2 text-xs text-gray-600 truncate max-w-xs text-center">
-                            {formData.typeCertFile?.name || "document.pdf"}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-center">
-                          <IconFileText className="w-8 h-8 text-gray-400 mb-2 shrink-0" />
-                          <span className="text-xs font-medium text-slate-500">
-                            Drag & drop document here or browse
-                          </span>
-                        </div>
-                      )}
-
-                      <input
-                        id="typeCertUpload"
-                        type="file"
-                        accept="application/pdf,image/*,.doc,.docx"
-                        onChange={handleTypeCertChange}
-                        className="hidden"
-                      />
-                      <div className="mt-3 flex items-center gap-2">
-                        <label
-                          htmlFor="typeCertUpload"
-                          className="inline-flex items-center justify-center px-4 py-1.5 min-h-[36px] bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow cursor-pointer transition-colors duration-200"
-                        >
-                          Browse
-                        </label>
-                        {formData.typeCertDocument && (
-                          <button
-                            type="button"
-                            onClick={handleRemoveTypeCert}
-                            className="px-3 py-1.5 min-h-[36px] text-xs font-semibold rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 transition-colors duration-200"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-
-                      {typeCertError && (
-                        <div className="mt-2 text-xs text-red-600 font-medium">{typeCertError}</div>
-                      )}
-                      {errors.typeCertDocument && (
-                        <p className="mt-2 text-xs font-semibold text-red-600" role="alert">
-                          {errors.typeCertDocument}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-            </div>
-          </div>
-        </section>
-
-        {/* Legal Address */}
-        <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-              Legal Address
-            </h3>
-          </div>
-          <div className="px-6 py-6 space-y-6">
-            {/* Map-backed address search — picks an entry to auto-fill the
-                rest of the form. Optional shortcut; manual entry still works. */}
-            <div>
-              <label htmlFor="addressSearch" className="block text-base font-medium text-gray-700 mb-2">
-                Search Location <span className="text-gray-400 text-sm font-normal">(optional shortcut)</span>
-              </label>
-              <AddressAutocomplete
-                id="addressSearch"
-                onSelect={(s) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    address: s.line1 || prev.address,
-                    city: s.city || prev.city,
-                    state: s.state || prev.state,
-                    zipCode: s.postcode || prev.zipCode,
-                    country: s.country || prev.country,
-                  }));
-                  // Clear any prior errors on the fields we just populated
-                  setErrors((prev) => ({
-                    ...prev,
-                    address: '',
-                    city: '',
-                    state: '',
-                    zipCode: '',
-                    country: '',
-                  }));
-                  showSuccessToast('Address auto-filled', s.displayName);
-                }}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Type 3+ characters to see suggestions. Picking one fills Line 1, City, State, ZIP, and Country at once — you can still edit any field afterwards.
-              </p>
-            </div>
-
-            {/* Address Line 1 — required, the primary street line */}
-            <div>
-              <label htmlFor="addressLine1" className="block text-base font-medium text-gray-700 mb-2">
-                Address Line 1 <span className="text-red-500 text-lg" aria-hidden="true">*</span>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                Company Name <span className="text-brand-500" aria-hidden="true">*</span>
               </label>
               <input
-                id="addressLine1"
                 type="text"
-                name="address"
-                value={formData.address}
-                onChange={(e) => handleInputChange("address", e.target.value)}
-                onBlur={() => handleBlur("address")}
-                autoComplete="address-line1"
-                className={`w-full text-base font-medium px-4 py-3 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                  errors.address && touched.address
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-gray-300'
+                name="companyName"
+                value={formData.companyName}
+                onChange={(e) => handleInputChange("companyName", e.target.value)}
+                onBlur={() => handleBlur("companyName")}
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.companyName && touched.companyName ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
                 }`}
-                placeholder="House / building / street"
+                placeholder="e.g. Acme Textiles Pvt. Ltd."
               />
-              {errors.address && touched.address && (
-                <p className="text-red-500 text-sm mt-1" role="alert">{errors.address}</p>
+              {errors.companyName && touched.companyName && (
+                <p className="text-red-500 text-xs mt-1">{errors.companyName}</p>
               )}
             </div>
 
-            {/* Address Line 2 — optional */}
             <div>
-              <label htmlFor="addressLine2" className="block text-base font-medium text-gray-700 mb-2">
-                Address Line 2 <span className="text-gray-400 text-sm font-normal">(optional)</span>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                GST Number <span className="text-brand-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="text"
+                name="gstNumber"
+                value={formData.gstNumber}
+                onChange={(e) => handleInputChange("gstNumber", e.target.value.toUpperCase())}
+                onBlur={() => handleBlur("gstNumber")}
+                maxLength={15}
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.gstNumber && touched.gstNumber ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="22AAAAA0000A1Z5"
+                style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+              />
+              {errors.gstNumber && touched.gstNumber && (
+                <p className="text-red-500 text-xs mt-1">{errors.gstNumber}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Dynamic Regulatory Fields — only shown when a supported type is selected */}
+          {(() => {
+            const meta = COMPANY_TYPE_META[formData.businessType as CompanyTypeId];
+            if (!meta) return null;
+            const idErr = !!(errors.companyIdNumber && touched.companyIdNumber);
+            const panErr = !!(errors.panNumber && touched.panNumber);
+            const idDescId = `companyIdNumber-${idErr ? 'error' : 'hint'}`;
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg bg-brand-50/40 border border-brand-100">
+                {/* Regulatory ID (IEC / CIN / Deed / LLPIN) */}
+                <div>
+                  <label htmlFor="companyIdNumber" className="block text-sm font-semibold text-slate-700 mb-1">
+                    {meta.idLabel} <span className="text-brand-500" aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    id="companyIdNumber"
+                    type="text"
+                    name="companyIdNumber"
+                    value={formData.companyIdNumber}
+                    onChange={(e) => {
+                      const v = meta.uppercase ? e.target.value.toUpperCase() : e.target.value;
+                      handleInputChange('companyIdNumber', v);
+                    }}
+                    onBlur={() => handleBlur('companyIdNumber')}
+                    maxLength={meta.maxLength}
+                    spellCheck={false}
+                    autoComplete="off"
+                    aria-describedby={idDescId}
+                    aria-invalid={idErr}
+                    className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                      idErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                    }`}
+                    placeholder={meta.idPlaceholder}
+                    style={meta.uppercase ? { fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' } : undefined}
+                  />
+                  {idErr ? (
+                    <p id={idDescId} className="text-red-500 text-xs mt-1" role="alert">{errors.companyIdNumber}</p>
+                  ) : (
+                    <p id={idDescId} className="text-slate-500 text-xs mt-1">{meta.idHint}</p>
+                  )}
+                </div>
+
+                {/* PAN Number — constant across all 4 types */}
+                <div>
+                  <label htmlFor="panNumber" className="block text-sm font-semibold text-slate-700 mb-1">
+                    PAN Number <span className="text-brand-500" aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    id="panNumber"
+                    type="text"
+                    name="panNumber"
+                    value={formData.panNumber}
+                    onChange={(e) => handleInputChange('panNumber', e.target.value.toUpperCase())}
+                    onBlur={() => handleBlur('panNumber')}
+                    maxLength={10}
+                    spellCheck={false}
+                    autoComplete="off"
+                    aria-describedby={`panNumber-${panErr ? 'error' : 'hint'}`}
+                    aria-invalid={panErr}
+                    className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                      panErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                    }`}
+                    placeholder="AAAAA0000A"
+                    style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+                  />
+                  {panErr ? (
+                    <p id="panNumber-error" className="text-red-500 text-xs mt-1" role="alert">{errors.panNumber}</p>
+                  ) : (
+                    <p id="panNumber-hint" className="text-slate-500 text-xs mt-1">10-character Permanent Account Number</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Account Security — Password */}
+          {(() => {
+            const isExistingVendorLocal = Boolean(data?.status);
+            return (
+              <div className="pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <label htmlFor="password" className="text-sm font-semibold text-slate-700">
+                    Account Password{' '}
+                    {isExistingVendorLocal ? (
+                      <span className="text-slate-400 text-xs font-normal">(leave blank to keep current)</span>
+                    ) : (
+                      <span className="text-brand-500" aria-hidden="true">*</span>
+                    )}
+                  </label>
+                </div>
+                <p className="text-xs text-slate-500 mb-2">
+                  {isExistingVendorLocal
+                    ? 'A password is already set. Leave blank to keep the current one, or type a new one to replace it.'
+                    : "Set a login password. You'll receive a new temporary password after approval."}
+                </p>
+                <input
+                  id="password"
+                  type="password"
+                  name="password"
+                  autoComplete="new-password"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  onBlur={() => handleBlur('password')}
+                  placeholder={isExistingVendorLocal ? 'Type a new password to replace the current one' : 'At least 8 characters'}
+                  className={`w-full max-w-sm h-10 rounded-lg border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
+                    errors.password && touched.password
+                      ? 'border-red-400 bg-red-50/40 focus-visible:border-red-500'
+                      : 'border-slate-300 bg-white hover:border-slate-400 focus-visible:border-brand-500'
+                  }`}
+                  aria-invalid={!!(errors.password && touched.password)}
+                  aria-describedby={errors.password && touched.password ? 'password-error' : 'password-help'}
+                />
+                {isExistingVendorLocal && !formData.password && (
+                  <p id="password-help" className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                    Password is set. Submitting without changing this field keeps the existing password.
+                  </p>
+                )}
+                {errors.password && touched.password && (
+                  <p id="password-error" className="text-red-500 text-xs mt-1.5" role="alert">{errors.password}</p>
+                )}
+              </div>
+            );
+          })()}
+        </AccordionSection>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 2 — Contact & Communication
+            Fields: Email 1/2, Phone 1/2, Landline, Website
+            ═══════════════════════════════════════════════════════════════ */}
+        <AccordionSection
+          id="contact"
+          icon={<Mail className="w-4.5 h-4.5" aria-hidden="true" />}
+          title="Contact & Communication"
+          subtitle="Business emails, phone numbers, landline, and website"
+        >
+          {/* Email Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Business Email</span>
+                <span className="text-brand-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange("email", e.target.value)}
+                onBlur={() => handleBlur("email")}
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.email && touched.email ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="company@example.com"
+                autoComplete="email"
+              />
+              {errors.email && touched.email && (
+                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Secondary Email</span>
+                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+              </label>
+              <input
+                type="email"
+                name="email2"
+                value={formData.email2}
+                onChange={(e) => handleInputChange("email2", e.target.value)}
+                onBlur={() => handleBlur("email2")}
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.email2 && touched.email2 ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="alternate@example.com"
+                autoComplete="off"
+              />
+              {errors.email2 && touched.email2 && (
+                <p className="text-red-500 text-xs mt-1">{errors.email2}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Phone Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Primary Phone</span>
+                <span className="text-brand-500" aria-hidden="true">*</span>
+              </label>
+              <PhoneInput
+                name="phone"
+                value={formData.phone}
+                onChange={(v) => handleInputChange("phone", v)}
+                onBlur={() => handleBlur("phone")}
+                invalid={!!(errors.phone && touched.phone)}
+                placeholder="9876543210"
+                autoComplete="tel"
+              />
+              {errors.phone && touched.phone && (
+                <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Secondary Phone</span>
+                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+              </label>
+              <PhoneInput
+                name="phoneNumber2"
+                value={formData.phoneNumber2}
+                onChange={(v) => handleInputChange("phoneNumber2", v)}
+                onBlur={() => handleBlur("phoneNumber2")}
+                invalid={!!(errors.phoneNumber2 && touched.phoneNumber2)}
+                placeholder="9876543210"
+                autoComplete="off"
+              />
+              {errors.phoneNumber2 && touched.phoneNumber2 && (
+                <p className="text-red-500 text-xs mt-1">{errors.phoneNumber2}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Landline + Website Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Landline Number</span>
+                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+              </label>
+              <PhoneInput
+                name="landlineNumber"
+                value={formData.landlineNumber}
+                onChange={(v) => handleInputChange("landlineNumber", v)}
+                onBlur={() => handleBlur("landlineNumber")}
+                invalid={!!(errors.landlineNumber && touched.landlineNumber)}
+                placeholder="2228175000"
+                autoComplete="off"
+              />
+              {errors.landlineNumber && touched.landlineNumber && (
+                <p className="text-red-500 text-xs mt-1">{errors.landlineNumber}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Website</span>
+                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+              </label>
+              <input
+                type="url"
+                name="website"
+                value={formData.website}
+                onChange={(e) => handleInputChange("website", e.target.value)}
+                className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
+                placeholder="www.yourcompany.com"
+                autoComplete="url"
+              />
+            </div>
+          </div>
+        </AccordionSection>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 3 — Legal Address & Site
+            Fields: Address 1/2/3, Landmark, City, State, ZIP, Country,
+                    Factory Ownership, Same-as-Warehouse checkbox
+            ═══════════════════════════════════════════════════════════════ */}
+        <AccordionSection
+          id="address"
+          icon={<MapPin className="w-4.5 h-4.5" aria-hidden="true" />}
+          title="Legal Address & Factory Site"
+          subtitle="Registered address, location details, and facility ownership"
+        >
+          {/* Location search shortcut */}
+          <div>
+            <label htmlFor="addressSearch" className="block text-sm font-semibold text-slate-700 mb-1">
+              Search Location{' '}
+              <span className="text-slate-400 text-xs font-normal">(optional shortcut)</span>
+            </label>
+            <AddressAutocomplete
+              id="addressSearch"
+              onSelect={(s) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  address: s.line1 || prev.address,
+                  city: s.city || prev.city,
+                  state: s.state || prev.state,
+                  zipCode: s.postcode || prev.zipCode,
+                  country: s.country || prev.country,
+                }));
+                setErrors((prev) => ({
+                  ...prev,
+                  address: '',
+                  city: '',
+                  state: '',
+                  zipCode: '',
+                  country: '',
+                }));
+                showSuccessToast('Address auto-filled', s.displayName);
+              }}
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              Type 3+ characters to see suggestions — fills Line 1, City, State, ZIP, and Country at once.
+            </p>
+          </div>
+
+          {/* Address Line 1 */}
+          <div>
+            <label htmlFor="addressLine1" className="block text-sm font-semibold text-slate-700 mb-1">
+              Address Line 1 <span className="text-brand-500" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="addressLine1"
+              type="text"
+              name="address"
+              value={formData.address}
+              onChange={(e) => handleInputChange("address", e.target.value)}
+              onBlur={() => handleBlur("address")}
+              autoComplete="address-line1"
+              className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                errors.address && touched.address ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+              }`}
+              placeholder="House / building / street"
+            />
+            {errors.address && touched.address && (
+              <p className="text-red-500 text-xs mt-1" role="alert">{errors.address}</p>
+            )}
+          </div>
+
+          {/* Address Line 2 + Line 3 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="addressLine2" className="block text-sm font-semibold text-slate-700 mb-1">
+                Address Line 2 <span className="text-slate-400 text-xs font-normal">(optional)</span>
               </label>
               <input
                 id="addressLine2"
@@ -1746,15 +1654,14 @@ export default function CompanyDetails({
                 value={formData.addressLine2}
                 onChange={(e) => handleInputChange("addressLine2", e.target.value)}
                 autoComplete="address-line2"
-                className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
+                className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
                 placeholder="Apartment, suite, floor"
               />
             </div>
 
-            {/* Address Line 3 — optional */}
             <div>
-              <label htmlFor="addressLine3" className="block text-base font-medium text-gray-700 mb-2">
-                Address Line 3 <span className="text-gray-400 text-sm font-normal">(optional)</span>
+              <label htmlFor="addressLine3" className="block text-sm font-semibold text-slate-700 mb-1">
+                Address Line 3 <span className="text-slate-400 text-xs font-normal">(optional)</span>
               </label>
               <input
                 id="addressLine3"
@@ -1763,308 +1670,475 @@ export default function CompanyDetails({
                 value={formData.addressLine3}
                 onChange={(e) => handleInputChange("addressLine3", e.target.value)}
                 autoComplete="address-line3"
-                className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
+                className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
                 placeholder="Building name, block, complex"
               />
             </div>
+          </div>
 
-            {/* Landmark — optional, helps with locating */}
+          {/* Landmark */}
+          <div>
+            <label htmlFor="landmark" className="block text-sm font-semibold text-slate-700 mb-1">
+              Landmark <span className="text-slate-400 text-xs font-normal">(optional)</span>
+            </label>
+            <input
+              id="landmark"
+              type="text"
+              name="landmark"
+              value={formData.landmark}
+              onChange={(e) => handleInputChange("landmark", e.target.value)}
+              autoComplete="off"
+              className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
+              placeholder="e.g. Near Central Mall, opposite Park View School"
+            />
+          </div>
+
+          {/* City + State + ZIP */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label htmlFor="landmark" className="block text-base font-medium text-gray-700 mb-2">
-                Landmark <span className="text-gray-400 text-sm font-normal">(optional)</span>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                City <span className="text-brand-500" aria-hidden="true">*</span>
               </label>
               <input
-                id="landmark"
                 type="text"
-                name="landmark"
-                value={formData.landmark}
-                onChange={(e) => handleInputChange("landmark", e.target.value)}
-                autoComplete="off"
-                className="w-full text-base font-medium px-4 py-3 border border-gray-300 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
-                placeholder="e.g. Near Central Mall, opposite Park View School"
+                name="city"
+                value={formData.city}
+                onChange={(e) => handleInputChange("city", e.target.value)}
+                onBlur={() => handleBlur("city")}
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.city && touched.city ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="City"
+              />
+              {errors.city && touched.city && (
+                <p className="text-red-500 text-xs mt-1">{errors.city}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                State / Province <span className="text-brand-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="text"
+                name="state"
+                value={formData.state}
+                onChange={(e) => handleInputChange("state", e.target.value)}
+                onBlur={() => handleBlur("state")}
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.state && touched.state ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="State"
+              />
+              {errors.state && touched.state && (
+                <p className="text-red-500 text-xs mt-1">{errors.state}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="zipCode" className="block text-sm font-semibold text-slate-700 mb-1">
+                ZIP / Postal Code <span className="text-brand-500" aria-hidden="true">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="zipCode"
+                  type="text"
+                  name="zipCode"
+                  value={formData.zipCode}
+                  onChange={(e) => handleInputChange("zipCode", e.target.value)}
+                  onBlur={(e) => {
+                    handleBlur("zipCode");
+                    runZipLookup(e.target.value, formData.country);
+                  }}
+                  autoComplete="postal-code"
+                  inputMode="text"
+                  className={`w-full text-sm font-medium px-4 py-2.5 ${zipLoading ? 'pr-9' : ''} border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                    errors.zipCode && touched.zipCode ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="ZIP code"
+                  aria-describedby="zipCode-hint"
+                />
+                {zipLoading && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-500" aria-live="polite" aria-label="Looking up postal code">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  </span>
+                )}
+              </div>
+              <p id="zipCode-hint" className="text-xs text-slate-400 mt-1">Auto-fills City and State on blur.</p>
+              {errors.zipCode && touched.zipCode && (
+                <p className="text-red-500 text-xs mt-1" role="alert">{errors.zipCode}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Country */}
+          <div>
+            <label htmlFor="company-country-select" className="block text-sm font-semibold text-slate-700 mb-1">
+              Country <span className="text-brand-500" aria-hidden="true">*</span>
+            </label>
+            <div data-field="country">
+              <CountrySelect
+                id="company-country-select"
+                value={formData.country}
+                onChange={(name) => handleInputChange('country', name)}
+                onBlur={() => handleBlur('country')}
+                invalid={!!(errors.country && touched.country)}
+                ariaDescribedBy={errors.country && touched.country ? 'company-country-error' : undefined}
+                placeholder="Select a country…"
               />
             </div>
+            {errors.country && touched.country && (
+              <p id="company-country-error" className="text-red-500 text-xs mt-1" role="alert">{errors.country}</p>
+            )}
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
-                  City <span className="text-red-500 text-lg">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={(e) => handleInputChange("city", e.target.value)}
-                  onBlur={() => handleBlur("city")}
-                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                    errors.city && touched.city
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-gray-300'
-                  }`}
-                  placeholder="City"
-                />
-                {errors.city && touched.city && (
-                  <p className="text-red-500 text-sm mt-1">{errors.city}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-base font-medium text-gray-700 mb-2">
-                  State/Province <span className="text-red-500 text-lg">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="state"
-                  value={formData.state}
-                  onChange={(e) => handleInputChange("state", e.target.value)}
-                  onBlur={() => handleBlur("state")}
-                  className={`w-full text-base font-medium px-4 py-3 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                    errors.state && touched.state
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-gray-300'
-                  }`}
-                  placeholder="State"
-                />
-                {errors.state && touched.state && (
-                  <p className="text-red-500 text-sm mt-1">{errors.state}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="zipCode" className="block text-base font-medium text-gray-700 mb-2">
-                  ZIP / Postal Code <span className="text-red-500 text-lg" aria-hidden="true">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id="zipCode"
-                    type="text"
-                    name="zipCode"
-                    value={formData.zipCode}
-                    onChange={(e) => handleInputChange("zipCode", e.target.value)}
-                    onBlur={(e) => {
-                      handleBlur("zipCode");
-                      runZipLookup(e.target.value, formData.country);
+          {/* Factory Ownership */}
+          <div>
+            <label id="factoryOwnership-label" className="block text-sm font-semibold text-slate-700 mb-1">
+              Factory Ownership{' '}
+              <span className="text-brand-500" aria-hidden="true">*</span>
+            </label>
+            <p className="text-xs text-slate-500 mb-3">
+              Select the type of ownership for your factory facility.
+            </p>
+            <div
+              className="flex flex-wrap gap-2"
+              role="radiogroup"
+              data-field="factoryOwnershipType"
+              aria-labelledby="factoryOwnership-label"
+              aria-describedby={
+                errors.factoryOwnershipType && touched.factoryOwnershipType
+                  ? 'factoryOwnership-error'
+                  : undefined
+              }
+            >
+              {factoryOwnershipTypes.map((type) => {
+                const selected = formData.factoryOwnershipType === type.id;
+                const invalid =
+                  !!(errors.factoryOwnershipType && touched.factoryOwnershipType) &&
+                  !formData.factoryOwnershipType;
+                return (
+                  <ToggleButton
+                    key={type.id}
+                    selected={selected}
+                    invalid={invalid}
+                    onClick={() => {
+                      handleInputChange('factoryOwnershipType', type.id);
+                      handleBlur('factoryOwnershipType');
                     }}
-                    autoComplete="postal-code"
-                    inputMode="text"
-                    className={`w-full text-base font-medium px-4 py-3 ${zipLoading ? 'pr-10' : ''} border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                      errors.zipCode && touched.zipCode
-                        ? 'border-red-500 bg-red-50'
-                        : 'border-gray-300'
-                    }`}
-                    placeholder="ZIP code"
-                    aria-describedby="zipCode-hint"
-                  />
-                  {zipLoading && (
-                    <span
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-500"
-                      aria-live="polite"
-                      aria-label="Looking up postal code"
-                    >
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    </span>
+                  >
+                    {type.label}
+                  </ToggleButton>
+                );
+              })}
+            </div>
+            {errors.factoryOwnershipType && touched.factoryOwnershipType && (
+              <p id="factoryOwnership-error" className="text-red-500 text-xs mt-2" role="alert">
+                {errors.factoryOwnershipType}
+              </p>
+            )}
+          </div>
+
+          {/* Same as Warehouse Checkbox */}
+          <div
+            className={`rounded-lg border p-4 transition-colors ${
+              formData.sameAsWarehouse
+                ? 'border-brand-300/50 bg-brand-50/40'
+                : 'border-slate-200 bg-white'
+            }`}
+          >
+            <label htmlFor="sameAsWarehouse" className="flex cursor-pointer items-start gap-3 select-none">
+              <input
+                type="checkbox"
+                id="sameAsWarehouse"
+                checked={formData.sameAsWarehouse}
+                onChange={(e) => handleInputChange('sameAsWarehouse', e.target.checked)}
+                className="h-4.5 w-4.5 mt-[2px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 focus-visible:ring-2 focus-visible:ring-brand-500/40"
+              />
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="text-sm font-semibold text-slate-900 leading-snug">
+                  Same as warehouse address
+                </div>
+                <div className="text-xs text-slate-500 leading-relaxed">
+                  {formData.sameAsWarehouse ? (
+                    <>
+                      <strong className="text-brand-600">Linked.</strong>{' '}
+                      Warehouse step will use this address and ownership type. Uncheck if your warehouse is at a different location.
+                    </>
+                  ) : (
+                    <>
+                      Check this if your warehouse uses the same address and ownership type. Warehouse fields will auto-fill.
+                    </>
                   )}
                 </div>
-                <p id="zipCode-hint" className="text-xs text-gray-500 mt-1">
-                  We&rsquo;ll auto-fill City and State once you finish typing.
-                </p>
-                {errors.zipCode && touched.zipCode && (
-                  <p className="text-red-500 text-sm mt-1" role="alert">{errors.zipCode}</p>
+              </div>
+            </label>
+          </div>
+        </AccordionSection>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 4 — Required Document Uploads
+            Fields: Logo, GST Certificate, PAN Card, Type-Specific Cert
+            ═══════════════════════════════════════════════════════════════ */}
+        <AccordionSection
+          id="documents"
+          icon={<IconFileText className="w-4.5 h-4.5" aria-hidden="true" />}
+          title="Required Document Uploads"
+          subtitle="Company logo, GST certificate, PAN card, and business registration certificate"
+        >
+          <div className="flex flex-col">
+            <p className="text-xs text-slate-500 mb-2">
+              Upload clear, legible copies of all required documents (PDF, PNG, JPG, WEBP or DOC — max 5 MB each).
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+            {/* Card: Company Logo */}
+            <div className="flex flex-col bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+              <div className="mb-3">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>Company Logo</span>
+                  <span className="text-slate-400 font-normal">(Optional)</span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">PNG, JPG, WEBP, SVG — max 2 MB</p>
+              </div>
+              <div
+                className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 transition-all duration-200 min-h-[140px] ${
+                  errors.logo ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                }`}
+                onDragOver={handleDragOver}
+                onDrop={handleLogoDrop}
+                role="region"
+                aria-label="Logo upload dropzone"
+                data-field="logo"
+                tabIndex={-1}
+              >
+                {formData.logo ? (
+                  <div className="flex flex-col items-center justify-center w-full">
+                    <div className="w-16 h-16 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                      <img src={formData.logo as string} alt="Company Logo" className="w-full h-full object-contain" />
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
+                      {formData.logoFile?.name || "logo.png"}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <Image className="w-7 h-7 text-slate-300 mb-1.5" />
+                    <span className="text-xs text-slate-400">Drag & drop or browse</span>
+                  </div>
+                )}
+                <input id="logoUpload" type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+                <div className="mt-2.5 flex items-center gap-2">
+                  <label htmlFor="logoUpload" className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors duration-200">
+                    Browse
+                  </label>
+                  {formData.logo && (
+                    <button type="button" onClick={handleRemoveLogo} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {logoError && <div className="mt-2 text-xs text-red-500 font-medium text-center">{logoError}</div>}
+              </div>
+            </div>
+
+            {/* Card: GST Certificate */}
+            <div className="flex flex-col bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+              <div className="mb-3">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>GST Certificate</span>
+                  <span className="text-brand-500 font-semibold">*</span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">PDF, PNG, JPG, WEBP, DOC — max 5 MB</p>
+              </div>
+              <div
+                className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 transition-all duration-200 min-h-[140px] ${
+                  errors.gstDocument ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                }`}
+                onDragOver={handleDragOver}
+                onDrop={handleGstDrop}
+                role="region"
+                aria-label="GST document upload dropzone"
+                data-field="gstDocument"
+                tabIndex={-1}
+              >
+                {formData.gstDocument ? (
+                  <div className="flex flex-col items-center justify-center w-full">
+                    <div className="w-16 h-16 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                      {formData.gstFile?.type.startsWith("image/") ? (
+                        <img src={formData.gstDocument as string} alt="GST Certificate" className="w-full h-full object-contain" />
+                      ) : (
+                        <IconFileText className="w-9 h-9 text-brand-400" />
+                      )}
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
+                      {formData.gstFile?.name || "gst_certificate.pdf"}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <IconFileText className="w-7 h-7 text-slate-300 mb-1.5" />
+                    <span className="text-xs text-slate-400">Drag & drop or browse</span>
+                  </div>
+                )}
+                <input id="gstUpload" type="file" accept="application/pdf,image/*,.doc,.docx" onChange={handleGstChange} className="hidden" />
+                <div className="mt-2.5 flex items-center gap-2">
+                  <label htmlFor="gstUpload" className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors duration-200">
+                    Browse
+                  </label>
+                  {formData.gstDocument && (
+                    <button type="button" onClick={handleRemoveGst} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {gstError && <div className="mt-2 text-xs text-red-500 font-medium text-center">{gstError}</div>}
+                {errors.gstDocument && (
+                  <p className="mt-1.5 text-xs font-semibold text-red-500 text-center" role="alert">{errors.gstDocument}</p>
                 )}
               </div>
             </div>
 
-            <div>
-              <label
-                htmlFor="company-country-select"
-                className="block text-base font-medium text-gray-700 mb-2"
-              >
-                Country <span className="text-red-500 text-lg">*</span>
-              </label>
-              <div data-field="country">
-                <CountrySelect
-                  id="company-country-select"
-                  value={formData.country}
-                  onChange={(name) => handleInputChange('country', name)}
-                  onBlur={() => handleBlur('country')}
-                  invalid={!!(errors.country && touched.country)}
-                  ariaDescribedBy={
-                    errors.country && touched.country ? 'company-country-error' : undefined
-                  }
-                  placeholder="Select a country…"
-                />
+            {/* Card: PAN Card */}
+            <div className="flex flex-col bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+              <div className="mb-3">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>PAN Card</span>
+                  <span className="text-brand-500 font-semibold">*</span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">PDF, PNG, JPG, WEBP, DOC — max 5 MB</p>
               </div>
-              {errors.country && touched.country && (
-                <p id="company-country-error" className="text-red-500 text-sm mt-1" role="alert">
-                  {errors.country}
-                </p>
-              )}
-            </div>
-
-            {/* ── Factory Ownership ───────────────────────────────────
-               Mirrors the Warehouse step's "Facility Ownership" pattern
-               (chip selector, label-only, required) so admin reviewers
-               can compare ownership of the factory vs the warehouse at
-               a glance. */}
-            <div>
-              <label
-                id="factoryOwnership-label"
-                className="block text-base font-medium text-gray-700 mb-2"
-              >
-                Factory Ownership{' '}
-                <span className="text-red-500 text-lg" aria-hidden="true">*</span>
-              </label>
-              <p className="text-sm text-gray-500 -mt-1 mb-3">
-                Select the type of ownership for your factory facility.
-              </p>
               <div
-                className="flex flex-wrap gap-2"
-                role="radiogroup"
-                data-field="factoryOwnershipType"
-                aria-labelledby="factoryOwnership-label"
-                aria-describedby={
-                  errors.factoryOwnershipType && touched.factoryOwnershipType
-                    ? 'factoryOwnership-error'
-                    : undefined
-                }
+                className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 transition-all duration-200 min-h-[140px] ${
+                  errors.panCardDocument ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                }`}
+                onDragOver={handleDragOver}
+                onDrop={handlePanCardDrop}
+                role="region"
+                aria-label="PAN Card upload dropzone"
+                data-field="panCardDocument"
+                tabIndex={-1}
               >
-                {factoryOwnershipTypes.map((type) => {
-                  const selected = formData.factoryOwnershipType === type.id;
-                  const invalid =
-                    !!(errors.factoryOwnershipType && touched.factoryOwnershipType) &&
-                    !formData.factoryOwnershipType;
-                  return (
-                    <ToggleButton
-                      key={type.id}
-                      selected={selected}
-                      invalid={invalid}
-                      onClick={() => {
-                        handleInputChange('factoryOwnershipType', type.id);
-                        handleBlur('factoryOwnershipType');
-                      }}
-                    >
-                      {type.label}
-                    </ToggleButton>
-                  );
-                })}
+                {formData.panCardDocument ? (
+                  <div className="flex flex-col items-center justify-center w-full">
+                    <div className="w-16 h-16 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                      {formData.panCardFile?.type.startsWith("image/") ? (
+                        <img src={formData.panCardDocument as string} alt="PAN Card preview" className="w-full h-full object-contain" />
+                      ) : (
+                        <IconFileText className="w-9 h-9 text-brand-400" />
+                      )}
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
+                      {formData.panCardFile?.name || "pan_card.pdf"}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <IconFileText className="w-7 h-7 text-slate-300 mb-1.5" />
+                    <span className="text-xs text-slate-400">Drag & drop or browse</span>
+                  </div>
+                )}
+                <input id="panCardUpload" type="file" accept="application/pdf,image/*,.doc,.docx" onChange={handlePanCardChange} className="hidden" />
+                <div className="mt-2.5 flex items-center gap-2">
+                  <label htmlFor="panCardUpload" className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors duration-200">
+                    Browse
+                  </label>
+                  {formData.panCardDocument && (
+                    <button type="button" onClick={handleRemovePanCard} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {panCardError && <div className="mt-2 text-xs text-red-500 font-medium text-center">{panCardError}</div>}
+                {errors.panCardDocument && (
+                  <p className="mt-1.5 text-xs font-semibold text-red-500 text-center" role="alert">{errors.panCardDocument}</p>
+                )}
               </div>
-              {errors.factoryOwnershipType && touched.factoryOwnershipType && (
-                <p
-                  id="factoryOwnership-error"
-                  className="text-red-500 text-sm mt-2"
-                  role="alert"
-                >
-                  {errors.factoryOwnershipType}
-                </p>
-              )}
             </div>
 
-            {/* ── Same as Warehouse — links this address + ownership
-                to the Warehouse step. While checked, every change here
-                streams up to WarehouseDetails in real time (debounced).
-                The Warehouse step shows an "inherited from Company"
-                banner and locks its fields. */}
-            <div
-              className={`rounded-lg border p-4 transition-colors ${
-                formData.sameAsWarehouse
-                  ? 'border-brand-500/30 bg-brand-50/40'
-                  : 'border-gray-200 bg-white'
-              }`}
-            >
-              <label
-                htmlFor="sameAsWarehouse"
-                className="flex cursor-pointer items-start gap-3 select-none"
-              >
-                <input
-                  type="checkbox"
-                  id="sameAsWarehouse"
-                  checked={formData.sameAsWarehouse}
-                  onChange={(e) => handleInputChange('sameAsWarehouse', e.target.checked)}
-                  className="h-5 w-5 mt-[3px] shrink-0 cursor-pointer accent-brand-500 rounded border-gray-300 focus-visible:ring-2 focus-visible:ring-brand-500/40"
-                />
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="text-base font-semibold text-gray-900 leading-snug">
-                    Same as warehouse address
+            {/* Card: Type-specific Certificate (conditional on businessType) */}
+            {(() => {
+              const meta = COMPANY_TYPE_META[formData.businessType as CompanyTypeId];
+              if (!meta) return null;
+              return (
+                <div className="flex flex-col bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+                  <div className="mb-3">
+                    <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>{meta.certLabel}</span>
+                      <span className="text-brand-500 font-semibold">*</span>
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">PDF, PNG, JPG, WEBP, DOC — max 5 MB</p>
                   </div>
-                  <div className="text-sm text-gray-600 leading-relaxed">
-                    {formData.sameAsWarehouse ? (
-                      <>
-                        <strong className="text-brand-700">Linked.</strong>{' '}
-                        Warehouse step will use this address and ownership type. Edits here update Warehouse instantly — uncheck if your warehouse is at a different location.
-                      </>
+                  <div
+                    className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 transition-all duration-200 min-h-[140px] ${
+                      errors.typeCertDocument ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDrop={handleTypeCertDrop}
+                    role="region"
+                    aria-label={`${meta.certLabel} upload dropzone`}
+                    data-field="typeCertDocument"
+                    tabIndex={-1}
+                  >
+                    {formData.typeCertDocument ? (
+                      <div className="flex flex-col items-center justify-center w-full">
+                        <div className="w-16 h-16 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                          {formData.typeCertFile?.type.startsWith("image/") ? (
+                            <img src={formData.typeCertDocument as string} alt={`${meta.certLabel} preview`} className="w-full h-full object-contain" />
+                          ) : (
+                            <IconFileText className="w-9 h-9 text-brand-400" />
+                          )}
+                        </div>
+                        <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
+                          {formData.typeCertFile?.name || "document.pdf"}
+                        </div>
+                      </div>
                     ) : (
-                      <>
-                        Check this if your warehouse uses the same address and ownership type. Warehouse fields will auto-fill and stay in sync with this section.
-                      </>
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <IconFileText className="w-7 h-7 text-slate-300 mb-1.5" />
+                        <span className="text-xs text-slate-400">Drag & drop or browse</span>
+                      </div>
+                    )}
+                    <input id="typeCertUpload" type="file" accept="application/pdf,image/*,.doc,.docx" onChange={handleTypeCertChange} className="hidden" />
+                    <div className="mt-2.5 flex items-center gap-2">
+                      <label htmlFor="typeCertUpload" className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors duration-200">
+                        Browse
+                      </label>
+                      {formData.typeCertDocument && (
+                        <button type="button" onClick={handleRemoveTypeCert} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200">
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    {typeCertError && <div className="mt-2 text-xs text-red-500 font-medium text-center">{typeCertError}</div>}
+                    {errors.typeCertDocument && (
+                      <p className="mt-1.5 text-xs font-semibold text-red-500 text-center" role="alert">{errors.typeCertDocument}</p>
                     )}
                   </div>
                 </div>
-              </label>
+              );
+            })()}
             </div>
           </div>
-        </section>
+        </AccordionSection>
 
-      {/* ── Account Security ───────────────────────────────────────────
-          Login password for the vendor's account. Required before
-          submission. Admin approval later generates a temporary
-          password and emails it (overriding this) — until then this
-          is the working credential. */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            Account Security{' '}
-            <span className="text-red-500 text-lg" aria-hidden="true">*</span>
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Set a login password for your vendor account. You&apos;ll receive a new temporary password once your application is approved.
-          </p>
-        </div>
-        <div className="px-6 py-6">
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700 mb-1.5"
-          >
-            Password <span className="text-red-500" aria-hidden="true">*</span>
-          </label>
-          <input
-            id="password"
-            type="password"
-            name="password"
-            autoComplete="new-password"
-            value={formData.password}
-            onChange={(e) => handleInputChange('password', e.target.value)}
-            onBlur={() => handleBlur('password')}
-            placeholder="At least 8 characters"
-            className={`w-full h-11 rounded-md border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
-              errors.password && touched.password
-                ? 'border-red-400 bg-red-50/40 focus-visible:border-red-500'
-                : 'border-slate-300 bg-white focus-visible:border-brand-500'
-            }`}
-            aria-invalid={!!(errors.password && touched.password)}
-            aria-describedby={errors.password && touched.password ? 'password-error' : undefined}
-          />
-          {errors.password && touched.password && (
-            <p
-              id="password-error"
-              className="text-red-500 text-sm mt-2"
-              role="alert"
-            >
-              {errors.password}
-            </p>
-          )}
-        </div>
-      </section>
+      </div>{/* end accordion sections */}
 
-      {/* Navigation */}
-      <div className="flex justify-end pt-4">
+      {/* ── Footer Navigation ─────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pt-5 mt-5 border-t border-slate-100">
+        <p className="text-xs text-slate-400 hidden sm:block">
+          All sections must be completed before proceeding.
+        </p>
         <Button
           onClick={handleNext}
-          className="inline-flex items-center gap-2 h-11 px-6 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+          className="ml-auto inline-flex items-center gap-2 h-11 px-7 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 active:bg-brand-700 transition-colors shadow-sm shadow-brand-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
         >
-          Save & Continue
+          Save &amp; Continue
           <ArrowRight className="w-4 h-4" aria-hidden="true" />
         </Button>
       </div>
+
     </div>
   );
 }

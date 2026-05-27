@@ -697,6 +697,14 @@ const registerVendor = async (req, res) => {
             name: String(c.name).trim(),
             issuedBy: null,
             description: c.description ? String(c.description).trim() : null,
+            // The form collects an expiry date AND a certificate file for
+            // each custom cert (same UI as catalog rows). Both live in the
+            // shared maps keyed by the custom cert's own id; pull them out
+            // here so they actually persist to the row.
+            expiryDate: parsedCertificationExpiryDates?.[c.id]
+              ? new Date(parsedCertificationExpiryDates[c.id])
+              : null,
+            documentUrl: certificationFileUrls[c.id] || null,
             isCustom: true,
           }))
       : [];
@@ -1212,6 +1220,72 @@ const updateVendorById = async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
+    // ── Optional password reset by admin ─────────────────────────────
+    // The edit form lets the admin replace the vendor's password from
+    // Step 1 (Account Security). Empty value = keep the current bcrypt
+    // hash; non-empty = bcrypt the new value and overwrite. We hash
+    // upfront so the value flows into `vendorUpdateData` below the same
+    // way every other column does. Stripped from `updateData` so the
+    // raw plaintext never accidentally lands anywhere downstream.
+    let adminPasswordHash = null;
+    if (updateData.password && typeof updateData.password === 'string' && updateData.password.length >= 8) {
+      adminPasswordHash = await bcrypt.hash(updateData.password, 12);
+    }
+    delete updateData.password;
+
+    // ── Admin re-uploads of Step 1 files ──────────────────────────────
+    // Mirror what registerVendor does for logo / GST / PAN / type cert.
+    // Previously updateVendorById parsed these via multer but ignored
+    // them — admin uploads silently disappeared. Now: new logo overwrites
+    // `companyLogo`; new GST / PAN / type cert documents replace the
+    // existing VendorDocument row of the same type. Missing fields leave
+    // the existing doc/URL untouched.
+    let adminLogoUrl = null;
+    if (req.files?.logo?.[0]) {
+      const logoResult = await uploadFiles([req.files.logo[0]], 'vendor-logos');
+      adminLogoUrl = logoResult[0].cloudinaryUrl;
+    }
+
+    const replaceVendorDoc = async (uploadField, docType, folder, displayName) => {
+      if (!req.files?.[uploadField]?.[0]) return;
+      const result = await uploadFiles([req.files[uploadField][0]], folder);
+      await prisma.vendorDocument.deleteMany({
+        where: { vendorId, type: docType },
+      });
+      await prisma.vendorDocument.create({
+        data: {
+          vendorId,
+          type: docType,
+          name: displayName,
+          documentUrl: result[0].cloudinaryUrl,
+        },
+      });
+    };
+
+    // Type-specific cert label depends on the (possibly just-updated)
+    // businessType from the request body — falls back to existing.
+    const businessTypeForCertLabel =
+      updateData.businessType || existingVendor.businessType || '';
+    const certLabelByType = {
+      'proprietorship': 'IEC Certificate',
+      'pvt-ltd': 'CIN Certificate',
+      'partnership-firm': 'Partnership Deed Certificate',
+      'llp': 'LLPIN Certificate',
+    };
+    const typeCertDisplayName =
+      certLabelByType[businessTypeForCertLabel] || 'Business Registration Certificate';
+
+    try {
+      await replaceVendorDoc('gstDocument', 'GST_CERTIFICATE', 'vendor-documents/gst', 'GST Certificate');
+      await replaceVendorDoc('panCardFile', 'PAN_CARD', 'vendor-documents/pan', 'PAN Card');
+      await replaceVendorDoc('typeCertFile', 'COMPANY_REGISTRATION', 'vendor-documents/business-cert', typeCertDisplayName);
+    } catch (uploadError) {
+      console.error('Admin document upload error:', uploadError);
+      return res.status(500).json({
+        error: 'Failed to upload documents: ' + uploadError.message,
+      });
+    }
+
     // Handle file uploads for certificates
     let certificationFileUrls = {};
     if (req.files?.certificationFiles) {
@@ -1363,6 +1437,17 @@ const updateVendorById = async (req, res) => {
 
     // Prepare update data - map form fields to database fields
     const vendorUpdateData = {
+      // Conditionally include the new password hash. Spreading an empty
+      // object when the admin didn't supply a new password leaves the
+      // existing column untouched — Prisma only writes the keys present
+      // in the data object, so the bcrypt hash is preserved across edits
+      // that don't touch Account Security.
+      ...(adminPasswordHash ? { password: adminPasswordHash } : {}),
+
+      // Replace the companyLogo URL only when the admin uploaded a new
+      // file. Without this, an empty edit would leave the column alone.
+      ...(adminLogoUrl ? { companyLogo: adminLogoUrl } : {}),
+
       // Company Details
       companyName: updateData.companyName,
       businessType: updateData.businessType || null,
@@ -1672,11 +1757,54 @@ const updateVendorById = async (req, res) => {
       await prisma.vendorDocument.createMany({ data: newDocs });
     }
 
-    // Update vendor
-    const updatedVendor = await prisma.vendor.update({
-      where: { id: vendorId },
-      data: vendorUpdateData
-    });
+    // ── Trim payload to only changed fields ──────────────────────────
+    // MongoDB Atlas caps aggregation pipelines at 50 stages. The Vendor
+    // model has ~70 columns the admin form writes; sending all of them
+    // every edit (most unchanged) blew past that limit with
+    // `Pipeline length greater than 50 not supported`. Prisma treats
+    // `undefined` keys as "skip this column", so we compare each key
+    // against `existingVendor` and drop the ones that already match.
+    // Result: a typical edit sends 3-5 keys instead of 70.
+    const valuesEqual = (a, b) => {
+      const aEmpty = a === null || a === undefined || a === '';
+      const bEmpty = b === null || b === undefined || b === '';
+      if (aEmpty && bEmpty) return true;
+      if (aEmpty !== bEmpty) return false;
+      if (typeof a === 'object' && typeof b === 'object') {
+        // JSON-stringify works for our shapes (arrays, plain objects, JSON
+        // columns) and is fast enough for the ~70-key budget here.
+        try {
+          return JSON.stringify(a) === JSON.stringify(b);
+        } catch {
+          return false;
+        }
+      }
+      return a === b;
+    };
+
+    const trimmedUpdate = {};
+    for (const [key, value] of Object.entries(vendorUpdateData)) {
+      if (value === undefined) continue;
+      // Always include the password hash when present — it only lands in
+      // vendorUpdateData when the admin explicitly typed a new password,
+      // and comparing bcrypt hashes char-by-char would never match anyway.
+      if (key === 'password') {
+        trimmedUpdate[key] = value;
+        continue;
+      }
+      if (valuesEqual(value, existingVendor[key])) continue;
+      trimmedUpdate[key] = value;
+    }
+
+    // Skip the round-trip entirely when nothing changed (admin clicked
+    // Save without editing anything). Prisma would still issue an empty
+    // update, which works but is wasted I/O.
+    const updatedVendor = Object.keys(trimmedUpdate).length > 0
+      ? await prisma.vendor.update({
+          where: { id: vendorId },
+          data: trimmedUpdate,
+        })
+      : existingVendor;
 
     // Handle certifications update
     if (parsedSelectedCertifications && Array.isArray(parsedSelectedCertifications)) {
@@ -1710,14 +1838,19 @@ const updateVendorById = async (req, res) => {
         Object.entries(CERT_NAME_MAP).map(([chipId, friendlyName]) => [friendlyName, chipId])
       );
 
-      // Create a map of existing cert URLs keyed by the chip id the
-      // update path will use to look them up below.
+      // Create a map of existing cert URLs keyed by the lookup id the
+      // update path will use below — chip id for catalog certs, raw
+      // VendorCertification id for custom certs (the form sends back the
+      // same id so the lookup matches).
       const existingCertUrls = {};
       existingCerts.forEach(cert => {
-        if (cert.documentUrl) {
-          const chipId = NAME_TO_CHIP[cert.name];
-          if (chipId) existingCertUrls[chipId] = cert.documentUrl;
+        if (!cert.documentUrl) return;
+        if (cert.isCustom) {
+          existingCertUrls[cert.id] = cert.documentUrl;
+          return;
         }
+        const chipId = NAME_TO_CHIP[cert.name];
+        if (chipId) existingCertUrls[chipId] = cert.documentUrl;
       });
 
       // Delete existing certifications
@@ -1749,6 +1882,16 @@ const updateVendorById = async (req, res) => {
               name: String(c.name).trim(),
               issuedBy: null,
               description: c.description ? String(c.description).trim() : null,
+              // Mirror registerVendor — keep expiry + documentUrl for
+              // custom certs too. The form keys them by the custom cert's
+              // own id in the shared certificationExpiryDates +
+              // certificationFiles maps. Falls back to the existing URL
+              // (keyed by id in existingCertUrls below) when admin didn't
+              // re-upload during edit.
+              expiryDate: parsedCertificationExpiryDates?.[c.id]
+                ? new Date(parsedCertificationExpiryDates[c.id])
+                : null,
+              documentUrl: certificationFileUrls[c.id] || existingCertUrls[c.id] || null,
               isCustom: true,
             }))
         : [];

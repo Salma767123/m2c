@@ -316,351 +316,501 @@ export default function WarehouseDetails({
     });
   }, []);
 
+  // ── Accordion Section State ────────────────────────────────────────
+  type SectionKey = 'ownership' | 'address' | 'photos' | 'map';
+  const [activeSection, setActiveSection] = useState<SectionKey>('ownership');
+
+  // Maps error field keys → their parent accordion section
+  const FIELD_SECTION_MAP: Record<string, SectionKey> = {
+    ownershipType: 'ownership',
+    warehousingCapacity: 'ownership',
+    warehouseAddress: 'address',
+    warehouseCity: 'address',
+    warehouseState: 'address',
+    warehouseZip: 'address',
+    warehouseCountry: 'address',
+    mapLink: 'map',
+  };
+  // factory image slot errors are handled separately in the photos section
+
+  const getSectionStatus = (section: SectionKey): 'complete' | 'partial' | 'empty' => {
+    if (section === 'ownership') {
+      if (formData.ownershipType) return 'complete';
+      return 'empty';
+    }
+    if (section === 'address') {
+      if (isLinked) {
+        return formData.warehouseAddress && formData.warehouseCity ? 'complete' : 'partial';
+      }
+      const required = [formData.warehouseAddress, formData.warehouseCity, formData.warehouseState, formData.warehouseZip, formData.warehouseCountry];
+      const filled = required.filter(Boolean).length;
+      if (filled === required.length) return 'complete';
+      if (filled > 0) return 'partial';
+      return 'empty';
+    }
+    if (section === 'photos') {
+      const requiredSlots = FACTORY_IMAGE_SLOTS.filter((s) => s.required);
+      const optionalSlots = FACTORY_IMAGE_SLOTS.filter((s) => !s.required);
+      const requiredDone = requiredSlots.every((s) => !!formData.factoryImages[s.id]);
+      const anyFilled = FACTORY_IMAGE_SLOTS.some((s) => !!formData.factoryImages[s.id]);
+      if (requiredDone && optionalSlots.every((s) => !!formData.factoryImages[s.id])) return 'complete';
+      if (requiredDone) return 'complete';
+      if (anyFilled) return 'partial';
+      return 'empty';
+    }
+    if (section === 'map') {
+      if (formData.mapLink) return 'complete';
+      return 'empty';
+    }
+    return 'empty';
+  };
+
+  const hasSectionErrors = (section: SectionKey): boolean => {
+    const directErrors = Object.keys(errors).filter(
+      (k) => FIELD_SECTION_MAP[k] === section && errors[k] && touched[k]
+    );
+    if (directErrors.length > 0) return true;
+    if (section === 'photos') {
+      return FACTORY_IMAGE_SLOTS.some((s) => {
+        const k = `factoryImage:${s.id}`;
+        return errors[k] && touched[k];
+      });
+    }
+    return false;
+  };
+
+  // AccordionSection — inline component (same pattern as Step 1)
+  const AccordionSection = ({
+    id,
+    icon,
+    title,
+    subtitle,
+    children,
+  }: {
+    id: SectionKey;
+    icon: React.ReactNode;
+    title: string;
+    subtitle: string;
+    children: React.ReactNode;
+  }) => {
+    const isOpen = activeSection === id;
+    const status = getSectionStatus(id);
+    const hasErrors = hasSectionErrors(id);
+
+    return (
+      <div
+        className={`rounded-xl border transition-all duration-300 ${!isOpen ? 'overflow-hidden' : ''} ${
+          isOpen
+            ? 'border-brand-300 shadow-md shadow-brand-500/8'
+            : hasErrors
+            ? 'border-red-300 bg-red-50/30'
+            : 'border-slate-200 hover:border-slate-300'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => setActiveSection(isOpen ? id : id)}
+          className={`w-full rounded-t-xl flex items-center gap-4 px-5 py-4 text-left transition-colors duration-200 ${
+            isOpen ? 'bg-gradient-to-r from-brand-50/80 to-white' : 'bg-white hover:bg-slate-50/60'
+          }`}
+          aria-expanded={isOpen}
+          aria-controls={`wh-section-${id}`}
+        >
+          <div
+            className={`flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-200 ${
+              isOpen
+                ? 'bg-brand-500 text-white'
+                : hasErrors
+                ? 'bg-red-100 text-red-600'
+                : status === 'complete'
+                ? 'bg-emerald-100 text-emerald-600'
+                : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {icon}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <p className={`font-semibold text-sm leading-tight ${isOpen ? 'text-brand-700' : 'text-slate-800'}`}>
+              {title}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>
+          </div>
+
+          <div className="flex-shrink-0 flex items-center gap-2">
+            {hasErrors && !isOpen && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Fix required
+              </span>
+            )}
+            {!hasErrors && status === 'complete' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Done
+              </span>
+            )}
+            {!hasErrors && status === 'partial' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                In progress
+              </span>
+            )}
+            <svg
+              className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+
+        <div
+          id={`wh-section-${id}`}
+          className={`transition-all duration-300 ${
+            isOpen ? 'max-h-[9999px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none overflow-hidden'
+          }`}
+          aria-hidden={!isOpen}
+        >
+          <div className="px-5 pb-6 pt-2 space-y-5 border-t border-slate-100">
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans">
-      {/* Header — h2 not h1, page h1 lives in VendorPanel
-         (web-design-guidelines: single h1 per page) */}
-      <div className="flex items-center gap-3 pb-2">
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-50 text-brand-600 shrink-0">
+    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6 sm:py-6 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      {/* ── Page Header ─────────────────────────────────────────────────── */}
+      <div className="flex items-start gap-4 pb-5 border-b border-slate-100 mb-5">
+        <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-brand-500 text-white shrink-0 shadow-sm">
           <Warehouse className="w-5 h-5" aria-hidden="true" />
         </div>
-        <div className="min-w-0">
-          <h2
-            className="text-headline-md text-gray-900 leading-tight"
-            style={{ textWrap: 'balance' as any }}
-          >
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-bold text-slate-900 leading-tight">
             Warehouse Details
           </h2>
-          <p className="text-sm text-gray-600 mt-0.5">
-            Please provide the details of your warehouse facility.
+          <p className="text-sm text-slate-500 mt-0.5">
+            Provide details of your warehouse facility, photos, and location.
           </p>
+        </div>
+        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-600 shrink-0">
+          <span className="w-2 h-2 rounded-full bg-brand-500 animate-pulse" />
+          Step 2 of 8
         </div>
       </div>
 
-      {/* ── Inheritance banner ───────────────────────────────────────
-          Surfaces when the user enabled "Same as warehouse address" on
-          the Company Details step. Address + ownership flow in live from
-          there; the user has to go back to edit. */}
+      {/* ── Linked-address banner (when Same as warehouse is ON) ─────────── */}
       {isLinked && (
         <div
           role="status"
           aria-live="polite"
-          className="rounded-lg border border-brand-500/30 bg-brand-50/50 p-6 mb-4"
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-brand-300/40 bg-brand-50/60 px-5 py-4 mb-4"
         >
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <svg
-                className="h-5 w-5 shrink-0 text-brand-600 mt-0.5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M9.243 3.03a1 1 0 01.727 1.213L9.53 6h2.94l.56-2.243a1 1 0 111.94.486L14.53 6H17a1 1 0 110 2h-2.97l-1 4H15a1 1 0 110 2h-2.47l-.56 2.242a1 1 0 11-1.94-.485L10.47 14H7.53l-.56 2.242a1 1 0 11-1.94-.485L5.47 14H3a1 1 0 110-2h2.97l1-4H5a1 1 0 110-2h2.47l.56-2.243a1 1 0 011.213-.727zM7.97 8l-1 4h2.94l1-4H7.97z"
-                  clipRule="evenodd"
-                />
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M9.243 3.03a1 1 0 01.727 1.213L9.53 6h2.94l.56-2.243a1 1 0 111.94.486L14.53 6H17a1 1 0 110 2h-2.97l-1 4H15a1 1 0 110 2h-2.47l-.56 2.242a1 1 0 11-1.94-.485L10.47 14H7.53l-.56 2.242a1 1 0 11-1.94-.485L5.47 14H3a1 1 0 110-2h2.97l1-4H5a1 1 0 110-2h2.47l.56-2.243a1 1 0 011.213-.727zM7.97 8l-1 4h2.94l1-4H7.97z" clipRule="evenodd" />
               </svg>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-brand-800">
-                  Inherited from Company Details
-                </p>
-                <p className="text-sm text-brand-700 mt-0.5 leading-relaxed">
-                  Ownership type and address are linked to the previous step. Edits
-                  there update these fields in real time. To enter different details,
-                  go back and uncheck <em>&ldquo;Same as warehouse address&rdquo;</em>.
-                </p>
-              </div>
             </div>
-            <button
-              type="button"
-              onClick={onPrev}
-              className="shrink-0 w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 sm:px-3 sm:py-1.5 text-sm font-medium text-brand-700 bg-white border border-brand-500/40 rounded-md hover:bg-brand-50 hover:border-brand-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 shadow-sm"
-            >
-              ← Edit on Company Details
-            </button>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-brand-800">Address inherited from Company Details</p>
+              <p className="text-xs text-brand-700 mt-0.5 leading-relaxed">
+                Ownership and address are synced from Step 1. To enter different details, go back and uncheck{' '}
+                <em>&ldquo;Same as warehouse address&rdquo;</em>.
+              </p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={onPrev}
+            className="shrink-0 w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-brand-700 bg-white border border-brand-400/40 rounded-lg hover:bg-brand-50 hover:border-brand-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 shadow-sm"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+            Edit on Company Details
+          </button>
         </div>
       )}
 
-      {/* Ownership Type */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <ShieldUser className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Facility Ownership{' '}
-            <span className="text-red-500 text-lg" aria-hidden="true">*</span>
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Select the type of ownership for your warehouse facility.
-          </p>
-        </div>
-        <div className="px-6 py-6">
-          <div
-            className="flex flex-wrap gap-2.5"
-            role="radiogroup"
-            aria-label="Facility ownership"
-            aria-disabled={isLinked}
-            data-field="ownershipType"
-          >
-            {ownershipTypes.map((type) => {
-              const isSelected = formData.ownershipType === type.id;
-              return (
+      {/* ── Accordion Sections ──────────────────────────────────────────── */}
+      <div className="space-y-3">
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 1 — Facility Ownership & Capacity
+            ═══════════════════════════════════════════════════════════════ */}
+        <AccordionSection
+          id="ownership"
+          icon={<ShieldUser className="w-4 h-4" aria-hidden="true" />}
+          title="Facility Ownership & Capacity"
+          subtitle="How you hold the warehouse and its total floor area"
+        >
+          {/* Ownership Type Chips */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">
+              Ownership Type{' '}
+              {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
+            </label>
+            <p className="text-xs text-slate-500 mb-3">
+              Select the type of ownership for your warehouse facility.
+            </p>
+            <div
+              className="flex flex-wrap gap-2.5"
+              role="radiogroup"
+              aria-label="Facility ownership"
+              aria-disabled={isLinked}
+              data-field="ownershipType"
+            >
+              {ownershipTypes.map((type) => (
                 <ToggleButton
                   key={type.id}
-                  selected={isSelected}
+                  selected={formData.ownershipType === type.id}
                   invalid={!isLinked && !!(errors.ownershipType && touched.ownershipType)}
                   disabled={isLinked}
                   onClick={() => handleInputChange('ownershipType', type.id)}
                 >
-                  {type.label}
+                  <span className="font-semibold">{type.label}</span>
+                  <span className="hidden sm:inline text-xs opacity-70 ml-1">— {type.description}</span>
                 </ToggleButton>
-              );
-            })}
+              ))}
+            </div>
+            {errors.ownershipType && touched.ownershipType && !isLinked && (
+              <p className="text-red-600 text-xs mt-2 font-medium" role="alert">
+                {errors.ownershipType}
+              </p>
+            )}
           </div>
-          {errors.ownershipType && touched.ownershipType && !isLinked && (
-            <p className="text-red-600 text-sm mt-2 font-medium" role="alert">
-              {errors.ownershipType}
-            </p>
-          )}
-        </div>
 
-        <div className="px-6 py-6 border-t border-slate-100">
-          <label htmlFor="warehousingCapacity" className="block text-base font-medium text-gray-700 mb-2">
-            Warehousing Capacity (sq ft)
-          </label>
-          <input
-            id="warehousingCapacity"
-            type="number"
-            name="warehousingCapacity"
-            value={formData.warehousingCapacity}
-            onChange={(e) => handleInputChange("warehousingCapacity", e.target.value)}
-            onBlur={() => handleBlur("warehousingCapacity")}
-            disabled={isLinked}
-            readOnly={isLinked}
-            aria-readonly={isLinked}
-            className={`w-full text-base font-medium px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-              isLinked
-                ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed'
-                : 'border-slate-200 hover:border-slate-300'
-            }`}
-            placeholder="e.g. 50000"
-          />
-        </div>
-      </section>
+          {/* Warehousing Capacity */}
+          <div className="max-w-xs">
+            <label htmlFor="warehousingCapacity" className="block text-sm font-semibold text-slate-700 mb-1">
+              Warehousing Capacity{' '}
+              <span className="text-slate-400 text-xs font-normal">(sq ft, optional)</span>
+            </label>
+            <div className="relative">
+              <input
+                id="warehousingCapacity"
+                type="number"
+                name="warehousingCapacity"
+                value={formData.warehousingCapacity}
+                onChange={(e) => handleInputChange('warehousingCapacity', e.target.value)}
+                onBlur={() => handleBlur('warehousingCapacity')}
+                disabled={isLinked}
+                readOnly={isLinked}
+                aria-readonly={isLinked}
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  isLinked
+                    ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
+                    : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="e.g. 50000"
+                min="0"
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">sq ft</span>
+            </div>
+          </div>
+        </AccordionSection>
 
-      {/* Warehouse Address */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Warehouse Address
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Where your facility is physically located.
-          </p>
-          {/* The "address copied" banner moved to the top of the page —
-             see the `isLinked` banner above the Ownership section. */}
-        </div>
-        <div className="px-6 py-6 space-y-5">
-          {/* Address Line 1 — required */}
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 2 — Warehouse Address
+            ═══════════════════════════════════════════════════════════════ */}
+        <AccordionSection
+          id="address"
+          icon={<MapPin className="w-4 h-4" aria-hidden="true" />}
+          title="Warehouse Address"
+          subtitle="Physical location of your warehouse facility"
+        >
+          {/* Address Line 1 */}
           <div>
-            <label htmlFor="warehouseAddress" className="block text-base font-medium text-gray-700 mb-2">
-              Address Line 1 <span className="text-red-500 text-lg" aria-hidden="true">*</span>
+            <label htmlFor="warehouseAddress" className="block text-sm font-semibold text-slate-700 mb-1">
+              Address Line 1{' '}
+              {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
             </label>
             <input
               id="warehouseAddress"
               type="text"
               name="warehouseAddress"
               value={formData.warehouseAddress}
-              onChange={(e) => handleInputChange("warehouseAddress", e.target.value)}
-              onBlur={() => handleBlur("warehouseAddress")}
+              onChange={(e) => handleInputChange('warehouseAddress', e.target.value)}
+              onBlur={() => handleBlur('warehouseAddress')}
               disabled={isLinked}
               readOnly={isLinked}
               aria-readonly={isLinked}
               autoComplete="address-line1"
-              className={`w-full text-base font-medium px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
+              className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
                 isLinked
-                  ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed'
+                  ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
                   : errors.warehouseAddress && touched.warehouseAddress
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-slate-200 hover:border-slate-300'
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-slate-300 hover:border-slate-400'
               }`}
               placeholder="House / building / street"
             />
             {errors.warehouseAddress && touched.warehouseAddress && !isLinked && (
-              <p className="text-red-600 text-sm mt-1 font-medium" role="alert">
-                {errors.warehouseAddress}
-              </p>
+              <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseAddress}</p>
             )}
           </div>
 
-          {/* Address Line 2 — optional */}
-          <div>
-            <label htmlFor="warehouseAddressLine2" className="block text-base font-medium text-gray-700 mb-2">
-              Address Line 2 <span className="text-gray-400 text-sm font-normal">(optional)</span>
-            </label>
-            <input
-              id="warehouseAddressLine2"
-              type="text"
-              name="warehouseAddressLine2"
-              value={formData.warehouseAddressLine2}
-              onChange={(e) => handleInputChange("warehouseAddressLine2", e.target.value)}
-              disabled={isLinked}
-              readOnly={isLinked}
-              aria-readonly={isLinked}
-              autoComplete="address-line2"
-              className={`w-full text-base font-medium px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                isLinked
-                  ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
-              placeholder="Apartment, suite, floor"
-            />
+          {/* Address Line 2 + 3 — 2-col grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="warehouseAddressLine2" className="block text-sm font-semibold text-slate-700 mb-1">
+                Address Line 2 <span className="text-slate-400 text-xs font-normal">(optional)</span>
+              </label>
+              <input
+                id="warehouseAddressLine2"
+                type="text"
+                name="warehouseAddressLine2"
+                value={formData.warehouseAddressLine2}
+                onChange={(e) => handleInputChange('warehouseAddressLine2', e.target.value)}
+                disabled={isLinked}
+                readOnly={isLinked}
+                aria-readonly={isLinked}
+                autoComplete="address-line2"
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="Apartment, suite, floor"
+              />
+            </div>
+            <div>
+              <label htmlFor="warehouseAddressLine3" className="block text-sm font-semibold text-slate-700 mb-1">
+                Address Line 3 <span className="text-slate-400 text-xs font-normal">(optional)</span>
+              </label>
+              <input
+                id="warehouseAddressLine3"
+                type="text"
+                name="warehouseAddressLine3"
+                value={formData.warehouseAddressLine3}
+                onChange={(e) => handleInputChange('warehouseAddressLine3', e.target.value)}
+                disabled={isLinked}
+                readOnly={isLinked}
+                aria-readonly={isLinked}
+                autoComplete="address-line3"
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="Building name, block, complex"
+              />
+            </div>
           </div>
 
-          {/* Address Line 3 — optional */}
+          {/* Landmark */}
           <div>
-            <label htmlFor="warehouseAddressLine3" className="block text-base font-medium text-gray-700 mb-2">
-              Address Line 3 <span className="text-gray-400 text-sm font-normal">(optional)</span>
-            </label>
-            <input
-              id="warehouseAddressLine3"
-              type="text"
-              name="warehouseAddressLine3"
-              value={formData.warehouseAddressLine3}
-              onChange={(e) => handleInputChange("warehouseAddressLine3", e.target.value)}
-              disabled={isLinked}
-              readOnly={isLinked}
-              aria-readonly={isLinked}
-              autoComplete="address-line3"
-              className={`w-full text-base font-medium px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                isLinked
-                  ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
-              placeholder="Building name, block, complex"
-            />
-          </div>
-
-          {/* Landmark — optional */}
-          <div>
-            <label htmlFor="warehouseLandmark" className="block text-base font-medium text-gray-700 mb-2">
-              Landmark <span className="text-gray-400 text-sm font-normal">(optional)</span>
+            <label htmlFor="warehouseLandmark" className="block text-sm font-semibold text-slate-700 mb-1">
+              Landmark <span className="text-slate-400 text-xs font-normal">(optional)</span>
             </label>
             <input
               id="warehouseLandmark"
               type="text"
               name="warehouseLandmark"
               value={formData.warehouseLandmark}
-              onChange={(e) => handleInputChange("warehouseLandmark", e.target.value)}
+              onChange={(e) => handleInputChange('warehouseLandmark', e.target.value)}
               disabled={isLinked}
               readOnly={isLinked}
               aria-readonly={isLinked}
               autoComplete="off"
-              className={`w-full text-base font-medium px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                isLinked
-                  ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed'
-                  : 'border-slate-200 hover:border-slate-300'
+              className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed' : 'border-slate-300 hover:border-slate-400'
               }`}
               placeholder="e.g. Near Central Mall, opposite Park View School"
             />
           </div>
 
+          {/* City + State + ZIP — 3-col */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label htmlFor="warehouseCity" className="block text-base font-medium text-gray-700 mb-2">
-                City <span className="text-red-500 text-lg" aria-hidden="true">*</span>
+              <label htmlFor="warehouseCity" className="block text-sm font-semibold text-slate-700 mb-1">
+                City {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
               </label>
               <input
                 id="warehouseCity"
                 type="text"
                 name="warehouseCity"
                 value={formData.warehouseCity}
-                onChange={(e) => handleInputChange("warehouseCity", e.target.value)}
-                onBlur={() => handleBlur("warehouseCity")}
+                onChange={(e) => handleInputChange('warehouseCity', e.target.value)}
+                onBlur={() => handleBlur('warehouseCity')}
                 disabled={isLinked}
                 readOnly={isLinked}
                 aria-readonly={isLinked}
                 autoComplete="address-level2"
-                className={`w-full text-base font-medium px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                  isLinked
-                    ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed'
-                    : errors.warehouseCity && touched.warehouseCity
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-slate-200 hover:border-slate-300'
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
+                    : errors.warehouseCity && touched.warehouseCity ? 'border-red-500 bg-red-50'
+                    : 'border-slate-300 hover:border-slate-400'
                 }`}
                 placeholder="City"
               />
               {errors.warehouseCity && touched.warehouseCity && !isLinked && (
-                <p className="text-red-600 text-sm mt-1 font-medium" role="alert">{errors.warehouseCity}</p>
+                <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseCity}</p>
               )}
             </div>
 
             <div>
-              <label htmlFor="warehouseState" className="block text-base font-medium text-gray-700 mb-2">
-                State/Province <span className="text-red-500 text-lg" aria-hidden="true">*</span>
+              <label htmlFor="warehouseState" className="block text-sm font-semibold text-slate-700 mb-1">
+                State / Province {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
               </label>
               <input
                 id="warehouseState"
                 type="text"
                 name="warehouseState"
                 value={formData.warehouseState}
-                onChange={(e) => handleInputChange("warehouseState", e.target.value)}
-                onBlur={() => handleBlur("warehouseState")}
+                onChange={(e) => handleInputChange('warehouseState', e.target.value)}
+                onBlur={() => handleBlur('warehouseState')}
                 disabled={isLinked}
                 readOnly={isLinked}
                 aria-readonly={isLinked}
                 autoComplete="address-level1"
-                className={`w-full text-base font-medium px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                  isLinked
-                    ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed'
-                    : errors.warehouseState && touched.warehouseState
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-slate-200 hover:border-slate-300'
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
+                    : errors.warehouseState && touched.warehouseState ? 'border-red-500 bg-red-50'
+                    : 'border-slate-300 hover:border-slate-400'
                 }`}
                 placeholder="State"
               />
               {errors.warehouseState && touched.warehouseState && !isLinked && (
-                <p className="text-red-600 text-sm mt-1 font-medium" role="alert">{errors.warehouseState}</p>
+                <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseState}</p>
               )}
             </div>
 
             <div>
-              <label htmlFor="warehouseZip" className="block text-base font-medium text-gray-700 mb-2">
-                ZIP/Postal Code <span className="text-red-500 text-lg" aria-hidden="true">*</span>
+              <label htmlFor="warehouseZip" className="block text-sm font-semibold text-slate-700 mb-1">
+                ZIP / Postal Code {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
               </label>
               <input
                 id="warehouseZip"
                 type="text"
                 name="warehouseZip"
                 value={formData.warehouseZip}
-                onChange={(e) => handleInputChange("warehouseZip", e.target.value)}
-                onBlur={() => handleBlur("warehouseZip")}
+                onChange={(e) => handleInputChange('warehouseZip', e.target.value)}
+                onBlur={() => handleBlur('warehouseZip')}
                 disabled={isLinked}
                 readOnly={isLinked}
                 aria-readonly={isLinked}
                 autoComplete="postal-code"
-                className={`w-full text-base font-medium px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                  isLinked
-                    ? 'bg-slate-50 text-slate-700 border-slate-200 cursor-not-allowed'
-                    : errors.warehouseZip && touched.warehouseZip
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-slate-200 hover:border-slate-300'
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
+                    : errors.warehouseZip && touched.warehouseZip ? 'border-red-500 bg-red-50'
+                    : 'border-slate-300 hover:border-slate-400'
                 }`}
                 placeholder="ZIP Code"
               />
               {errors.warehouseZip && touched.warehouseZip && !isLinked && (
-                <p className="text-red-600 text-sm mt-1 font-medium" role="alert">{errors.warehouseZip}</p>
+                <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseZip}</p>
               )}
             </div>
           </div>
+
+          {/* Country */}
           <div>
-            <label
-              htmlFor="warehouse-country-select"
-              className="block text-base font-medium text-gray-700 mb-2"
-            >
-              Country <span className="text-red-500 text-lg" aria-hidden="true">*</span>
+            <label htmlFor="warehouse-country-select" className="block text-sm font-semibold text-slate-700 mb-1">
+              Country {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
             </label>
             <div data-field="warehouseCountry">
               <CountrySelect
@@ -679,73 +829,72 @@ export default function WarehouseDetails({
               />
             </div>
             {errors.warehouseCountry && touched.warehouseCountry && !isLinked && (
-              <p
-                id="warehouse-country-error"
-                className="text-red-600 text-sm mt-1 font-medium"
-                role="alert"
-              >
+              <p id="warehouse-country-error" className="text-red-600 text-xs mt-1 font-medium" role="alert">
                 {errors.warehouseCountry}
               </p>
             )}
           </div>
-        </div>
-      </section>
+        </AccordionSection>
 
-      {/* Factory Images */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Camera className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Factory Images
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Photos of your facility — helps buyers verify the operation.
-          </p>
-        </div>
-        <div className="px-6 py-6 space-y-4">
-          <p className="text-xs text-gray-500">
-            PNG, JPG, WEBP, or GIF · up to {FACTORY_IMAGE_MAX_LABEL} each.{' '}
-            <span className="font-medium text-gray-700">Required:</span> Factory Name Board, Front View.
-          </p>
-          <div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-            role="group"
-            aria-label="Factory images"
-          >
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 3 — Factory / Facility Photos
+            ═══════════════════════════════════════════════════════════════ */}
+        <AccordionSection
+          id="photos"
+          icon={<Camera className="w-4 h-4" aria-hidden="true" />}
+          title="Factory & Facility Photos"
+          subtitle="Upload named facility photos — Name Board and Front View are required"
+        >
+          <div className="flex flex-col">
+            <p className="text-xs text-slate-500 mb-2">
+              PNG, JPG, WEBP, or GIF • up to {FACTORY_IMAGE_MAX_LABEL} each.{' '}
+              <span className="font-semibold text-slate-700">Required:</span> Factory Name Board, Front View.
+            </p>
+
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+              role="group"
+              aria-label="Factory images"
+            >
             {FACTORY_IMAGE_SLOTS.map((slot) => {
               const value = formData.factoryImages[slot.id];
               const slotErrKey = `factoryImage:${slot.id}`;
               const slotError = errors[slotErrKey] && touched[slotErrKey] ? errors[slotErrKey] : '';
               const inputId = `factory-img-${slot.id}`;
+
               return (
                 <div
                   key={slot.id}
                   data-field={slotErrKey}
-                  className="flex flex-col rounded-lg border border-gray-200 bg-gray-50/40 p-3 transition-colors hover:bg-gray-50"
+                  className={`flex flex-col rounded-xl border p-3 transition-all duration-200 ${
+                    slotError
+                      ? 'border-red-300 bg-red-50/30'
+                      : value
+                      ? 'border-brand-300/40 bg-brand-50/10'
+                      : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 leading-tight">
-                        {slot.label}
-                        {slot.required ? (
-                          <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
-                        ) : (
-                          <span className="ml-1.5 text-[11px] font-normal text-gray-400">
-                            (optional)
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">{slot.description}</p>
-                    </div>
+                  {/* Slot header */}
+                  <div className="mb-2">
+                    <p className="text-xs font-bold text-slate-800 leading-tight">
+                      {slot.label}
+                      {slot.required ? (
+                        <span className="text-brand-500 ml-0.5" aria-hidden="true">*</span>
+                      ) : (
+                        <span className="ml-1 text-[10px] font-normal text-slate-400">(optional)</span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{slot.description}</p>
                   </div>
 
+                  {/* Upload zone */}
                   <div
-                    className={`relative aspect-[4/3] w-full overflow-hidden rounded-md border-2 border-dashed transition-colors ${
+                    className={`relative aspect-[4/3] w-full overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
                       slotError
-                        ? 'border-red-400 bg-red-50/40'
+                        ? 'border-red-400 bg-red-50/30'
                         : value
-                          ? 'border-brand-500/30 bg-white'
-                          : 'border-gray-300 bg-white hover:border-brand-500/40 hover:bg-brand-50/20'
+                        ? 'border-brand-400/30 bg-white'
+                        : 'border-slate-300 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
                     }`}
                   >
                     {value?.url ? (
@@ -760,19 +909,19 @@ export default function WarehouseDetails({
                           type="button"
                           onClick={() => handleSlotRemove(slot.id)}
                           aria-label={`Remove ${slot.label}`}
-                          className="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/95 text-red-600 shadow-sm hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 transition-colors"
+                          className="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/95 text-red-600 shadow-sm hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 transition-colors"
                         >
-                          <X className="w-4 h-4" aria-hidden="true" />
+                          <X className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       </>
                     ) : (
                       <label
                         htmlFor={inputId}
-                        className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer text-center px-3 focus-within:ring-2 focus-within:ring-brand-500/40 rounded-md"
+                        className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer text-center px-2 focus-within:ring-2 focus-within:ring-brand-500/40 rounded-lg"
                       >
-                        <Upload className="w-6 h-6 text-gray-400" aria-hidden="true" />
-                        <span className="text-xs font-medium text-brand-700">Click to upload</span>
-                        <span className="text-[11px] text-gray-500">or drag &amp; drop</span>
+                        <Upload className="w-5 h-5 text-slate-300" aria-hidden="true" />
+                        <span className="text-[11px] font-semibold text-brand-600">Upload</span>
+                        <span className="text-[10px] text-slate-400">or drag & drop</span>
                       </label>
                     )}
                     <input
@@ -794,84 +943,69 @@ export default function WarehouseDetails({
                     />
                   </div>
 
+                  {/* Filename + replace link */}
                   {value && (
-                    <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-                      <p className="truncate text-gray-700" title={value.name}>
-                        {value.name}
-                      </p>
-                      <label
-                        htmlFor={inputId}
-                        className="shrink-0 cursor-pointer text-brand-700 hover:text-brand-600 font-medium"
-                      >
+                    <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px]">
+                      <p className="truncate text-slate-600" title={value.name}>{value.name}</p>
+                      <label htmlFor={inputId} className="shrink-0 cursor-pointer text-brand-600 hover:text-brand-500 font-semibold">
                         Replace
                       </label>
                     </div>
                   )}
 
                   {slotError && (
-                    <p className="text-red-600 text-xs mt-1 font-medium" role="alert">
-                      {slotError}
-                    </p>
+                    <p className="text-red-600 text-[11px] mt-1 font-medium" role="alert">{slotError}</p>
                   )}
                 </div>
               );
             })}
+            </div>
           </div>
-        </div>
-      </section>
+        </AccordionSection>
 
-      {/* Route Map */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Map className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Location Map{' '}
-            <span className="text-red-500 text-lg" aria-hidden="true">*</span>
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Search your warehouse address or drop a pin — the embed link generates automatically.
-          </p>
-        </div>
-        <div className="px-6 py-6">
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 4 — Location Map
+            ═══════════════════════════════════════════════════════════════ */}
+        <AccordionSection
+          id="map"
+          icon={<Map className="w-4 h-4" aria-hidden="true" />}
+          title="Location Map"
+          subtitle="Search address or drop a pin — Google Maps embed generates automatically"
+        >
           <div data-field-name="mapLink">
             <LocationPicker
               label="Warehouse Location"
               required
               value={formData.mapLink}
               onChange={(link) => {
-                handleInputChange("mapLink", link);
-                // Live-sync to parent so the user can jump to Review via the
-                // sidebar without clicking Continue first. Push the *whole*
-                // local state, not just `mapLink` — a partial push causes
-                // VendorPanel to round-trip a `data` prop missing the
-                // local-only fields (factoryImages, blob URLs, etc.), and
-                // the render-phase sync then wipes them from local state.
-                // See: factory images vanished when user updated the map.
+                handleInputChange('mapLink', link);
                 onUpdateData({ ...formData, mapLink: link });
               }}
               error={errors.mapLink && touched.mapLink ? errors.mapLink : undefined}
             />
           </div>
-        </div>
-      </section>
+        </AccordionSection>
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between pt-4 gap-3">
+      </div>{/* end accordion sections */}
+
+      {/* ── Footer Navigation ──────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pt-5 mt-5 border-t border-slate-100 gap-3">
         <Button
           onClick={onPrev}
-          className="inline-flex items-center gap-2 h-11 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
+          className="inline-flex items-center gap-2 h-11 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 rounded-lg"
         >
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-          Back to Company Details
+          Back
         </Button>
         <Button
           onClick={handleNext}
-          className="inline-flex items-center gap-2 h-11 px-6 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+          className="inline-flex items-center gap-2 h-11 px-7 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 active:bg-brand-700 transition-colors shadow-sm shadow-brand-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
         >
-          Save &amp; Continue to Owner Profile
+          Save &amp; Continue
           <ArrowRight className="w-4 h-4" aria-hidden="true" />
         </Button>
       </div>
+
     </div>
   );
 }

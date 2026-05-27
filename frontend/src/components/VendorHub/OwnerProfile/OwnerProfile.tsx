@@ -2,9 +2,8 @@
 
 import { useCallback, useState } from 'react';
 import { Button } from '@/components/UI/Button';
-import Dropdown from '@/components/UI/Dropdown';
-import { User, Calendar, Users, Mail, Plus, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
-import { ToggleButton, PhoneInput, validatePhoneE164 } from '@/components/VendorHub/FormUI';
+import { User, Calendar, Users, Mail, Plus, Trash2, ArrowLeft, ArrowRight, IdCard, Phone as PhoneIcon } from 'lucide-react';
+import { ToggleButton, PhoneInput, validatePhoneE164, AccordionSection } from '@/components/VendorHub/FormUI';
 import { scrollToFirstError } from '@/lib/formErrorScroll';
 import { showErrorToast } from '@/lib/toast-utils';
 
@@ -36,6 +35,22 @@ const DESIGNATION_IDS = new Set(designationOptions.map((d) => d.id));
 const DESIGNATION_OTHER = 'other';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// ── Step 3 accordion section map ─────────────────────────────────────────
+// `SECTION_FIELDS` lists every form field that belongs to the section so
+// auto-expand-on-error knows which sections to keep visible after a failed
+// Save & Continue. `SECTION_REQUIRED` is the strict subset of fields that
+// must be filled for the green "complete" checkmark to render in the
+// section header. Additional contacts are validated dynamically (the team
+// section toggles by whether any partial rows exist), so they're not
+// listed here. Keep these in lockstep with the validation in handleNext.
+const SECTION_FIELDS: Record<string, string[]> = {
+  identity: ['ownerName', 'designation'],
+  contact: ['ownerEmail', 'ownerEmail2', 'ownerPhone', 'ownerPhone2', 'ownerLandline'],
+  team: [],
+  history: ['businessStartDate'],
+  size: ['employeeCount'],
+};
 
 const calculateDuration = (startDate: string) => {
   if (!startDate) return '00Y / 00M';
@@ -158,6 +173,28 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Accordion: single-active-section pattern matching Step 1
+  // (CompanyDetails.tsx → AccordionSection). One section open at a time;
+  // clicking a different section's header switches the focus. Default to
+  // the first section so a new visitor sees Owner Identity expanded.
+  type SectionKey = 'identity' | 'contact' | 'team' | 'history' | 'size';
+  const [activeSection, setActiveSection] = useState<SectionKey>('identity');
+
+  // Maps each form field name → the section that owns it. Used by handleNext
+  // to auto-open the section containing the first failed field (mirrors
+  // Step 1's pattern at CompanyDetails.tsx:929).
+  const FIELD_SECTION_MAP: Record<string, SectionKey> = {
+    ownerName: 'identity',
+    designation: 'identity',
+    ownerEmail: 'contact',
+    ownerEmail2: 'contact',
+    ownerPhone: 'contact',
+    ownerPhone2: 'contact',
+    ownerLandline: 'contact',
+    businessStartDate: 'history',
+    employeeCount: 'size',
+  };
 
   // Render-phase sync (Vercel §5.1) — avoids the
   // `react-hooks/set-state-in-effect` rule and runs cleanly when the
@@ -342,6 +379,23 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      // Auto-open the section containing the first error so the field is
+      // visible the instant the user lands on the failing field (mirrors
+      // Step 1's behaviour — CompanyDetails.tsx → handleNext).
+      const fieldOrder = [
+        'ownerName',
+        'designation',
+        'ownerEmail',
+        'ownerEmail2',
+        'ownerPhone',
+        'ownerPhone2',
+        'ownerLandline',
+        'businessStartDate',
+        'employeeCount',
+      ];
+      const firstErrorField = fieldOrder.find((f) => newErrors[f]);
+      const targetSection = firstErrorField ? FIELD_SECTION_MAP[firstErrorField] : null;
+      if (targetSection) setActiveSection(targetSection);
       const allTouched: Record<string, boolean> = {};
       Object.keys(newErrors).forEach((key) => {
         allTouched[key] = true;
@@ -390,6 +444,70 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     onNext();
   }, [formData, additionalOwners, data.businessType, onUpdateData, onNext]);
 
+  // ── Section status helpers ─────────────────────────────────────────────
+  // Mirrors Step 1's `getSectionStatus` (CompanyDetails.tsx) — returns one
+  // of three states the accordion header surfaces as a colored badge:
+  //   - 'complete' (green "Done")   → every required field filled
+  //   - 'partial'  (amber "In progress") → some field touched but not all
+  //   - 'empty'    (no badge)        → nothing entered yet
+  const allowMultipleOwners = resolveOwnerStructure(data.businessType).allowMultiple;
+  const getSectionStatus = (section: SectionKey): 'complete' | 'partial' | 'empty' => {
+    if (section === 'identity') {
+      const required = [formData.ownerName, formData.designation];
+      const filled = required.filter(Boolean).length;
+      if (filled === required.length) return 'complete';
+      if (filled > 0) return 'partial';
+      return 'empty';
+    }
+    if (section === 'contact') {
+      const required = [formData.ownerEmail, formData.ownerPhone];
+      const optional = [formData.ownerEmail2, formData.ownerPhone2, formData.ownerLandline];
+      if (required.every(Boolean)) return 'complete';
+      if (required.some(Boolean) || optional.some(Boolean)) return 'partial';
+      return 'empty';
+    }
+    if (section === 'team') {
+      // Optional section — "complete" once at least one row is filled,
+      // "partial" if any partial row exists, otherwise "empty".
+      if (!allowMultipleOwners) return 'empty';
+      const filledRows = additionalOwners.filter((o) => o.name && o.email && o.phone);
+      const partialRows = additionalOwners.filter((o) => o.name || o.email || o.phone);
+      if (filledRows.length > 0 && filledRows.length === additionalOwners.length) return 'complete';
+      if (partialRows.length > 0) return 'partial';
+      return 'empty';
+    }
+    if (section === 'history') {
+      if (formData.businessStartDate) return 'complete';
+      return 'empty';
+    }
+    if (section === 'size') {
+      if (formData.employeeCount) return 'complete';
+      return 'empty';
+    }
+    return 'empty';
+  };
+
+  // Helper that computes the AccordionSection props for a given section id.
+  // Spread into each JSX call (`<AccordionSection {...sectionProps('identity')} ...>`)
+  // so the module-level component stays stateless while we close over the
+  // local errors / activeSection / status state here.
+  const sectionProps = (id: SectionKey) => {
+    const isOpen = activeSection === id;
+    const status = getSectionStatus(id);
+    const fields = SECTION_FIELDS[id] || [];
+    const teamErrorKeys =
+      id === 'team' ? Object.keys(errors).filter((k) => k.startsWith('additionalOwner_')) : [];
+    const hasErrors =
+      (id === 'team' ? teamErrorKeys.length : fields.filter((f) => errors[f]).length) > 0;
+    return {
+      id,
+      isOpen,
+      status,
+      hasErrors,
+      onActivate: () => setActiveSection(id),
+    };
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
@@ -407,18 +525,18 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         </div>
       </div>
 
-      {/* Owner Details */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <User className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Owner Information
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Identity and contact details for the primary point-of-contact.
-          </p>
-        </div>
-        <div className="p-6 space-y-5">
+      {/* ── Accordion Sections ──────────────────────────────────────────
+          Same single-active-section pattern as Step 1 (CompanyDetails) so
+          a vendor moving from Step 1 → Step 3 sees identical chrome,
+          status badges, and interactions. */}
+      <div className="space-y-3">
+
+      <AccordionSection
+        {...sectionProps('identity')}
+        icon={<IdCard className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Owner Identity"
+        subtitle="Owner full name and designation"
+      >
           {/* Owner Name */}
           <div>
             <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -529,7 +647,14 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               </div>
             );
           })()}
+      </AccordionSection>
 
+      <AccordionSection
+        {...sectionProps('contact')}
+        icon={<PhoneIcon className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Owner Contact"
+        subtitle="Email + phone numbers we'll use to reach the owner"
+      >
           {/* Emails — primary required, secondary optional, 2-col on sm+ */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -660,32 +785,22 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               )}
             </div>
           </div>
-        </div>
-      </section>
+      </AccordionSection>
 
       {/* Additional Contacts (Directors / Partners / Owners) — only
          rendered when the upstream company type allows multiple contacts.
          Proprietorship has a single owner, so the section is hidden. */}
       {ownerStructure.allowMultiple ? (
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Users className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-              Additional {ownerStructure.contactLabelPlural}
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">{ownerStructure.description}</p>
-          </div>
-          <button
-            type="button"
-            onClick={handleAddOwner}
-            className="shrink-0 inline-flex items-center gap-2 h-9 px-3 text-sm font-medium text-brand-700 bg-brand-50 border border-brand-500/30 rounded-md hover:bg-brand-100 hover:border-brand-500/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
-          >
-            <Plus className="w-4 h-4" aria-hidden="true" />
-            Add {ownerStructure.contactLabel}
-          </button>
-        </div>
-        <div className="px-6 py-6 space-y-4">
+      <AccordionSection
+        {...sectionProps('team')}
+        icon={<Users className="w-4.5 h-4.5" aria-hidden="true" />}
+        title={`Additional ${ownerStructure.contactLabelPlural}`}
+        subtitle={
+          additionalOwners.length > 0
+            ? `${additionalOwners.length} ${additionalOwners.length === 1 ? ownerStructure.contactLabel.toLowerCase() : ownerStructure.contactLabelPlural.toLowerCase()} added — ${ownerStructure.description.toLowerCase()}`
+            : ownerStructure.description
+        }
+      >
           {additionalOwners.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-2">
               No additional {ownerStructure.contactLabelPlural.toLowerCase()} added yet.
@@ -716,7 +831,16 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                     Remove
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 2-col grid throughout — matches the primary owner section
+                    above. Required + optional fields pair up naturally:
+                      row 1: Full Name * | Designation
+                      row 2: Email *     | Email 2
+                      row 3: Phone *     | Phone 2
+                      row 4: Landline    (full-width, max-md so it doesn't
+                                          stretch wider than the input above)
+                    The earlier 3-col grid left empty placeholder columns on
+                    rows 1 and 2 which read as awkward visual gaps. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Full Name <span className="text-red-500" aria-hidden="true">*</span>
@@ -752,7 +876,6 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                       placeholder={`e.g. ${ownerStructure.contactLabel}`}
                     />
                   </div>
-                  <div className="hidden md:block" aria-hidden="true" />
 
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -793,7 +916,6 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                       placeholder="optional secondary email"
                     />
                   </div>
-                  <div className="hidden md:block" aria-hidden="true" />
 
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -830,7 +952,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                       placeholder="optional secondary phone"
                     />
                   </div>
-                  <div>
+
+                  <div className="sm:col-span-2 sm:max-w-md">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Landline <span className="text-gray-400">(optional)</span>
                     </label>
@@ -848,12 +971,26 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               </div>
             ))
           )}
-        </div>
-      </section>
+
+          {/* "+ Add another" tile — sits inside the section body, after the
+              last director card. Replaces the old header-strip button which
+              created a visually disjointed band between the section header
+              and the first form card. */}
+          {additionalOwners.length > 0 && (
+            <button
+              type="button"
+              onClick={handleAddOwner}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-brand-700 bg-brand-50/50 border border-dashed border-brand-300 rounded-lg hover:bg-brand-50 hover:border-brand-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+            >
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              Add another {ownerStructure.contactLabel.toLowerCase()}
+            </button>
+          )}
+      </AccordionSection>
       ) : (
         // Proprietorship — single owner only. Show an info note instead of
         // the Add-owner section so the user understands why it's hidden.
-        <section className="bg-white border border-slate-200 rounded-lg p-6">
+        <div className="rounded-xl border border-slate-200 p-5 bg-white">
           <div className="flex items-start gap-3">
             <Users className="w-5 h-5 mt-0.5 text-gray-400 shrink-0" aria-hidden="true" />
             <p className="text-sm text-gray-600">
@@ -863,21 +1000,16 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               </span>
             </p>
           </div>
-        </section>
+        </div>
       )}
 
-      {/* Business History */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Calendar className="w-5 h-5 mr-2" />
-            Business History
-          </h2>
-          <p className="text-sm text-gray-600 mt-1">
-            When did you start operations?
-          </p>
-        </div>
-        <div className="p-6 max-w-3xl">
+      <AccordionSection
+        {...sectionProps('history')}
+        icon={<Calendar className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Business History"
+        subtitle="When operations began and total business duration"
+      >
+        <div className="max-w-3xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <label htmlFor="businessStartDate" className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -928,17 +1060,14 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
             </div>
           </div>
         </div>
-      </section>
+      </AccordionSection>
 
-      {/* Employee Count */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Users className="w-5 h-5 mr-2" />
-            Company Size
-          </h2>
-        </div>
-        <div className="p-6">
+      <AccordionSection
+        {...sectionProps('size')}
+        icon={<Users className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Company Size"
+        subtitle="How many people work in your business today"
+      >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-4">
               Number of Employees <span className="text-red-500">*</span>
@@ -966,8 +1095,9 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               <p className="text-red-500 text-sm mt-2">{errors.employeeCount}</p>
             )}
           </div>
-        </div>
-      </section>
+      </AccordionSection>
+
+      </div>
 
       {/* Navigation */}
       <div className="flex items-center justify-between pt-4 gap-3">

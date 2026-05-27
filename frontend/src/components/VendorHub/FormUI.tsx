@@ -14,7 +14,8 @@
  */
 
 import React, { useState, useRef, useEffect, useMemo, useId } from 'react';
-import { ChevronDown, Check, Search, MapPin, Loader2 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { ChevronDown, Check, Search, MapPin, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Country, type ICountry } from 'country-state-city';
 import { parsePhoneNumberFromString, validatePhoneNumberLength } from 'libphonenumber-js';
 import { searchAddress, type AddressSuggestion } from '@/lib/addressSearch';
@@ -1343,5 +1344,140 @@ export function Hint({
       : 'bg-blue-50 border-blue-200 text-blue-900';
   return (
     <div className={`text-sm border rounded-lg px-3 py-2 ${tone}`}>{children}</div>
+  );
+}
+
+// ── AccordionSection ───────────────────────────────────────────────────
+// Single-active-section accordion card matching the visual contract of
+// Step 1's (CompanyDetails) inline AccordionSection: colored border per
+// state, gradient header when open, colored icon bubble, status badge
+// ("Done" / "In progress" / "Fix required"), rotating chevron, max-h
+// body transition.
+//
+// Module-level on purpose — defining the same JSX inside the parent
+// component would violate react-hooks/static-components (each render
+// creates a fresh component identity, resetting state). Callers compute
+// `isOpen` / `status` / `hasErrors` from their own state and pass them
+// in; this component stays stateless apart from the children it renders.
+//
+// `headerExtra` is an optional slot that renders ABOVE the body, BELOW
+// the header band — used for per-section action buttons that don't fit
+// in the title row. Pass `null` (the default) when not needed.
+export type AccordionSectionStatus = 'complete' | 'partial' | 'empty';
+export interface AccordionSectionProps {
+  id: string;
+  icon: ReactNode;
+  title: string;
+  subtitle: string;
+  isOpen: boolean;
+  status: AccordionSectionStatus;
+  hasErrors: boolean;
+  onActivate: () => void;
+  headerExtra?: ReactNode;
+  children: ReactNode;
+}
+export function AccordionSection({
+  id,
+  icon,
+  title,
+  subtitle,
+  isOpen,
+  status,
+  hasErrors,
+  onActivate,
+  headerExtra,
+  children,
+}: AccordionSectionProps) {
+  return (
+    <div
+      className={`rounded-xl border transition-all duration-300 ${!isOpen ? 'overflow-hidden' : ''} ${
+        isOpen
+          ? 'border-brand-300 shadow-md shadow-brand-500/8'
+          : hasErrors
+            ? 'border-red-300 bg-red-50/30'
+            : 'border-slate-200 hover:border-slate-300'
+      }`}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onActivate}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onActivate();
+          }
+        }}
+        className={`w-full rounded-t-xl flex items-center gap-4 px-5 py-4 text-left transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
+          isOpen ? 'bg-linear-to-r from-brand-50/80 to-white' : 'bg-white hover:bg-slate-50/60'
+        }`}
+        aria-expanded={isOpen}
+        aria-controls={`section-${id}`}
+      >
+        <div
+          className={`flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg transition-colors duration-200 ${
+            isOpen
+              ? 'bg-brand-500 text-white'
+              : hasErrors
+                ? 'bg-red-100 text-red-600'
+                : status === 'complete'
+                  ? 'bg-emerald-100 text-emerald-600'
+                  : 'bg-slate-100 text-slate-500'
+          }`}
+        >
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p
+            className={`font-semibold text-sm leading-tight ${
+              isOpen ? 'text-brand-700' : 'text-slate-800'
+            }`}
+          >
+            {title}
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>
+        </div>
+        <div className="flex-shrink-0 flex items-center gap-2">
+          {headerExtra && (
+            <div className="mr-2" onClick={(e) => e.stopPropagation()}>
+              {headerExtra}
+            </div>
+          )}
+          {hasErrors && !isOpen && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">
+              <AlertCircle className="w-3 h-3" aria-hidden="true" />
+              Fix required
+            </span>
+          )}
+          {!hasErrors && status === 'complete' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+              <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+              Done
+            </span>
+          )}
+          {!hasErrors && status === 'partial' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+              In progress
+            </span>
+          )}
+          <ChevronDown
+            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+              isOpen ? 'rotate-180' : ''
+            }`}
+            aria-hidden="true"
+          />
+        </div>
+      </div>
+
+      <div
+        id={`section-${id}`}
+        className={`transition-all duration-300 ${
+          isOpen ? 'max-h-[9999px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+        }`}
+        aria-hidden={!isOpen}
+      >
+        <div className="px-5 pb-6 pt-2 space-y-5 border-t border-slate-100">{children}</div>
+      </div>
+    </div>
   );
 }

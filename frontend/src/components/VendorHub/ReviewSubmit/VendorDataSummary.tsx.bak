@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { SquarePen, Calendar, Building2, Warehouse, UserCircle, Tags, Factory, ShieldCheck, Briefcase } from 'lucide-react';
-import { AccordionSection } from '../FormUI';
+import React from 'react';
+import { SquarePen, Calendar } from 'lucide-react';
 
 /**
  * Read-only summary of a vendor's collected registration data. Shared by
@@ -34,6 +33,12 @@ interface CertificateStatus {
 }
 
 // ── Local presentational helpers ────────────────────────────────────────
+
+const FormCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+    {children}
+  </section>
+);
 
 const InfoRow: React.FC<{ label: string; value: string | React.ReactNode }> = ({ label, value }) => (
   <div className="flex flex-col sm:flex-row sm:items-start py-3 border-b border-slate-100 last:border-0 px-6">
@@ -137,8 +142,6 @@ export default function VendorDataSummary({
 }: VendorDataSummaryProps) {
   const isManufacturer = isManufacturerFromData(data);
 
-  const [activeSection, setActiveSection] = useState<string>('company');
-
   // Canonical step indices into the 8-step wizard. VendorPanel / AddEditVendor
   // always render all 8 steps in the sidebar; Manufacturing Facilities (index 4)
   // is auto-skipped at nav-time for non-manufacturers, so no mapping is needed here.
@@ -155,31 +158,21 @@ export default function VendorDataSummary({
     return stepMap[logicalStep] ?? 0;
   };
 
-  const renderEditBtn = (step: number) => {
-    if (!onGoToStep) return null;
-    return (
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onGoToStep(step); }}
-        className="text-brand-600 bg-brand-50 hover:bg-brand-100 transition-colors px-3 py-1.5 rounded-md flex items-center gap-1 text-sm font-semibold"
-      >
-        <SquarePen className="w-4 h-4" aria-hidden="true" />
-        Edit
-      </button>
-    );
-  };
-
-  const sectionProps = (id: string, title: string, subtitle: string, icon: any, stepNum: number) => ({
-    id,
-    title,
-    subtitle,
-    icon,
-    isOpen: activeSection === id,
-    status: 'complete' as const,
-    hasErrors: false,
-    onActivate: () => setActiveSection(activeSection === id ? '' : id),
-    headerExtra: renderEditBtn(stepNum)
-  });
+  const SectionHeader = ({ title, step }: { title: string; step: number }) => (
+    <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+      <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">{title}</h3>
+      {onGoToStep && (
+        <button
+          type="button"
+          onClick={() => onGoToStep(step)}
+          className="text-brand-600 bg-brand-50 hover:bg-brand-100 transition-colors px-3 py-1.5 rounded-md flex items-center gap-1 text-sm font-semibold"
+        >
+          <SquarePen className="w-4 h-4" aria-hidden="true" />
+          Edit
+        </button>
+      )}
+    </div>
+  );
 
   // Manufacturing Facilities labels
   const enabledFacilities = Object.entries(data.enabledFacilities || {})
@@ -230,7 +223,8 @@ export default function VendorDataSummary({
 
   return (
     <div className="space-y-6">
-      <AccordionSection {...sectionProps('company', 'Company Details', 'Business identity and registration info', <Building2 className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('company'))}>
+      <FormCard>
+        <SectionHeader title="Company Details" step={getStepNumber('company')} />
         <div className="flex flex-col">
           <InfoRow label="Business Type" value={getBusinessTypeLabel(data.businessType)} />
           <InfoRow label="Company Name" value={data.companyName} />
@@ -283,9 +277,10 @@ export default function VendorDataSummary({
             <InfoRow label="Business Reg. Certificate" value="Uploaded" />
           )}
         </div>
-      </AccordionSection>
+      </FormCard>
 
-      <AccordionSection {...sectionProps('warehouse', 'Warehouse / Factory', 'Operating locations and premises', <Warehouse className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('warehouse'))}>
+      <FormCard>
+        <SectionHeader title="Warehouse / Factory" step={getStepNumber('warehouse')} />
         <div className="flex flex-col">
           <InfoRow label="Ownership Type" value={getOwnershipTypeLabel(data.ownershipType)} />
           <InfoRow
@@ -310,9 +305,10 @@ export default function VendorDataSummary({
           <InfoRow label="Factory Images" value={`${(data.factoryImages ? (Array.isArray(data.factoryImages) ? data.factoryImages.length : Object.keys(data.factoryImages).length) : 0)} file(s) uploaded`} />
           <InfoRow label="Map Link" value={data.mapLink ? 'Provided' : 'Not provided'} />
         </div>
-      </AccordionSection>
+      </FormCard>
 
-      <AccordionSection {...sectionProps('owner', 'Owner Profile', 'Key personnel details', <UserCircle className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('owner'))}>
+      <FormCard>
+        <SectionHeader title="Owner Profile" step={getStepNumber('owner')} />
         <div className="flex flex-col">
           <InfoRow label="Owner Name" value={data.ownerName} />
           {data.designation && (
@@ -368,9 +364,10 @@ export default function VendorDataSummary({
             </>
           )}
         </div>
-      </AccordionSection>
+      </FormCard>
 
-      <AccordionSection {...sectionProps('vendor', 'Vendor Type & Products', 'Business model and catalogue', <Tags className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('vendor'))}>
+      <FormCard>
+        <SectionHeader title="Vendor Type & Products" step={getStepNumber('vendor')} />
         <div className="flex flex-col">
           <InfoRow label="Vendor Type" value={getVendorTypeLabel(data.vendorType)} />
           <InfoRow label="Market Focus" value={getMarketTypeLabel(data.marketType)} />
@@ -399,10 +396,11 @@ export default function VendorDataSummary({
             />
           )}
         </div>
-      </AccordionSection>
+      </FormCard>
 
       {isManufacturer && (
-        <AccordionSection {...sectionProps('manufacturing', 'Manufacturing Facilities', 'Production capabilities', <Factory className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('manufacturing'))}>
+        <FormCard>
+          <SectionHeader title="Manufacturing Facilities" step={getStepNumber('manufacturing')} />
           <div className="flex flex-col">
             <InfoRow
               label="Active Facilities"
@@ -425,10 +423,11 @@ export default function VendorDataSummary({
               );
             })}
           </div>
-        </AccordionSection>
+        </FormCard>
       )}
 
-      <AccordionSection {...sectionProps('certifications', 'Certifications & Logistics', 'Quality standards and shipping', <ShieldCheck className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('certifications'))}>
+      <FormCard>
+        <SectionHeader title="Certifications & Logistics" step={getStepNumber('certifications')} />
         <div className="flex flex-col">
           <InfoRow
             label="Certifications"
@@ -523,9 +522,10 @@ export default function VendorDataSummary({
             }
           />
         </div>
-      </AccordionSection>
+      </FormCard>
 
-      <AccordionSection {...sectionProps('contact', 'Contact & Trade', 'Key contacts and regulatory IDs', <Briefcase className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('contact'))}>
+      <FormCard>
+        <SectionHeader title="Contact & Trade" step={getStepNumber('contact')} />
         <div className="flex flex-col">
           <InfoRow label="Main Contact Name" value={data.mainContact?.name || 'Not provided'} />
           <InfoRow
@@ -594,7 +594,7 @@ export default function VendorDataSummary({
             </>
           )}
         </div>
-      </AccordionSection>
+      </FormCard>
     </div>
   );
 }

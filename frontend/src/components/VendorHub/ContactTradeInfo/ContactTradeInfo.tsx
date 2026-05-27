@@ -5,7 +5,7 @@ import { Button } from '@/components/UI/Button';
 import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight, Landmark, FileText } from 'lucide-react';
 import Image from 'next/image';
 import Dropdown from '@/components/UI/Dropdown';
-import { PhoneInput, CountrySelect, validatePhoneE164 } from '@/components/VendorHub/FormUI';
+import { PhoneInput, CountrySelect, validatePhoneE164, AccordionSection } from '@/components/VendorHub/FormUI';
 import { handleUpload } from '@/lib/toast-utils';
 
 interface ContactTradeInfoProps {
@@ -102,6 +102,81 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Accordion: single-active-section pattern matching Steps 3/4/5/6.
+  // Five sections grouping the field clusters:
+  //   - 'mainContact':  primary person we'll talk to
+  //   - 'alternates':   secondary contacts (optional, multi-add)
+  //   - 'tradeFlow':    import/export experience + countries
+  //   - 'regulatory':   trade license / business reg / tax ID
+  //   - 'banking':      payout banking info
+  type SectionKey = 'mainContact' | 'alternates' | 'tradeFlow' | 'regulatory' | 'banking';
+  const [activeSection, setActiveSection] = useState<SectionKey>('mainContact');
+
+  // Maps error keys → owning section. Used in handleNext to auto-open
+  // the failing section after a Save attempt.
+  const FIELD_SECTION_MAP: Record<string, SectionKey> = {
+    'mainContact.firstName': 'mainContact',
+    'mainContact.lastName': 'mainContact',
+    'mainContact.designation': 'mainContact',
+    'mainContact.email1': 'mainContact',
+    'mainContact.phone1': 'mainContact',
+    'mainContact.department': 'mainContact',
+    'mainContact.photo': 'mainContact',
+    hasImportExport: 'tradeFlow',
+    importCountries: 'tradeFlow',
+    exportCountries: 'tradeFlow',
+  };
+
+  // Returns 'complete' | 'partial' | 'empty' per section — drives the
+  // colored status badge in the section header.
+  const getSectionStatus = (section: SectionKey): 'complete' | 'partial' | 'empty' => {
+    if (section === 'mainContact') {
+      const mc = formData.mainContact;
+      const required = [mc.firstName, mc.lastName, mc.designation, mc.email1, mc.phone1, mc.department];
+      const filled = required.filter(Boolean).length;
+      if (filled === required.length) return 'complete';
+      if (filled > 0) return 'partial';
+      return 'empty';
+    }
+    if (section === 'alternates') {
+      if (formData.alternateContacts.length === 0) return 'empty';
+      const allValid = formData.alternateContacts.every((c: any) =>
+        c.firstName && c.lastName && c.designation && c.email1 && c.phone1 && c.department
+      );
+      return allValid ? 'complete' : 'partial';
+    }
+    if (section === 'tradeFlow') {
+      if (formData.hasImportExport === 'yes') {
+        const hasCountries =
+          formData.importCountries.length > 0 || formData.exportCountries.length > 0;
+        return hasCountries ? 'complete' : 'partial';
+      }
+      if (formData.hasImportExport === 'no') return 'complete';
+      return 'empty';
+    }
+    if (section === 'regulatory') {
+      const any = formData.tradeLicenseNumber || formData.businessRegistrationNumber || formData.taxIdentificationNumber;
+      return any ? 'complete' : 'empty'; // all fields are optional
+    }
+    if (section === 'banking') {
+      const bd = formData.bankingDetails || {};
+      const any = bd.bankName || bd.accountNumber || bd.swiftCode || bd.iban;
+      const all = bd.bankName && bd.accountNumber;
+      if (all) return 'complete';
+      if (any) return 'partial';
+      return 'empty';
+    }
+    return 'empty';
+  };
+
+  const sectionProps = (id: SectionKey) => ({
+    id,
+    isOpen: activeSection === id,
+    status: getSectionStatus(id),
+    hasErrors: Object.keys(errors).some((k) => FIELD_SECTION_MAP[k] === id && Boolean(errors[k])),
+    onActivate: () => setActiveSection(id),
+  });
 
   useEffect(() => {
     const mainNameParts = parseName(data?.mainContact?.name || '');
@@ -516,15 +591,15 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         </div>
       </div>
 
+      <div className="space-y-4">
       {/* Main Contact */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-visible relative z-30">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <User className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Contact Person
-          </h3>
-        </div>
-        <div className="px-6 py-6">
+      <AccordionSection
+        {...sectionProps('mainContact')}
+        icon={<User className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Contact Person"
+        subtitle="Primary contact details"
+      >
+        <div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             {/* Profile Photo Upload moved to the top */}
@@ -844,27 +919,24 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             )}
           </div>
         </div>
-      </section>
+      </AccordionSection>
 
       {/* Alternate Contacts */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-visible relative z-20">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Mail className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-              Contact Person 2 (Optional)
-            </h3>
-            {formData.alternateContacts.length < 3 && (
+      <AccordionSection
+        {...sectionProps('alternates')}
+        icon={<Mail className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Contact Person 2 (Optional)"
+        subtitle="Secondary contact persons"
+      >
+        <div>
+          {formData.alternateContacts.length === 0 ? (
+            <div className="text-center py-6 border border-dashed border-slate-300 rounded-lg bg-slate-50">
+              <p className="text-slate-500 text-sm font-medium mb-4">No alternate contacts added</p>
               <Button onClick={addAlternateContact} variant="outline" size="sm" className="bg-brand-500 text-white hover:bg-brand-600 border-transparent">
                 <Plus className="w-4 h-4 mr-1.5" aria-hidden="true" />
                 Add Contact
               </Button>
-            )}
-          </div>
-        </div>
-        <div className="px-6 py-6">
-          {formData.alternateContacts.length === 0 ? (
-            <p className="text-slate-500 text-center py-4 text-sm font-medium">No alternate contacts added</p>
+            </div>
           ) : (
             <div className="space-y-6">
               {formData.alternateContacts.map((contact: Contact, index: number) => (
@@ -1101,20 +1173,28 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                   </div>
                 </div>
               ))}
+              
+              {formData.alternateContacts.length < 3 && (
+                <div className="flex justify-end pt-2">
+                  <Button onClick={addAlternateContact} variant="outline" size="sm" className="bg-brand-500 text-white hover:bg-brand-600 border-transparent">
+                    <Plus className="w-4 h-4 mr-1.5" aria-hidden="true" />
+                    Add Another Contact
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
-      </section>
+      </AccordionSection>
 
       {/* Import/Export Information */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-visible relative z-10">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Globe className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Import/Export Information
-          </h3>
-        </div>
-        <div className="px-6 py-6 space-y-4">
+      <AccordionSection
+        {...sectionProps('tradeFlow')}
+        icon={<Globe className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Import/Export Information"
+        subtitle="Import and export experience"
+      >
+        <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Do you engage in import/export activities?
@@ -1238,21 +1318,17 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             </div>
           )}
         </div>
-      </section>
+      </AccordionSection>
 
       {/* Regulatory IDs — Trade License / Business Registration / Tax ID.
           All optional, persisted to dedicated Vendor columns. */}
-      <section className="bg-white border border-slate-200 rounded-lg">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Regulatory IDs
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">
-            Optional — admins use these to verify the vendor against external registries.
-          </p>
-        </div>
-        <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <AccordionSection
+        {...sectionProps('regulatory')}
+        icon={<FileText className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Regulatory IDs"
+        subtitle="Optional — admins use these to verify the vendor against external registries."
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label htmlFor="tradeLicenseNumber" className="block text-sm font-medium text-gray-700 mb-1">
               Trade License Number <span className="text-gray-400">(optional)</span>
@@ -1296,22 +1372,18 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             />
           </div>
         </div>
-      </section>
+      </AccordionSection>
 
       {/* Banking — bank name + account number are India-domestic; SWIFT/IBAN
           are international. All optional at the form level so vendors can
           fill what applies. Persisted to VendorBankDetails (1:1 with Vendor). */}
-      <section className="bg-white border border-slate-200 rounded-lg">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Landmark className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Banking Details
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">
-            Optional — used for payouts once your account is approved. SWIFT and IBAN are only needed for international wires.
-          </p>
-        </div>
-        <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <AccordionSection
+        {...sectionProps('banking')}
+        icon={<Landmark className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Banking Details"
+        subtitle="Optional — used for payouts once your account is approved."
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="bankName" className="block text-sm font-medium text-gray-700 mb-1">
               Bank Name <span className="text-gray-400">(optional)</span>
@@ -1372,7 +1444,8 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             />
           </div>
         </div>
-      </section>
+      </AccordionSection>
+      </div>
 
       {/* Navigation */}
       <div className="flex items-center justify-between pt-4 gap-3">

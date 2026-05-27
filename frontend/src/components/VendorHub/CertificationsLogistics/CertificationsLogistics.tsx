@@ -29,6 +29,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { handleUpload } from '@/lib/toast-utils';
+import { AccordionSection } from '@/components/VendorHub/FormUI';
 
 interface CertificationsLogisticsProps {
   onNext: () => void;
@@ -212,6 +213,80 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       complianceStandards: data.complianceStandards || '',
     });
   }
+
+  // ── Accordion Section State ────────────────────────────────────────
+  type SectionKey = 'certifications' | 'quality' | 'logistics';
+  const [activeSection, setActiveSection] = useState<SectionKey>('certifications');
+
+  const FIELD_SECTION_MAP: Record<string, SectionKey> = {
+    qualityControlProcess: 'quality',
+    complianceStandards: 'quality',
+    packagingCapabilities: 'logistics',
+    logisticsPartners: 'logistics',
+    shippingMethods: 'logistics',
+  };
+
+  const getSectionStatus = (section: SectionKey): 'complete' | 'partial' | 'empty' => {
+    if (section === 'certifications') {
+      const hasSelected = formData.selectedCertifications.length > 0;
+      const hasOther = formData.otherCertifications.length > 0;
+      if (!hasSelected && !hasOther) return 'empty';
+      const selectedComplete = formData.selectedCertifications.every((id: string) => !!formData.certificationFiles[id]);
+      const otherComplete = formData.otherCertifications.every((c: OtherCertification) => !!formData.certificationFiles[c.id]);
+      if (selectedComplete && otherComplete) return 'complete';
+      return 'partial';
+    }
+    if (section === 'quality') {
+      const required = [formData.qualityControlProcess, formData.complianceStandards];
+      const filled = required.filter(Boolean).length;
+      if (filled === required.length) return 'complete';
+      if (filled > 0) return 'partial';
+      return 'empty';
+    }
+    if (section === 'logistics') {
+      const required = [formData.packagingCapabilities, formData.logisticsPartners];
+      const hasShipping = formData.shippingMethods.length > 0;
+      const filledText = required.filter(Boolean).length;
+      if (filledText === required.length && hasShipping) return 'complete';
+      if (filledText > 0 || hasShipping) return 'partial';
+      return 'empty';
+    }
+    return 'empty';
+  };
+
+  const hasSectionErrors = (section: SectionKey): boolean => {
+    const directErrors = Object.keys(errors).filter(
+      (k) => FIELD_SECTION_MAP[k] === section && errors[k] && touched[k]
+    );
+    if (directErrors.length > 0) return true;
+    if (section === 'certifications') {
+      const hasCertErrors = formData.selectedCertifications.some((id: string) => 
+        (errors[`certFile_${id}`] && touched[`certFile_${id}`]) ||
+        (errors[`certExpiry_${id}`] && touched[`certExpiry_${id}`])
+      );
+      const hasOtherErrors = formData.otherCertifications.some((c: OtherCertification) => 
+        (errors[`otherCertName_${c.id}`] && touched[`otherCertName_${c.id}`]) ||
+        (errors[`otherCertFile_${c.id}`] && touched[`otherCertFile_${c.id}`]) ||
+        (errors[`otherCertExpiry_${c.id}`] && touched[`otherCertExpiry_${c.id}`])
+      );
+      return hasCertErrors || hasOtherErrors;
+    }
+    if (section === 'logistics') {
+      if (errors['shippingMethods'] && touched['shippingMethods']) return true;
+    }
+    return false;
+  };
+
+  // Spread into each <AccordionSection {...sectionProps('id')} ...> call.
+  // The shared AccordionSection (FormUI) is stateless — this helper closes
+  // over local state (activeSection, errors, status) for each section.
+  const sectionProps = (id: SectionKey) => ({
+    id,
+    isOpen: activeSection === id,
+    status: getSectionStatus(id),
+    hasErrors: hasSectionErrors(id),
+    onActivate: () => setActiveSection(id),
+  });
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -538,6 +613,15 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       });
       setTouched(allTouched);
 
+      // Auto-expand the first failing section
+      if (Object.keys(newErrors).some(k => k.startsWith('certFile_') || k.startsWith('certExpiry_') || k.startsWith('otherCert'))) {
+        setActiveSection('certifications');
+      } else if (newErrors.qualityControlProcess || newErrors.complianceStandards) {
+        setActiveSection('quality');
+      } else if (newErrors.packagingCapabilities || newErrors.logisticsPartners || newErrors.shippingMethods) {
+        setActiveSection('logistics');
+      }
+
       setTimeout(() => {
         const firstErrorKey = Object.keys(newErrors)[0];
         let element = document.getElementById(firstErrorKey) || document.querySelector(`[name="${firstErrorKey}"]`);
@@ -579,23 +663,21 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       </div>
 
       {/* Certifications */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Award className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Certifications
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Pick the standards your facility holds. Upload the certificate and expiry date for each one selected.
-          </p>
-        </div>
-        <div className="px-6 py-6 space-y-6">
-          {/* Standard cert grid — 3-col on lg, 2-col on md, 1-col mobile */}
-          <div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-            role="group"
-            aria-label="Standard certifications"
-          >
+      <AccordionSection
+        {...sectionProps('certifications')}
+        icon={<Award className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Certifications & Uploads"
+        subtitle="Pick the standards your facility holds and upload your certificates."
+      >
+        <div className="flex flex-col gap-8">
+          <div>
+            <h4 className="text-sm font-semibold text-slate-800 mb-3">Available Certifications</h4>
+            {/* Standard cert grid — 3-col on lg, 2-col on md, 1-col mobile */}
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+              role="group"
+              aria-label="Standard certifications"
+            >
             {CERTIFICATIONS.map((cert) => {
               const Icon = cert.icon;
               const isSelected = formData.selectedCertifications.includes(cert.id);
@@ -637,9 +719,8 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
           {/* Details for selected certs — appears below the grid in a
               clean list, not inline inside each card (cleaner scanning). */}
           {formData.selectedCertifications.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-slate-400" aria-hidden="true" />
+            <div className="space-y-3 mt-8">
+              <h4 className="text-sm font-semibold text-slate-800">
                 Upload certificates ({formData.selectedCertifications.length} selected)
               </h4>
               {formData.selectedCertifications.map((certId: string) => {
@@ -801,7 +882,7 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
           )}
 
           {/* ── Other Certifications — user-defined certs not in the catalog ── */}
-          <div className="border-t border-slate-100 pt-5">
+          <div className="border-t border-slate-100 pt-8">
             <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
               <div className="min-w-0">
                 <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
@@ -1016,20 +1097,18 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
               </div>
             )}
           </div>
-        </div>
-      </section>
+          </div> {/* Closes the Available Certifications wrapper */}
 
-      {/* Uploaded Files Summary */}
-      {Object.keys(formData.certificationFiles).length > 0 && (
-        <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-              Uploaded Certificates ({Object.keys(formData.certificationFiles).length})
-            </h3>
-          </div>
-          <div className="px-6 py-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Uploaded Files Summary */}
+          {Object.keys(formData.certificationFiles).length > 0 && (
+            <div className="mt-8">
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                  <FileText className="w-4.5 h-4.5 text-slate-500 shrink-0" aria-hidden="true" />
+                  Uploaded Certificates ({Object.keys(formData.certificationFiles).length})
+                </h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Object.entries(formData.certificationFiles).map(([certId, fileData]: [string, any]) => {
                 const cert = CERTIFICATIONS.find((c) => c.id === certId);
                 const otherCert = formData.otherCertifications.find(
@@ -1089,20 +1168,20 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                   </div>
                 );
               })}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
+      </AccordionSection>
 
       {/* Quality Control */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Quality Control Process
-          </h3>
-        </div>
-        <div className="px-6 py-6 space-y-4">
+      <AccordionSection
+        {...sectionProps('quality')}
+        icon={<CheckCircle className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Quality Control Process"
+        subtitle="Describe your testing procedures and compliance standards"
+      >
+        <div className="flex flex-col gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Quality Control Process Description <span className="text-red-500">*</span>
@@ -1148,17 +1227,16 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
             )}
           </div>
         </div>
-      </section>
+      </AccordionSection>
 
       {/* Packaging & Logistics */}
-      <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Package className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
-            Packaging & Logistics
-          </h3>
-        </div>
-        <div className="px-6 py-6 space-y-4">
+      <AccordionSection
+        {...sectionProps('logistics')}
+        icon={<Package className="w-4.5 h-4.5" aria-hidden="true" />}
+        title="Packaging & Logistics"
+        subtitle="Detail your packaging capabilities and shipping methods"
+      >
+        <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1229,7 +1307,7 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
             )}
           </div>
         </div>
-      </section>
+      </AccordionSection>
 
       {/* Navigation */}
       <div className="flex items-center justify-between pt-4 gap-3">
