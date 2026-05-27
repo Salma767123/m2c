@@ -139,7 +139,7 @@ export default function HeroSection() {
               src={slide.imageUrl}
               alt={slide.altText || `Banner slide ${index + 1}`}
               fill
-              className="object-contain sm:object-contain md:object-cover object-center"
+              className="object-contain md:object-cover object-center"
               priority={index === 0}
               sizes="100vw"
               unoptimized={slide.imageUrl.startsWith("http")}

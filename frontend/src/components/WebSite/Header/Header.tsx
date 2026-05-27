@@ -297,15 +297,15 @@ const Header = () => {
       {/* Main Header */}
       <header className="bg-white shadow-lg border-b border-gray-100 transition-all duration-300">
         <div className="max-w-7xl 2xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex items-center h-16 sm:h-18 md:h-20 xl:h-28 gap-2 sm:gap-3 md:gap-4">
+          <div className="flex items-center h-[68px] sm:h-18 md:h-20 xl:h-28 gap-2 sm:gap-3 md:gap-4">
 
             {/* Section 1: Logo (30% on desktop, 50% on mobile/tablet) */}
             <div className="w-[50%] md:w-[30%] flex justify-start shrink-0">
               <Link href="/" className="flex items-center">
                 <CompanyLogo
-                  className="h-8 sm:h-10 md:h-14 lg:h-20 xl:h-24 w-auto object-contain"
-                  skeletonClassName="h-8 sm:h-10 md:h-14 lg:h-20 xl:h-24 aspect-square bg-gray-100"
-                  fallbackSizes="(max-width: 640px) 32px, (max-width: 768px) 40px, (max-width: 1024px) 56px, (max-width: 1280px) 80px, 120px"
+                  className="h-11 sm:h-12 md:h-14 lg:h-20 xl:h-24 w-auto object-contain"
+                  skeletonClassName="h-11 sm:h-12 md:h-14 lg:h-20 xl:h-24 aspect-square bg-gray-100"
+                  fallbackSizes="(max-width: 640px) 44px, (max-width: 768px) 48px, (max-width: 1024px) 56px, (max-width: 1280px) 80px, 120px"
                   priority
                 />
               </Link>
@@ -323,16 +323,16 @@ const Header = () => {
             </div>
 
             {/* Section 3: Action Icons (30% on desktop, 50% on mobile/tablet) */}
-            <div className="w-[50%] md:w-[30%] flex items-center justify-end gap-0.5 sm:gap-1.5 md:gap-3 shrink-0">
+            <div className="w-[50%] md:w-[30%] flex items-center justify-end gap-1 sm:gap-1.5 md:gap-3 shrink-0">
               {/* Notifications (logged-in users only) */}
               {isUserLoggedIn && <NotificationDropdown />}
 
               {/* Wishlist */}
               <Link
                 href="/wishlist"
-                className="relative p-1.5 sm:p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-105"
+                className="relative p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-105"
               >
-                <Heart className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                <Heart className="w-5 h-5 md:w-6 md:h-6" />
                 {wishlistCount > 0 && (
                   <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#212121] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs">
                     {wishlistCount > 99 ? '99+' : wishlistCount}
@@ -343,9 +343,9 @@ const Header = () => {
               {/* Cart */}
               <Link
                 href="/cart"
-                className="relative p-1.5 sm:p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-105"
+                className="relative p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-105"
               >
-                <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />
                 {cartCount > 0 && (
                   <span className="absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 bg-[#212121] text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-medium text-xs">
                     {cartCount > 99 ? '99+' : cartCount}
@@ -356,10 +356,10 @@ const Header = () => {
               {/* Search Icon */}
               <button
                 onClick={() => setShowSearchModal(true)}
-                className="p-1.5 sm:p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-110"
+                className="p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-lg transition-all duration-200 transform hover:scale-110"
                 aria-label="Search"
               >
-                <Search className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                <Search className="w-5 h-5 md:w-6 md:h-6" />
               </button>
 
               {/* Globe Icon - Language & Currency Selector */}
@@ -368,10 +368,10 @@ const Header = () => {
                   onClick={() =>
                     setIsLanguageCurrencyOpen(!isLanguageCurrencyOpen)
                   }
-                  className="p-1.5 sm:p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-xl transition-all duration-200 transform hover:scale-110"
+                  className="p-2 text-[#222222] hover:text-white hover:bg-[#212121] rounded-xl transition-all duration-200 transform hover:scale-110"
                   aria-label="Language and Currency"
                 >
-                  <Globe className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                  <Globe className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
 
                 {/* Language & Currency Modal */}
@@ -585,13 +585,13 @@ const Header = () => {
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="lg:hidden p-1.5 sm:p-2 text-slate-700 hover:text-gray-600 hover:bg-slate-100 rounded-lg transition-all duration-200 transform hover:scale-110"
+                className="lg:hidden p-2 text-slate-700 hover:text-gray-600 hover:bg-slate-100 rounded-lg transition-all duration-200 transform hover:scale-110"
                 aria-label="Toggle menu"
               >
                 {isMenuOpen ? (
-                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <X className="w-6 h-6" />
                 ) : (
-                  <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <Menu className="w-6 h-6" />
                 )}
               </button>
             </div>
@@ -656,9 +656,6 @@ const Header = () => {
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span>My Orders</span>
-                <span className="ml-auto bg-gray-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
-                  0
-                </span>
               </Link>
 
               <hr className="my-3 sm:my-4 border-slate-200" />

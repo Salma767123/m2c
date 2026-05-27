@@ -62,16 +62,16 @@ const Category = () => {
   return (
     <div className="bg-white shadow-sm">
       <div className="max-w-7xl xl:max-w-420 mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
-        <div className="h-10 sm:h-12 flex items-center gap-1 sm:gap-2 md:justify-center overflow-x-auto scrollbar-hide scroll-smooth">
+        <div className="h-11 sm:h-12 flex items-center gap-1.5 sm:gap-2 md:justify-center overflow-x-auto scrollbar-hide scroll-smooth">
 
           {categories.slice(0, 8).map((category) => (
             <Link
               key={category.id}
               href={`/categories/${category.slug}`}
-              className={`px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap transition-all duration-200 shrink-0 ${
+              className={`px-2.5 sm:px-3 py-1.5 sm:py-1 rounded-lg whitespace-nowrap transition-all duration-200 shrink-0 ${
                 isActiveCategory(category.slug)
                   ? 'text-white bg-[#222222] shadow-sm text-sm sm:text-base md:text-lg font-semibold transform scale-105'
-                  : 'text-[#444444] hover:text-white hover:bg-[#212121] text-sm sm:text-base'
+                  : 'text-[#444444] hover:text-white hover:bg-[#212121] text-[15px] sm:text-base'
               }`}
             >
               {category.name}
