@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
-import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight, Landmark, FileText } from 'lucide-react';
+import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Dropdown from '@/components/UI/Dropdown';
 import { PhoneInput, CountrySelect, validatePhoneE164, AccordionSection } from '@/components/VendorHub/FormUI';
@@ -88,15 +88,6 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       hasImportExport: data.hasImportExport || 'no',
       importCountries: data.importCountries || [],
       exportCountries: data.exportCountries || [],
-      tradeLicenseNumber: data.tradeLicenseNumber || '',
-      businessRegistrationNumber: data.businessRegistrationNumber || '',
-      taxIdentificationNumber: data.taxIdentificationNumber || '',
-      bankingDetails: data.bankingDetails || {
-        bankName: '',
-        accountNumber: '',
-        swiftCode: '',
-        iban: ''
-      }
     };
   });
 
@@ -104,13 +95,11 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Accordion: single-active-section pattern matching Steps 3/4/5/6.
-  // Five sections grouping the field clusters:
+  // Three sections grouping the field clusters:
   //   - 'mainContact':  primary person we'll talk to
   //   - 'alternates':   secondary contacts (optional, multi-add)
   //   - 'tradeFlow':    import/export experience + countries
-  //   - 'regulatory':   trade license / business reg / tax ID
-  //   - 'banking':      payout banking info
-  type SectionKey = 'mainContact' | 'alternates' | 'tradeFlow' | 'regulatory' | 'banking';
+  type SectionKey = 'mainContact' | 'alternates' | 'tradeFlow';
   const [activeSection, setActiveSection] = useState<SectionKey>('mainContact');
 
   // Maps error keys → owning section. Used in handleNext to auto-open
@@ -153,18 +142,6 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         return hasCountries ? 'complete' : 'partial';
       }
       if (formData.hasImportExport === 'no') return 'complete';
-      return 'empty';
-    }
-    if (section === 'regulatory') {
-      const any = formData.tradeLicenseNumber || formData.businessRegistrationNumber || formData.taxIdentificationNumber;
-      return any ? 'complete' : 'empty'; // all fields are optional
-    }
-    if (section === 'banking') {
-      const bd = formData.bankingDetails || {};
-      const any = bd.bankName || bd.accountNumber || bd.swiftCode || bd.iban;
-      const all = bd.bankName && bd.accountNumber;
-      if (all) return 'complete';
-      if (any) return 'partial';
       return 'empty';
     }
     return 'empty';
@@ -216,15 +193,6 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       hasImportExport: data.hasImportExport || 'no',
       importCountries: data.importCountries || [],
       exportCountries: data.exportCountries || [],
-      tradeLicenseNumber: data.tradeLicenseNumber || '',
-      businessRegistrationNumber: data.businessRegistrationNumber || '',
-      taxIdentificationNumber: data.taxIdentificationNumber || '',
-      bankingDetails: data.bankingDetails || {
-        bankName: '',
-        accountNumber: '',
-        swiftCode: '',
-        iban: ''
-      }
     });
   }, [data]);
 
@@ -434,8 +402,10 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     }
 
     if (main.landline) {
-      const landErr = validatePhoneE164(main.landline, { label: 'Landline Number' });
-      if (landErr) newErrors['mainContact.landline'] = landErr;
+      const landline = main.landline.trim();
+      if (landline && !/^\d{8,15}$/.test(landline)) {
+        newErrors['mainContact.landline'] = 'Landline Number must be 8-15 digits';
+      }
     }
 
     if (!main.department?.trim()) {
@@ -499,8 +469,10 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       }
 
       if (alt.landline) {
-        const landErr = validatePhoneE164(alt.landline, { label: 'Landline Number' });
-        if (landErr) newErrors[`${prefix}_landline`] = landErr;
+        const landline = alt.landline.trim();
+        if (landline && !/^\d{8,15}$/.test(landline)) {
+          newErrors[`${prefix}_landline`] = 'Landline Number must be 8-15 digits';
+        }
       }
 
       if (!alt.department?.trim()) {
@@ -856,19 +828,25 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="mainContact.landline" className="block text-sm font-medium text-gray-700 mb-2">
                 Landline Number (Optional)
               </label>
-              <div id="mainContact.landline">
-                <PhoneInput
-                  name="mainContact.landline"
-                  value={formData.mainContact.landline || ''}
-                  onChange={(v) => updateMainContact('landline', v)}
-                  onBlur={() => handleBlur('mainContact.landline')}
-                  invalid={!!(errors['mainContact.landline'] && touched['mainContact.landline'])}
-                  placeholder="+1 555 987 6543"
-                />
-              </div>
+              <input
+                id="mainContact.landline"
+                type="tel"
+                name="mainContact.landline"
+                value={formData.mainContact.landline || ''}
+                onChange={(e) => updateMainContact('landline', e.target.value.replace(/\D/g, ''))}
+                onBlur={() => handleBlur('mainContact.landline')}
+                inputMode="tel"
+                autoComplete="off"
+                className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
+                  errors['mainContact.landline'] && touched['mainContact.landline']
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="2228175000"
+              />
               {errors['mainContact.landline'] && touched['mainContact.landline'] && (
                 <p className="text-red-500 text-sm mt-1">{errors['mainContact.landline']}</p>
               )}
@@ -1118,17 +1096,23 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                       )}
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Landline Number (Optional)</label>
-                      <div id={`altContact_${contact.id}_landline`}>
-                        <PhoneInput
-                          name={`altContact_${contact.id}_landline`}
-                          value={contact.landline || ''}
-                          onChange={(v) => updateAlternateContact(contact.id, 'landline', v)}
-                          onBlur={() => handleBlur(`altContact_${contact.id}_landline`)}
-                          invalid={!!(errors[`altContact_${contact.id}_landline`] && touched[`altContact_${contact.id}_landline`])}
-                          placeholder="+1 555 111 2222"
-                        />
-                      </div>
+                      <label htmlFor={`altContact_${contact.id}_landline`} className="block text-sm font-medium text-gray-700 mb-2">Landline Number (Optional)</label>
+                      <input
+                        id={`altContact_${contact.id}_landline`}
+                        type="tel"
+                        name={`altContact_${contact.id}_landline`}
+                        value={contact.landline || ''}
+                        onChange={(e) => updateAlternateContact(contact.id, 'landline', e.target.value.replace(/\D/g, ''))}
+                        onBlur={() => handleBlur(`altContact_${contact.id}_landline`)}
+                        inputMode="tel"
+                        autoComplete="off"
+                        className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
+                          errors[`altContact_${contact.id}_landline`] && touched[`altContact_${contact.id}_landline`]
+                            ? 'border-red-500 bg-red-50'
+                            : 'border-slate-300 hover:border-slate-400'
+                        }`}
+                        placeholder="2228175000"
+                      />
                       {errors[`altContact_${contact.id}_landline`] && touched[`altContact_${contact.id}_landline`] && (
                         <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_landline`]}</p>
                       )}
@@ -1320,131 +1304,6 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         </div>
       </AccordionSection>
 
-      {/* Regulatory IDs — Trade License / Business Registration / Tax ID.
-          All optional, persisted to dedicated Vendor columns. */}
-      <AccordionSection
-        {...sectionProps('regulatory')}
-        icon={<FileText className="w-4.5 h-4.5" aria-hidden="true" />}
-        title="Regulatory IDs"
-        subtitle="Optional — admins use these to verify the vendor against external registries."
-      >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="tradeLicenseNumber" className="block text-sm font-medium text-gray-700 mb-1">
-              Trade License Number <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              id="tradeLicenseNumber"
-              value={formData.tradeLicenseNumber}
-              onChange={(e) => handleInputChange('tradeLicenseNumber', e.target.value)}
-              autoComplete="off"
-              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
-              placeholder="e.g. TL-2024-001234"
-            />
-          </div>
-          <div>
-            <label htmlFor="businessRegistrationNumber" className="block text-sm font-medium text-gray-700 mb-1">
-              Business Registration No. <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              id="businessRegistrationNumber"
-              value={formData.businessRegistrationNumber}
-              onChange={(e) => handleInputChange('businessRegistrationNumber', e.target.value)}
-              autoComplete="off"
-              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
-              placeholder="Issued by your local registrar"
-            />
-          </div>
-          <div>
-            <label htmlFor="taxIdentificationNumber" className="block text-sm font-medium text-gray-700 mb-1">
-              Tax Identification No. <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              id="taxIdentificationNumber"
-              value={formData.taxIdentificationNumber}
-              onChange={(e) => handleInputChange('taxIdentificationNumber', e.target.value)}
-              autoComplete="off"
-              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
-              placeholder="e.g. TIN-2024-XXXX"
-            />
-          </div>
-        </div>
-      </AccordionSection>
-
-      {/* Banking — bank name + account number are India-domestic; SWIFT/IBAN
-          are international. All optional at the form level so vendors can
-          fill what applies. Persisted to VendorBankDetails (1:1 with Vendor). */}
-      <AccordionSection
-        {...sectionProps('banking')}
-        icon={<Landmark className="w-4.5 h-4.5" aria-hidden="true" />}
-        title="Banking Details"
-        subtitle="Optional — used for payouts once your account is approved."
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="bankName" className="block text-sm font-medium text-gray-700 mb-1">
-              Bank Name <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              id="bankName"
-              value={formData.bankingDetails.bankName}
-              onChange={(e) => handleInputChange('bankingDetails', { ...formData.bankingDetails, bankName: e.target.value })}
-              autoComplete="off"
-              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
-              placeholder="e.g. HDFC Bank"
-            />
-          </div>
-          <div>
-            <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-700 mb-1">
-              Account Number <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              id="accountNumber"
-              value={formData.bankingDetails.accountNumber}
-              onChange={(e) => handleInputChange('bankingDetails', { ...formData.bankingDetails, accountNumber: e.target.value })}
-              autoComplete="off"
-              inputMode="numeric"
-              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
-              placeholder="Account number"
-            />
-          </div>
-          <div>
-            <label htmlFor="swiftCode" className="block text-sm font-medium text-gray-700 mb-1">
-              SWIFT / BIC <span className="text-gray-400">(international only)</span>
-            </label>
-            <input
-              type="text"
-              id="swiftCode"
-              value={formData.bankingDetails.swiftCode}
-              onChange={(e) => handleInputChange('bankingDetails', { ...formData.bankingDetails, swiftCode: e.target.value.toUpperCase() })}
-              autoComplete="off"
-              maxLength={11}
-              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm font-mono"
-              placeholder="e.g. HDFCINBBXXX"
-            />
-          </div>
-          <div>
-            <label htmlFor="iban" className="block text-sm font-medium text-gray-700 mb-1">
-              IBAN <span className="text-gray-400">(international only)</span>
-            </label>
-            <input
-              type="text"
-              id="iban"
-              value={formData.bankingDetails.iban}
-              onChange={(e) => handleInputChange('bankingDetails', { ...formData.bankingDetails, iban: e.target.value.toUpperCase().replace(/\s+/g, '') })}
-              autoComplete="off"
-              maxLength={34}
-              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm font-mono"
-              placeholder="e.g. DE89370400440532013000"
-            />
-          </div>
-        </div>
-      </AccordionSection>
       </div>
 
       {/* Navigation */}

@@ -1068,12 +1068,6 @@ export function CountrySelect({
                       />
                     </span>
                     <span className="flex-1 truncate">{c.name}</span>
-                    <span
-                      className={`text-xs ${isSel ? 'text-brand-600' : 'text-slate-500'}`}
-                      style={{ fontVariantNumeric: 'tabular-nums' }}
-                    >
-                      {c.code}
-                    </span>
                     <span className="flex w-4 justify-end">
                       {isSel && (
                         <Check className="h-4 w-4 shrink-0 text-brand-500" aria-hidden="true" />

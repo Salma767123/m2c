@@ -45,7 +45,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // section toggles by whether any partial rows exist), so they're not
 // listed here. Keep these in lockstep with the validation in handleNext.
 const SECTION_FIELDS: Record<string, string[]> = {
-  identity: ['ownerName', 'designation'],
+  identity: ['designation', 'ownerName'],
   contact: ['ownerEmail', 'ownerEmail2', 'ownerPhone', 'ownerPhone2', 'ownerLandline'],
   team: [],
   history: ['businessStartDate'],
@@ -266,11 +266,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       // Live phone validation — same pattern as CompanyDetails. Error only
       // *renders* after blur (touched gate), but updates live as the user
       // edits a previously-flagged number.
-      if (field === 'ownerPhone' || field === 'ownerPhone2' || field === 'ownerLandline') {
+      if (field === 'ownerPhone' || field === 'ownerPhone2') {
         const labelMap: Record<string, string> = {
           ownerPhone: 'Phone Number 1',
           ownerPhone2: 'Phone Number 2',
-          ownerLandline: 'Landline Number',
         };
         const liveErr = value
           ? validatePhoneE164(value, {
@@ -279,6 +278,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               isLive: true,
             })
           : '';
+        setErrors((prev) => (prev[field] === liveErr ? prev : { ...prev, [field]: liveErr }));
+      } else if (field === 'ownerLandline') {
+        const v = (value || '').trim();
+        const liveErr = v && !/^\d{8,15}$/.test(v) ? 'Landline Number must be 8-15 digits' : '';
         setErrors((prev) => (prev[field] === liveErr ? prev : { ...prev, [field]: liveErr }));
       }
     },
@@ -292,7 +295,6 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     const phoneLabels: Record<string, string> = {
       ownerPhone: 'Phone Number 1',
       ownerPhone2: 'Phone Number 2',
-      ownerLandline: 'Landline Number',
     };
     if (field in phoneLabels) {
       const value = (formData as any)[field] as string;
@@ -303,6 +305,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         });
         setErrors((prev) => (prev[field] === err ? prev : { ...prev, [field]: err }));
       }
+    } else if (field === 'ownerLandline') {
+      const v = (formData.ownerLandline || '').trim();
+      const err = v && !/^\d{8,15}$/.test(v) ? 'Landline Number must be 8-15 digits' : '';
+      setErrors((prev) => (prev[field] === err ? prev : { ...prev, [field]: err }));
     }
   }, [formData]);
 
@@ -349,11 +355,12 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       label: 'Phone Number 2',
     });
     if (phone2Err) newErrors.ownerPhone2 = phone2Err;
-    const landlineErr = validatePhoneE164(formData.ownerLandline, {
-      required: false,
-      label: 'Landline Number',
-    });
-    if (landlineErr) newErrors.ownerLandline = landlineErr;
+    if (formData.ownerLandline) {
+      const landline = formData.ownerLandline.trim();
+      if (landline && !/^\d{8,15}$/.test(landline)) {
+        newErrors.ownerLandline = 'Landline Number must be 8-15 digits';
+      }
+    }
 
     if (!formData.businessStartDate) newErrors.businessStartDate = 'Start date is required';
     if (!formData.employeeCount) newErrors.employeeCount = 'Please pick an employee range';
@@ -383,8 +390,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       // visible the instant the user lands on the failing field (mirrors
       // Step 1's behaviour — CompanyDetails.tsx → handleNext).
       const fieldOrder = [
-        'ownerName',
         'designation',
+        'ownerName',
         'ownerEmail',
         'ownerEmail2',
         'ownerPhone',
@@ -413,8 +420,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       requestAnimationFrame(() => {
         scrollToFirstError(newErrors, {
           fieldOrder: [
-            'ownerName',
             'designation',
+            'ownerName',
             'ownerEmail',
             'ownerEmail2',
             'ownerPhone',
@@ -535,35 +542,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         {...sectionProps('identity')}
         icon={<IdCard className="w-4.5 h-4.5" aria-hidden="true" />}
         title="Owner Identity"
-        subtitle="Owner full name and designation"
+        subtitle="Designation and owner full name"
       >
-          {/* Owner Name */}
-          <div>
-            <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Owner Full Name <span className="text-red-500" aria-hidden="true">*</span>
-            </label>
-            <input
-              id="ownerName"
-              type="text"
-              name="ownerName"
-              value={formData.ownerName}
-              onChange={(e) => handleInputChange('ownerName', e.target.value)}
-              onBlur={() => handleBlur('ownerName')}
-              autoComplete="name"
-              className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                errors.ownerName && touched.ownerName
-                  ? 'border-red-500 bg-red-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
-              placeholder="Enter owner's full name"
-            />
-            {errors.ownerName && touched.ownerName && (
-              <p className="text-red-600 text-sm mt-1 font-medium" role="alert">
-                {errors.ownerName}
-              </p>
-            )}
-          </div>
-
           {/* Designation — chip group + "Other" conditional input */}
           {(() => {
             const d = formData.designation;
@@ -647,6 +627,33 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               </div>
             );
           })()}
+
+          {/* Owner Name */}
+          <div>
+            <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-1.5">
+              Owner Full Name <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="ownerName"
+              type="text"
+              name="ownerName"
+              value={formData.ownerName}
+              onChange={(e) => handleInputChange('ownerName', e.target.value)}
+              onBlur={() => handleBlur('ownerName')}
+              autoComplete="name"
+              className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
+                errors.ownerName && touched.ownerName
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+              placeholder="Enter owner's full name"
+            />
+            {errors.ownerName && touched.ownerName && (
+              <p className="text-red-600 text-sm mt-1 font-medium" role="alert">
+                {errors.ownerName}
+              </p>
+            )}
+          </div>
       </AccordionSection>
 
       <AccordionSection
@@ -765,18 +772,25 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
             </div>
 
             <div className="sm:col-span-2 sm:max-w-md">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="ownerLandline" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Landline Number{' '}
                 <span className="text-gray-400 text-xs font-normal">(optional)</span>
               </label>
-              <PhoneInput
+              <input
+                id="ownerLandline"
+                type="tel"
                 name="ownerLandline"
                 value={formData.ownerLandline}
-                onChange={(v) => handleInputChange('ownerLandline', v)}
+                onChange={(e) => handleInputChange('ownerLandline', e.target.value.replace(/\D/g, ''))}
                 onBlur={() => handleBlur('ownerLandline')}
-                invalid={!!(errors.ownerLandline && touched.ownerLandline)}
-                placeholder="2228175000"
+                inputMode="tel"
                 autoComplete="off"
+                className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
+                  errors.ownerLandline && touched.ownerLandline
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+                placeholder="2228175000"
               />
               {errors.ownerLandline && touched.ownerLandline && (
                 <p className="text-red-600 text-sm mt-1 font-medium" role="alert">

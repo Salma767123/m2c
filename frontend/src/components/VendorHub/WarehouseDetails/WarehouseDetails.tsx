@@ -174,9 +174,9 @@ export default function WarehouseDetails({
   // from re-rendering just because the parent re-rendered.
   const handleInputChange = useCallback(
     (field: string, value: any) => {
-      // Defensive: ignore edits while linked. The UI disables inputs but a
-      // programmatic call shouldn't be able to bypass the lock either.
-      if (isLinked) return;
+      // Defensive: ignore edits while linked, EXCEPT for warehousingCapacity
+      // which should remain editable even when address is linked
+      if (isLinked && field !== 'warehousingCapacity') return;
       setFormData((prev) => ({ ...prev, [field]: value }));
       // Clear error when user starts typing
       setErrors((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
@@ -601,14 +601,7 @@ export default function WarehouseDetails({
                 value={formData.warehousingCapacity}
                 onChange={(e) => handleInputChange('warehousingCapacity', e.target.value)}
                 onBlur={() => handleBlur('warehousingCapacity')}
-                disabled={isLinked}
-                readOnly={isLinked}
-                aria-readonly={isLinked}
-                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                  isLinked
-                    ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
-                    : 'border-slate-300 hover:border-slate-400'
-                }`}
+                className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
                 placeholder="e.g. 50000"
                 min="0"
               />

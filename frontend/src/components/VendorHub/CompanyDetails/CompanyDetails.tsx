@@ -464,11 +464,10 @@ export default function CompanyDetails({
     // aren't shouted at while typing the first few digits — but once
     // they've blurred, subsequent edits get live feedback as they
     // correct the number.
-    if (field === 'phone' || field === 'phoneNumber2' || field === 'landlineNumber') {
+    if (field === 'phone' || field === 'phoneNumber2') {
       const labelMap: Record<string, string> = {
         phone: 'Phone Number 1',
         phoneNumber2: 'Phone Number 2',
-        landlineNumber: 'Landline Number',
       };
       const liveErr = value
         ? validatePhoneE164(value, {
@@ -522,10 +521,11 @@ export default function CompanyDetails({
         label: 'Phone Number 2',
       });
     } else if (field === 'landlineNumber' && currentFormData.landlineNumber) {
-      fieldError = validatePhoneE164(currentFormData.landlineNumber, {
-        required: false,
-        label: 'Landline Number',
-      });
+      // Simple validation for landline: just digits, 8-15 characters
+      const landline = currentFormData.landlineNumber.trim();
+      if (landline && !/^\d{8,15}$/.test(landline)) {
+        fieldError = 'Landline Number must be 8-15 digits';
+      }
     }
 
     if (fieldError) {
@@ -837,11 +837,14 @@ export default function CompanyDetails({
     });
     if (phone2Err) newErrors.phoneNumber2 = phone2Err;
 
-    const landlineErr = validatePhoneE164(currentFormData.landlineNumber, {
-      required: false,
-      label: 'Landline Number',
-    });
-    if (landlineErr) newErrors.landlineNumber = landlineErr;
+    // Simple validation for landline: just digits, 8-15 characters
+    if (currentFormData.landlineNumber) {
+      const landline = currentFormData.landlineNumber.trim();
+      if (landline && !/^\d{8,15}$/.test(landline)) {
+        newErrors.landlineNumber = 'Landline Number must be 8-15 digits';
+      }
+    }
+    
     if (!currentFormData.address) newErrors.address = 'Address is required';
     if (!currentFormData.city) newErrors.city = 'City is required';
     if (!currentFormData.state) newErrors.state = 'State is required';
@@ -1541,14 +1544,20 @@ export default function CompanyDetails({
                 <span>Landline Number</span>
                 <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
-              <PhoneInput
+              <input
+                type="tel"
                 name="landlineNumber"
                 value={formData.landlineNumber}
-                onChange={(v) => handleInputChange("landlineNumber", v)}
+                onChange={(e) => handleInputChange("landlineNumber", e.target.value)}
                 onBlur={() => handleBlur("landlineNumber")}
-                invalid={!!(errors.landlineNumber && touched.landlineNumber)}
+                className={[
+                  'w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none',
+                  errors.landlineNumber && touched.landlineNumber
+                    ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/25'
+                    : 'border-slate-300 hover:border-slate-400 focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500'
+                ].join(' ')}
                 placeholder="2228175000"
-                autoComplete="off"
+                autoComplete="tel"
               />
               {errors.landlineNumber && touched.landlineNumber && (
                 <p className="text-red-500 text-xs mt-1">{errors.landlineNumber}</p>
@@ -1585,6 +1594,53 @@ export default function CompanyDetails({
           title="Legal Address & Factory Site"
           subtitle="Registered address, location details, and facility ownership"
         >
+          {/* Factory Ownership - MOVED TO FIRST */}
+          <div>
+            <label id="factoryOwnership-label" className="block text-sm font-semibold text-slate-700 mb-1">
+              Factory Ownership{' '}
+              <span className="text-brand-500" aria-hidden="true">*</span>
+            </label>
+            <p className="text-xs text-slate-500 mb-3">
+              Select the type of ownership for your factory facility.
+            </p>
+            <div
+              className="flex flex-wrap gap-2"
+              role="radiogroup"
+              data-field="factoryOwnershipType"
+              aria-labelledby="factoryOwnership-label"
+              aria-describedby={
+                errors.factoryOwnershipType && touched.factoryOwnershipType
+                  ? 'factoryOwnership-error'
+                  : undefined
+              }
+            >
+              {factoryOwnershipTypes.map((type) => {
+                const selected = formData.factoryOwnershipType === type.id;
+                const invalid =
+                  !!(errors.factoryOwnershipType && touched.factoryOwnershipType) &&
+                  !formData.factoryOwnershipType;
+                return (
+                  <ToggleButton
+                    key={type.id}
+                    selected={selected}
+                    invalid={invalid}
+                    onClick={() => {
+                      handleInputChange('factoryOwnershipType', type.id);
+                      handleBlur('factoryOwnershipType');
+                    }}
+                  >
+                    {type.label}
+                  </ToggleButton>
+                );
+              })}
+            </div>
+            {errors.factoryOwnershipType && touched.factoryOwnershipType && (
+              <p id="factoryOwnership-error" className="text-red-500 text-xs mt-2" role="alert">
+                {errors.factoryOwnershipType}
+              </p>
+            )}
+          </div>
+
           {/* Location search shortcut */}
           <div>
             <label htmlFor="addressSearch" className="block text-sm font-semibold text-slate-700 mb-1">
@@ -1789,53 +1845,6 @@ export default function CompanyDetails({
             </div>
             {errors.country && touched.country && (
               <p id="company-country-error" className="text-red-500 text-xs mt-1" role="alert">{errors.country}</p>
-            )}
-          </div>
-
-          {/* Factory Ownership */}
-          <div>
-            <label id="factoryOwnership-label" className="block text-sm font-semibold text-slate-700 mb-1">
-              Factory Ownership{' '}
-              <span className="text-brand-500" aria-hidden="true">*</span>
-            </label>
-            <p className="text-xs text-slate-500 mb-3">
-              Select the type of ownership for your factory facility.
-            </p>
-            <div
-              className="flex flex-wrap gap-2"
-              role="radiogroup"
-              data-field="factoryOwnershipType"
-              aria-labelledby="factoryOwnership-label"
-              aria-describedby={
-                errors.factoryOwnershipType && touched.factoryOwnershipType
-                  ? 'factoryOwnership-error'
-                  : undefined
-              }
-            >
-              {factoryOwnershipTypes.map((type) => {
-                const selected = formData.factoryOwnershipType === type.id;
-                const invalid =
-                  !!(errors.factoryOwnershipType && touched.factoryOwnershipType) &&
-                  !formData.factoryOwnershipType;
-                return (
-                  <ToggleButton
-                    key={type.id}
-                    selected={selected}
-                    invalid={invalid}
-                    onClick={() => {
-                      handleInputChange('factoryOwnershipType', type.id);
-                      handleBlur('factoryOwnershipType');
-                    }}
-                  >
-                    {type.label}
-                  </ToggleButton>
-                );
-              })}
-            </div>
-            {errors.factoryOwnershipType && touched.factoryOwnershipType && (
-              <p id="factoryOwnership-error" className="text-red-500 text-xs mt-2" role="alert">
-                {errors.factoryOwnershipType}
-              </p>
             )}
           </div>
 
