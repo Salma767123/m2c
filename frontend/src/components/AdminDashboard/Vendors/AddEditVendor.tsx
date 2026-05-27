@@ -85,7 +85,11 @@ interface VendorFormData {
   warehouseState: string
   warehouseZip: string
   warehouseCountry: string
-  factoryImages: any[]
+  // Slot-keyed Record in edit mode (`{ nameBoard: {file,url,name}, ... }`)
+  // mirroring WarehouseDetails state. Pre-fill defaults to empty `{}`; the
+  // component's normaliseFactoryImages also tolerates the legacy array shape
+  // for backwards compatibility during the migration window.
+  factoryImages: Record<string, { file: File | null; url: string; name: string; isExisting?: boolean }> | any[]
   mapLink: string
 
   // Owner Profile
@@ -123,6 +127,12 @@ interface VendorFormData {
   selectedCertifications: string[]
   certificationFiles: { [key: string]: any }
   certificationExpiryDates: { [key: string]: string }
+  /** User-defined custom certs (Step 6 "other certifications") — name +
+   *  optional description. Persisted as VendorCertification rows with
+   *  `isCustom: true`. Kept separate from the catalog-id `selectedCertifications`
+   *  list so reloads don't pollute the chip set with phantom entries. */
+  otherCertifications: Array<{ id: string; name: string; description?: string }>
+
   packagingCapabilities: string
   warehousingCapacity: string
   logisticsPartners: string
@@ -220,7 +230,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     warehouseState: '',
     warehouseZip: '',
     warehouseCountry: 'India',
-    factoryImages: [],
+    factoryImages: {},
     mapLink: '',
 
     // Owner Profile
@@ -252,6 +262,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 
     // Certifications & Logistics
     selectedCertifications: [],
+    otherCertifications: [],
     certificationFiles: {},
     certificationExpiryDates: {},
     packagingCapabilities: '',
@@ -292,58 +303,37 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   })
 
   const steps = [
-    { title: 'Company Details', icon: Building2 },
-    { title: 'Warehouse Details', icon: MapPin },
-    { title: 'Owner Profile', icon: User },
-    { title: 'Vendor Type & Products', icon: Package },
-    { title: 'Manufacturing Facilities', icon: Factory },
-    { title: 'Certifications & Logistics', icon: Award },
-    { title: 'Contact & Trade Info', icon: Phone },
-    { title: 'Review & Submit', icon: CheckCircle }
+    { title: 'Company Details', icon: Building2 },             // 0
+    { title: 'Warehouse Details', icon: MapPin },              // 1
+    { title: 'Owner Profile', icon: User },                    // 2
+    { title: 'Vendor Type & Products', icon: Package },        // 3
+    { title: 'Manufacturing Facilities', icon: Factory },      // 4 — skipped when non-manufacturer
+    { title: 'Certifications & Logistics', icon: Award },      // 5
+    { title: 'Contact & Trade Info', icon: Phone },            // 6
+    { title: 'Review & Submit', icon: CheckCircle }            // 7
   ]
 
-  // Check if Manufacturing Facilities step should be included
+  const MANUFACTURING_STEP_INDEX = 4
+
   const isManufacturer = () => {
     const vendorTypes = formData.vendorType || []
     return Array.isArray(vendorTypes) ? vendorTypes.includes('manufacturer') : vendorTypes === 'manufacturer'
   }
 
-  // Generate dynamic steps based on vendor type
-  const getSteps = () => {
-    if (isManufacturer()) {
-      return steps // Include all steps including Manufacturing Facilities
-    } else {
-      // Skip Manufacturing Facilities step
-      return steps.filter((_, index) => index !== 4)
-    }
-  }
+  // All 8 steps are always rendered in the sidebar for a stable step count.
+  // Manufacturing Facilities is auto-skipped at nav-time once Step 4
+  // (Vendor Type) is saved with no manufacturer selection.
+  const isStepSkipped = (index: number) =>
+    index === MANUFACTURING_STEP_INDEX &&
+    completedSteps.includes(3) &&
+    !isManufacturer()
 
-  const filteredSteps = getSteps()
-
-  // Map logical step to actual step index
-  const getActualStepIndex = (logicalStep: number) => {
-    if (isManufacturer()) {
-      return logicalStep // No mapping needed
-    } else {
-      // Skip Manufacturing Facilities (index 4)
-      if (logicalStep >= 4) {
-        return logicalStep + 1 // Add 1 to account for skipped step
-      }
-      return logicalStep
+  const findAdjacent = (from: number, dir: 1 | -1) => {
+    let next = from + dir
+    while (next >= 0 && next < steps.length && isStepSkipped(next)) {
+      next += dir
     }
-  }
-
-  // Map actual step index to logical step
-  const getLogicalStepIndex = (actualStep: number) => {
-    if (isManufacturer()) {
-      return actualStep // No mapping needed
-    } else {
-      // Skip Manufacturing Facilities (index 4)
-      if (actualStep > 4) {
-        return actualStep - 1 // Subtract 1 to account for skipped step
-      }
-      return actualStep
-    }
+    return next
   }
 
   useEffect(() => {
@@ -394,14 +384,6 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 
       console.log('Vendor data loaded:', vendor)
 
-      // Map companyType from backend enum to form value
-      const companyTypeMap: Record<string, string> = {
-        'SOLE_PROPRIETORSHIP': 'sole',
-        'PARTNERSHIP': 'partnership',
-        'CORPORATION': 'corporation',
-        'LLC': 'llc',
-      }
-
       // Parse mainContact from backend (stored as JSON)
       const mainContactData = vendor.mainContact || {}
 
@@ -411,10 +393,69 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       const findDocUrl = (type: string): string | null =>
         vendor.documents?.find((doc: { type: string; documentUrl: string }) => doc.type === type)?.documentUrl || null;
 
+      // Reverse of backend CERT_NAME_MAP — friendly name (as stored in DB) →
+      // form chip id. The old code did `cert.name.toLowerCase()` which only
+      // worked for single-word certs; multi-word names ("SMETA / Sedex",
+      // "ISO 9001", "ISO 14001", "Fair Trade") would silently fail to match
+      // any chip and lose their file + expiry on every reload, and on save
+      // the existing-URL preservation key didn't match either → admin save
+      // wiped the certificate document. Keep this in sync with the backend
+      // `CERT_NAME_MAP` (vendorController.js) and the CERTIFICATIONS catalog
+      // (CertificationsLogistics.tsx).
+      const CATALOG_NAME_TO_CHIP: Record<string, string> = {
+        'OEKO-TEX': 'oeko-tex',
+        'GOTS': 'gots',
+        'GRS': 'grs',
+        'SMETA / Sedex': 'smeta',
+        'ISO 9001': 'iso-9001',
+        'ISO 14001': 'iso-14001',
+        'BSCI': 'bsci',
+        'FSC': 'fsc',
+        'Fair Trade': 'fair-trade',
+        'WRAP': 'wrap',
+        'BCI': 'bci',
+      };
+      const allCerts = vendor.certifications || [];
+      const catalogCerts = allCerts.filter((c: any) => !c.isCustom);
+      const customCerts = allCerts.filter((c: any) => c.isCustom);
+
+      const reloadedSelectedCertifications: string[] = [];
+      const reloadedCertificationFiles: Record<string, any> = {};
+      const reloadedCertificationExpiryDates: Record<string, string> = {};
+      catalogCerts.forEach((cert: any) => {
+        const chipId = CATALOG_NAME_TO_CHIP[cert.name];
+        if (!chipId) return; // unmappable legacy row — skip rather than corrupt the chip set
+        reloadedSelectedCertifications.push(chipId);
+        if (cert.documentUrl) {
+          reloadedCertificationFiles[chipId] = {
+            url: cert.documentUrl,
+            name: cert.documentUrl.split('/').pop() || `${cert.name} Certificate`,
+            size: 0,
+            type: cert.documentUrl.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg',
+            isExisting: true,
+          };
+        }
+        if (cert.expiryDate) {
+          reloadedCertificationExpiryDates[chipId] = new Date(cert.expiryDate).toISOString().split('T')[0];
+        }
+      });
+
+      // Custom certs (Step 6 "other certifications"). Carry the vendor-typed
+      // name + description back into the form so admins see what was originally
+      // submitted instead of an empty list.
+      const reloadedOtherCertifications = customCerts.map((c: any, i: number) => ({
+        id: c.id || `custom-${i}`,
+        name: c.name,
+        description: c.description || '',
+      }));
+
       // Map vendor data to form structure
       setFormData({
         // Company Details
-        businessType: (vendor.companyType && companyTypeMap[vendor.companyType]) || 'corporation',
+        // Read the Step 1 chip selection from the raw `businessType` column.
+        // Fall back to '' (no chip selected) for legacy rows that pre-date
+        // this column — the form will leave the chip unselected.
+        businessType: vendor.businessType || '',
         companyName: vendor.companyName || '',
         gstNumber: vendor.gstNumber || '',
         companyIdNumber: vendor.companyIdNumber || '',
@@ -457,12 +498,44 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         warehouseState: vendor.warehouseState || '',
         warehouseZip: vendor.warehouseZipCode || '',
         warehouseCountry: vendor.warehouseCountry || 'India',
-        factoryImages: vendor.documents?.filter((doc: any) => doc.type === 'OTHER' && doc.name.includes('Factory')).map((doc: any, index: number) => ({
-          url: doc.documentUrl,
-          name: doc.name || `Factory Image ${index + 1}`,
-          id: doc.id || `existing-${index}`,
-          isExisting: true,
-        })) || [],
+        // Reverse map: descriptive document name → slot id. Mirrors
+        // FACTORY_SLOT_LABEL_MAP in backend/controllers/vendorController.js
+        // and FACTORY_IMAGE_SLOTS in WarehouseDetails.tsx; keep all three in
+        // sync if new slots are added.
+        // Build slot-keyed Record so WarehouseDetails renders existing photos
+        // back into their original slots. Legacy rows named "Factory Image N"
+        // (pre-slot era) collapse into the `others` slot so they remain
+        // visible and replaceable.
+        factoryImages: (() => {
+          const slotByName: Record<string, string> = {
+            'Factory Name Board': 'nameBoard',
+            'Factory Front View': 'frontView',
+            'Factory Back View': 'backView',
+            'Factory Left View': 'leftView',
+            'Factory Right View': 'rightView',
+            'Factory Road View': 'roadView',
+            'Factory Interior': 'insideFactory',
+            'Factory Image (Other)': 'others',
+          };
+          const record: Record<string, { file: File | null; url: string; name: string; isExisting: boolean }> = {};
+          const factoryDocs = vendor.documents?.filter(
+            (doc: any) => doc.type === 'OTHER' && doc.name?.includes('Factory'),
+          ) || [];
+          factoryDocs.forEach((doc: any) => {
+            const slotId = slotByName[doc.name] || 'others';
+            // Don't overwrite a slot that already has a more-specific match;
+            // legacy fallback into `others` only fills if `others` is empty.
+            if (!record[slotId]) {
+              record[slotId] = {
+                file: null,
+                url: doc.documentUrl,
+                name: doc.name,
+                isExisting: true,
+              };
+            }
+          });
+          return record;
+        })(),
         mapLink: vendor.mapLink || '',
 
         // Owner Profile
@@ -477,15 +550,35 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           ? new Date(vendor.businessStartDate).toISOString().split('T')[0]
           : '',
         yearEstablished: vendor.establishedYear?.toString() || '',
-        employeeCount: vendor.annualTurnover || '',
+        // Read the headcount range from its own column. (The old code
+        // pointed at `annualTurnover` — a stale proxy from before the
+        // dedicated `employeeCount` column existed.)
+        employeeCount: vendor.employeeCount || '',
         additionalOwners: vendor.additionalOwners || [],
 
         // Vendor Type & Products
         // Prefer the new multi-select `vendorTypes` array when present; fall
-        // back to the legacy single-enum mapping for older rows.
-        vendorType: Array.isArray(vendor.vendorTypes) && vendor.vendorTypes.length > 0
-          ? vendor.vendorTypes
-          : vendor.vendorType === 'TEXTILE_MANUFACTURER' ? ['manufacturer'] : ['trader'],
+        // back to deriving from the role/legacy enums for older rows.
+        // Reverse-map by priority:
+        //   1. vendorTypes array (the canonical multi-select column)
+        //   2. companyType enum (vendor role — set since the role-vs-structure split)
+        //   3. vendorType legacy enum (single-value, only useful for TEXTILE_MANUFACTURER)
+        //   4. [] — leaves the chips unselected for unmappable legacy values
+        //      (TRADER / DISTRIBUTOR / WHOLESALER / RETAILER have no chip equivalent).
+        vendorType: (() => {
+          if (Array.isArray(vendor.vendorTypes) && vendor.vendorTypes.length > 0) {
+            return vendor.vendorTypes;
+          }
+          const roleEnumToChip: Record<string, string> = {
+            'MANUFACTURER': 'manufacturer',
+            'IMPORTER': 'importer',
+            'EXPORTER': 'exporter',
+          };
+          const roleChip = roleEnumToChip[(vendor as any).companyType];
+          if (roleChip) return [roleChip];
+          if (vendor.vendorType === 'TEXTILE_MANUFACTURER') return ['manufacturer'];
+          return [];
+        })(),
         marketType: vendor.primaryMarkets || [],
         categoryProducts: (vendor.categoryProducts as { [key: string]: unknown[] }) || {},
         additionalCategories: vendor.additionalCategories || [],
@@ -504,30 +597,13 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         enabledFacilities: vendor.enabledFacilities || {},
         facilityDetails: vendor.facilityDetails || {},
 
-        // Certifications & Logistics
-        selectedCertifications: vendor.certifications?.map((cert: any) => {
-          return cert.name.toLowerCase();
-        }) || [],
-        certificationFiles: vendor.certifications?.reduce((acc: any, cert: any) => {
-          if (cert.documentUrl) {
-            const certId = cert.name.toLowerCase();
-            acc[certId] = {
-              url: cert.documentUrl,
-              name: cert.documentUrl.split('/').pop() || `${cert.name} Certificate`,
-              size: 0,
-              type: cert.documentUrl.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg',
-              isExisting: true,
-            };
-          }
-          return acc;
-        }, {}) || {},
-        certificationExpiryDates: vendor.certifications?.reduce((acc: any, cert: any) => {
-          if (cert.expiryDate) {
-            const certId = cert.name.toLowerCase();
-            acc[certId] = new Date(cert.expiryDate).toISOString().split('T')[0]
-          }
-          return acc
-        }, {}) || {},
+        // Certifications & Logistics — built above from a split on
+        // `isCustom`, with catalog certs reverse-mapped to chip ids via
+        // CATALOG_NAME_TO_CHIP so multi-word names match correctly.
+        selectedCertifications: reloadedSelectedCertifications,
+        certificationFiles: reloadedCertificationFiles,
+        certificationExpiryDates: reloadedCertificationExpiryDates,
+        otherCertifications: reloadedOtherCertifications,
         packagingCapabilities: vendor.packagingCapabilities || '',
         warehousingCapacity: vendor.storageCapacity || '',
         logisticsPartners: vendor.logisticsPartners || '',
@@ -535,8 +611,14 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         qualityControlProcess: vendor.qualityControl || '',
         complianceStandards: vendor.complianceStandards || '',
 
-        // Contact & Trade Info
+        // Contact & Trade Info — spread the stored JSON FIRST so every field
+        // the registration form persisted (firstName / middleName / lastName /
+        // customDesignation / customDepartment / landline / etc.) flows back
+        // into the edit form. Then layer the owner-derived fallbacks on top
+        // for the required core fields so an empty `mainContact` JSON still
+        // resolves to a usable contact.
         mainContact: {
+          ...mainContactData,
           name: mainContactData.name || vendor.ownerName || '',
           designation: mainContactData.designation || 'Owner',
           email1: mainContactData.email1 || vendor.ownerEmail || '',
@@ -544,7 +626,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           phone1: mainContactData.phone1 || vendor.ownerPhone || '',
           phone2: mainContactData.phone2 || '',
           department: mainContactData.department || 'Management',
-          photo: mainContactData.photo || vendor.ownerPhoto || null
+          photo: mainContactData.photo || vendor.ownerPhoto || null,
         },
         alternateContacts: vendor.alternateContacts || [],
         // Treat either flag as "yes" so the FE chip reflects any kind of
@@ -600,47 +682,29 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   }
 
   const nextStep = () => {
-    const maxStep = filteredSteps.length - 1
-    if (currentStep < maxStep) {
-      // Mark current step as completed
+    if (currentStep < steps.length - 1) {
       if (!completedSteps.includes(currentStep)) {
         setCompletedSteps(prev => [...prev, currentStep])
       }
-
-      // Special handling when moving from Vendor Type & Products step
-      if (currentStep === 3) {
-        // If not a manufacturer, skip Manufacturing Facilities
-        if (!isManufacturer()) {
-          setCurrentStep(4) // Go directly to Certifications & Logistics (logical step 4, which maps to actual step 5)
-        } else {
-          setCurrentStep(currentStep + 1) // Go to Manufacturing Facilities
-        }
-      } else {
-        setCurrentStep(currentStep + 1)
-      }
+      setCurrentStep(findAdjacent(currentStep, 1))
     }
   }
 
   const prevStep = () => {
     if (currentStep > 0) {
-      // Special handling when moving back from Certifications & Logistics
-      if (currentStep === 4 && !isManufacturer()) {
-        setCurrentStep(3) // Go back to Vendor Type & Products (skip Manufacturing Facilities)
-      } else {
-        setCurrentStep(currentStep - 1)
-      }
+      setCurrentStep(findAdjacent(currentStep, -1))
     }
   }
 
   const goToStep = async (step: number) => {
-    // Only allow navigation to current step or completed steps
-    // Do NOT allow jumping to next step without completing current one
+    if (isStepSkipped(step)) return
+
+    // Allow navigation to current step or completed steps.
     const canNavigate = step === currentStep || completedSteps.includes(step)
 
     if (canNavigate) {
       setCurrentStep(step)
     } else {
-      // Show warning toast
       const { toast } = await import('@/hooks/use-toast')
       toast({
         title: 'Step Locked',
@@ -703,9 +767,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   }
 
   const renderStepContent = () => {
-    const actualStepIndex = getActualStepIndex(currentStep)
-
-    switch (actualStepIndex) {
+    switch (currentStep) {
       case 0:
         return <CompanyDetails onNext={nextStep} onUpdateData={updateFormData} data={formData} />
       case 1:
@@ -721,7 +783,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       case 6:
         return <ContactTradeInfo onNext={nextStep} onPrev={prevStep} onUpdateData={updateFormData} data={formData} />
       case 7:
-        return <AdminReviewSubmitStep formData={formData} onSubmit={handleSubmit} onGoToStep={(step) => goToStep(getLogicalStepIndex(step))} mode={mode} />
+        return <AdminReviewSubmitStep formData={formData} onSubmit={handleSubmit} onGoToStep={goToStep} mode={mode} />
       default:
         return <CompanyDetails onNext={nextStep} onUpdateData={updateFormData} data={formData} />
     }
@@ -757,33 +819,42 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
             </div>
 
             <div className="space-y-4">
-              {filteredSteps.map((step, index) => {
+              {steps.map((step, index) => {
                 const Icon = step.icon
-                const isCompleted = completedSteps.includes(index)
-                const isCurrent = index === currentStep
-                const isAccessible = isCurrent || isCompleted
-                const isLocked = !isAccessible
+                const skipped = isStepSkipped(index)
+                const isCompleted = completedSteps.includes(index) && !skipped
+                const isCurrent = index === currentStep && !skipped
+                const isAccessible = !skipped && (isCurrent || isCompleted)
+                const isLocked = !skipped && !isAccessible
 
                 return (
                   <div
                     key={index}
-                    className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${isCurrent
-                      ? 'bg-brand-50/50 border-r-4 border-brand-500 cursor-pointer'
-                      : isCompleted
-                        ? 'bg-success-50 hover:bg-success-50/70 cursor-pointer'
-                        : 'bg-gray-50 opacity-60 cursor-not-allowed'
+                    className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ${
+                      skipped
+                        ? 'bg-gray-50 opacity-50 cursor-not-allowed'
+                        : isCurrent
+                          ? 'bg-brand-50/50 border-r-4 border-brand-500 cursor-pointer'
+                          : isCompleted
+                            ? 'bg-success-50 hover:bg-success-50/70 cursor-pointer'
+                            : 'bg-gray-50 opacity-60 cursor-not-allowed'
                       }`}
-                    onClick={() => goToStep(index)}
+                    onClick={() => !skipped && goToStep(index)}
                   >
                     <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${isCurrent
-                        ? 'bg-brand-500 text-white'
-                        : isCompleted
-                          ? 'bg-success-500 text-white'
-                          : 'bg-gray-300 text-gray-500'
+                      className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
+                        skipped
+                          ? 'bg-gray-100 text-gray-400 border border-dashed border-gray-300'
+                          : isCurrent
+                            ? 'bg-brand-500 text-white'
+                            : isCompleted
+                              ? 'bg-success-500 text-white'
+                              : 'bg-gray-300 text-gray-500'
                         }`}
                     >
-                      {isCompleted ? (
+                      {skipped ? (
+                        <span>&mdash;</span>
+                      ) : isCompleted ? (
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
@@ -798,22 +869,28 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 
                     <div className="flex-1">
                       <p
-                        className={`text-sm font-medium ${isCurrent
-                          ? 'text-brand-700'
-                          : isCompleted
-                            ? 'text-success-700'
-                            : 'text-gray-400'
+                        className={`text-sm font-medium ${
+                          skipped
+                            ? 'text-gray-400 line-through decoration-gray-300'
+                            : isCurrent
+                              ? 'text-brand-700'
+                              : isCompleted
+                                ? 'text-success-700'
+                                : 'text-gray-400'
                           }`}
                       >
                         {step.title}
                       </p>
-                      {isCurrent && (
+                      {skipped && (
+                        <p className="text-xs text-gray-400 mt-1">Not applicable</p>
+                      )}
+                      {!skipped && isCurrent && (
                         <p className="text-xs text-brand-600 mt-1">Current Step</p>
                       )}
-                      {isCompleted && (
+                      {!skipped && isCompleted && (
                         <p className="text-xs text-success-500 mt-1">Completed</p>
                       )}
-                      {isLocked && (
+                      {!skipped && isLocked && (
                         <p className="text-xs text-gray-400 mt-1">Locked</p>
                       )}
                     </div>
@@ -822,21 +899,38 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
               })}
             </div>
 
-            {/* Progress Summary */}
-            <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">Progress</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {Math.round(((currentStep) / (filteredSteps.length - 1)) * 100)}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-linear-to-r from-brand-500 to-brand-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${((currentStep) / (filteredSteps.length - 1)) * 100}%` }}
-                ></div>
-              </div>
-            </div>
+            {/* Progress Summary — skipped steps excluded from both numerator
+                and denominator; current in-progress step earns partial
+                credit so the bar moves before Save & Continue is hit. */}
+            {(() => {
+              const visibleStepCount = steps.filter((_, i) => !isStepSkipped(i)).length
+              const completedVisibleCount = completedSteps.filter(i => !isStepSkipped(i)).length
+              const inProgressCredit =
+                !isStepSkipped(currentStep) && !completedSteps.includes(currentStep) ? 0.4 : 0
+              const progressPercent = Math.min(
+                100,
+                Math.round(((completedVisibleCount + inProgressCredit) / visibleStepCount) * 100),
+              )
+              return (
+                <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-700">Progress</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {progressPercent}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-linear-to-r from-brand-500 to-brand-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${progressPercent}%` }}
+                    ></div>
+                  </div>
+                  <div className="mt-2 text-[10px] text-gray-500 font-medium tabular-nums">
+                    {completedVisibleCount} of {visibleStepCount} completed
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </div>
 
@@ -851,14 +945,14 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                     {currentStep + 1}
                   </div>
                   <div>
-                    <h1 className="text-headline-md text-gray-900">{filteredSteps[currentStep].title}</h1>
-                    <p className="text-gray-600">Step {currentStep + 1} of {filteredSteps.length}</p>
+                    <h1 className="text-headline-md text-gray-900">{steps[currentStep].title}</h1>
+                    <p className="text-gray-600">Step {currentStep + 1} of {steps.length}</p>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-1">
                   <div
                     className="bg-brand-500 h-1 rounded-full transition-all duration-300"
-                    style={{ width: `${((currentStep + 1) / filteredSteps.length) * 100}%` }}
+                    style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
                   ></div>
                 </div>
               </div>

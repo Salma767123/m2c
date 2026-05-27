@@ -11,16 +11,18 @@ import ContactTradeInfo from "../ContactTradeInfo/ContactTradeInfo";
 import ReviewSubmit from "../ReviewSubmit/ReviewSubmit";
 // import ReviewSubmit from '../ReviewSubmit/ReviewSubmit'; // Temporarily commented out
 
-const baseSteps = [
-  "Company Details",
-  "Warehouse",
-  "Owner Profile",
-  "Vendor Type & Products",
-  "Manufacturing Facilities", // This will be conditionally included
-  "Certifications & Logistics",
-  "Contact & Trade Info",
-  "Review & Submit",
+const steps = [
+  "Company Details",            // 0
+  "Warehouse",                  // 1
+  "Owner Profile",              // 2
+  "Vendor Type & Products",     // 3
+  "Manufacturing Facilities",   // 4 — skipped at nav-time when non-manufacturer
+  "Certifications & Logistics", // 5
+  "Contact & Trade Info",       // 6
+  "Review & Submit",            // 7
 ];
+
+const MANUFACTURING_STEP_INDEX = 4;
 
 interface FormData {
   vendorType?: string | string[];
@@ -33,7 +35,6 @@ export default function VendorPanel() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isEditingFromReview, setIsEditingFromReview] = useState(false);
 
-  // Check if Manufacturing Facilities step should be included
   const isManufacturer = () => {
     const vendorTypes = formData.vendorType || [];
     return Array.isArray(vendorTypes)
@@ -41,42 +42,21 @@ export default function VendorPanel() {
       : vendorTypes === "manufacturer";
   };
 
-  // Generate dynamic steps based on vendor type
-  const getSteps = () => {
-    if (isManufacturer()) {
-      return baseSteps; // Include all steps including Manufacturing Facilities
-    } else {
-      // Skip Manufacturing Facilities step
-      return baseSteps.filter((_, index) => index !== 4);
-    }
-  };
+  // Manufacturing Facilities is only relevant once the vendor has committed
+  // to a type on Step 4. Before then we keep the step "live" so the sidebar
+  // shows a stable 8-step flow. After Step 4 is saved, non-manufacturers see
+  // it marked N/A and nav skips over it.
+  const isStepSkipped = (index: number) =>
+    index === MANUFACTURING_STEP_INDEX &&
+    completedSteps.includes(3) &&
+    !isManufacturer();
 
-  const steps = getSteps();
-
-  // Map logical step to actual step index
-  const getActualStepIndex = (logicalStep: number) => {
-    if (isManufacturer()) {
-      return logicalStep; // No mapping needed
-    } else {
-      // Skip Manufacturing Facilities (index 4)
-      if (logicalStep >= 4) {
-        return logicalStep + 1; // Add 1 to account for skipped step
-      }
-      return logicalStep;
+  const findAdjacent = (from: number, dir: 1 | -1) => {
+    let next = from + dir;
+    while (next >= 0 && next < steps.length && isStepSkipped(next)) {
+      next += dir;
     }
-  };
-
-  // Map actual step index to logical step
-  const getLogicalStepIndex = (actualStep: number) => {
-    if (isManufacturer()) {
-      return actualStep; // No mapping needed
-    } else {
-      // Skip Manufacturing Facilities (index 4)
-      if (actualStep > 4) {
-        return actualStep - 1; // Subtract 1 to account for skipped step
-      }
-      return actualStep;
-    }
+    return next;
   };
 
   const updateFormData = (stepData: Partial<FormData>) => {
@@ -97,22 +77,9 @@ export default function VendorPanel() {
       return;
     }
 
-    const maxStep = steps.length - 1;
-    if (currentStep < maxStep) {
-      // Mark current step as completed
+    if (currentStep < steps.length - 1) {
       markStepAsCompleted(currentStep);
-
-      // Special handling when moving from Vendor Type & Products step
-      if (currentStep === 3) {
-        // If not a manufacturer, skip Manufacturing Facilities
-        if (!isManufacturer()) {
-          setCurrentStep(4); // Go directly to Certifications & Logistics (logical step 4, which maps to actual step 5)
-        } else {
-          setCurrentStep(currentStep + 1); // Go to Manufacturing Facilities
-        }
-      } else {
-        setCurrentStep(currentStep + 1);
-      }
+      setCurrentStep(findAdjacent(currentStep, 1));
     }
   };
 
@@ -124,28 +91,32 @@ export default function VendorPanel() {
     }
 
     if (currentStep > 0) {
-      // Special handling when moving back from Certifications & Logistics
-      if (currentStep === 4 && !isManufacturer()) {
-        setCurrentStep(3); // Go back to Vendor Type & Products (skip Manufacturing Facilities)
-      } else {
-        setCurrentStep(currentStep - 1);
-      }
+      setCurrentStep(findAdjacent(currentStep, -1));
     }
   };
 
   const goToStep = (step: number, fromReviewEdit: boolean = false) => {
+    if (isStepSkipped(step)) return;
+
     if (fromReviewEdit) {
       setIsEditingFromReview(true);
       setCurrentStep(step);
       return;
     }
 
-    // Only allow going to completed steps or the next immediate step
-    if (step <= currentStep || completedSteps.includes(step - 1)) {
+    // Allow going to completed steps, the current step, or the next
+    // immediately-available step. When the previous step is skipped, fall
+    // back to the one before it so the flow doesn't get stuck.
+    const previousLive = findAdjacent(step, -1);
+    const canEnter =
+      step <= currentStep ||
+      completedSteps.includes(step - 1) ||
+      (previousLive >= 0 && completedSteps.includes(previousLive));
+
+    if (canEnter) {
       setIsEditingFromReview(false);
       setCurrentStep(step);
     } else {
-      // Show alert that previous steps must be completed
       alert(
         "Please complete the previous steps before proceeding to this step.",
       );
@@ -153,9 +124,7 @@ export default function VendorPanel() {
   };
 
   const renderStep = () => {
-    const actualStepIndex = getActualStepIndex(currentStep);
-
-    switch (actualStepIndex) {
+    switch (currentStep) {
       case 0:
         return (
           <CompanyDetails
@@ -237,15 +206,31 @@ export default function VendorPanel() {
     }
   };
 
-  const progressPercent = Math.round(
-    (completedSteps.length / steps.length) * 100,
+  // Progress reflects work-in-progress, not just saved steps:
+  //   - Skipped steps are excluded from both numerator and denominator.
+  //   - The current (in-progress) step earns a partial credit so the bar
+  //     moves as the vendor advances through the wizard, instead of sitting
+  //     at 0% until they hit Save & Continue.
+  const visibleStepCount = steps.filter((_, i) => !isStepSkipped(i)).length;
+  const completedVisibleCount = completedSteps.filter(
+    (i) => !isStepSkipped(i),
+  ).length;
+  const inProgressCredit =
+    !isStepSkipped(currentStep) && !completedSteps.includes(currentStep)
+      ? 0.4
+      : 0;
+  const progressPercent = Math.min(
+    100,
+    Math.round(
+      ((completedVisibleCount + inProgressCredit) / visibleStepCount) * 100,
+    ),
   );
 
   return (
     <div className="min-h-screen bg-linear-to-b from-gray-100 to-slate-100 font-sans">
       <div className="flex min-h-screen">
         {/* Left Sidebar — semantic <aside> + <nav> (web-design #129: no <div> with onClick) */}
-        <aside className="hidden md:flex flex-col w-68 bg-white border-r border-gray-100 sticky top-21.25 self-start h-[calc(100vh-85px)] shrink-0 z-[var(--z-sticky)] shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
+        <aside className="hidden md:flex flex-col w-68 bg-white border-r border-gray-100 sticky top-21.25 self-start h-[calc(100vh-85px)] shrink-0 z-(--z-sticky) shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
           {/* Header */}
           <div className="px-6 py-6 border-b border-gray-100 shrink-0">
             <h2 className="text-xs font-bold text-gray-900 tracking-widest uppercase">
@@ -260,12 +245,14 @@ export default function VendorPanel() {
           <nav aria-label="Registration steps" className="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin">
             <ul className="space-y-1 relative" role="list">
               {steps.map((step, index) => {
-                const isCompleted = completedSteps.includes(index);
-                const isCurrent = index === currentStep;
+                const skipped = isStepSkipped(index);
+                const isCompleted = completedSteps.includes(index) && !skipped;
+                const isCurrent = index === currentStep && !skipped;
                 const isAccessible =
-                  index <= currentStep ||
-                  isCompleted ||
-                  (index > 0 && completedSteps.includes(index - 1));
+                  !skipped &&
+                  (index <= currentStep ||
+                    isCompleted ||
+                    (index > 0 && completedSteps.includes(index - 1)));
 
                 return (
                   <li key={index} className="relative flex items-start gap-4 pb-6 last:pb-0">
@@ -285,24 +272,30 @@ export default function VendorPanel() {
                       disabled={!isAccessible}
                       onClick={() => isAccessible && goToStep(index)}
                       aria-current={isCurrent ? "step" : undefined}
-                      aria-label={`Step ${index + 1}: ${step}${isCompleted ? ", completed" : isCurrent ? ", current" : ""}`}
+                      aria-label={`Step ${index + 1}: ${step}${skipped ? ", not applicable" : isCompleted ? ", completed" : isCurrent ? ", current" : ""}`}
                       className={`flex items-start gap-3.5 p-2 rounded-xl w-full text-left transition-all duration-200 group relative
                         ${
-                          isCurrent
-                            ? "bg-brand-50/50"
-                            : isAccessible && !isCompleted
-                              ? "hover:bg-gray-50/60 cursor-pointer"
-                              : isCompleted
-                                ? "hover:bg-success-50/30 cursor-pointer"
-                                : "opacity-60 cursor-not-allowed"
+                          skipped
+                            ? "opacity-50 cursor-not-allowed"
+                            : isCurrent
+                              ? "bg-brand-50/50"
+                              : isAccessible && !isCompleted
+                                ? "hover:bg-gray-50/60 cursor-pointer"
+                                : isCompleted
+                                  ? "hover:bg-success-50/30 cursor-pointer"
+                                  : "opacity-60 cursor-not-allowed"
                         }`}
                     >
                       {/* Step Indicator Dot */}
                       <div className="relative shrink-0 z-10 flex items-center justify-center w-8 h-8">
-                        {isCompleted ? (
+                        {skipped ? (
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full border border-dashed border-gray-300 bg-gray-50 text-gray-400 text-xs font-medium">
+                            &mdash;
+                          </div>
+                        ) : isCompleted ? (
                           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success-500 text-white shadow-[0_0_0_4px_rgba(22,163,74,0.1)] transition-transform duration-200 group-hover:scale-105">
                             <svg
-                              className="w-4 h-4 stroke-[3]"
+                              className="w-4 h-4 stroke-3"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -333,16 +326,22 @@ export default function VendorPanel() {
                       <div className="flex-1 min-w-0 pt-0.5">
                         <p
                           className={`text-sm font-semibold leading-tight truncate transition-colors duration-150 ${
-                            isCurrent
-                              ? "text-brand-700 font-bold"
-                              : isCompleted
-                                ? "text-gray-700 group-hover:text-success-700"
-                                : "text-gray-500 group-hover:text-gray-900"
+                            skipped
+                              ? "text-gray-400 line-through decoration-gray-300"
+                              : isCurrent
+                                ? "text-brand-700 font-bold"
+                                : isCompleted
+                                  ? "text-gray-700 group-hover:text-success-700"
+                                  : "text-gray-500 group-hover:text-gray-900"
                           }`}
                         >
                           {step}
                         </p>
-                        {isCurrent ? (
+                        {skipped ? (
+                          <span className="text-[10px] text-gray-400 mt-0.5">
+                            Not applicable
+                          </span>
+                        ) : isCurrent ? (
                           <span className="text-[10px] text-brand-600 font-bold tracking-wide uppercase mt-0.5 flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                             In Progress
@@ -380,13 +379,13 @@ export default function VendorPanel() {
             </div>
             <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
               <div
-                className="h-1.5 rounded-full bg-gradient-to-r from-brand-500 to-brand-600 transition-[width] duration-500 ease-out shadow-[0_0_8px_rgba(224,26,27,0.15)]"
+                className="h-1.5 rounded-full bg-linear-to-r from-brand-500 to-brand-600 transition-[width] duration-500 ease-out shadow-[0_0_8px_rgba(224,26,27,0.15)]"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
             <div className="flex justify-between items-center mt-2.5">
               <span className="text-[10px] text-gray-400 font-medium tabular-nums">
-                {completedSteps.length} of {steps.length} completed
+                {completedVisibleCount} of {visibleStepCount} completed
               </span>
               {progressPercent === 100 && (
                 <span className="text-[10px] text-success-500 font-bold flex items-center gap-0.5 animate-bounce">
@@ -403,7 +402,7 @@ export default function VendorPanel() {
         {/* Right Content Area (responsive width) */}
         <div className="flex-1 w-full min-w-0">
           {/* Mobile Sticky Progress Tracker */}
-          <div className="md:hidden sticky top-[77px] z-[var(--z-sticky)] bg-white/95 backdrop-blur-md border-b border-gray-200/80 px-4 py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] transition-all duration-300">
+          <div className="md:hidden sticky top-19.25 z-(--z-sticky) bg-white/95 backdrop-blur-md border-b border-gray-200/80 px-4 py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] transition-all duration-300">
             <div className="flex justify-between items-center gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex items-center justify-center w-8 h-8 bg-brand-500 text-white rounded-lg font-bold shrink-0 text-sm shadow-[0_3px_8px_rgba(224,26,27,0.15)]">
@@ -461,19 +460,25 @@ export default function VendorPanel() {
                   aria-valuemin={0}
                   aria-valuemax={100}
                 >
-                  {steps.map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-1 flex-1 rounded-full transition-colors duration-300"
-                      style={{
-                        backgroundColor: completedSteps.includes(i)
-                          ? "var(--color-success-500)"
-                          : i === currentStep
-                            ? "var(--color-brand-500)"
-                            : "var(--color-outline)",
-                      }}
-                    />
-                  ))}
+                  {steps.map((_, i) => {
+                    const skipped = isStepSkipped(i);
+                    return (
+                      <div
+                        key={i}
+                        className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+                          skipped ? "opacity-40" : ""
+                        }`}
+                        style={{
+                          backgroundColor:
+                            !skipped && completedSteps.includes(i)
+                              ? "var(--color-success-500)"
+                              : !skipped && i === currentStep
+                                ? "var(--color-brand-500)"
+                                : "var(--color-outline)",
+                        }}
+                      />
+                    );
+                  })}
                 </div>
               </div>
 

@@ -41,7 +41,19 @@ export interface VendorRegistrationData {
   ownerPhone: string;
   ownerPhone2?: string;
   ownerLandline?: string;
-  additionalOwners?: Array<{ name: string; email: string; phone: string }>;
+  /** Additional owners / directors / partners. Required core fields are
+   *  name + email + phone; the rest are optional and mirror the primary
+   *  owner shape (designation / email2 / phone2 / landline). Backend
+   *  stores the full array as raw JSON on the `additionalOwners` column. */
+  additionalOwners?: Array<{
+    name: string;
+    designation?: string;
+    email: string;
+    email2?: string;
+    phone: string;
+    phone2?: string;
+    landline?: string;
+  }>;
   /** Full date — preferred over legacy `yearEstablished`. Backend derives
    *  `establishedYear` from this. */
   businessStartDate?: string;
@@ -183,6 +195,10 @@ export interface VendorProfile {
   id: string;
   email: string;
   companyName: string;
+  /** Raw business STRUCTURE from Step 1 (proprietorship / pvt-ltd /
+   *  partnership-firm / llp / others / <custom>). Distinct from
+   *  `companyType` (vendor role enum). */
+  businessType?: string;
   companyLogo?: string;
   gstNumber?: string;
   /** Type-specific regulatory ID — IEC / CIN / Partnership Deed / LLPIN. */
@@ -199,9 +215,20 @@ export interface VendorProfile {
   ownerPhone2?: string;
   ownerLandline?: string;
   ownerPhoto?: string;
-  additionalOwners?: Array<{ name: string; email: string; phone: string }>;
+  additionalOwners?: Array<{
+    name: string;
+    /** Optional designation — matches primary-owner shape. */
+    designation?: string;
+    email: string;
+    email2?: string;
+    phone: string;
+    phone2?: string;
+    landline?: string;
+  }>;
   /** Full date — backend derives `establishedYear` from this. */
   businessStartDate?: string;
+  /** Employee head-count range chip from Step 3 (e.g. "10-20"). */
+  employeeCount?: string;
   businessPhone: string;
   landlineNumber?: string;
   phoneNumber2?: string;
@@ -664,19 +691,44 @@ class VendorService {
         });
       }
 
-      // Handle factory images - separate existing URLs from new file uploads
-      if (vendorData.factoryImages && vendorData.factoryImages.length > 0) {
+      // Handle factory images. WarehouseDetails stores them slot-keyed
+      // (`{ nameBoard: {file,url,name}, ... }`); legacy callers may still
+      // pass an array. Always send `existingFactoryImages` (even empty)
+      // so the backend can distinguish "admin emptied this section" from
+      // "admin didn't touch it" — without this, the backend defaults to
+      // `[]` and deletes every factory document on the row. We also tag
+      // each preserved URL and each new file upload with its slot id so
+      // the backend can keep the descriptive document name.
+      if (vendorData.factoryImages) {
         const existingImageUrls: string[] = [];
-        vendorData.factoryImages.forEach((image: any) => {
-          if (image.isExisting && image.url) {
-            existingImageUrls.push(image.url);
-          } else if (image.file instanceof File) {
-            formData.append('factoryImages', image.file);
+        const existingSlotIds: string[] = [];
+        let newFileIndex = 0;
+
+        const emitSlot = (slotId: string | null, slot: any) => {
+          if (!slot) return;
+          if (slot.file instanceof File) {
+            formData.append('factoryImages', slot.file);
+            if (slotId) formData.append(`factoryImageSlot_${newFileIndex}`, slotId);
+            newFileIndex++;
+          } else if (slot.url) {
+            existingImageUrls.push(slot.url);
+            existingSlotIds.push(slotId || '');
           }
-        });
-        if (existingImageUrls.length > 0) {
-          formData.append('existingFactoryImages', JSON.stringify(existingImageUrls));
+        };
+
+        if (Array.isArray(vendorData.factoryImages)) {
+          // Legacy array shape — no slot identity available.
+          vendorData.factoryImages.forEach((image: any) => emitSlot(null, image));
+        } else if (typeof vendorData.factoryImages === 'object') {
+          Object.entries(vendorData.factoryImages).forEach(([slotId, slot]) =>
+            emitSlot(slotId, slot),
+          );
         }
+
+        formData.append('existingFactoryImages', JSON.stringify(existingImageUrls));
+        existingSlotIds.forEach((slotId, i) => {
+          if (slotId) formData.append(`existingFactoryImageSlot_${i}`, slotId);
+        });
       }
 
       // Handle product photos - separate existing URLs from new file uploads

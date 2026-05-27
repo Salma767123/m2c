@@ -82,6 +82,21 @@ const writeInspectionAuditLogs = (pendingInspections, { decision, adminId, admin
 // current FE values matched any key, so every vendor was silently tagged
 // MANUFACTURER. Deriving from vendorType (manufacturer / importer /
 // exporter) makes the column reflect what the user actually selected.
+// Factory image slot → admin-facing label. Mirrors FACTORY_IMAGE_SLOTS in
+// WarehouseDetails.tsx; keep these in sync if new slots are added. Used by
+// both registerVendor and updateVendorById so the document name carries
+// the slot identity through every persistence path.
+const FACTORY_SLOT_LABEL_MAP = {
+  nameBoard: 'Factory Name Board',
+  frontView: 'Factory Front View',
+  backView: 'Factory Back View',
+  leftView: 'Factory Left View',
+  rightView: 'Factory Right View',
+  roadView: 'Factory Road View',
+  insideFactory: 'Factory Interior',
+  others: 'Factory Image (Other)',
+};
+
 const getCompanyTypeEnum = (vendorTypes) => {
   const first = Array.isArray(vendorTypes) ? vendorTypes[0] : vendorTypes;
   const mapping = {
@@ -476,10 +491,16 @@ const registerVendor = async (req, res) => {
       ownerPhoto: ownerPhotoUrl,
       additionalOwners: additionalOwners ? (typeof additionalOwners === 'string' ? JSON.parse(additionalOwners) : additionalOwners) : null,
       businessStartDate: businessStartDateValid ? parsedBusinessStartDate : null,
+      employeeCount: employeeCount || null,
 
       // Company Details
       companyName,
       companyType: getCompanyTypeEnum(parsedVendorType),
+      // Persist the raw Step 1 chip selection (proprietorship / pvt-ltd /
+      // partnership-firm / llp / others / <custom>). Drives admin label
+      // resolution for the regulatory ID (CIN / IEC / Deed / LLPIN) and the
+      // type-specific cert document.
+      businessType: businessType || null,
       establishedYear: derivedEstablishedYear,
       companyDescription: derivedEstablishedYear
         ? `${companyName} - ${businessType} established in ${derivedEstablishedYear}`
@@ -725,23 +746,11 @@ const registerVendor = async (req, res) => {
     }
 
     if (factoryImageUploads.length > 0) {
-      // Slot ID → admin-facing label. Mirrors FACTORY_IMAGE_SLOTS in
-      // WarehouseDetails.tsx; keep them in sync if new slots are added.
-      const slotLabelMap = {
-        nameBoard: 'Factory Name Board',
-        frontView: 'Factory Front View',
-        backView: 'Factory Back View',
-        leftView: 'Factory Left View',
-        rightView: 'Factory Right View',
-        roadView: 'Factory Road View',
-        insideFactory: 'Factory Interior',
-        others: 'Factory Image (Other)',
-      };
       factoryImageUploads.forEach(({ url, slotId }, index) => {
         documents.push({
           vendorId: vendor.id,
           type: 'OTHER',
-          name: slotLabelMap[slotId] || `Factory Image ${index + 1}`,
+          name: FACTORY_SLOT_LABEL_MAP[slotId] || `Factory Image ${index + 1}`,
           documentUrl: url,
         });
       });
@@ -1279,6 +1288,27 @@ const updateVendorById = async (req, res) => {
       { folder: 'vendor-product-photos', resource_type: 'image' },
     );
 
+    // Same resolve for the main contact / alternate contact photo fields.
+    // The form stores re-uploaded photos as base64 data URIs inside
+    // `mainContact.photo` (and `alternateContacts[].photo`); without this,
+    // the entire data URI gets persisted into the JSON column and reloaded
+    // on every profile view — both bloats the DB and breaks the photo
+    // preview in admin UIs that expect a real URL.
+    const rawParsedMainContact = updateData.mainContact
+      ? (typeof updateData.mainContact === 'string' ? JSON.parse(updateData.mainContact) : updateData.mainContact)
+      : null;
+    const rawParsedAlternateContacts = updateData.alternateContacts
+      ? (typeof updateData.alternateContacts === 'string' ? JSON.parse(updateData.alternateContacts) : updateData.alternateContacts)
+      : [];
+    const resolvedMainContact = await resolveBase64InValue(rawParsedMainContact, {
+      folder: 'vendor-contact-photos',
+      resource_type: 'image',
+    });
+    const resolvedAlternateContacts = await resolveBase64InValue(rawParsedAlternateContacts, {
+      folder: 'vendor-contact-photos',
+      resource_type: 'image',
+    });
+
     // Mirror registration path: keep the raw multi-select array alongside
     // the legacy single-enum derivation so multi-role vendors aren't lossy.
     const vendorTypesArray = Array.isArray(parsedVendorType)
@@ -1335,6 +1365,7 @@ const updateVendorById = async (req, res) => {
     const vendorUpdateData = {
       // Company Details
       companyName: updateData.companyName,
+      businessType: updateData.businessType || null,
       gstNumber: updateData.gstNumber || null,
       companyIdNumber: updateData.companyIdNumber || null,
       panNumber: updateData.panNumber || null,
@@ -1367,6 +1398,7 @@ const updateVendorById = async (req, res) => {
       }),
       businessStartDate: businessStartDateValid ? parsedBusinessStartDate : null,
       establishedYear: derivedEstablishedYear,
+      employeeCount: updateData.employeeCount || null,
       // annualTurnover deliberately not set here — the admin form doesn't
       // collect a real turnover value. The previous `employeeCount` proxy
       // was semantic nonsense ("10-20" is a headcount range, not money).
@@ -1408,9 +1440,12 @@ const updateVendorById = async (req, res) => {
       })(),
 
       // Vendor Type & Products
-      vendorType: getCompanyTypeEnum(parsedVendorType) === 'MANUFACTURER'
-        ? 'TEXTILE_MANUFACTURER'
-        : 'TRADING_COMPANY',
+      // Mirror registerVendor: keep both legacy single-enum and the role
+      // enum in sync with the multi-select array so admin edits propagate
+      // through every downstream column (registerVendor sets both; the
+      // previous update path left `companyType` stale).
+      vendorType: getVendorTypeEnum(parsedVendorType),
+      companyType: getCompanyTypeEnum(parsedVendorType),
       vendorTypes: vendorTypesArray,
       primaryMarkets: parsedMarketType || [],
       productCategories: normalizedProductCategories,
@@ -1437,9 +1472,12 @@ const updateVendorById = async (req, res) => {
       exportCountries: parsedExportCountries || [],
       importCountries: parsedImportCountries || [],
 
-      // Contact & Trade Information
-      mainContact: updateData.mainContact ? (typeof updateData.mainContact === 'string' ? JSON.parse(updateData.mainContact) : updateData.mainContact) : null,
-      alternateContacts: updateData.alternateContacts ? (typeof updateData.alternateContacts === 'string' ? JSON.parse(updateData.alternateContacts) : updateData.alternateContacts) : [],
+      // Contact & Trade Information — `resolvedMainContact` /
+      // `resolvedAlternateContacts` come from the resolveBase64InValue
+      // pass above so any newly-uploaded photos land in Cloudinary instead
+      // of being stuffed as raw data URIs into the JSON column.
+      mainContact: resolvedMainContact || null,
+      alternateContacts: resolvedAlternateContacts || [],
       tradeLicenseNumber: updateData.tradeLicenseNumber || null,
       businessRegistrationNumber: updateData.businessRegistrationNumber || null,
       taxIdentificationNumber: updateData.taxIdentificationNumber || null,
@@ -1482,66 +1520,97 @@ const updateVendorById = async (req, res) => {
       });
     }
 
-    // Handle factory images update
-    // Parse existing factory image URLs the frontend wants to keep
-    const existingFactoryImages = updateData.existingFactoryImages
-      ? (typeof updateData.existingFactoryImages === 'string'
-          ? JSON.parse(updateData.existingFactoryImages)
-          : updateData.existingFactoryImages)
-      : [];
+    // ── Factory images update ──────────────────────────────────────────
+    // Frontend sends:
+    //   - `existingFactoryImages`: JSON array of URLs to preserve
+    //   - `existingFactoryImageSlot_<i>`: slot id for each preserved URL
+    //   - `factoryImages` (multer files): new uploads
+    //   - `factoryImageSlot_<i>`: slot id for each new file (same pattern
+    //     as registerVendor — see line ~327)
+    //
+    // The frontend ALWAYS sends `existingFactoryImages` (even when empty
+    // as `"[]"`) so we can distinguish "admin didn't touch this section"
+    // (key absent) from "admin removed everything" (key present, empty).
+    // When the key is absent we leave existing rows untouched — fixes the
+    // prior data-loss bug where every edit-save wiped all factory photos.
+    const factoryImagesTouched = Object.prototype.hasOwnProperty.call(
+      updateData,
+      'existingFactoryImages',
+    ) || !!req.files?.factoryImages;
 
-    // Upload new factory images if provided
-    let newFactoryImageUrls = [];
-    if (req.files?.factoryImages) {
-      try {
-        const factoryResults = await uploadFiles(req.files.factoryImages, 'vendor-factories');
-        newFactoryImageUrls = factoryResults.map(result => result.cloudinaryUrl);
-        console.log('Uploaded new factory images:', newFactoryImageUrls);
-      } catch (uploadError) {
-        console.error('Factory image upload error:', uploadError);
-        return res.status(500).json({
-          error: 'Failed to upload factory images: ' + uploadError.message
-        });
-      }
-    }
+    if (factoryImagesTouched) {
+      const existingFactoryImages = updateData.existingFactoryImages
+        ? (typeof updateData.existingFactoryImages === 'string'
+            ? JSON.parse(updateData.existingFactoryImages)
+            : updateData.existingFactoryImages)
+        : [];
 
-    // Delete factory image documents that are no longer in the existing list
-    const currentFactoryDocs = await prisma.vendorDocument.findMany({
-      where: {
-        vendorId,
-        type: 'OTHER',
-        name: { contains: 'Factory' }
-      }
-    });
-
-    const docsToDelete = currentFactoryDocs.filter(
-      doc => !existingFactoryImages.includes(doc.documentUrl)
-    );
-    if (docsToDelete.length > 0) {
-      // Clean up Cloudinary files (non-blocking, best-effort)
-      for (const doc of docsToDelete) {
+      // Upload new factory images, capturing slot identity per file.
+      let newFactoryImageUploads = [];
+      if (req.files?.factoryImages) {
         try {
-          const publicId = doc.documentUrl.split('/').pop().split('.')[0];
-          await deleteFromCloudinary(`vendor-factories/${publicId}`);
-        } catch (deleteError) {
-          console.warn('Failed to delete factory image from Cloudinary:', deleteError.message);
+          const factoryResults = await uploadFiles(req.files.factoryImages, 'vendor-factories');
+          newFactoryImageUploads = factoryResults.map((result, index) => ({
+            url: result.cloudinaryUrl,
+            slotId: req.body[`factoryImageSlot_${index}`] || null,
+          }));
+        } catch (uploadError) {
+          console.error('Factory image upload error:', uploadError);
+          return res.status(500).json({
+            error: 'Failed to upload factory images: ' + uploadError.message
+          });
         }
       }
-      await prisma.vendorDocument.deleteMany({
-        where: { id: { in: docsToDelete.map(d => d.id) } }
-      });
-    }
 
-    // Create new factory image documents
-    if (newFactoryImageUrls.length > 0) {
-      const existingCount = existingFactoryImages.length;
-      const newDocs = newFactoryImageUrls.map((url, index) => ({
-        vendorId,
-        type: 'OTHER',
-        name: `Factory Image ${existingCount + index + 1}`,
-        documentUrl: url
-      }));
-      await prisma.vendorDocument.createMany({ data: newDocs });
+      // Delete factory image documents that are no longer in the preserved list.
+      const currentFactoryDocs = await prisma.vendorDocument.findMany({
+        where: {
+          vendorId,
+          type: 'OTHER',
+          name: { contains: 'Factory' }
+        }
+      });
+
+      const docsToDelete = currentFactoryDocs.filter(
+        doc => !existingFactoryImages.includes(doc.documentUrl)
+      );
+      if (docsToDelete.length > 0) {
+        for (const doc of docsToDelete) {
+          try {
+            const publicId = doc.documentUrl.split('/').pop().split('.')[0];
+            await deleteFromCloudinary(`vendor-factories/${publicId}`);
+          } catch (deleteError) {
+            console.warn('Failed to delete factory image from Cloudinary:', deleteError.message);
+          }
+        }
+        await prisma.vendorDocument.deleteMany({
+          where: { id: { in: docsToDelete.map(d => d.id) } }
+        });
+      }
+
+      // Update names of preserved docs so each carries the current slot
+      // label (admin may have moved a photo from one slot to another).
+      for (let i = 0; i < existingFactoryImages.length; i++) {
+        const url = existingFactoryImages[i];
+        const slotId = req.body[`existingFactoryImageSlot_${i}`];
+        const desiredName = FACTORY_SLOT_LABEL_MAP[slotId];
+        if (!desiredName) continue;
+        await prisma.vendorDocument.updateMany({
+          where: { vendorId, documentUrl: url, type: 'OTHER' },
+          data: { name: desiredName },
+        });
+      }
+
+      // Create new factory image documents with proper slot-derived names.
+      if (newFactoryImageUploads.length > 0) {
+        const newDocs = newFactoryImageUploads.map(({ url, slotId }, index) => ({
+          vendorId,
+          type: 'OTHER',
+          name: FACTORY_SLOT_LABEL_MAP[slotId] || `Factory Image ${index + 1}`,
+          documentUrl: url,
+        }));
+        await prisma.vendorDocument.createMany({ data: newDocs });
+      }
     }
 
     // Handle product photos update (stored as VendorDocument with type 'PRODUCT_PHOTO')
@@ -1616,19 +1685,6 @@ const updateVendorById = async (req, res) => {
         where: { vendorId }
       });
 
-      // Create a map of existing cert URLs
-      const existingCertUrls = {};
-      existingCerts.forEach(cert => {
-        if (cert.documentUrl) {
-          existingCertUrls[cert.name.toLowerCase()] = cert.documentUrl;
-        }
-      });
-
-      // Delete existing certifications
-      await prisma.vendorCertification.deleteMany({
-        where: { vendorId }
-      });
-
       // Same cert-name map used by the registration path — keep them in
       // sync. Falls back to ID.toUpperCase() for unknown / legacy ids.
       const CERT_NAME_MAP = {
@@ -1644,6 +1700,30 @@ const updateVendorById = async (req, res) => {
         'wrap': 'WRAP',
         'bci': 'BCI',
       };
+
+      // Build the reverse lookup (friendly name → chip id) ONCE so existing
+      // cert URLs can be re-keyed by chip id. The old `cert.name.toLowerCase()`
+      // keying silently failed for multi-word names ("SMETA / Sedex" →
+      // "smeta / sedex" ≠ chip id "smeta") and wiped the document URL on
+      // every admin save for SMETA / ISO 9001 / ISO 14001 / Fair Trade certs.
+      const NAME_TO_CHIP = Object.fromEntries(
+        Object.entries(CERT_NAME_MAP).map(([chipId, friendlyName]) => [friendlyName, chipId])
+      );
+
+      // Create a map of existing cert URLs keyed by the chip id the
+      // update path will use to look them up below.
+      const existingCertUrls = {};
+      existingCerts.forEach(cert => {
+        if (cert.documentUrl) {
+          const chipId = NAME_TO_CHIP[cert.name];
+          if (chipId) existingCertUrls[chipId] = cert.documentUrl;
+        }
+      });
+
+      // Delete existing certifications
+      await prisma.vendorCertification.deleteMany({
+        where: { vendorId }
+      });
 
       // Catalog certs
       const catalogRows = parsedSelectedCertifications.map((certId) => ({

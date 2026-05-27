@@ -518,6 +518,21 @@ export default function VendorView({ vendorId }: VendorViewProps) {
   )
 }
 
+// Map Step 1 chip IDs back to display labels. Any other value (the
+// `'others'` placeholder or a custom user-typed string) is shown as-is
+// with light title-casing so admins see exactly what the vendor entered.
+const BUSINESS_TYPE_LABELS: Record<string, string> = {
+  'proprietorship': 'Proprietorship',
+  'pvt-ltd': 'Pvt Ltd',
+  'partnership-firm': 'Partnership Firm',
+  'llp': 'LLP',
+  'others': 'Others',
+};
+const businessTypeLabel = (raw: string): string => {
+  if (!raw) return '';
+  return BUSINESS_TYPE_LABELS[raw] || raw;
+};
+
 // Tab Components
 function OverviewTab({ vendor }: { vendor: VendorProfile }) {
   return (
@@ -534,12 +549,12 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                {(vendor as any).companyType && (
+                {(vendor as any).businessType && (
                   <div className="flex items-center space-x-3">
                     <Building2 className="h-4 w-4 text-gray-400" />
                     <div>
                       <p className="text-sm text-gray-600">Business Type</p>
-                      <p className="font-medium capitalize">{(vendor as any).companyType.replace(/_/g, ' ').toLowerCase()}</p>
+                      <p className="font-medium">{businessTypeLabel((vendor as any).businessType)}</p>
                     </div>
                   </div>
                 )}
@@ -706,6 +721,12 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{new Date((vendor as any).businessStartDate).toLocaleDateString()}</p>
                   </div>
                 )}
+                {(vendor as any).employeeCount && (
+                  <div>
+                    <p className="text-sm text-gray-600">Employee Count</p>
+                    <p className="font-medium">{(vendor as any).employeeCount}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-gray-600">Vendor Type</p>
                   <p className="font-medium capitalize">
@@ -726,23 +747,47 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">Additional Owners</h4>
                   <div className="space-y-3">
                     {owners.map((owner: any, index: number) => (
-                      <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                        <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold">
+                      <div key={index} className="flex items-start gap-4 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 mt-0.5">
                           {index + 2}
                         </div>
-                        <div className="grid grid-cols-3 gap-4 flex-1 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 flex-1 text-sm">
                           <div>
                             <p className="text-gray-500">Name</p>
                             <p className="font-medium">{owner.name}</p>
                           </div>
+                          {owner.designation && (
+                            <div>
+                              <p className="text-gray-500">Designation</p>
+                              <p className="font-medium">{owner.designation}</p>
+                            </div>
+                          )}
                           <div>
                             <p className="text-gray-500">Email</p>
                             <p className="font-medium">{owner.email}</p>
                           </div>
+                          {owner.email2 && (
+                            <div>
+                              <p className="text-gray-500">Email 2</p>
+                              <p className="font-medium">{owner.email2}</p>
+                            </div>
+                          )}
                           <div>
                             <p className="text-gray-500">Phone</p>
                             <p className="font-medium">{owner.phone}</p>
                           </div>
+                          {owner.phone2 && (
+                            <div>
+                              <p className="text-gray-500">Phone 2</p>
+                              <p className="font-medium">{owner.phone2}</p>
+                            </div>
+                          )}
+                          {owner.landline && (
+                            <div>
+                              <p className="text-gray-500">Landline</p>
+                              <p className="font-medium">{owner.landline}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1211,10 +1256,10 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
             <div className="space-y-5">
               {v.additionalCategories.map((cat: any) => (
                 <div key={cat.id}>
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                    {cat.name || 'Unnamed Category'}
-                    <Badge className="ml-2 bg-orange-50 text-orange-700 border border-orange-200">Custom</Badge>
-                  </p>
+                  <div className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <span>{cat.name || 'Unnamed Category'}</span>
+                    <Badge className="bg-orange-50 text-orange-700 border border-orange-200">Custom</Badge>
+                  </div>
                   {Array.isArray(cat.products) && cat.products.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {cat.products.map((p: any, i: number) => (
@@ -1340,12 +1385,12 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="flex items-center space-x-3">
                     <Award className="h-8 w-8 text-yellow-500" />
                     <div>
-                      <p className="font-medium flex items-center gap-2">
-                        {cert.name}
+                      <div className="font-medium flex items-center gap-2">
+                        <span>{cert.name}</span>
                         {(cert as any).isCustom && (
                           <Badge className="bg-orange-50 text-orange-700 border border-orange-200">Custom</Badge>
                         )}
-                      </p>
+                      </div>
                       {cert.issuedBy && (
                         <p className="text-sm text-gray-600">Issued by: {cert.issuedBy}</p>
                       )}
@@ -1665,7 +1710,9 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Designation</p>
-                <p className="font-medium">{vendor.mainContact.designation || 'N/A'}</p>
+                <p className="font-medium">
+                  {(vendor.mainContact as any).customDesignation || vendor.mainContact.designation || 'N/A'}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Email 1</p>
@@ -1687,9 +1734,17 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                   <p className="font-medium">{vendor.mainContact.phone2}</p>
                 </div>
               )}
+              {(vendor.mainContact as any).landline && (
+                <div>
+                  <p className="text-sm text-gray-600">Landline</p>
+                  <p className="font-medium">{(vendor.mainContact as any).landline}</p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-gray-600">Department</p>
-                <p className="font-medium capitalize">{vendor.mainContact.department || 'N/A'}</p>
+                <p className="font-medium capitalize">
+                  {(vendor.mainContact as any).customDepartment || vendor.mainContact.department || 'N/A'}
+                </p>
               </div>
               </div>
             </div>
@@ -1718,19 +1773,41 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Designation</p>
-                      <p className="font-medium">{contact.designation || 'N/A'}</p>
+                      <p className="font-medium">
+                        {contact.customDesignation || contact.designation || 'N/A'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Email</p>
                       <p className="font-medium">{contact.email1 || contact.email || 'N/A'}</p>
                     </div>
+                    {contact.email2 && (
+                      <div>
+                        <p className="text-sm text-gray-600">Email 2</p>
+                        <p className="font-medium">{contact.email2}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm text-gray-600">Phone</p>
                       <p className="font-medium">{contact.phone1 || contact.phone || 'N/A'}</p>
                     </div>
+                    {contact.phone2 && (
+                      <div>
+                        <p className="text-sm text-gray-600">Phone 2</p>
+                        <p className="font-medium">{contact.phone2}</p>
+                      </div>
+                    )}
+                    {contact.landline && (
+                      <div>
+                        <p className="text-sm text-gray-600">Landline</p>
+                        <p className="font-medium">{contact.landline}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm text-gray-600">Department</p>
-                      <p className="font-medium capitalize">{contact.department || 'N/A'}</p>
+                      <p className="font-medium capitalize">
+                        {contact.customDepartment || contact.department || 'N/A'}
+                      </p>
                     </div>
                   </div>
                 </div>

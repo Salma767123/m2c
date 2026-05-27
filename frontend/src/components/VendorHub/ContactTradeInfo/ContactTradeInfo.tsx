@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
-import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight, Landmark, FileText } from 'lucide-react';
 import Image from 'next/image';
 import Dropdown from '@/components/UI/Dropdown';
 import { PhoneInput, CountrySelect, validatePhoneE164 } from '@/components/VendorHub/FormUI';
@@ -1237,6 +1237,140 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
               </div>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Regulatory IDs — Trade License / Business Registration / Tax ID.
+          All optional, persisted to dedicated Vendor columns. */}
+      <section className="bg-white border border-slate-200 rounded-lg">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
+            Regulatory IDs
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Optional — admins use these to verify the vendor against external registries.
+          </p>
+        </div>
+        <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="tradeLicenseNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              Trade License Number <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              id="tradeLicenseNumber"
+              value={formData.tradeLicenseNumber}
+              onChange={(e) => handleInputChange('tradeLicenseNumber', e.target.value)}
+              autoComplete="off"
+              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+              placeholder="e.g. TL-2024-001234"
+            />
+          </div>
+          <div>
+            <label htmlFor="businessRegistrationNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              Business Registration No. <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              id="businessRegistrationNumber"
+              value={formData.businessRegistrationNumber}
+              onChange={(e) => handleInputChange('businessRegistrationNumber', e.target.value)}
+              autoComplete="off"
+              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+              placeholder="Issued by your local registrar"
+            />
+          </div>
+          <div>
+            <label htmlFor="taxIdentificationNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              Tax Identification No. <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              id="taxIdentificationNumber"
+              value={formData.taxIdentificationNumber}
+              onChange={(e) => handleInputChange('taxIdentificationNumber', e.target.value)}
+              autoComplete="off"
+              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+              placeholder="e.g. TIN-2024-XXXX"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Banking — bank name + account number are India-domestic; SWIFT/IBAN
+          are international. All optional at the form level so vendors can
+          fill what applies. Persisted to VendorBankDetails (1:1 with Vendor). */}
+      <section className="bg-white border border-slate-200 rounded-lg">
+        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Landmark className="w-5 h-5 text-gray-500 shrink-0" aria-hidden="true" />
+            Banking Details
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Optional — used for payouts once your account is approved. SWIFT and IBAN are only needed for international wires.
+          </p>
+        </div>
+        <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="bankName" className="block text-sm font-medium text-gray-700 mb-1">
+              Bank Name <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              id="bankName"
+              value={formData.bankingDetails.bankName}
+              onChange={(e) => handleInputChange('bankingDetails', { ...formData.bankingDetails, bankName: e.target.value })}
+              autoComplete="off"
+              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+              placeholder="e.g. HDFC Bank"
+            />
+          </div>
+          <div>
+            <label htmlFor="accountNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              Account Number <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              id="accountNumber"
+              value={formData.bankingDetails.accountNumber}
+              onChange={(e) => handleInputChange('bankingDetails', { ...formData.bankingDetails, accountNumber: e.target.value })}
+              autoComplete="off"
+              inputMode="numeric"
+              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+              placeholder="Account number"
+            />
+          </div>
+          <div>
+            <label htmlFor="swiftCode" className="block text-sm font-medium text-gray-700 mb-1">
+              SWIFT / BIC <span className="text-gray-400">(international only)</span>
+            </label>
+            <input
+              type="text"
+              id="swiftCode"
+              value={formData.bankingDetails.swiftCode}
+              onChange={(e) => handleInputChange('bankingDetails', { ...formData.bankingDetails, swiftCode: e.target.value.toUpperCase() })}
+              autoComplete="off"
+              maxLength={11}
+              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm font-mono"
+              placeholder="e.g. HDFCINBBXXX"
+            />
+          </div>
+          <div>
+            <label htmlFor="iban" className="block text-sm font-medium text-gray-700 mb-1">
+              IBAN <span className="text-gray-400">(international only)</span>
+            </label>
+            <input
+              type="text"
+              id="iban"
+              value={formData.bankingDetails.iban}
+              onChange={(e) => handleInputChange('bankingDetails', { ...formData.bankingDetails, iban: e.target.value.toUpperCase().replace(/\s+/g, '') })}
+              autoComplete="off"
+              maxLength={34}
+              className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm font-mono"
+              placeholder="e.g. DE89370400440532013000"
+            />
+          </div>
         </div>
       </section>
 

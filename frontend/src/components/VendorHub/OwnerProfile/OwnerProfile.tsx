@@ -141,7 +141,18 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     employeeCount: data.employeeCount || ''
   });
 
-  const [additionalOwners, setAdditionalOwners] = useState<Array<{ name: string; email: string; phone: string }>>(
+  // Additional contact shape mirrors the primary owner so admins reading a
+  // partnership / Pvt Ltd / LLP vendor get the same detail per director/partner.
+  // All fields except name / email / phone are optional.
+  const [additionalOwners, setAdditionalOwners] = useState<Array<{
+    name: string;
+    designation?: string;
+    email: string;
+    email2?: string;
+    phone: string;
+    phone2?: string;
+    landline?: string;
+  }>>(
     data.additionalOwners || []
   );
 
@@ -184,7 +195,15 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     // single owner. The button is hidden in the UI, but a stale event or
     // programmatic call shouldn't be able to bypass the rule either.
     if (!resolveOwnerStructure(data.businessType).allowMultiple) return;
-    setAdditionalOwners(prev => [...prev, { name: '', email: '', phone: '' }]);
+    setAdditionalOwners(prev => [...prev, {
+      name: '',
+      designation: '',
+      email: '',
+      email2: '',
+      phone: '',
+      phone2: '',
+      landline: '',
+    }]);
   };
 
   const handleRemoveOwner = (index: number) => {
@@ -722,6 +741,21 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Designation <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={owner.designation || ''}
+                      onChange={(e) => handleOwnerFieldChange(index, 'designation', e.target.value)}
+                      autoComplete="off"
+                      className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+                      placeholder={`e.g. ${ownerStructure.contactLabel}`}
+                    />
+                  </div>
+                  <div className="hidden md:block" aria-hidden="true" />
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Email <span className="text-red-500" aria-hidden="true">*</span>
                     </label>
                     <input
@@ -746,6 +780,23 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Email 2 <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={owner.email2 || ''}
+                      onChange={(e) => handleOwnerFieldChange(index, 'email2', e.target.value)}
+                      autoComplete="off"
+                      inputMode="email"
+                      spellCheck={false}
+                      className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+                      placeholder="optional secondary email"
+                    />
+                  </div>
+                  <div className="hidden md:block" aria-hidden="true" />
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Phone <span className="text-red-500" aria-hidden="true">*</span>
                     </label>
                     <input
@@ -764,6 +815,34 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                     {errors[`additionalOwner_${index}_phone`] && (
                       <p className="text-red-500 text-xs mt-1">{errors[`additionalOwner_${index}_phone`]}</p>
                     )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Phone 2 <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={owner.phone2 || ''}
+                      onChange={(e) => handleOwnerFieldChange(index, 'phone2', e.target.value)}
+                      autoComplete="off"
+                      inputMode="tel"
+                      className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+                      placeholder="optional secondary phone"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Landline <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={owner.landline || ''}
+                      onChange={(e) => handleOwnerFieldChange(index, 'landline', e.target.value)}
+                      autoComplete="off"
+                      inputMode="tel"
+                      className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
+                      placeholder="optional landline"
+                    />
                   </div>
                 </div>
               </div>

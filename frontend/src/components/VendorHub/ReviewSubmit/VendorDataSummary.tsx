@@ -142,8 +142,9 @@ export default function VendorDataSummary({
 }: VendorDataSummaryProps) {
   const isManufacturer = isManufacturerFromData(data);
 
-  // Step indices skip Manufacturing for non-manufacturers, matching the
-  // VendorPanel / AddEditVendor step-filtering logic.
+  // Canonical step indices into the 8-step wizard. VendorPanel / AddEditVendor
+  // always render all 8 steps in the sidebar; Manufacturing Facilities (index 4)
+  // is auto-skipped at nav-time for non-manufacturers, so no mapping is needed here.
   const getStepNumber = (logicalStep: string): number => {
     const stepMap: Record<string, number> = {
       'company': 0,
@@ -151,8 +152,8 @@ export default function VendorDataSummary({
       'owner': 2,
       'vendor': 3,
       'manufacturing': 4,
-      'certifications': isManufacturer ? 5 : 4,
-      'contact': isManufacturer ? 6 : 5,
+      'certifications': 5,
+      'contact': 6,
     };
     return stepMap[logicalStep] ?? 0;
   };
@@ -352,8 +353,12 @@ export default function VendorDataSummary({
                 <div key={index} className="pl-4 border-l-2 border-slate-200 space-y-1 my-2">
                   <p className="text-sm font-bold text-slate-800 px-6 mt-2">Owner {index + 2}</p>
                   <InfoRow label="Name" value={owner.name} />
+                  {owner.designation && <InfoRow label="Designation" value={owner.designation} />}
                   <InfoRow label="Email" value={owner.email} />
+                  {owner.email2 && <InfoRow label="Email 2" value={owner.email2} />}
                   <InfoRow label="Phone" value={owner.phone} />
+                  {owner.phone2 && <InfoRow label="Phone 2" value={owner.phone2} />}
+                  {owner.landline && <InfoRow label="Landline" value={owner.landline} />}
                 </div>
               ))}
             </>
@@ -523,7 +528,10 @@ export default function VendorDataSummary({
         <SectionHeader title="Contact & Trade" step={getStepNumber('contact')} />
         <div className="flex flex-col">
           <InfoRow label="Main Contact Name" value={data.mainContact?.name || 'Not provided'} />
-          <InfoRow label="Main Contact Designation" value={data.mainContact?.designation || 'Not provided'} />
+          <InfoRow
+            label="Main Contact Designation"
+            value={data.mainContact?.customDesignation || data.mainContact?.designation || 'Not provided'}
+          />
           <InfoRow label="Main Contact Email" value={data.mainContact?.email1 || data.mainContact?.email || 'Not provided'} />
           {data.mainContact?.email2 && (
             <InfoRow label="Main Contact Email 2" value={data.mainContact.email2} />
@@ -535,7 +543,10 @@ export default function VendorDataSummary({
           {data.mainContact?.landline && (
             <InfoRow label="Main Contact Landline" value={data.mainContact.landline} />
           )}
-          <InfoRow label="Main Contact Department" value={data.mainContact?.department || 'Not provided'} />
+          <InfoRow
+            label="Main Contact Department"
+            value={data.mainContact?.customDepartment || data.mainContact?.department || 'Not provided'}
+          />
           <InfoRow label="Alternate Contacts" value={`${(data.alternateContacts || []).length} contact(s) added`} />
           {(data.alternateContacts || []).length > 0 && (
             <div className="ml-4 space-y-2 border-l-2 border-slate-200 pl-4 my-2">
@@ -543,9 +554,21 @@ export default function VendorDataSummary({
                 <div key={contact.id || index} className="space-y-1">
                   <div className="font-bold text-sm text-slate-900 px-6 py-2">Contact {index + 1}:</div>
                   <InfoRow label="Name" value={contact.name || 'Not provided'} />
-                  <InfoRow label="Designation" value={contact.designation || 'Not provided'} />
+                  <InfoRow
+                    label="Designation"
+                    value={contact.customDesignation || contact.designation || 'Not provided'}
+                  />
                   <InfoRow label="Email" value={contact.email1 || contact.email || 'Not provided'} />
+                  {contact.email2 && <InfoRow label="Email 2" value={contact.email2} />}
                   <InfoRow label="Phone" value={contact.phone1 || contact.phone || 'Not provided'} />
+                  {contact.phone2 && <InfoRow label="Phone 2" value={contact.phone2} />}
+                  {contact.landline && <InfoRow label="Landline" value={contact.landline} />}
+                  {(contact.customDepartment || contact.department) && (
+                    <InfoRow
+                      label="Department"
+                      value={contact.customDepartment || contact.department}
+                    />
+                  )}
                 </div>
               ))}
             </div>

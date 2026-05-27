@@ -276,10 +276,21 @@ model Vendor {
   // `establishedYear` below is derived from this on the backend for
   // backward-compat with code that still reads year-only.
   businessStartDate DateTime?
+  // Employee head-count range chip from Step 3 (e.g. "10-20", "50-100").
+  // String — the form collects ranges, not exact integers. Replaces the
+  // previous "stuff this into annualTurnover" hack the audit removed.
+  employeeCount    String?
 
   // Company Details
   companyName        String
   companyType        CompanyType
+  // Raw business STRUCTURE selected on Step 1 (proprietorship / pvt-ltd /
+  // partnership-firm / llp / others / <custom-others-text>). Distinct from
+  // `companyType` above, which is the vendor ROLE enum (manufacturer / trader
+  // / etc.). Both are needed: structure drives the regulatory-ID label
+  // (CIN vs IEC vs Deed vs LLPIN) and the type-specific cert upload; role
+  // drives the vendor-flow logic.
+  businessType       String?
   // Derived from `businessStartDate` (Owner Profile step) at write time.
   // Made nullable because not every submission carries a parseable date,
   // and the previous non-null constraint was silently breaking registration.
