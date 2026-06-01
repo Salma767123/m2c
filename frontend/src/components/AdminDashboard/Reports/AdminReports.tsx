@@ -440,7 +440,7 @@ export default function AdminReports() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="day" stroke="#6b7280" />
                   <YAxis stroke="#6b7280" tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v: any, name: string | undefined) => name === 'sales' ? [fmt(v), 'Sales'] : [v, 'Orders']} />
+                  <Tooltip formatter={(v: any, name: any) => name === 'sales' ? [fmt(v), 'Sales'] : [v, 'Orders']} />
                   <Legend />
                   <Line type="monotone" dataKey="sales" stroke="#3b82f6" strokeWidth={3} dot={{ fill: '#3b82f6', r: 5 }} name="Sales" />
                   <Line type="monotone" dataKey="orders" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 5 }} name="Orders" />
