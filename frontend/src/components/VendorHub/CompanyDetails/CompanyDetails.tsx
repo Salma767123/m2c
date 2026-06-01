@@ -1555,8 +1555,8 @@ export default function CompanyDetails({
             />
           </div>
 
-          {/* City + State + ZIP */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* City + State / Province (Row 1) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">
                 City <span className="text-brand-500" aria-hidden="true">*</span>
@@ -1596,6 +1596,29 @@ export default function CompanyDetails({
                 <p className="text-red-500 text-xs mt-1">{errors.state}</p>
               )}
             </div>
+          </div>
+
+          {/* Country + ZIP / Postal Code (Row 2) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="company-country-select" className="block text-sm font-semibold text-slate-700 mb-1">
+                Country <span className="text-brand-500" aria-hidden="true">*</span>
+              </label>
+              <div data-field="country">
+                <CountrySelect
+                  id="company-country-select"
+                  value={formData.country}
+                  onChange={(name) => handleInputChange('country', name)}
+                  onBlur={() => handleBlur('country')}
+                  invalid={!!(errors.country && touched.country)}
+                  ariaDescribedBy={errors.country && touched.country ? 'company-country-error' : undefined}
+                  placeholder="Select a country…"
+                />
+              </div>
+              {errors.country && touched.country && (
+                <p id="company-country-error" className="text-red-500 text-xs mt-1" role="alert">{errors.country}</p>
+              )}
+            </div>
 
             <div>
               <label htmlFor="zipCode" className="block text-sm font-semibold text-slate-700 mb-1">
@@ -1629,27 +1652,6 @@ export default function CompanyDetails({
                 <p className="text-red-500 text-xs mt-1" role="alert">{errors.zipCode}</p>
               )}
             </div>
-          </div>
-
-          {/* Country */}
-          <div>
-            <label htmlFor="company-country-select" className="block text-sm font-semibold text-slate-700 mb-1">
-              Country <span className="text-brand-500" aria-hidden="true">*</span>
-            </label>
-            <div data-field="country">
-              <CountrySelect
-                id="company-country-select"
-                value={formData.country}
-                onChange={(name) => handleInputChange('country', name)}
-                onBlur={() => handleBlur('country')}
-                invalid={!!(errors.country && touched.country)}
-                ariaDescribedBy={errors.country && touched.country ? 'company-country-error' : undefined}
-                placeholder="Select a country…"
-              />
-            </div>
-            {errors.country && touched.country && (
-              <p id="company-country-error" className="text-red-500 text-xs mt-1" role="alert">{errors.country}</p>
-            )}
           </div>
 
           {/* Same as Warehouse Checkbox */}

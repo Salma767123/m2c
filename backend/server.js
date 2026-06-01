@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 5000;
 // CORS Configuration - must be before helmet
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:3003",
   "https://m2-c-p6ikdsx.vercel.app",
   "https://m2cmarkdowns.com",
   process.env.FRONTEND_URL,
