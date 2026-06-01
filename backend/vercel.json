@@ -12,7 +12,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://frontend-phi-lyart-67.vercel.app"
+          "value": "https://m2c-testing.vercel.app"
         },
         {
           "key": "Access-Control-Allow-Methods",
