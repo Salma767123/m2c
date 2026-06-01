@@ -8,11 +8,11 @@
   ],
   "headers": [
     {
-      "source": "/api/(.*)",
+      "source": "/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://m2-c-p6ikdsx.vercel.app"
+          "value": "https://frontend-phi-lyart-67.vercel.app"
         },
         {
           "key": "Access-Control-Allow-Methods",
