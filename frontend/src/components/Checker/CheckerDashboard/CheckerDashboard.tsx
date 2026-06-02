@@ -18,6 +18,7 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
   const [assignedProducts, setAssignedProducts] = useState<any[]>([])
   const [assignedVendors, setAssignedVendors] = useState<any[]>([])
   const [completedInspections, setCompletedInspections] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<'vendor' | 'product'>('vendor')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -67,30 +68,30 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
   const stats = [
     {
       label: "Total Assignments",
-      value: (assignedProducts.length + assignedVendors.length).toString(),
+      value: activeTab === 'vendor' ? assignedVendors.length.toString() : assignedProducts.length.toString(),
       icon: TrendingUp,
-      trend: `${pl(assignedProducts.length, "Product")} · ${pl(assignedVendors.length, "Vendor")}`,
+      trend: activeTab === 'vendor' ? `${pl(assignedVendors.length, "Vendor")}` : `${pl(assignedProducts.length, "Product")}`,
       color: "blue" as const,
     },
     {
       label: "Pending Action",
-      value: (pendingProducts + pendingVendors).toString(),
+      value: activeTab === 'vendor' ? pendingVendors.toString() : pendingProducts.toString(),
       icon: Clock,
-      trend: `${pl(pendingProducts, "Product")} · ${pl(pendingVendors, "Vendor")}`,
+      trend: activeTab === 'vendor' ? `${pl(pendingVendors, "Vendor")}` : `${pl(pendingProducts, "Product")}`,
       color: "amber" as const,
     },
     {
       label: "Passed",
-      value: (passedProducts + passedVendors).toString(),
+      value: activeTab === 'vendor' ? passedVendors.toString() : passedProducts.toString(),
       icon: CheckCircle2,
-      trend: `${pl(passedProducts, "Product")} · ${pl(passedVendors, "Vendor")}`,
+      trend: activeTab === 'vendor' ? `${pl(passedVendors, "Vendor")}` : `${pl(passedProducts, "Product")}`,
       color: "emerald" as const,
     },
     {
       label: "Rejected",
-      value: (failedProducts + failedVendors).toString(),
+      value: activeTab === 'vendor' ? failedVendors.toString() : failedProducts.toString(),
       icon: AlertCircle,
-      trend: `${pl(failedProducts, "Product")} · ${pl(failedVendors, "Vendor")}`,
+      trend: activeTab === 'vendor' ? `${pl(failedVendors, "Vendor")}` : `${pl(failedProducts, "Product")}`,
       color: "red" as const,
     },
   ]
@@ -217,6 +218,30 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
         </div>
       </div>
 
+      {/* Filter Tabs */}
+      <div className="flex gap-4 border-b border-slate-200 mb-8">
+        <button
+          onClick={() => setActiveTab('vendor')}
+          className={`pb-4 px-2 text-sm font-semibold transition-colors relative ${activeTab === 'vendor' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <div className="flex items-center gap-2">
+            <Factory className="w-4 h-4" />
+            Vendor Inspection
+          </div>
+          {activeTab === 'vendor' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
+        </button>
+        <button
+          onClick={() => setActiveTab('product')}
+          className={`pb-4 px-2 text-sm font-semibold transition-colors relative ${activeTab === 'product' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            Product Inspection
+          </div>
+          {activeTab === 'product' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
+        </button>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat) => (
@@ -236,22 +261,24 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">Recent Assignments</h2>
-                  <p className="text-sm text-slate-600">Products and Vendors awaiting action</p>
+                  <p className="text-sm text-slate-600">
+                    {activeTab === 'vendor' ? 'Vendors awaiting action' : 'Products awaiting action'}
+                  </p>
                 </div>
               </div>
               <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">
-                {assignedProducts.length + assignedVendors.length} total
+                {activeTab === 'vendor' ? assignedVendors.length : assignedProducts.length} total
               </span>
             </div>
           </div>
 
           <div className="p-6">
-            {assignedProducts.length === 0 && assignedVendors.length === 0 ? (
+            {(activeTab === 'vendor' ? assignedVendors.length : assignedProducts.length) === 0 ? (
               <div className="text-center py-8 text-slate-500">No active assignments found.</div>
             ) : (
               <div className="space-y-6">
                 {/* Products Section */}
-                {assignedProducts.length > 0 && (
+                {activeTab === 'product' && assignedProducts.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <Package className="w-4 h-4 text-blue-600" />
@@ -291,7 +318,7 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
                 )}
 
                 {/* Vendors Section */}
-                {assignedVendors.length > 0 && (
+                {activeTab === 'vendor' && assignedVendors.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <Factory className="w-4 h-4 text-emerald-600" />
