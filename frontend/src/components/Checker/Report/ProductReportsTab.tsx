@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   Eye, Package, CheckCircle, XCircle, Download,
-  Search, X, ChevronLeft, ChevronRight, RotateCw,
+  Search, X, ChevronLeft, ChevronRight, RotateCw, Calendar,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -22,6 +22,12 @@ const TABLE_MIN_HEIGHT_PX = PAGE_SIZE * 65
 const SORT_OPTIONS = [
   { value: "updatedAt:desc", label: "Latest first" },
   { value: "updatedAt:asc", label: "Oldest first" },
+]
+
+const STATUS_OPTIONS = [
+  { value: "", label: "All results" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "REJECTED", label: "Rejected" },
 ]
 
 function getPageRange(current: number, total: number): Array<number | "…"> {
@@ -54,11 +60,16 @@ export default function ProductReportsTab() {
 
   const initialSearch = searchParams.get("psearch") ?? ""
   const initialSort = searchParams.get("psort") ?? DEFAULT_SORT
+  const initialStatus = searchParams.get("pstatus") ?? ""
+  const initialDate = searchParams.get("pdate") ?? ""
   const initialPage = Math.max(parseInt(searchParams.get("ppage") || "1", 10) || 1, 1)
 
   const [searchInput, setSearchInput] = useState(initialSearch)
   const [sort, setSort] = useState(initialSort)
+  const [statusFilter, setStatusFilter] = useState(initialStatus)
+  const [dateFilter, setDateFilter] = useState(initialDate)
   const [page, setPage] = useState(initialPage)
+  const dateInputRef = useRef<HTMLInputElement>(null)
 
   const debouncedSearch = useDebounce(searchInput, 300)
 
@@ -74,7 +85,7 @@ export default function ProductReportsTab() {
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return }
     setPage(1)
-  }, [debouncedSearch])
+  }, [debouncedSearch, statusFilter, dateFilter])
 
   const [sortBy, sortOrder] = useMemo(() => {
     const [by, ord] = sort.split(":")
@@ -87,13 +98,15 @@ export default function ProductReportsTab() {
     // Preserve tab param
     params.set("tab", "product")
     // Clean product params then set
-    params.delete("psearch"); params.delete("psort"); params.delete("ppage")
+    params.delete("psearch"); params.delete("psort"); params.delete("pstatus"); params.delete("pdate"); params.delete("ppage")
     if (debouncedSearch) params.set("psearch", debouncedSearch)
     if (sort !== DEFAULT_SORT) params.set("psort", sort)
+    if (statusFilter) params.set("pstatus", statusFilter)
+    if (dateFilter) params.set("pdate", dateFilter)
     if (page !== 1) params.set("ppage", String(page))
     const qs = params.toString()
     router.replace(qs ? `?${qs}` : "?tab=product", { scroll: false })
-  }, [debouncedSearch, sort, page, router])
+  }, [debouncedSearch, sort, statusFilter, dateFilter, page, router])
 
   const fetchReports = useCallback(async () => {
     const id = ++requestIdRef.current
@@ -125,12 +138,37 @@ export default function ProductReportsTab() {
   const handleClearFilters = () => {
     setSearchInput("")
     setSort(DEFAULT_SORT)
+    setStatusFilter("")
+    setDateFilter("")
     setPage(1)
   }
 
-  const hasActiveFilters = Boolean(debouncedSearch || sort !== DEFAULT_SORT || page !== 1)
+  // Client-side status + date filters (filtered within the current server page).
+  const filteredProducts = useMemo(() => {
+    let list = products
+    if (statusFilter === "APPROVED") {
+      list = list.filter((p) => p.approvalStatus === "QC_APPROVED" || p.approvalStatus === "APPROVED")
+    } else if (statusFilter === "REJECTED") {
+      list = list.filter((p) => p.approvalStatus === "REJECTED")
+    }
+    if (dateFilter) {
+      list = list.filter((p) => {
+        if (!p.updatedAt) return false
+        const d = new Date(p.updatedAt)
+        if (Number.isNaN(d.getTime())) return false
+        const raw = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+        return raw === dateFilter
+      })
+    }
+    return list
+  }, [products, statusFilter, dateFilter])
+
+  const isClientFiltered = Boolean(statusFilter || dateFilter)
+  const hasActiveFilters = Boolean(debouncedSearch || sort !== DEFAULT_SORT || statusFilter || dateFilter || page !== 1)
   const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
-  const rangeEnd = Math.min(pagination.page * pagination.limit, pagination.total)
+  const rangeEnd = isClientFiltered
+    ? rangeStart + filteredProducts.length - 1
+    : Math.min(pagination.page * pagination.limit, pagination.total)
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -147,7 +185,7 @@ export default function ProductReportsTab() {
   return (
     <div className="space-y-4">
       {/* Filter bar */}
-      <div className="grid gap-3 md:grid-cols-[1fr_auto] items-start">
+      <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] items-start">
         <div className="relative">
           <label htmlFor="product-report-search" className="sr-only">Search product reports</label>
           <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 pointer-events-none" />
@@ -157,7 +195,7 @@ export default function ProductReportsTab() {
             placeholder="Search by product, SKU, or vendor..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full pl-12 pr-10 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all bg-white shadow-sm"
+            className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs"
           />
           {searchInput && (
             <button
@@ -168,6 +206,46 @@ export default function ProductReportsTab() {
               <X className="w-4 h-4" />
             </button>
           )}
+        </div>
+        <div className="relative min-w-45">
+          <label htmlFor="product-report-date" className="sr-only">Filter by Inspected Date</label>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              try { dateInputRef.current?.showPicker() } catch (err) {}
+            }}
+            className="absolute left-3.5 top-3.5 text-slate-400 hover:text-brand-500 cursor-pointer z-10 transition-colors"
+            title="Open calendar picker"
+          >
+            <Calendar className="w-5 h-5" />
+          </button>
+          <input
+            ref={dateInputRef}
+            id="product-report-date"
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs text-sm text-slate-700 [&::-webkit-calendar-picker-indicator]:hidden"
+          />
+          {dateFilter && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setDateFilter("") }}
+              aria-label="Clear date filter"
+              className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer z-10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <div className="min-w-45">
+          <Dropdown
+            id="product-report-status"
+            value={statusFilter}
+            options={STATUS_OPTIONS}
+            onChange={(v) => { setStatusFilter(v as string); setPage(1) }}
+            placeholder="All results"
+          />
         </div>
         <div className="min-w-45">
           <Dropdown
@@ -184,14 +262,14 @@ export default function ProductReportsTab() {
         <span>
           {loading
             ? "Loading product reports..."
-            : pagination.total === 0
+            : (isClientFiltered ? filteredProducts.length : pagination.total) === 0
               ? "0 reports"
-              : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total} report${pagination.total === 1 ? "" : "s"}`}
+              : `Showing ${rangeStart}–${rangeEnd} of ${isClientFiltered ? filteredProducts.length : pagination.total} report${(isClientFiltered ? filteredProducts.length : pagination.total) === 1 ? "" : "s"}`}
         </span>
         {hasActiveFilters && (
           <button
             onClick={handleClearFilters}
-            className="text-[#222222] hover:text-[#333333] font-medium underline underline-offset-2"
+            className="text-brand-600 hover:text-brand-700 font-medium underline underline-offset-2"
           >
             Clear filters
           </button>
@@ -235,7 +313,7 @@ export default function ProductReportsTab() {
               </div>
             ))}
           </div>
-        ) : !loading && !error && products.length === 0 ? (
+        ) : !loading && !error && filteredProducts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
             <div className="p-4 bg-slate-100 rounded-2xl">
               <Package className="w-12 h-12 text-slate-400" />
@@ -251,7 +329,7 @@ export default function ProductReportsTab() {
             {hasActiveFilters && (
               <button
                 onClick={handleClearFilters}
-                className="mt-2 px-4 py-2 bg-[#222222] text-white font-medium rounded-lg hover:bg-[#333333] transition-colors"
+                className="mt-2 px-4 py-2 bg-brand-500 text-white font-semibold rounded-xl hover:bg-brand-600 active:bg-brand-700 transition-colors shadow-xs shadow-brand-500/10"
               >
                 Clear filters
               </button>
@@ -271,7 +349,7 @@ export default function ProductReportsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => (
+              {filteredProducts.map((product) => (
                 <TableRow key={product.id} className="hover:bg-slate-50/50">
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -296,7 +374,7 @@ export default function ProductReportsTab() {
                   <TableCell className="text-slate-600 text-sm">{product.category || "—"}</TableCell>
                   <TableCell>
                     {product.baseSku ? (
-                      <span className="font-mono text-sm text-neutral-600 bg-neutral-50 px-2 py-1 rounded-md border border-neutral-200">
+                      <span className="font-mono text-sm text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
                         {product.baseSku}
                       </span>
                     ) : (
@@ -313,7 +391,7 @@ export default function ProductReportsTab() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => router.push(`/checker/dashboard/report/product/${product.id}`)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
                         title="View Report"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -321,7 +399,7 @@ export default function ProductReportsTab() {
                       </button>
                       <button
                         onClick={() => router.push(`/checker/dashboard/report/product/${product.id}?download=true`)}
-                        className="flex items-center justify-center w-8 h-8 text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                        className="flex items-center justify-center w-8 h-8 text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
                         title="Download PDF"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -359,7 +437,7 @@ export default function ProductReportsTab() {
                 aria-current={p === page ? "page" : undefined}
                 className={`min-w-9 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                   p === page
-                    ? "bg-[#222222] text-white border-[#222222]"
+                    ? "bg-brand-500 text-white border-brand-500"
                     : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
                 } disabled:opacity-40 disabled:cursor-not-allowed`}
               >

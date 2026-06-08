@@ -14,6 +14,10 @@ export interface QCCheckerData {
     zipCode?: string;
     country?: string;
     dateOfBirth?: string;
+    alternatePhone?: string;
+    alternateEmail?: string;
+    profilePhoto?: string;
+    idProof?: string;
     joiningDate: string;
     specialization?: string;
     experience?: number;
@@ -38,6 +42,10 @@ export interface CreateQCCheckerData {
     zipCode?: string;
     country?: string;
     dateOfBirth?: string;
+    alternatePhone?: string;
+    alternateEmail?: string;
+    profilePhoto?: string;
+    idProof?: string;
     joiningDate?: string;
     status?: string;
     specialization?: string;

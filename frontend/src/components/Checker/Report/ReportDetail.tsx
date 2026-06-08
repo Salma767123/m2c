@@ -195,7 +195,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
       <AlertTriangle className="w-12 h-12 text-amber-400" />
       <p className="text-slate-600">{error || "Inspection not found"}</p>
-      {onBack && <button onClick={onBack} className="text-[#222222] underline text-sm focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 rounded">Go back</button>}
+      {onBack && <button onClick={onBack} className="text-brand-600 underline text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1 rounded">Go back</button>}
     </div>
   )
 
@@ -237,7 +237,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
       {/* Header */}
       <div className="flex items-center gap-4">
         {onBack && (
-          <button onClick={onBack} aria-label="Go back" className="p-2 hover:bg-slate-100 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1">
+          <button onClick={onBack} aria-label="Go back" className="p-2 hover:bg-slate-100 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1">
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </button>
         )}
@@ -250,7 +250,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
         <button
           onClick={handleDownloadPdf}
           disabled={downloading}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#222222] rounded-lg hover:bg-[#333333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand-500 rounded-xl hover:bg-brand-600 active:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shadow-brand-500/10 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
         >
           <Download className="w-4 h-4" />
           {downloading ? "Generating..." : "Download PDF"}
@@ -268,17 +268,17 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
       <div ref={reportRef} className="space-y-6">
 
       {/* Summary Banner */}
-      <div className="bg-gradient-to-r from-[#222222] to-[#333333] rounded-2xl p-6 text-white grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="bg-gradient-to-r from-brand-600 to-brand-700 rounded-2xl p-6 text-white grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
-          <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Vendor</p>
+          <p className="text-brand-100 text-xs font-medium uppercase mb-1">Vendor</p>
           <p className="font-semibold text-sm">{inspection.vendor?.companyName || fd.vendorName || "—"}</p>
         </div>
         <div>
-          <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Client</p>
+          <p className="text-brand-100 text-xs font-medium uppercase mb-1">Client</p>
           <p className="font-semibold text-sm">{inspection.clientName || "—"}</p>
         </div>
         <div>
-          <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Completed On</p>
+          <p className="text-brand-100 text-xs font-medium uppercase mb-1">Completed On</p>
           <p className="font-semibold text-sm">
             {inspection.completedAt
               ? new Date(inspection.completedAt).toLocaleDateString("en-IN")
@@ -286,13 +286,13 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
           </p>
         </div>
         <div>
-          <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Priority</p>
+          <p className="text-brand-100 text-xs font-medium uppercase mb-1">Priority</p>
           <p className="font-semibold text-sm">{inspection.priority || "—"}</p>
         </div>
       </div>
 
       {/* SECTION 1: Factory Details */}
-      <Section title="Section 1 — Factory Details" icon={Factory} accent="bg-neutral-50 text-neutral-800">
+      <Section title="Section 1 — Factory Details" icon={Factory} accent="bg-brand-50 text-brand-700">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <InfoRow label="Vendor Name" value={fd.vendorName} />
           <InfoRow label="Factory Name" value={fd.factoryName} />
@@ -303,7 +303,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
       </Section>
 
       {/* SECTION 2: Legal */}
-      <Section title="Section 2 — Legal & Registration" icon={ShieldCheck} accent="bg-neutral-50 text-neutral-800">
+      <Section title="Section 2 — Legal & Registration" icon={ShieldCheck} accent="bg-brand-50 text-brand-700">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <InfoRow label="Business Reg. No." value={fd.businessRegistrationNumber} />
           <InfoRow label="GST / Tax ID" value={fd.gstTaxId} />
@@ -344,9 +344,9 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
           <InfoRow label="Inspection Status" value={fd.inspectionStatus} />
         </div>
         {(fd.inspectorRemarks || inspection.notes) && (
-          <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-4 mt-2">
-            <p className="text-xs font-semibold text-neutral-700 uppercase mb-1">Remarks</p>
-            <p className="text-sm text-neutral-900">{fd.inspectorRemarks || inspection.notes}</p>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2">
+            <p className="text-xs font-semibold text-slate-700 uppercase mb-1">Remarks</p>
+            <p className="text-sm text-slate-900">{fd.inspectorRemarks || inspection.notes}</p>
           </div>
         )}
       </Section>
@@ -397,7 +397,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                       key={i}
                       href={doc.data}
                       download={doc.name || `Document_${i + 1}`}
-                      className="flex items-center gap-2 px-3 py-2 bg-neutral-50 text-neutral-700 border border-neutral-200 rounded-lg text-xs font-medium hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                      className="flex items-center gap-2 px-3 py-2 bg-brand-50 text-brand-700 border border-brand-200 rounded-lg text-xs font-medium hover:bg-brand-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
                     >
                       <FileText className="w-3.5 h-3.5" />
                       {doc.name || `Document ${i + 1}`}
@@ -492,7 +492,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                 </div>
                 <div className="text-xs text-center flex-shrink-0">
                   {item.aqlLevel && (
-                    <div><p className="font-bold text-[#222222]">{item.aqlLevel}</p><p className="text-slate-500">AQL</p></div>
+                    <div><p className="font-bold text-brand-600">{item.aqlLevel}</p><p className="text-slate-500">AQL</p></div>
                   )}
                 </div>
               </div>

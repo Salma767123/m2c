@@ -1557,6 +1557,14 @@ model QCChecker {
   // Personal
   dateOfBirth DateTime?
 
+  // Alternate contact
+  alternatePhone String?
+  alternateEmail String?
+
+  // Media / documents (stored as URL or base64 data URL)
+  profilePhoto String?
+  idProof      String?
+
   // Professional
   joiningDate    DateTime @default(now())
   specialization String?

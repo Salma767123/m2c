@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import Dropdown from '@/components/UI/Dropdown'
 import {
     AlertCircle,
+    Calendar,
     Eye,
     FileText,
     Search,
@@ -84,12 +85,16 @@ export default function Products() {
     const initialSearch = searchParams.get('search') ?? ''
     const initialStatus = searchParams.get('status') ?? ''
     const initialSort = searchParams.get('sort') ?? DEFAULT_SORT
+    const initialDate = searchParams.get('date') ?? ''
     const initialPage = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1)
 
     const [searchInput, setSearchInput] = useState(initialSearch)
     const [status, setStatus] = useState(initialStatus)
     const [sort, setSort] = useState(initialSort)
+    const [dateFilter, setDateFilter] = useState(initialDate)
     const [page, setPage] = useState(initialPage)
+
+    const dateInputRef = useRef<HTMLInputElement>(null)
 
     const debouncedSearch = useDebounce(searchInput, 300)
 
@@ -147,7 +152,7 @@ export default function Products() {
             return
         }
         setPage(1)
-    }, [debouncedSearch])
+    }, [debouncedSearch, dateFilter])
 
     // Sync URL for shareability + back-button behaviour.
     useEffect(() => {
@@ -161,14 +166,17 @@ export default function Products() {
         
         if (sort !== DEFAULT_SORT) params.set('sort', sort)
         else params.delete('sort')
-        
+
+        if (dateFilter) params.set('date', dateFilter)
+        else params.delete('date')
+
         if (page !== 1) params.set('page', String(page))
         else params.delete('page')
-        
+
         const qs = params.toString()
         router.replace(qs ? `?${qs}` : '?', { scroll: false })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [debouncedSearch, status, sort, page, router])
+    }, [debouncedSearch, status, sort, dateFilter, page, router])
 
     const [sortBy, sortOrder] = useMemo(() => {
         const [by, ord] = sort.split(':')
@@ -211,16 +219,33 @@ export default function Products() {
         loadProducts()
     }, [loadProducts])
 
+    // Client-side date filter (mirrors the Vendor module): match each
+    // product's createdAt against the picked day, formatted as a local
+    // YYYY-MM-DD string so the comparison is timezone-safe.
+    const filteredProducts = useMemo(() => {
+        if (!dateFilter) return products
+        return products.filter((p) => {
+            if (!p.createdAt) return false
+            const d = new Date(p.createdAt)
+            if (Number.isNaN(d.getTime())) return false
+            const raw = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+            return raw === dateFilter
+        })
+    }, [products, dateFilter])
+
     const handleClearFilters = () => {
         setSearchInput('')
         setStatus('')
         setSort(DEFAULT_SORT)
+        setDateFilter('')
         setPage(1)
     }
 
-    const hasActiveFilters = Boolean(debouncedSearch || status || sort !== DEFAULT_SORT || page !== 1)
+    const hasActiveFilters = Boolean(debouncedSearch || status || sort !== DEFAULT_SORT || dateFilter || page !== 1)
     const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
-    const rangeEnd = Math.min(pagination.page * pagination.limit, pagination.total)
+    const rangeEnd = dateFilter
+        ? rangeStart + filteredProducts.length - 1
+        : Math.min(pagination.page * pagination.limit, pagination.total)
 
     if (selectedProduct) {
         return (
@@ -296,7 +321,7 @@ export default function Products() {
 
             {/* Filter bar */}
             <div className="mb-4">
-                <div className="grid gap-4 md:grid-cols-[1fr_auto] items-center">
+                <div className="grid gap-4 md:grid-cols-[1fr_auto_auto] items-center">
                     <div className="relative flex-1">
                         <label htmlFor="product-search" className="sr-only">Search products</label>
                         <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 pointer-events-none" />
@@ -313,6 +338,42 @@ export default function Products() {
                                 onClick={() => setSearchInput('')}
                                 aria-label="Clear search"
                                 className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                    <div className="relative min-w-45">
+                        <label htmlFor="product-date-filter" className="sr-only">Filter by Assigned Date</label>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                try {
+                                    dateInputRef.current?.showPicker()
+                                } catch (err) {}
+                            }}
+                            className="absolute left-3.5 top-3.5 text-slate-400 hover:text-brand-500 cursor-pointer z-10 transition-colors"
+                            title="Open calendar picker"
+                        >
+                            <Calendar className="w-5 h-5" />
+                        </button>
+                        <input
+                            ref={dateInputRef}
+                            id="product-date-filter"
+                            type="date"
+                            value={dateFilter}
+                            onChange={(e) => setDateFilter(e.target.value)}
+                            className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs text-sm text-slate-700 [&::-webkit-calendar-picker-indicator]:hidden"
+                        />
+                        {dateFilter && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setDateFilter('')
+                                }}
+                                aria-label="Clear date filter"
+                                className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer z-10"
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -338,9 +399,9 @@ export default function Products() {
                 <span>
                     {loading
                         ? 'Loading products...'
-                        : pagination.total === 0
+                        : filteredProducts.length === 0
                             ? '0 products'
-                            : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total} product${pagination.total === 1 ? '' : 's'}`}
+                            : `Showing ${rangeStart}–${rangeEnd} of ${dateFilter ? filteredProducts.length : pagination.total} product${(dateFilter ? filteredProducts.length : pagination.total) === 1 ? '' : 's'}`}
                 </span>
                 {hasActiveFilters && (
                     <button
@@ -418,7 +479,7 @@ export default function Products() {
             )}
 
             {/* Product data grid */}
-            {!error && products.length > 0 && (
+            {!error && filteredProducts.length > 0 && (
                 <div className="overflow-x-auto bg-white border border-slate-200/80 rounded-2xl shadow-xs scrollbar-none mb-6">
                     <Table>
                         <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
@@ -431,7 +492,7 @@ export default function Products() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {products.map((product) => (
+                            {filteredProducts.map((product) => (
                                 <TableRow
                                     key={product.id}
                                     onClick={() => handleViewDetails(product.id)}
@@ -505,7 +566,7 @@ export default function Products() {
             )}
 
             {/* Empty state */}
-            {!loading && !error && products.length === 0 && (
+            {!loading && !error && filteredProducts.length === 0 && (
                 <div className="text-center py-16">
                     <div className="bg-slate-100 p-6 rounded-2xl inline-block mb-4">
                         <AlertCircle className="w-16 h-16 text-slate-400 mx-auto" />

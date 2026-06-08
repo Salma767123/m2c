@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import {
   Eye, CheckCircle, XCircle, Download,
-  Factory, Package, Search, X, ChevronLeft, ChevronRight, RotateCw,
+  Factory, Package, Search, X, ChevronLeft, ChevronRight, RotateCw, Calendar,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -56,12 +56,15 @@ export default function ReportsPage() {
   const initialSearch = searchParams.get("search") ?? ""
   const initialResult = searchParams.get("result") ?? ""
   const initialSort = searchParams.get("sort") ?? DEFAULT_SORT
+  const initialDate = searchParams.get("date") ?? ""
   const initialPage = Math.max(parseInt(searchParams.get("page") || "1", 10) || 1, 1)
 
   const [searchInput, setSearchInput] = useState(initialSearch)
   const [result, setResult] = useState(initialResult)
   const [sort, setSort] = useState(initialSort)
+  const [dateFilter, setDateFilter] = useState(initialDate)
   const [page, setPage] = useState(initialPage)
+  const dateInputRef = useRef<HTMLInputElement>(null)
 
   const debouncedSearch = useDebounce(searchInput, 300)
 
@@ -78,7 +81,7 @@ export default function ReportsPage() {
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return }
     setPage(1)
-  }, [debouncedSearch])
+  }, [debouncedSearch, dateFilter])
 
   const [sortBy, sortOrder] = useMemo(() => {
     const [by, ord] = sort.split(":")
@@ -92,10 +95,11 @@ export default function ReportsPage() {
     if (debouncedSearch) params.set("search", debouncedSearch)
     if (result) params.set("result", result)
     if (sort !== DEFAULT_SORT) params.set("sort", sort)
+    if (dateFilter) params.set("date", dateFilter)
     if (page !== 1) params.set("page", String(page))
     const qs = params.toString()
     router.replace(qs ? `?${qs}` : "?", { scroll: false })
-  }, [activeTab, debouncedSearch, result, sort, page, router])
+  }, [activeTab, debouncedSearch, result, sort, dateFilter, page, router])
 
   const loadReports = useCallback(async () => {
     const id = ++requestIdRef.current
@@ -135,12 +139,28 @@ export default function ReportsPage() {
     setSearchInput("")
     setResult("")
     setSort(DEFAULT_SORT)
+    setDateFilter("")
     setPage(1)
   }
 
-  const hasActiveFilters = Boolean(debouncedSearch || result || sort !== DEFAULT_SORT || page !== 1)
+  // Client-side date filter (matches the vendor/products module pattern) — filters within the current server page.
+  const filteredInspections = useMemo(() => {
+    if (!dateFilter) return inspections
+    return inspections.filter((insp) => {
+      const src = insp.completedAt || insp.scheduledDate
+      if (!src) return false
+      const d = new Date(src)
+      if (Number.isNaN(d.getTime())) return false
+      const raw = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+      return raw === dateFilter
+    })
+  }, [inspections, dateFilter])
+
+  const hasActiveFilters = Boolean(debouncedSearch || result || sort !== DEFAULT_SORT || dateFilter || page !== 1)
   const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
-  const rangeEnd = Math.min(pagination.page * pagination.limit, pagination.total)
+  const rangeEnd = dateFilter
+    ? rangeStart + filteredInspections.length - 1
+    : Math.min(pagination.page * pagination.limit, pagination.total)
 
   const getResultBadge = (r: string) => {
     switch (r) {
@@ -187,9 +207,9 @@ export default function ReportsPage() {
             key={tab.key}
             onClick={() => handleTabChange(tab.key)}
             aria-current={activeTab === tab.key ? "page" : undefined}
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold whitespace-nowrap transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 ${
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold whitespace-nowrap transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1 ${
               activeTab === tab.key
-                ? "text-[#222222] border-b-2 border-[#222222] bg-neutral-50/40"
+                ? "text-brand-600 border-b-2 border-brand-500 bg-brand-50/40"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
@@ -203,7 +223,7 @@ export default function ReportsPage() {
       {activeTab === "factory" && (
         <div className="space-y-4">
           {/* Filter bar */}
-          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-start">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] items-start">
             <div className="relative">
               <label htmlFor="report-search" className="sr-only">Search reports</label>
               <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 pointer-events-none" />
@@ -213,13 +233,44 @@ export default function ReportsPage() {
                 placeholder="Search by vendor, client..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full pl-12 pr-10 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:border-transparent transition-all bg-white shadow-sm"
+                className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs"
               />
               {searchInput && (
                 <button
                   onClick={() => setSearchInput("")}
                   aria-label="Clear search"
                   className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <div className="relative min-w-45">
+              <label htmlFor="report-date-filter" className="sr-only">Filter by Completed Date</label>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  try { dateInputRef.current?.showPicker() } catch (err) {}
+                }}
+                className="absolute left-3.5 top-3.5 text-slate-400 hover:text-brand-500 cursor-pointer z-10 transition-colors"
+                title="Open calendar picker"
+              >
+                <Calendar className="w-5 h-5" />
+              </button>
+              <input
+                ref={dateInputRef}
+                id="report-date-filter"
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs text-sm text-slate-700 [&::-webkit-calendar-picker-indicator]:hidden"
+              />
+              {dateFilter && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDateFilter("") }}
+                  aria-label="Clear date filter"
+                  className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer z-10"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -249,14 +300,14 @@ export default function ReportsPage() {
             <span>
               {loading
                 ? "Loading reports..."
-                : pagination.total === 0
+                : (dateFilter ? filteredInspections.length : pagination.total) === 0
                   ? "0 reports"
-                  : `Showing ${rangeStart}–${rangeEnd} of ${pagination.total} report${pagination.total === 1 ? "" : "s"}`}
+                  : `Showing ${rangeStart}–${rangeEnd} of ${dateFilter ? filteredInspections.length : pagination.total} report${(dateFilter ? filteredInspections.length : pagination.total) === 1 ? "" : "s"}`}
             </span>
             {hasActiveFilters && (
               <button
                 onClick={handleClearFilters}
-                className="text-[#222222] hover:text-[#333333] font-medium underline underline-offset-2"
+                className="text-brand-600 hover:text-brand-700 font-medium underline underline-offset-2"
               >
                 Clear filters
               </button>
@@ -295,7 +346,7 @@ export default function ReportsPage() {
                   </div>
                 ))}
               </div>
-            ) : !loading && !error && inspections.length === 0 ? (
+            ) : !loading && !error && filteredInspections.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
                 <div className="p-4 bg-slate-100 rounded-2xl">
                   <Factory className="w-12 h-12 text-slate-400" />
@@ -311,7 +362,7 @@ export default function ReportsPage() {
                 {hasActiveFilters && (
                   <button
                     onClick={handleClearFilters}
-                    className="mt-2 px-4 py-2 bg-[#222222] text-white font-medium rounded-lg hover:bg-[#333333] transition-colors"
+                    className="mt-2 px-4 py-2 bg-brand-500 text-white font-semibold rounded-xl hover:bg-brand-600 active:bg-brand-700 transition-colors shadow-xs shadow-brand-500/10"
                   >
                     Clear filters
                   </button>
@@ -329,7 +380,7 @@ export default function ReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {inspections.map((insp) => {
+                  {filteredInspections.map((insp) => {
                     const row = buildRow(insp)
                     return (
                       <TableRow key={insp.id} className="hover:bg-slate-50/50">
@@ -343,7 +394,7 @@ export default function ReportsPage() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => router.push(`/checker/dashboard/report/${insp.id}`)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
                               title="View Report"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -351,7 +402,7 @@ export default function ReportsPage() {
                             </button>
                             <button
                               onClick={() => router.push(`/checker/dashboard/report/${insp.id}?download=true`)}
-                              className="flex items-center justify-center w-8 h-8 text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg hover:bg-neutral-100 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+                              className="flex items-center justify-center w-8 h-8 text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
                               title="Download PDF"
                             >
                               <Download className="w-3.5 h-3.5" />
@@ -390,7 +441,7 @@ export default function ReportsPage() {
                     aria-current={p === page ? "page" : undefined}
                     className={`min-w-9 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                       p === page
-                        ? "bg-[#222222] text-white border-[#222222]"
+                        ? "bg-brand-500 text-white border-brand-500"
                         : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
                     } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >

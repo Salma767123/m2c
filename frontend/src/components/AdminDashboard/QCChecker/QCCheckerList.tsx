@@ -287,6 +287,15 @@ export default function QCCheckerList() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
+                        {hasPermission('view_qc_checkers') && (
+                          <Link
+                            href={`/admin/dashboard/qc-checker/${checker.id}`}
+                            className="p-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        )}
                         {hasPermission('edit_qc_checkers') && (
                           <button
                             onClick={() => handleResendClick(checker.id, checker.email)}

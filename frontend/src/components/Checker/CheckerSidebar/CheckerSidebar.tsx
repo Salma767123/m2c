@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   Factory,
   FileText,
-  Settings,
+  User,
   LogOut,
   Package,
 } from 'lucide-react'
@@ -37,9 +37,9 @@ const sidebarItems = [
     icon: FileText,
   },
   {
-    title: 'Settings',
+    title: 'Profile',
     href: '/checker/dashboard/settings',
-    icon: Settings,
+    icon: User,
   },
 ]
 

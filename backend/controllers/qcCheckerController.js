@@ -63,6 +63,10 @@ const createQCChecker = async (req, res) => {
             experience,
             certifications,
             assignedHubId,
+            alternatePhone,
+            alternateEmail,
+            profilePhoto,
+            idProof,
         } = req.body;
 
         // Validation
@@ -104,6 +108,10 @@ const createQCChecker = async (req, res) => {
                 zipCode: zipCode || null,
                 country: country || 'India',
                 dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+                alternatePhone: alternatePhone || null,
+                alternateEmail: alternateEmail || null,
+                profilePhoto: profilePhoto || null,
+                idProof: idProof || null,
                 joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
                 specialization: specialization || null,
                 experience: experience ? parseInt(experience) : 0,
@@ -244,6 +252,10 @@ const getQCCheckerById = async (req, res) => {
                 zipCode: true,
                 country: true,
                 dateOfBirth: true,
+                alternatePhone: true,
+                alternateEmail: true,
+                profilePhoto: true,
+                idProof: true,
                 joiningDate: true,
                 specialization: true,
                 experience: true,
@@ -300,6 +312,10 @@ const updateQCChecker = async (req, res) => {
             experience,
             certifications,
             assignedHubId,
+            alternatePhone,
+            alternateEmail,
+            profilePhoto,
+            idProof,
         } = req.body;
 
         const existing = await prisma.qCChecker.findUnique({ where: { id } });
@@ -319,6 +335,10 @@ const updateQCChecker = async (req, res) => {
         if (zipCode !== undefined) updateData.zipCode = zipCode || null;
         if (country !== undefined) updateData.country = country || 'India';
         if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+        if (alternatePhone !== undefined) updateData.alternatePhone = alternatePhone || null;
+        if (alternateEmail !== undefined) updateData.alternateEmail = alternateEmail || null;
+        if (profilePhoto !== undefined) updateData.profilePhoto = profilePhoto || null;
+        if (idProof !== undefined) updateData.idProof = idProof || null;
         if (joiningDate !== undefined) updateData.joiningDate = joiningDate ? new Date(joiningDate) : existing.joiningDate;
         if (status) {
             updateData.status = status.toUpperCase();
@@ -344,6 +364,10 @@ const updateQCChecker = async (req, res) => {
                 zipCode: true,
                 country: true,
                 dateOfBirth: true,
+                alternatePhone: true,
+                alternateEmail: true,
+                profilePhoto: true,
+                idProof: true,
                 joiningDate: true,
                 specialization: true,
                 experience: true,
@@ -552,6 +576,10 @@ const getCheckerProfile = async (req, res) => {
                 zipCode: true,
                 country: true,
                 dateOfBirth: true,
+                alternatePhone: true,
+                alternateEmail: true,
+                profilePhoto: true,
+                idProof: true,
                 joiningDate: true,
                 specialization: true,
                 experience: true,
@@ -600,6 +628,10 @@ const updateCheckerProfile = async (req, res) => {
             state,
             zipCode,
             country,
+            alternatePhone,
+            alternateEmail,
+            profilePhoto,
+            idProof,
             password
         } = req.body;
 
@@ -622,7 +654,11 @@ const updateCheckerProfile = async (req, res) => {
         if (state !== undefined) updateData.state = state || null;
         if (zipCode !== undefined) updateData.zipCode = zipCode || null;
         if (country !== undefined) updateData.country = country || 'India';
-        
+        if (alternatePhone !== undefined) updateData.alternatePhone = alternatePhone || null;
+        if (alternateEmail !== undefined) updateData.alternateEmail = alternateEmail || null;
+        if (profilePhoto !== undefined) updateData.profilePhoto = profilePhoto || null;
+        if (idProof !== undefined) updateData.idProof = idProof || null;
+
         if (password) {
             updateData.password = await bcrypt.hash(password, 10);
         }
@@ -642,6 +678,10 @@ const updateCheckerProfile = async (req, res) => {
                 zipCode: true,
                 country: true,
                 dateOfBirth: true,
+                alternatePhone: true,
+                alternateEmail: true,
+                profilePhoto: true,
+                idProof: true,
                 joiningDate: true,
                 specialization: true,
                 experience: true,

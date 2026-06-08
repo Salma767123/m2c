@@ -7,7 +7,6 @@ import { Badge } from '@/components/UI/Badge'
 import NotificationDropdown from '@/components/Shared/NotificationDropdown'
 import {
   Bell,
-  Settings,
   User,
   LogOut,
   Menu,
@@ -65,7 +64,7 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
       '/checker/dashboard': { title: 'Dashboard', icon: LayoutDashboard },
       '/checker/dashboard/vendors': { title: 'Vendors', icon: Factory },
       '/checker/dashboard/report': { title: 'Reports', icon: FileText },
-      '/checker/dashboard/settings': { title: 'Settings', icon: Settings },
+      '/checker/dashboard/settings': { title: 'Profile', icon: User },
     }
 
     return pageMap[pathname] || { title: 'Dashboard', icon: LayoutDashboard }
@@ -136,10 +135,17 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
             {/* User Dropdown */}
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-md border border-slate-200 z-50 overflow-hidden">
-                <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false)
+                    router.push('/checker/dashboard/settings')
+                  }}
+                  className="w-full text-left p-3 border-b border-slate-100 bg-slate-50/50 hover:bg-brand-50 transition-colors"
+                  title="View profile"
+                >
                   <p className="font-semibold text-slate-900 text-sm truncate">{checkerName}</p>
                   <p className="text-xs text-slate-500 font-medium">QC Checker</p>
-                </div>
+                </button>
                 <div className="p-1.5 bg-white">
                   <button
                     onClick={() => {

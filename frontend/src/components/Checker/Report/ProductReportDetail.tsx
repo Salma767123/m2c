@@ -7,7 +7,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   ArrowLeft, CheckCircle, XCircle,
   AlertTriangle, Package, ClipboardList, Ruler,
-  Box, Bug, FlaskConical, Camera, Star, Download, Clock
+  Box, Bug, FlaskConical, Camera, Star, Download, Clock, FileText
 } from "lucide-react"
 import { Badge } from "@/components/UI/Badge"
 import qcCheckerService from "@/services/qcCheckerService"
@@ -237,7 +237,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
       <AlertTriangle className="w-12 h-12 text-amber-400" />
       <p className="text-slate-600">{error || "Product not found"}</p>
-      {onBack && <button onClick={onBack} className="text-[#222222] underline text-sm focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 rounded">Go back</button>}
+      {onBack && <button onClick={onBack} className="text-brand-600 underline text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1 rounded">Go back</button>}
     </div>
   )
 
@@ -247,6 +247,26 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
   const items = Array.isArray(fd.items) ? (fd.items as InspectionItem[]) : []
   const measurements = Array.isArray(fd.measurements) ? (fd.measurements as Measurement[]) : []
   const tests = Array.isArray(fd.tests) ? (fd.tests as InspectionTest[]) : []
+
+  // Sign-off artifacts from the rebuilt Documentation step.
+  const signedDocuments = Array.isArray(fd.signedDocuments) ? fd.signedDocuments : []
+  const signedReport = Array.isArray(fd.signedReport) ? fd.signedReport : []
+  const companyIdCards = Array.isArray(fd.companyIdCards) ? fd.companyIdCards : []
+  // Legacy field kept for older reports only.
+  const documentationPhotos = Array.isArray(fd.documentationPhotos) ? fd.documentationPhotos : []
+
+  // Overall result mirrors the Review step's remark-code average scoring.
+  const remarkCodes = Object.keys(REMARK_LABELS)
+    .map((k) => Number(fd[k]))
+    .filter((n) => !Number.isNaN(n) && n >= 1 && n <= 10)
+  const remarkAvg = remarkCodes.length ? remarkCodes.reduce((a, b) => a + b, 0) / remarkCodes.length : 10
+  const overallStatus = remarkAvg >= 8 ? "PASS" : remarkAvg >= 6 ? "RE-INSPECTION" : "REJECTED"
+  const overallStyle =
+    overallStatus === "PASS"
+      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+      : overallStatus === "RE-INSPECTION"
+        ? "bg-amber-50 border-amber-200 text-amber-800"
+        : "bg-red-50 border-red-200 text-red-800"
 
   const handleDownloadPdf = async () => {
     if (!reportRef.current) return
@@ -273,7 +293,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       {/* Header */}
       <div className="flex items-center gap-4">
         {onBack && (
-          <button onClick={onBack} aria-label="Go back" className="p-2 hover:bg-slate-100 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1">
+          <button onClick={onBack} aria-label="Go back" className="p-2 hover:bg-slate-100 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1">
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </button>
         )}
@@ -286,7 +306,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         <button
           onClick={handleDownloadPdf}
           disabled={downloading}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#222222] rounded-lg hover:bg-[#333333] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand-500 rounded-xl hover:bg-brand-600 active:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shadow-brand-500/10 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
         >
           <Download className="w-4 h-4" />
           {downloading ? "Generating..." : "Download PDF"}
@@ -302,21 +322,21 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       <div ref={reportRef} className="space-y-6">
 
       {/* Summary Banner */}
-      <div className="bg-linear-to-r from-[#222222] to-[#333333] rounded-2xl p-6 text-white grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="bg-linear-to-r from-brand-600 to-brand-700 rounded-2xl p-6 text-white grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
-          <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Product</p>
+          <p className="text-brand-100 text-xs font-medium uppercase mb-1">Product</p>
           <p className="font-semibold text-sm">{product.name || "—"}</p>
         </div>
         <div>
-          <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Vendor</p>
+          <p className="text-brand-100 text-xs font-medium uppercase mb-1">Vendor</p>
           <p className="font-semibold text-sm">{product.vendor?.companyName || "—"}</p>
         </div>
         <div>
-          <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Category</p>
+          <p className="text-brand-100 text-xs font-medium uppercase mb-1">Category</p>
           <p className="font-semibold text-sm">{product.category || "—"}</p>
         </div>
         <div>
-          <p className="text-neutral-400 text-xs font-medium uppercase mb-1">Inspected On</p>
+          <p className="text-brand-100 text-xs font-medium uppercase mb-1">Inspected On</p>
           <p className="font-semibold text-sm">
             {product.updatedAt ? new Date(product.updatedAt).toLocaleDateString("en-IN") : "—"}
           </p>
@@ -332,7 +352,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       )}
 
       {/* Section 1: General Information */}
-      <Section title="Section 1 — General Information" icon={ClipboardList} accent="bg-neutral-50 text-neutral-800">
+      <Section title="Section 1 — General Information" icon={ClipboardList} accent="bg-brand-50 text-brand-700">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <InfoRow label="Client" value={fd.client} />
           <InfoRow label="Vendor" value={fd.vendor} />
@@ -344,7 +364,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       </Section>
 
       {/* Section 2: Preparation */}
-      <Section title="Section 2 — Preparation" icon={Package} accent="bg-neutral-50 text-neutral-800">
+      <Section title="Section 2 — Preparation" icon={Package} accent="bg-brand-50 text-brand-700">
         {items.length > 0 ? (
           <div className="space-y-3 mb-4">
             {items.map((item, i) => (
@@ -355,7 +375,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
                 </div>
                 <div className="flex gap-4 text-xs text-center flex-shrink-0">
                   <div><p className="font-bold text-slate-800">{item.totalQuantity ?? "—"}</p><p className="text-slate-500">Total Qty</p></div>
-                  <div><p className="font-bold text-[#222222]">{item.inspectionQuantity ?? "—"}</p><p className="text-slate-500">Inspection Qty</p></div>
+                  <div><p className="font-bold text-brand-600">{item.inspectionQuantity ?? "—"}</p><p className="text-slate-500">Inspection Qty</p></div>
                 </div>
               </div>
             ))}
@@ -474,7 +494,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           <div className="space-y-2 mb-4">
             {fd.criticalDefectDetails && <div className="bg-red-50 border border-red-100 rounded-lg p-3"><p className="text-xs font-semibold text-red-700 uppercase mb-1">Critical Defect Details</p><p className="text-sm text-red-900">{fd.criticalDefectDetails}</p></div>}
             {fd.majorDefectDetails && <div className="bg-amber-50 border border-amber-100 rounded-lg p-3"><p className="text-xs font-semibold text-amber-700 uppercase mb-1">Major Defect Details</p><p className="text-sm text-amber-900">{fd.majorDefectDetails}</p></div>}
-            {fd.minorDefectDetails && <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3"><p className="text-xs font-semibold text-neutral-700 uppercase mb-1">Minor Defect Details</p><p className="text-sm text-neutral-900">{fd.minorDefectDetails}</p></div>}
+            {fd.minorDefectDetails && <div className="bg-slate-50 border border-slate-200 rounded-lg p-3"><p className="text-xs font-semibold text-slate-700 uppercase mb-1">Minor Defect Details</p><p className="text-sm text-slate-900">{fd.minorDefectDetails}</p></div>}
           </div>
         )}
         <PhotoGrid photos={fd.defectPhotos} label="Defect Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
@@ -546,14 +566,106 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         <PhotoGrid photos={fd.testingPhotos} label="Testing Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>
 
-      {/* Section 7: Documentation */}
-      <Section title="Section 7 — Documentation" icon={Camera} accent="bg-sky-50 text-sky-800">
-        <div className="mb-4">
-          <InfoRow label="Inspector Signature" value={fd.inspectorSignature} />
+      {/* Section 7: Review & Final Decision */}
+      <Section title="Section 7 — Review & Final Decision" icon={Star} accent="bg-amber-50 text-amber-800">
+        <div className="flex flex-wrap items-center gap-3 mb-5">
+          <span className="text-sm font-medium text-slate-700">Final Decision:</span>
+          {fd.finalDecision === "Approved" ? (
+            <span className="flex items-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-100 px-4 py-1.5 rounded-full">
+              <CheckCircle className="w-4 h-4" /> Approved
+            </span>
+          ) : fd.finalDecision === "Rejected" ? (
+            <span className="flex items-center gap-1.5 text-sm font-bold text-red-700 bg-red-100 px-4 py-1.5 rounded-full">
+              <XCircle className="w-4 h-4" /> Rejected
+            </span>
+          ) : (
+            <span className="text-sm text-slate-400">{fd.finalDecision || "—"}</span>
+          )}
         </div>
-        <PhotoGrid photos={fd.documentationPhotos} label="General Documentation Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
-        <PhotoGrid photos={fd.photocopyDocuments} label="Photocopy Documents" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
-        <PhotoGrid photos={fd.companyIdCards} label="Company ID Cards" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+
+        {/* Overall result — remark-code average scoring (mirrors Review step) */}
+        <div className={`rounded-xl border p-4 mb-4 ${overallStyle}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Overall Result</p>
+              <p className="text-lg font-bold">{overallStatus}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Average Score</p>
+              <p className="text-lg font-bold">{remarkAvg.toFixed(1)}/10</p>
+            </div>
+          </div>
+          {remarkCodes.length > 0 && (
+            <p className="text-xs mt-2 opacity-80">
+              Remark codes: {remarkCodes.join(", ")} · {remarkCodes.length} remark{remarkCodes.length > 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+
+        {fd.reviewerRemarks && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <p className="text-xs font-semibold text-slate-700 uppercase mb-1">Reviewer Remarks</p>
+            <p className="text-sm text-slate-900">{fd.reviewerRemarks}</p>
+          </div>
+        )}
+      </Section>
+
+      {/* Section 8: Documentation & Sign-off */}
+      <Section title="Section 8 — Documentation & Sign-off" icon={FileText} accent="bg-sky-50 text-sky-800">
+        {/* Client signature */}
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Client Signature</p>
+          {fd.clientSignature ? (
+            <img
+              src={fd.clientSignature}
+              alt="Client signature"
+              onError={(e) => { e.currentTarget.style.display = "none" }}
+              className="h-20 object-contain border border-slate-200 rounded-lg bg-white px-3 py-2"
+            />
+          ) : (
+            <p className="text-sm text-slate-400">Not captured</p>
+          )}
+        </div>
+
+        {/* Digitally-signed report (PDF) */}
+        {signedReport.length > 0 && (
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Digitally-Signed Report</p>
+            <div className="flex flex-wrap gap-2">
+              {signedReport.map((doc: any, i: number) => {
+                const href = doc?.data || doc?.url
+                return href ? (
+                  <a
+                    key={i}
+                    href={href}
+                    download={doc?.name || `Signed_Report_${i + 1}.pdf`}
+                    className="flex items-center gap-2 px-3 py-2 bg-brand-50 text-brand-700 border border-brand-200 rounded-lg text-xs font-semibold hover:bg-brand-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {doc?.name || `Signed Report ${i + 1}`}
+                  </a>
+                ) : (
+                  <span key={i} className="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
+                    {doc?.name || `Signed Report ${i + 1}`}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Manually-signed document scans */}
+        <PhotoGrid photos={signedDocuments} label="Signed Documents" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+        {/* Company ID cards */}
+        <PhotoGrid photos={companyIdCards} label="Company ID Cards" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+        {/* Legacy general documentation photos (older reports only) */}
+        {documentationPhotos.length > 0 && (
+          <PhotoGrid photos={documentationPhotos} label="General Documentation Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
+        )}
+
+        {signedReport.length === 0 && signedDocuments.length === 0 && companyIdCards.length === 0 && !fd.clientSignature && documentationPhotos.length === 0 && (
+          <p className="text-slate-400 text-sm">No documentation captured.</p>
+        )}
       </Section>
 
       {/* Selfie Verification */}
@@ -591,30 +703,6 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
           </div>
         </Section>
       )}
-
-      {/* Section 8: Review & Decision */}
-      <Section title="Section 8 — Review & Final Decision" icon={Star} accent="bg-amber-50 text-amber-800">
-        <div className="flex items-center gap-4 mb-4">
-          <span className="text-sm font-medium text-slate-700">Final Decision:</span>
-          {fd.finalDecision === "Approved" ? (
-            <span className="flex items-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-100 px-4 py-1.5 rounded-full">
-              <CheckCircle className="w-4 h-4" /> Approved
-            </span>
-          ) : fd.finalDecision === "Rejected" ? (
-            <span className="flex items-center gap-1.5 text-sm font-bold text-red-700 bg-red-100 px-4 py-1.5 rounded-full">
-              <XCircle className="w-4 h-4" /> Rejected
-            </span>
-          ) : (
-            <span className="text-sm text-slate-400">{fd.finalDecision || "—"}</span>
-          )}
-        </div>
-        {fd.reviewerRemarks && (
-          <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-4">
-            <p className="text-xs font-semibold text-neutral-700 uppercase mb-1">Reviewer Remarks</p>
-            <p className="text-sm text-neutral-900">{fd.reviewerRemarks}</p>
-          </div>
-        )}
-      </Section>
 
       {/* Timestamps */}
       <div className="bg-white rounded-xl border border-slate-200 px-6 py-4">
