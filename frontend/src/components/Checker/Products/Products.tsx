@@ -224,24 +224,16 @@ export default function Products() {
 
     if (selectedProduct) {
         return (
-            <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900">Product Inspection</h1>
-                        <p className="text-slate-600 mt-1">Complete the inspection form for {selectedProduct.name}</p>
-                    </div>
-                </div>
-                <ProductInspectionForm
-                    productId={selectedProduct.id}
-                    productName={selectedProduct.name}
-                    vendorName={selectedProduct.vendor.companyName}
-                    onComplete={() => {
-                        handleBackToList()
-                        loadProducts()
-                    }}
-                    onCancel={handleBackToList}
-                />
-            </div>
+            <ProductInspectionForm
+                productId={selectedProduct.id}
+                productName={selectedProduct.name}
+                vendorName={selectedProduct.vendor.companyName}
+                onComplete={() => {
+                    handleBackToList()
+                    loadProducts()
+                }}
+                onCancel={handleBackToList}
+            />
         )
     }
 

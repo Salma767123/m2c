@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Check, ArrowLeft, ArrowRight } from "lucide-react"
+import { Check, ArrowLeft, ArrowRight, AlertTriangle } from "lucide-react"
 
 // Import steps from the actual paths
 import GeneralInformation from "@/components/Checker/Vendor/Steps/GeneralInformation"
@@ -55,6 +55,94 @@ export default function ProductInspectionForm({
     const [currentStep, setCurrentStep] = useState<Step>("generalInformation")
     const [submitting, setSubmitting] = useState(false)
     const [errors, setErrors] = useState<AllErrors>({})
+
+    // ── Exit-confirmation guard ────────────────────────────────────────────────
+    // While the inspection is being filled, any accidental navigation away
+    // (sidebar/menu link, browser back, tab close/refresh, or the form's own
+    // back arrow) should prompt "are you sure you want to exit?" so in-progress
+    // work isn't lost. `allowLeaveRef` short-circuits the guard once the user has
+    // confirmed an exit or the inspection has been submitted successfully.
+    const [showExitConfirm, setShowExitConfirm] = useState(false)
+    const pendingNavRef = useRef<null | (() => void)>(null)
+    const allowLeaveRef = useRef(false)
+    const rootRef = useRef<HTMLDivElement>(null)
+
+    // Route a navigation attempt through the confirmation modal. If the guard is
+    // disabled (already confirmed / submitted) the action runs immediately.
+    const requestExit = (action: () => void) => {
+        if (allowLeaveRef.current) {
+            action()
+            return
+        }
+        pendingNavRef.current = action
+        setShowExitConfirm(true)
+    }
+
+    const confirmExit = () => {
+        setShowExitConfirm(false)
+        allowLeaveRef.current = true
+        const action = pendingNavRef.current
+        pendingNavRef.current = null
+        action?.()
+    }
+
+    const cancelExit = () => {
+        setShowExitConfirm(false)
+        pendingNavRef.current = null
+    }
+
+    // Warn on tab close / refresh / hard browser navigation.
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            if (allowLeaveRef.current) return
+            e.preventDefault()
+            e.returnValue = ""
+        }
+        window.addEventListener("beforeunload", handler)
+        return () => window.removeEventListener("beforeunload", handler)
+    }, [])
+
+    // Intercept the browser Back button. We seed a dummy history entry so the
+    // first Back fires a popstate we can catch; we re-seed it to stay on the page
+    // and surface the confirmation instead.
+    useEffect(() => {
+        window.history.pushState(null, "", window.location.href)
+        const onPop = () => {
+            if (allowLeaveRef.current) return
+            window.history.pushState(null, "", window.location.href)
+            requestExit(() => {
+                allowLeaveRef.current = true
+                window.history.back()
+            })
+        }
+        window.addEventListener("popstate", onPop)
+        return () => window.removeEventListener("popstate", onPop)
+    }, [])
+
+    // Intercept clicks on navigation links outside the form (e.g. the checker
+    // sidebar menu). Capture phase + stopImmediatePropagation runs before React's
+    // Link handler, so we can hold the navigation behind the confirmation modal.
+    useEffect(() => {
+        const onClickCapture = (e: MouseEvent) => {
+            if (allowLeaveRef.current) return
+            if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+            const target = e.target as HTMLElement | null
+            const anchor = target?.closest("a") as HTMLAnchorElement | null
+            if (!anchor) return
+            if (rootRef.current && rootRef.current.contains(anchor)) return
+            const href = anchor.getAttribute("href")
+            if (!href || href.startsWith("#") || anchor.target === "_blank") return
+            e.preventDefault()
+            e.stopPropagation()
+            e.stopImmediatePropagation()
+            requestExit(() => {
+                allowLeaveRef.current = true
+                window.location.href = href
+            })
+        }
+        document.addEventListener("click", onClickCapture, true)
+        return () => document.removeEventListener("click", onClickCapture, true)
+    }, [])
 
     // Snapshot of which fields the server supplied at autofill time. Used by
     // the child steps (General Information today) to decide which inputs stay
@@ -189,15 +277,15 @@ export default function ProductInspectionForm({
         }
     }, [productId, vendorName])
 
-    const steps: { id: Step; label: string }[] = [
-        { id: "generalInformation", label: "General Information" },
-        { id: "preparation", label: "Preparation" },
-        { id: "measurements", label: "Measurements" },
-        { id: "packaging", label: "Packaging" },
-        { id: "defects", label: "Defects" },
-        { id: "testing", label: "Testing" },
-        { id: "documentation", label: "Documentation" },
-        { id: "review", label: "Review & Sign-Off" },
+    const steps: { id: Step; label: string; description: string }[] = [
+        { id: "generalInformation", label: "General Info", description: "Client, vendor and service context" },
+        { id: "preparation", label: "Preparation", description: "Items and warehouse evidence" },
+        { id: "measurements", label: "Measurements", description: "Dimensions and tolerances" },
+        { id: "packaging", label: "Packaging", description: "Carton, retail and workmanship" },
+        { id: "defects", label: "Defects", description: "AQL sampling and defect counts" },
+        { id: "testing", label: "Testing", description: "On-site test battery results" },
+        { id: "documentation", label: "Documentation", description: "Signatures and supporting docs" },
+        { id: "review", label: "Review", description: "Final decision and sign-off" },
     ]
 
     const currentStepIndex = steps.findIndex((s) => s.id === currentStep)
@@ -290,6 +378,9 @@ export default function ProductInspectionForm({
             } else {
                 await qcCheckerService.rejectProduct(productId, formData.reviewerRemarks, cleanedData)
             }
+            // Submission succeeded — disable the exit guard so the post-submit
+            // redirect (and any cleanup navigation) isn't blocked by the modal.
+            allowLeaveRef.current = true
             showSuccessToast("Success", "Product inspection completed and submitted successfully.")
             onComplete()
         } catch (error: any) {
@@ -300,126 +391,216 @@ export default function ProductInspectionForm({
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
-            <div className="flex border-b border-slate-200">
-                {/* Sidebar */}
-                <div className="w-1/4 p-6 border-r border-slate-200 hidden md:block">
-                    <h3 className="text-lg font-bold text-slate-900 mb-6 font-display">Product Inspection</h3>
-                    <nav className="space-y-2">
-                        {steps.map((step, index) => {
-                            const isActive = currentStep === step.id
-                            const isPast = steps.findIndex((s) => s.id === currentStep) > index
-                            const stepHasErrors = hasErrors(errors[step.id])
-
-                            return (
-                                <button
-                                    key={step.id}
-                                    onClick={() => goToStep(step.id)}
-                                    aria-current={isActive ? "step" : undefined}
-                                    aria-label={`${step.label}${stepHasErrors ? " (has errors)" : ""}`}
-                                    className={`flex items-center w-full p-3 rounded-xl transition-all duration-200 text-left ${stepHasErrors
-                                        ? "bg-red-50 text-red-700"
-                                        : isActive
-                                            ? "bg-blue-50 text-blue-700"
-                                            : isPast
-                                                ? "text-slate-600 hover:bg-slate-50"
-                                                : "text-slate-400 hover:bg-slate-50"
-                                        }`}
-                                >
-                                    <div
-                                        className={`flex items-center justify-center w-8 h-8 rounded-full mr-3 text-sm font-semibold transition-colors duration-200 ${stepHasErrors
-                                            ? "bg-red-100 text-red-600 ring-2 ring-red-200"
-                                            : isActive
-                                                ? "bg-blue-100 text-blue-700 font-bold"
-                                                : isPast
-                                                    ? "bg-green-100 text-green-600"
-                                                    : "bg-slate-100 text-slate-500"
-                                            }`}
-                                    >
-                                        {stepHasErrors ? "!" : isPast ? <Check className="w-4 h-4" /> : index + 1}
-                                    </div>
-                                    <span className={`font-medium ${isActive ? "font-bold" : ""}`}>
-                                        {step.label}
-                                    </span>
-                                </button>
-                            )
-                        })}
-                    </nav>
+        <div ref={rootRef} className="min-h-screen font-sans bg-[#f7f7f5]">
+            <div className="p-8 max-w-5xl mx-auto">
+                {/* Header */}
+                <div className="mb-8">
+                    <div className="flex items-center gap-4 mb-4">
+                        <button
+                            onClick={() => requestExit(onCancel)}
+                            className="p-2 hover:bg-white rounded-lg transition-colors"
+                            aria-label="Back"
+                        >
+                            <ArrowLeft className="w-5 h-5 text-slate-600" />
+                        </button>
+                        <div>
+                            <h1 className="text-4xl font-bold text-slate-900">Product Inspection</h1>
+                            <p className="text-slate-600 text-lg">
+                                {productName}
+                                {vendorName ? <span className="text-slate-400"> · {vendorName}</span> : null}
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Form Content */}
-                <div className="flex-1 flex flex-col min-h-[600px]">
-                    <div className="p-8 flex-1">
-                        {currentStep === "generalInformation" && (
-                            <GeneralInformation formData={formData} setFormData={setFormData} autofillSnapshot={autofillSnapshot} />
-                        )}
-                        {currentStep === "preparation" && (
-                            <Preparation formData={formData} setFormData={setFormData} />
-                        )}
-                        {currentStep === "measurements" && (
-                            <Measurements formData={formData} setFormData={setFormData} />
-                        )}
-                        {currentStep === "packaging" && (
-                            <Packaging formData={formData} setFormData={setFormData} />
-                        )}
-                        {currentStep === "defects" && (
-                            <Defects formData={formData} setFormData={setFormData} />
-                        )}
-                        {currentStep === "testing" && (
-                            <Testing formData={formData} setFormData={setFormData} />
-                        )}
-                        {currentStep === "documentation" && (
-                            <Documentation formData={formData} setFormData={setFormData} />
-                        )}
-                        {currentStep === "review" && (
-                            <Review formData={formData as any} />
-                        )}
+                {/* Step Indicator */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 mb-8 overflow-x-auto">
+                    {/* Progress Bar */}
+                    <div className="relative mb-8 min-w-[820px]">
+                        <div className="flex items-center justify-between">
+                            {steps.map((step, index) => {
+                                const stepHasErrors = hasErrors(errors[step.id])
+                                return (
+                                    <div key={step.id} className="flex flex-col items-center relative z-10 flex-1">
+                                        {/* Step Circle */}
+                                        <div
+                                            className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 cursor-pointer text-sm border-2 ${stepHasErrors
+                                                ? "bg-red-50 border-red-500 text-red-600 ring-4 ring-red-100"
+                                                : index < currentStepIndex
+                                                    ? "bg-brand-500 text-white border-brand-500 shadow-sm shadow-brand-500/10"
+                                                    : index === currentStepIndex
+                                                        ? "bg-brand-500 text-white border-brand-500 shadow-sm shadow-brand-500/10 ring-4 ring-brand-100"
+                                                        : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+                                                }`}
+                                            onClick={() => goToStep(step.id)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault()
+                                                    goToStep(step.id)
+                                                }
+                                            }}
+                                            role="button"
+                                            tabIndex={0}
+                                            aria-current={index === currentStepIndex ? "step" : undefined}
+                                            aria-label={`Go to ${step.label}${stepHasErrors ? " (has errors)" : ""}`}
+                                        >
+                                            {stepHasErrors ? "!" : index < currentStepIndex ? <Check className="w-5 h-5" /> : index + 1}
+                                        </div>
+
+                                        {/* Step Label */}
+                                        <div className="mt-3 text-center max-w-24">
+                                            <p
+                                                className={`text-xs font-medium leading-tight ${stepHasErrors
+                                                    ? "text-red-600"
+                                                    : index <= currentStepIndex ? "text-slate-900" : "text-slate-500"
+                                                    }`}
+                                            >
+                                                {step.label}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+
+                        {/* Progress Line */}
+                        <div className="absolute top-6 left-6 right-6 h-0.5 bg-slate-200 z-0">
+                            <div
+                                className="h-full bg-brand-500 transition-all duration-500 ease-out"
+                                style={{
+                                    width: `${(currentStepIndex / (steps.length - 1)) * 100}%`
+                                }}
+                            />
+                        </div>
                     </div>
 
-                    <div className="p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl flex items-center justify-between">
-                        <div>
-                            <button
-                                onClick={onCancel}
-                                className="px-6 py-2.5 text-slate-600 hover:bg-slate-200 rounded-xl font-medium transition-colors duration-200"
-                            >
-                                Cancel
-                            </button>
+                    {/* Current Step Info */}
+                    <div className="text-center bg-slate-50 rounded-xl p-6">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                            <div className="w-2 h-2 bg-brand-500 rounded-full"></div>
+                            <p className="text-slate-600 text-sm font-medium">
+                                Step {currentStepIndex + 1} of {steps.length}
+                            </p>
+                            <div className="w-2 h-2 bg-brand-500 rounded-full"></div>
                         </div>
-                        <div className="flex gap-4">
-                            {currentStepIndex > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={prevStep}
-                                    className="flex items-center px-6 py-2.5 border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 rounded-xl font-medium transition-colors duration-200"
-                                >
-                                    <ArrowLeft className="w-4 h-4 mr-2" />
-                                    Previous
-                                </button>
-                            )}
-                            {isLastStep ? (
-                                <button
-                                    type="button"
-                                    onClick={handleSubmit}
-                                    disabled={submitting}
-                                    className="flex items-center px-6 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-medium shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {submitting ? "Submitting..." : "Submit Report"}
-                                    {!submitting && <Check className="w-4 h-4 ml-2" />}
-                                </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={nextStep}
-                                    className="flex items-center px-6 py-2.5 bg-slate-900 text-white hover:bg-slate-800 rounded-xl font-medium shadow-sm transition-all duration-200"
-                                >
-                                    Next Step
-                                    <ArrowRight className="w-4 h-4 ml-2" />
-                                </button>
-                            )}
-                        </div>
+                        <h3 className="text-slate-900 font-bold text-xl mb-1">
+                            {steps[currentStepIndex].label}
+                        </h3>
+                        <p className="text-slate-600 text-sm">
+                            {steps[currentStepIndex].description}
+                        </p>
                     </div>
+                </div>
+
+                {/* Step Content */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 mb-8">
+                    {currentStep === "generalInformation" && (
+                        <GeneralInformation formData={formData} setFormData={setFormData} autofillSnapshot={autofillSnapshot} />
+                    )}
+                    {currentStep === "preparation" && (
+                        <Preparation formData={formData} setFormData={setFormData} />
+                    )}
+                    {currentStep === "measurements" && (
+                        <Measurements formData={formData} setFormData={setFormData} />
+                    )}
+                    {currentStep === "packaging" && (
+                        <Packaging formData={formData} setFormData={setFormData} />
+                    )}
+                    {currentStep === "defects" && (
+                        <Defects formData={formData} setFormData={setFormData} />
+                    )}
+                    {currentStep === "testing" && (
+                        <Testing formData={formData} setFormData={setFormData} />
+                    )}
+                    {currentStep === "documentation" && (
+                        <Documentation formData={formData} setFormData={setFormData} />
+                    )}
+                    {currentStep === "review" && (
+                        <Review formData={formData as any} />
+                    )}
+                </div>
+
+                {/* Navigation Buttons */}
+                <div className="flex gap-4 justify-between">
+                    <button
+                        onClick={prevStep}
+                        disabled={currentStepIndex === 0}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 border ${currentStepIndex === 0
+                            ? "border-slate-100 bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                            : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800"
+                            }`}
+                    >
+                        <ArrowLeft className="w-4 h-4" />
+                        Previous
+                    </button>
+
+                    {isLastStep ? (
+                        <button
+                            onClick={handleSubmit}
+                            disabled={submitting}
+                            className={`flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-xl transition-colors duration-200 shadow-sm shadow-emerald-600/10 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${submitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        >
+                            <Check className="w-5 h-5" />
+                            {submitting ? "Submitting..." : "Complete Product Inspection"}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={nextStep}
+                            className="flex items-center gap-2 px-6 py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold rounded-xl transition-colors duration-200 shadow-sm shadow-brand-500/10 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                        >
+                            Next
+                            <ArrowRight className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
             </div>
+
+            {/* Exit-confirmation modal */}
+            {showExitConfirm && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="exit-confirm-title"
+                    onClick={cancelExit}
+                >
+                    <div
+                        className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-6">
+                            <div className="flex items-start gap-4">
+                                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center">
+                                    <AlertTriangle className="w-6 h-6 text-brand-500" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 id="exit-confirm-title" className="text-lg font-bold text-slate-900">
+                                        Exit inspection?
+                                    </h3>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        Are you sure you want to exit? Your inspection progress on this form
+                                        will be lost and won&apos;t be saved.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
+                            <button
+                                onClick={cancelExit}
+                                className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition-colors"
+                            >
+                                Keep editing
+                            </button>
+                            <button
+                                onClick={confirmExit}
+                                className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10"
+                            >
+                                Yes, exit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
