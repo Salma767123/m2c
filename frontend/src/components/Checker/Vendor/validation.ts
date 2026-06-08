@@ -2,6 +2,11 @@
 // Each validator returns a map of fieldName -> error message. An empty object
 // means "this step is valid".
 
+import { FACTORY_IMAGE_SLOTS } from "./Steps/factoryImageSlots"
+
+// Required named photo slots — both must be uploaded before the step is valid.
+const REQUIRED_FACTORY_SLOTS = FACTORY_IMAGE_SLOTS.filter((s) => s.required)
+
 export type Step =
     | "factoryDetails"
     | "legalRegistration"
@@ -124,8 +129,15 @@ function validateInspectionInfo(d: any): StepErrors {
 function validateBasicEvidence(d: any): StepErrors {
     const e: StepErrors = {}
     const photos = Array.isArray(d.factoryPhotos) ? d.factoryPhotos : []
-    if (photos.length === 0) {
-        e.factoryPhotos = "Upload at least one factory photo"
+    const hasSlot = (id: string) =>
+        photos.some((p: any) => p?.slotId === id && (p?.data || p?.url))
+
+    const missing = REQUIRED_FACTORY_SLOTS.filter((s) => !hasSlot(s.id))
+    for (const s of missing) {
+        e[`factoryImage:${s.id}`] = `${s.label} photo is required`
+    }
+    if (missing.length > 0) {
+        e.factoryPhotos = `Upload the required photos: ${missing.map((s) => s.label).join(", ")}`
     }
     return e
 }
@@ -183,7 +195,9 @@ const FIELD_TO_STEP: Record<string, Step> = {
 export function groupFieldErrors(flat: Record<string, string>): AllErrors {
     const out: AllErrors = {}
     for (const [field, msg] of Object.entries(flat)) {
-        const step = FIELD_TO_STEP[field]
+        // Per-slot photo errors (`factoryImage:<slotId>`) all belong to the
+        // Basic Evidence step.
+        const step = field.startsWith("factoryImage:") ? "basicEvidence" : FIELD_TO_STEP[field]
         if (!step) continue
         if (!out[step]) out[step] = {}
         out[step]![field] = msg

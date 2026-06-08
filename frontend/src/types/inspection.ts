@@ -5,9 +5,12 @@ export interface Vendor {
   name: string
   location: string
   submittedDate?: string
+  assignedDate?: string
+  createdAtRaw?: string
   recentPO?: string
-  status: 'PENDING' | 'UNDER_REVIEW' | 'REINSPECTION' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'
+  status: string
   inspectionStatus?: string | null
+  state?: string | null
   contactPerson?: {
     name: string
     designation: string

@@ -419,10 +419,15 @@ class QCCheckerService {
         }
     }
 
-    // Start an Inspection
-    async startInspection(inspectionId: string): Promise<{ success: boolean; message: string; inspection: any }> {
+    // Start an Inspection.
+    // The backend geofences the checker against the vendor factory, so the
+    // current GPS coordinates must be sent in the request body.
+    async startInspection(
+        inspectionId: string,
+        coords?: { checkerLatitude: number; checkerLongitude: number }
+    ): Promise<{ success: boolean; message: string; inspection: any }> {
         try {
-            const response = await axios.post(`/inspections/${inspectionId}/start`, {}, {
+            const response = await axios.post(`/inspections/${inspectionId}/start`, coords || {}, {
                 headers: {
                     'Authorization': `Bearer ${this.getCheckerToken()}`
                 }

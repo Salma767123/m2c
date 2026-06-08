@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { TrendingUp, Clock, CheckCircle2, AlertCircle, Calendar, CalendarDays, Factory, Package } from "lucide-react"
 import StatCard from "@/components/Checker/CheckerDashboard/StatCard"
 import InspectionForm from "@/components/Checker/Vendor/InspectionForm"
@@ -13,6 +14,7 @@ interface DashboardHomeProps {
 }
 
 export default function DashboardHome({ checkerID }: DashboardHomeProps) {
+  const router = useRouter()
   const [selectedInspection, setSelectedInspection] = useState<any | null>(null)
   const [showInspectionForm, setShowInspectionForm] = useState(false)
   const [assignedProducts, setAssignedProducts] = useState<any[]>([])
@@ -72,6 +74,7 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
       icon: TrendingUp,
       trend: activeTab === 'vendor' ? `${pl(assignedVendors.length, "Vendor")}` : `${pl(assignedProducts.length, "Product")}`,
       color: "blue" as const,
+      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors' : '/checker/dashboard/products'),
     },
     {
       label: "Pending Action",
@@ -79,13 +82,15 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
       icon: Clock,
       trend: activeTab === 'vendor' ? `${pl(pendingVendors, "Vendor")}` : `${pl(pendingProducts, "Product")}`,
       color: "amber" as const,
+      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=&inspectionStatus=Pending' : '/checker/dashboard/products?status=PENDING'),
     },
     {
-      label: "Passed",
+      label: "Completed",
       value: activeTab === 'vendor' ? passedVendors.toString() : passedProducts.toString(),
       icon: CheckCircle2,
       trend: activeTab === 'vendor' ? `${pl(passedVendors, "Vendor")}` : `${pl(passedProducts, "Product")}`,
       color: "emerald" as const,
+      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=&inspectionStatus=Completed' : '/checker/dashboard/products?status=QC_APPROVED'),
     },
     {
       label: "Rejected",
@@ -93,6 +98,7 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
       icon: AlertCircle,
       trend: activeTab === 'vendor' ? `${pl(failedVendors, "Vendor")}` : `${pl(failedProducts, "Product")}`,
       color: "red" as const,
+      onClick: () => router.push(activeTab === 'vendor' ? '/checker/dashboard/vendors?status=Rejected' : '/checker/dashboard/products?status=REJECTED'),
     },
   ]
 
@@ -196,18 +202,17 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
       />
     )
   }
-
   return (
-    <div className="p-8 font-sans">
+    <div className="p-8 font-sans bg-[#f7f7f5] min-h-screen">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">Dashboard</h1>
-            <p className="text-slate-600 text-lg">Welcome back, <span className="font-semibold text-blue-600">{checkerID}</span></p>
+            <h1 className="text-4xl font-bold text-slate-900 mb-2 tracking-tight">Dashboard</h1>
+            <p className="text-slate-500 text-lg">Welcome back, <span className="font-semibold text-brand-500">{checkerID}</span></p>
           </div>
-          <div className="flex items-center gap-2 text-slate-500">
-            <Calendar className="w-5 h-5" />
+          <div className="flex items-center gap-2 text-slate-500 bg-white border border-slate-200 px-4 py-2.5 rounded-xl shadow-xs">
+            <Calendar className="w-5 h-5 text-brand-500" />
             <span className="text-sm font-medium">{new Date().toLocaleDateString('en-US', {
               weekday: 'long',
               year: 'numeric',
@@ -218,27 +223,29 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-4 border-b border-slate-200 mb-8">
+      {/* Filter Tabs - Business Type selection chips styling */}
+      <div className="flex gap-4 mb-8">
         <button
           onClick={() => setActiveTab('vendor')}
-          className={`pb-4 px-2 text-sm font-semibold transition-colors relative ${activeTab === 'vendor' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`flex-1 max-w-[240px] p-3.5 border rounded-xl cursor-pointer transition-all duration-200 text-center outline-none flex items-center justify-center gap-3 font-semibold text-sm focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 active:scale-[0.98] ${
+            activeTab === 'vendor'
+              ? "border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10 text-brand-700 font-bold"
+              : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+          }`}
         >
-          <div className="flex items-center gap-2">
-            <Factory className="w-4 h-4" />
-            Vendor Inspection
-          </div>
-          {activeTab === 'vendor' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
+          <Factory className="w-5 h-5" />
+          Vendor Inspection
         </button>
         <button
           onClick={() => setActiveTab('product')}
-          className={`pb-4 px-2 text-sm font-semibold transition-colors relative ${activeTab === 'product' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`flex-1 max-w-[240px] p-3.5 border rounded-xl cursor-pointer transition-all duration-200 text-center outline-none flex items-center justify-center gap-3 font-semibold text-sm focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 active:scale-[0.98] ${
+            activeTab === 'product'
+              ? "border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10 text-brand-700 font-bold"
+              : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+          }`}
         >
-          <div className="flex items-center gap-2">
-            <Package className="w-4 h-4" />
-            Product Inspection
-          </div>
-          {activeTab === 'product' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
+          <Package className="w-5 h-5" />
+          Product Inspection
         </button>
       </div>
 
@@ -251,22 +258,22 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
 
       {/* Main Content */}
       <div className="grid grid-cols-1 gap-8 mb-8">
-        {/* Scheduled Inspections */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-200/60 bg-linear-to-r from-blue-50 to-white">
+        {/* Scheduled Inspections Card */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+          <div className="px-6 py-5 border-b border-slate-100 bg-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <CalendarDays className="w-5 h-5 text-blue-600" />
+                <div className="p-2.5 bg-brand-50 rounded-xl">
+                  <CalendarDays className="w-5 h-5 text-brand-500" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">Recent Assignments</h2>
-                  <p className="text-sm text-slate-600">
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">Recent Assignments</h2>
+                  <p className="text-sm text-slate-500">
                     {activeTab === 'vendor' ? 'Vendors awaiting action' : 'Products awaiting action'}
                   </p>
                 </div>
               </div>
-              <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">
+              <span className="bg-brand-50 text-brand-700 text-xs font-semibold px-3 py-1.5 rounded-full">
                 {activeTab === 'vendor' ? assignedVendors.length : assignedProducts.length} total
               </span>
             </div>
@@ -274,40 +281,40 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
 
           <div className="p-6">
             {(activeTab === 'vendor' ? assignedVendors.length : assignedProducts.length) === 0 ? (
-              <div className="text-center py-8 text-slate-500">No active assignments found.</div>
+              <div className="text-center py-12 text-slate-400 font-medium">No active assignments found.</div>
             ) : (
               <div className="space-y-6">
                 {/* Products Section */}
                 {activeTab === 'product' && assignedProducts.length > 0 && (
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Package className="w-4 h-4 text-blue-600" />
-                      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Products</h3>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Package className="w-4 h-4 text-brand-500" />
+                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Products</h3>
                       <span className="text-xs text-slate-400 font-medium">({assignedProducts.length})</span>
                     </div>
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                       {[...assignedProducts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((product) => (
-                        <div key={product.id} className="border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="p-2 bg-blue-50 rounded-lg shrink-0">
-                                <Package className="w-4 h-4 text-blue-600" />
+                        <div key={product.id} className="border border-slate-200 bg-white rounded-xl p-5 hover:shadow-xs hover:border-slate-300 transition-all duration-300">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="p-2.5 bg-brand-50 rounded-xl shrink-0">
+                                <Package className="w-5 h-5 text-brand-500" />
                               </div>
                               <div className="min-w-0">
                                 <h4 className="font-semibold text-slate-900 text-sm truncate">{product.name}</h4>
-                                <p className="text-xs text-slate-500">SKU: {product.baseSku}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">SKU: {product.baseSku}</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3 shrink-0 ml-3">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadge(product.approvalStatus)}`}>
+                            <div className="flex items-center gap-3 self-start sm:self-center">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(product.approvalStatus)}`}>
                                 {formatStatus(product.approvalStatus)}
                               </span>
-                              <p className="text-xs text-slate-500 hidden sm:block">{product.vendor?.companyName}</p>
+                              <p className="text-xs font-medium text-slate-500">{product.vendor?.companyName}</p>
                             </div>
                           </div>
                           <button
                             onClick={() => window.location.href = '/checker/dashboard/products'}
-                            className="w-full bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md text-sm"
+                            className="w-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors duration-200 shadow-sm shadow-brand-500/10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                           >
                             Go to Products
                           </button>
@@ -320,31 +327,31 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
                 {/* Vendors Section */}
                 {activeTab === 'vendor' && assignedVendors.length > 0 && (
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Factory className="w-4 h-4 text-emerald-600" />
-                      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Vendors</h3>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Factory className="w-4 h-4 text-brand-500" />
+                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vendors</h3>
                       <span className="text-xs text-slate-400 font-medium">({assignedVendors.length})</span>
                     </div>
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                       {[...assignedVendors].sort((a, b) => new Date(b.createdAt || b.submittedAt || 0).getTime() - new Date(a.createdAt || a.submittedAt || 0).getTime()).map((vendor) => (
-                        <div key={vendor.id} className="border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="p-2 bg-emerald-50 rounded-lg shrink-0">
-                                <Factory className="w-4 h-4 text-emerald-600" />
+                        <div key={vendor.id} className="border border-slate-200 bg-white rounded-xl p-5 hover:shadow-xs hover:border-slate-300 transition-all duration-300">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="p-2.5 bg-brand-50 rounded-xl shrink-0">
+                                <Factory className="w-5 h-5 text-brand-500" />
                               </div>
                               <div className="min-w-0">
                                 <h4 className="font-semibold text-slate-900 text-sm truncate">{vendor.companyName}</h4>
-                                <p className="text-xs text-slate-500">Factory Onboarding</p>
+                                <p className="text-xs text-slate-400 mt-0.5">Factory Onboarding</p>
                               </div>
                             </div>
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium border shrink-0 ml-3 ${getStatusBadge(vendor.status)}`}>
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(vendor.status)}`}>
                               {formatStatus(vendor.status)}
                             </span>
                           </div>
                           <button
                             onClick={() => window.location.href = '/checker/dashboard/vendors'}
-                            className="w-full bg-emerald-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md text-sm"
+                            className="w-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors duration-200 shadow-sm shadow-brand-500/10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                           >
                             Go to Vendors
                           </button>

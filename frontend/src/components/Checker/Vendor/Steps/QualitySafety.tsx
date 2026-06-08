@@ -1,5 +1,7 @@
 "use client"
 
+import { SelectField } from "./fieldHelpers"
+
 interface StepProps {
     formData: any
     setFormData: (data: any) => void
@@ -20,39 +22,27 @@ export default function QualitySafety({ formData, setFormData }: StepProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Quality Check Process Available:</label>
-                    <select
+                    <SelectField
                         value={formData.qualityCheckProcess}
-                        onChange={(e) => setFormData({ ...formData, qualityCheckProcess: e.target.value })}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    >
-                        {options.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                    </select>
+                        onChange={(value) => setFormData({ ...formData, qualityCheckProcess: value })}
+                        options={options}
+                    />
                 </div>
                 <div>
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Safety Equipment Available:</label>
-                    <select
+                    <SelectField
                         value={formData.safetyEquipment}
-                        onChange={(e) => setFormData({ ...formData, safetyEquipment: e.target.value })}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    >
-                        {options.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                    </select>
+                        onChange={(value) => setFormData({ ...formData, safetyEquipment: value })}
+                        options={options}
+                    />
                 </div>
                 <div>
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">Clean Working Environment:</label>
-                    <select
+                    <SelectField
                         value={formData.cleanWorkingEnvironment}
-                        onChange={(e) => setFormData({ ...formData, cleanWorkingEnvironment: e.target.value })}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    >
-                        {options.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                    </select>
+                        onChange={(value) => setFormData({ ...formData, cleanWorkingEnvironment: value })}
+                        options={options}
+                    />
                 </div>
             </div>
         </div>

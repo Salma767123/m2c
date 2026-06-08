@@ -1,7 +1,7 @@
 "use client"
 
 import type { StepErrors } from "../validation"
-import { BASE_INPUT, OK_BORDER, inputCls, ErrorText, RequiredMark } from "./fieldHelpers"
+import { inputCls, ErrorText, RequiredMark, READONLY_CLS, SelectField } from "./fieldHelpers"
 
 interface StepProps {
     formData: any
@@ -46,7 +46,7 @@ export default function InspectionInfo({ formData, setFormData, errors = {} }: S
                         aria-readonly="true"
                         title="Auto-filled from your logged-in QC Checker profile"
                         placeholder="Loading inspector..."
-                        className={`${BASE_INPUT} ${OK_BORDER} bg-slate-100 text-slate-700 cursor-not-allowed`}
+                        className={READONLY_CLS}
                     />
                     <ErrorText msg={errors.inspectorName} />
                     {!errors.inspectorName && (
@@ -57,16 +57,12 @@ export default function InspectionInfo({ formData, setFormData, errors = {} }: S
                     <label className="block text-slate-700 font-semibold mb-3 text-sm">
                         Inspection Status<RequiredMark />
                     </label>
-                    <select
+                    <SelectField
                         value={formData.inspectionStatus || "Approved"}
-                        onChange={(e) => setFormData({ ...formData, inspectionStatus: e.target.value })}
-                        aria-invalid={!!errors.inspectionStatus}
-                        className={inputCls(!!errors.inspectionStatus, "bg-white")}
-                    >
-                        {statusOptions.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                    </select>
+                        onChange={(value) => setFormData({ ...formData, inspectionStatus: value })}
+                        options={statusOptions}
+                        hasError={!!errors.inspectionStatus}
+                    />
                     <ErrorText msg={errors.inspectionStatus} />
                 </div>
                 <div className="md:col-span-2">

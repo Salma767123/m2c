@@ -39,11 +39,11 @@ const TAB_LABELS: Record<Tab, string> = {
 // Mirrors the ProductApprovalStatus enum in backend/prisma/schema.prisma —
 // products have no UNDER_REVIEW status (that is vendor-only).
 const APPROVAL_COLOR: Record<string, string> = {
-    PENDING: "bg-amber-100 text-amber-800 border-amber-200",
-    REINSPECTION: "bg-orange-100 text-orange-800 border-orange-200",
-    QC_APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    APPROVED: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    REJECTED: "bg-red-100 text-red-800 border-red-200",
+    PENDING: "bg-amber-50 text-amber-700 border-amber-200/85",
+    REINSPECTION: "bg-purple-50 text-purple-700 border-purple-200/85",
+    QC_APPROVED: "bg-blue-50 text-blue-700 border-blue-200/85",
+    APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200/85",
+    REJECTED: "bg-red-50 text-red-700 border-red-200/85",
 }
 
 const APPROVAL_LABELS: Record<string, string> = {
@@ -192,40 +192,42 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
         null
 
     return (
-        <div className="min-h-screen font-sans bg-linear-to-br from-slate-50 to-blue-50/30">
+        <div className="min-h-screen font-sans bg-[#f7f7f5]">
             <div className="p-8 max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={onBack}
-                            className="p-2 hover:bg-white rounded-lg transition-colors"
+                            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                             aria-label="Back to products list"
                         >
                             <ArrowLeft className="w-5 h-5 text-slate-600" />
                         </button>
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-900">{product.name}</h1>
-                            <div className="flex items-center gap-3 mt-1 text-sm text-slate-600">
-                                <span>SKU: <span className="font-mono">{product.baseSku}</span></span>
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${APPROVAL_COLOR[product.approvalStatus] || "bg-slate-100 text-slate-700 border-slate-200"}`}>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <h1 className="text-3xl font-bold text-slate-900">{product.name}</h1>
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${APPROVAL_COLOR[product.approvalStatus] || "bg-slate-50 text-slate-700 border-slate-200/85"}`}>
                                     {APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus}
                                 </span>
                             </div>
+                            <p className="text-sm text-slate-500 mt-1">SKU: <span className="font-mono">{product.baseSku}</span></p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={load}
-                            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
-                            aria-label="Refresh"
+                            disabled={loading}
+                            title="Refresh"
+                            aria-label="Refresh product details"
+                            className="p-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50"
                         >
-                            <RotateCw className="w-4 h-4" /> Refresh
+                            <RotateCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                         </button>
                         {canStartInspection && onStartInspection && (
                             <button
                                 onClick={onStartInspection}
-                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                                className="flex items-center gap-2 px-6 py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                             >
                                 <FileText className="w-4 h-4" /> Start Inspection
                             </button>
@@ -234,12 +236,12 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                 </div>
 
                 {/* Summary Card */}
-                <div className="bg-linear-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white mb-6 shadow-sm">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <SummaryStat icon={<IndianRupee className="w-4 h-4" />} label="Base Price" value={formatCurrency(product.basePrice)} />
-                        <SummaryStat icon={<Package className="w-4 h-4" />} label="Total Stock" value={String(product.totalStock ?? 0)} />
-                        <SummaryStat icon={<Layers className="w-4 h-4" />} label="Variants" value={String(product.variants?.length ?? 0)} />
-                        <SummaryStat icon={<Clock className="w-4 h-4" />} label="Listed" value={formatDate(product.createdAt)} />
+                <div className="bg-brand-50/40 border border-brand-100/60 rounded-2xl p-6 mb-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        <SummaryStat icon={<IndianRupee className="w-5 h-5" />} label="Base Price" value={formatCurrency(product.basePrice)} />
+                        <SummaryStat icon={<Package className="w-5 h-5" />} label="Total Stock" value={String(product.totalStock ?? 0)} />
+                        <SummaryStat icon={<Layers className="w-5 h-5" />} label="Variants" value={String(product.variants?.length ?? 0)} />
+                        <SummaryStat icon={<Clock className="w-5 h-5" />} label="Listed" value={formatDate(product.createdAt)} />
                     </div>
                 </div>
 
@@ -252,7 +254,7 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                                 onClick={() => setActiveTab(tab)}
                                 aria-current={activeTab === tab ? "page" : undefined}
                                 className={`px-5 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${activeTab === tab
-                                    ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/40"
+                                    ? "text-brand-600 border-b-2 border-brand-500 bg-brand-50/40"
                                     : "text-slate-600 hover:text-slate-900"
                                     }`}
                             >
@@ -288,12 +290,12 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
 
 function SummaryStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
     return (
-        <div>
-            <div className="flex items-center gap-1.5 text-xs text-white/80 mb-1">
-                {icon}
-                <span>{label}</span>
+        <div className="flex items-center gap-3">
+            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg shrink-0">{icon}</div>
+            <div className="min-w-0">
+                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">{label}</p>
+                <p className="font-bold text-slate-900 truncate">{value}</p>
             </div>
-            <p className="text-lg font-bold">{value}</p>
         </div>
     )
 }
@@ -408,7 +410,7 @@ function ImagesTab({
                                         caption: img.alt || `${product.name} — image ${idx + 1}`,
                                     })
                                 }
-                                className="relative group text-left rounded-xl overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="relative group text-left rounded-xl overflow-hidden focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                                 aria-label={`View ${img.alt || `image ${idx + 1}`} in fullscreen`}
                             >
                                 <img
@@ -417,7 +419,7 @@ function ImagesTab({
                                     className="w-full h-32 object-cover border border-slate-200 group-hover:opacity-90 transition-opacity"
                                 />
                                 {img.isPrimary && (
-                                    <span className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                    <span className="absolute top-1.5 left-1.5 bg-brand-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
                                         Primary
                                     </span>
                                 )}
@@ -454,7 +456,7 @@ function ImagesTab({
                                                     <button
                                                         type="button"
                                                         onClick={() => onOpenLightbox({ src: thumb, caption })}
-                                                        className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 block"
+                                                        className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 hover:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 block"
                                                         aria-label={`View image for ${caption}`}
                                                     >
                                                         <img

@@ -1,8 +1,15 @@
 "use client"
 
-import { Upload, X, Image as ImageIcon, FileText, AlertCircle } from "lucide-react"
+import { Upload, X, FileText, AlertCircle } from "lucide-react"
 import type { StepErrors } from "../validation"
-import { ErrorText, RequiredMark } from "./fieldHelpers"
+import { ErrorText } from "./fieldHelpers"
+import {
+    FACTORY_IMAGE_SLOTS,
+    REQUIRED_FACTORY_SLOT_LABEL,
+    getSlotPhoto,
+    type FactoryImageSlotId,
+    type FactoryPhoto,
+} from "./factoryImageSlots"
 
 interface StepProps {
     formData: any
@@ -38,43 +45,46 @@ const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<stri
     })
 }
 
-export default function BasicEvidence({ formData, setFormData, errors = {} }: StepProps) {
+const ALLOWED_IMAGE_TYPES = "image/png,image/jpeg,image/webp,image/gif"
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
+export default function BasicEvidence({ formData, setFormData, errors = {} }: StepProps) {
+    const photos: FactoryPhoto[] = Array.isArray(formData.factoryPhotos) ? formData.factoryPhotos : []
+
+    // Upload (or replace) the single image for a named slot.
+    const handleSlotUpload = async (slotId: FactoryImageSlotId, label: string, file: File) => {
+        if (!file.type.startsWith("image/")) return
+        const data = await compressImage(file)
+        const entry: FactoryPhoto = { slotId, label, name: file.name, data, url: data }
+        const others = photos.filter((p) => p.slotId !== slotId)
+        setFormData({ ...formData, factoryPhotos: [...others, entry] })
+    }
+
+    const handleSlotRemove = (slotId: FactoryImageSlotId) => {
+        setFormData({ ...formData, factoryPhotos: photos.filter((p) => p.slotId !== slotId) })
+    }
+
+    // Documents — unchanged generic multi-file upload (optional).
+    const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files) return
         const files = Array.from(e.target.files)
-
         const newEntries = await Promise.all(
             files.map(async (file) => {
-                if (file.type.startsWith("image/")) {
-                    // Compress images to keep payload small
-                    const data = await compressImage(file)
-                    return { file, url: data, data, name: file.name }
-                } else {
-                    // For PDFs / docs — store as base64 directly
-                    const data = await new Promise<string>((resolve) => {
-                        const reader = new FileReader()
-                        reader.onload = () => resolve(reader.result as string)
-                        reader.readAsDataURL(file)
-                    })
-                    return { file, url: null, data, name: file.name }
-                }
+                const data = await new Promise<string>((resolve) => {
+                    const reader = new FileReader()
+                    reader.onload = () => resolve(reader.result as string)
+                    reader.readAsDataURL(file)
+                })
+                return { name: file.name, data, url: null }
             })
         )
-
-        setFormData({
-            ...formData,
-            [fieldName]: [...(formData[fieldName] || []), ...newEntries],
-        })
-
-        // Reset input so the same file can be re-selected
+        setFormData({ ...formData, documentsUpload: [...(formData.documentsUpload || []), ...newEntries] })
         e.target.value = ""
     }
 
-    const removeFile = (index: number, fieldName: string) => {
-        const updated = [...(formData[fieldName] || [])]
+    const removeDoc = (index: number) => {
+        const updated = [...(formData.documentsUpload || [])]
         updated.splice(index, 1)
-        setFormData({ ...formData, [fieldName]: updated })
+        setFormData({ ...formData, documentsUpload: updated })
     }
 
     return (
@@ -82,7 +92,7 @@ export default function BasicEvidence({ formData, setFormData, errors = {} }: St
             <div className="border-b border-slate-200 pb-6">
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Basic Evidence</h2>
                 <p className="text-slate-600">
-                    Upload factory photos and any supporting documents. Images are compressed automatically.
+                    Upload named factory photos and any supporting documents. Images are compressed automatically.
                 </p>
                 <div className="flex items-center gap-2 mt-3 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -91,57 +101,122 @@ export default function BasicEvidence({ formData, setFormData, errors = {} }: St
             </div>
 
             <div className="space-y-6">
-                {/* Factory Photos */}
+                {/* Factory & Facility Photos — named slots */}
                 <div>
-                    <label className="block text-slate-700 font-semibold mb-3 text-sm">
-                        Factory Photos<RequiredMark />
-                    </label>
-                    <div className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 transition-colors cursor-pointer ${errors.factoryPhotos ? "border-red-400 bg-red-50/40" : "border-slate-300 bg-slate-50 hover:bg-slate-100"}`}>
-                        <Upload className="w-8 h-8 text-slate-400 mb-3" />
-                        <p className="text-sm text-slate-600 mb-4">Click to upload or drag and drop images</p>
-                        <label className="cursor-pointer bg-white px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">
-                            Browse Files
-                            <input
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => handleFileUpload(e, "factoryPhotos")}
-                            />
+                    <div className="flex items-center justify-between mb-1">
+                        <label className="block text-slate-700 font-semibold text-sm">
+                            Factory &amp; Facility Photos
                         </label>
                     </div>
-                    <ErrorText msg={errors.factoryPhotos} />
-                    {formData.factoryPhotos?.length > 0 && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
-                            {formData.factoryPhotos.map((photo: any, idx: number) => {
-                                const previewSrc = photo.data || photo.url
-                                return (
-                                    <div key={idx} className="relative group">
-                                        {previewSrc && previewSrc.startsWith("data:image") ? (
-                                            <img
-                                                src={previewSrc}
-                                                alt={photo.name}
-                                                className="w-full h-28 object-cover rounded-xl border border-slate-200"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-28 flex items-center justify-center bg-slate-100 rounded-xl border border-slate-200">
-                                                <ImageIcon className="w-8 h-8 text-slate-400" />
-                                            </div>
-                                        )}
-                                        <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate">
-                                            {photo.name}
-                                        </div>
-                                        <button
-                                            onClick={() => removeFile(idx, "factoryPhotos")}
-                                            className="absolute top-1.5 right-1.5 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow"
-                                        >
-                                            <X className="w-3 h-3" />
-                                        </button>
+                    <p className="text-xs text-slate-500 mb-4">
+                        PNG, JPG, WEBP, or GIF.{" "}
+                        <span className="font-semibold text-slate-700">Required:</span> {REQUIRED_FACTORY_SLOT_LABEL}.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" role="group" aria-label="Factory images">
+                        {FACTORY_IMAGE_SLOTS.map((slot) => {
+                            const value = getSlotPhoto(photos, slot.id)
+                            const slotErrKey = `factoryImage:${slot.id}`
+                            const slotError = errors[slotErrKey]
+                            const inputId = `factory-img-${slot.id}`
+                            const previewSrc = value?.data || value?.url || null
+
+                            return (
+                                <div
+                                    key={slot.id}
+                                    className={`flex flex-col rounded-xl border p-3 transition-all duration-200 ${slotError
+                                        ? "border-red-300 bg-red-50/30"
+                                        : value
+                                            ? "border-brand-300/40 bg-brand-50/10"
+                                            : "border-slate-200 bg-slate-50/50 hover:border-slate-300"
+                                        }`}
+                                >
+                                    {/* Slot header */}
+                                    <div className="mb-2">
+                                        <p className="text-xs font-bold text-slate-800 leading-tight">
+                                            {slot.label}
+                                            {slot.required ? (
+                                                <span className="text-brand-500 ml-0.5" aria-hidden="true">*</span>
+                                            ) : (
+                                                <span className="ml-1 text-[10px] font-normal text-slate-400">(optional)</span>
+                                            )}
+                                        </p>
+                                        <p className="text-[11px] text-slate-400 mt-0.5">{slot.description}</p>
                                     </div>
-                                )
-                            })}
-                        </div>
-                    )}
+
+                                    {/* Upload zone */}
+                                    <div
+                                        className={`relative aspect-[4/3] w-full overflow-hidden rounded-lg border-2 border-dashed transition-colors ${slotError
+                                            ? "border-red-400 bg-red-50/30"
+                                            : value
+                                                ? "border-brand-400/30 bg-white"
+                                                : "border-slate-300 bg-white hover:border-brand-400/50 hover:bg-brand-50/10"
+                                            }`}
+                                    >
+                                        {previewSrc ? (
+                                            <>
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={previewSrc}
+                                                    alt={`${slot.label} preview`}
+                                                    className="absolute inset-0 w-full h-full object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleSlotRemove(slot.id)}
+                                                    aria-label={`Remove ${slot.label}`}
+                                                    className="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/95 text-red-600 shadow-sm hover:bg-red-50 hover:text-red-700 transition-colors"
+                                                >
+                                                    <X className="w-3.5 h-3.5" aria-hidden="true" />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <label
+                                                htmlFor={inputId}
+                                                className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer text-center px-2"
+                                            >
+                                                <Upload className="w-5 h-5 text-slate-300" aria-hidden="true" />
+                                                <span className="text-[11px] font-semibold text-brand-600">Upload</span>
+                                                <span className="text-[10px] text-slate-400">or drag &amp; drop</span>
+                                            </label>
+                                        )}
+                                        <input
+                                            id={inputId}
+                                            type="file"
+                                            accept={ALLOWED_IMAGE_TYPES}
+                                            className="sr-only"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0]
+                                                if (file) handleSlotUpload(slot.id, slot.label, file)
+                                                e.target.value = ""
+                                            }}
+                                            onDragOver={(e) => e.preventDefault()}
+                                            onDrop={(e) => {
+                                                e.preventDefault()
+                                                const file = e.dataTransfer.files?.[0]
+                                                if (file) handleSlotUpload(slot.id, slot.label, file)
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Filename + replace link */}
+                                    {value && (
+                                        <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px]">
+                                            <p className="truncate text-slate-600" title={value.name}>{value.name}</p>
+                                            <label htmlFor={inputId} className="shrink-0 cursor-pointer text-brand-600 hover:text-brand-500 font-semibold">
+                                                Replace
+                                            </label>
+                                        </div>
+                                    )}
+
+                                    {slotError && (
+                                        <p className="text-red-600 text-[11px] mt-1 font-medium" role="alert">{slotError}</p>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                    <ErrorText msg={errors.factoryPhotos} />
                 </div>
 
                 {/* Documents Upload */}
@@ -159,7 +234,7 @@ export default function BasicEvidence({ formData, setFormData, errors = {} }: St
                                 multiple
                                 accept=".pdf,.doc,.docx"
                                 className="hidden"
-                                onChange={(e) => handleFileUpload(e, "documentsUpload")}
+                                onChange={handleDocUpload}
                             />
                         </label>
                     </div>
@@ -168,11 +243,11 @@ export default function BasicEvidence({ formData, setFormData, errors = {} }: St
                             {formData.documentsUpload.map((doc: any, idx: number) => (
                                 <div key={idx} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-white">
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                                        <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                        <FileText className="w-4 h-4 text-brand-500 flex-shrink-0" />
                                         <span className="text-sm text-slate-700 truncate">{doc.name}</span>
                                     </div>
                                     <button
-                                        onClick={() => removeFile(idx, "documentsUpload")}
+                                        onClick={() => removeDoc(idx)}
                                         className="text-red-500 hover:text-red-700 p-1 ml-2 flex-shrink-0"
                                     >
                                         <X className="w-4 h-4" />

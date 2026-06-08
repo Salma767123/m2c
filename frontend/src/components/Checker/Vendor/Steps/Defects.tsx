@@ -2,6 +2,7 @@
 
 import { ChevronDown, ChevronUp, Camera, CheckCircle, AlertTriangle, Upload, X, Image as ImageIcon } from "lucide-react"
 import { useRef } from "react"
+import { SelectField } from "./fieldHelpers"
 
 // Compress image before storing to keep payload manageable
 const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
@@ -96,15 +97,11 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Inspection Level</label>
-            <select
+            <SelectField
               value={formData.inspectionLevel}
-              onChange={(e) => setFormData({ ...formData, inspectionLevel: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="L-I">L-I</option>
-              <option value="L-II">L-II</option>
-              <option value="L-III">L-III</option>
-            </select>
+              onChange={(value) => setFormData({ ...formData, inspectionLevel: value })}
+              options={["L-I", "L-II", "L-III"]}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Sample Size</label>

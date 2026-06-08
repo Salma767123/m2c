@@ -305,17 +305,20 @@ export default function FactoryInspectionReviewPage() {
               <IconPhoto size={14} /> Factory Photos ({formData.factoryPhotos.length})
             </h3>
             <div className="flex gap-2 flex-wrap">
-              {(formData.factoryPhotos as Array<string | { name?: string; data?: string }>).map((photo, i) => {
-                const url = typeof photo === 'string' ? photo : photo?.data || '';
-                const name = typeof photo === 'string' ? `Factory photo ${i + 1}` : photo?.name || `Factory photo ${i + 1}`;
+              {(formData.factoryPhotos as Array<string | { name?: string; data?: string; url?: string; label?: string }>).map((photo, i) => {
+                const url = typeof photo === 'string' ? photo : photo?.data || photo?.url || '';
+                const name = typeof photo === 'string'
+                  ? `Factory photo ${i + 1}`
+                  : photo?.label || photo?.name || `Factory photo ${i + 1}`;
                 if (!url) return null;
                 return (
-                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer" title={name} className="flex flex-col items-center gap-1 w-20">
                   <img
                     src={url}
                     alt={name}
                     className="w-20 h-20 object-cover rounded-lg border hover:ring-2 ring-blue-300 transition-all"
                   />
+                  <span className="text-[10px] text-gray-600 font-medium text-center truncate w-full">{name}</span>
                 </a>
                 );
               })}

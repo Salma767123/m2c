@@ -724,12 +724,8 @@ const getAssignedVendors = async (req, res) => {
                     factoryAddress: true,
                     factoryCity: true,
                     factoryState: true,
-                    // Return up to 5 most recent inspections; the frontend
-                    // picks an actionable one (SCHEDULED/IN_PROGRESS) over a
-                    // terminal one so the card button reflects what the checker
-                    // can actually do.
                     inspections: {
-                        select: { status: true },
+                        select: { status: true, result: true, cycleNumber: true },
                         orderBy: { createdAt: 'desc' },
                         take: 5,
                     },

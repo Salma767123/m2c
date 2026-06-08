@@ -11,7 +11,6 @@ import {
   Mail,
   CheckCircle,
   Play,
-  TrendingUp,
   BarChart3,
   Globe,
   Briefcase,
@@ -21,9 +20,100 @@ import {
   FileText,
   Loader2,
   RotateCw,
+  UserCircle,
+  Tags,
+  Building2,
+  ShieldCheck,
 } from "lucide-react"
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
+const MAIN_STATUS_COLORS: Record<string, string> = {
+  "New Assignment": "bg-blue-50 text-blue-700 border-blue-200/85",
+  "Under Review by Admin": "bg-orange-50 text-orange-700 border-orange-200/85",
+  "Re-Inspection": "bg-purple-50 text-purple-700 border-purple-200/85",
+  "Re-Inspection Under Review by Admin": "bg-amber-50 text-amber-700 border-amber-200/85",
+  "Re-Inspection Under Review": "bg-amber-50 text-amber-700 border-amber-200/85",
+  "Approved": "bg-emerald-50 text-emerald-700 border-emerald-200/85",
+  "Rejected": "bg-red-50 text-red-700 border-red-200/85",
+}
+
+const INSPECTION_STATUS_COLORS: Record<string, string> = {
+  "Pending": "bg-slate-50 text-slate-700 border-slate-200/85",
+  "Submitted": "bg-blue-50 text-blue-700 border-blue-200/85",
+  "Rejected": "bg-red-50 text-red-700 border-red-200/85",
+  "Completed": "bg-emerald-50 text-emerald-700 border-emerald-200/85",
+}
+
+function getNewMainStatus(dbStatus: string, latestInspection?: { status?: string | null; result?: string | null; cycleNumber?: number | null } | null): string {
+  const status = dbStatus?.toUpperCase() || 'PENDING'
+  if (status === 'APPROVED') {
+    return 'Approved'
+  }
+  if (status === 'REJECTED') {
+    return 'Rejected'
+  }
+  if (status === 'REINSPECTION') {
+    return 'Re-Inspection'
+  }
+  if (status === 'UNDER_REVIEW') {
+    if (latestInspection) {
+      const inspStatus = latestInspection.status?.toUpperCase()
+      const cycle = latestInspection.cycleNumber ?? 1
+      if (inspStatus === 'SCHEDULED' || inspStatus === 'IN_PROGRESS') {
+        if (cycle > 1) {
+          return 'Re-Inspection'
+        }
+        return 'New Assignment'
+      }
+      if (inspStatus === 'SUBMITTED' || inspStatus === 'UNDER_ADMIN_REVIEW') {
+        if (cycle > 1) {
+          return 'Re-Inspection Under Review by Admin'
+        }
+        return 'Under Review by Admin'
+      }
+    }
+    return 'Under Review by Admin'
+  }
+  if (status === 'PENDING') {
+    return 'New Assignment'
+  }
+  return status.replace(/_/g, " ").toLowerCase()
+}
+
+function getNewInspectionStatus(dbStatus: string, latestInspection?: { status?: string | null; result?: string | null } | null): string {
+  const status = dbStatus?.toUpperCase() || 'PENDING'
+  if (status === 'APPROVED') {
+    return 'Completed'
+  }
+  if (status === 'REJECTED') {
+    if (latestInspection && latestInspection.result?.toUpperCase() === 'FAILED') {
+      return 'Rejected'
+    }
+    return 'Completed'
+  }
+  if (status === 'REINSPECTION') {
+    return 'Pending'
+  }
+  if (status === 'UNDER_REVIEW') {
+    if (latestInspection) {
+      const inspStatus = latestInspection.status?.toUpperCase()
+      if (inspStatus === 'SCHEDULED' || inspStatus === 'IN_PROGRESS') {
+        return 'Pending'
+      }
+      if (inspStatus === 'SUBMITTED' || inspStatus === 'UNDER_ADMIN_REVIEW') {
+        if (latestInspection.result?.toUpperCase() === 'FAILED') {
+          return 'Rejected'
+        }
+        return 'Submitted'
+      }
+    }
+    return 'Pending'
+  }
+  if (status === 'PENDING') {
+    return 'Pending'
+  }
+  return 'Pending'
+}
 
 interface VendorDetailProps {
   vendor: Vendor
@@ -84,6 +174,10 @@ export default function VendorDetail({
     i => i.status === 'SCHEDULED' || i.status === 'IN_PROGRESS'
   )
 
+  const latestInspection = inspections.length > 0 ? inspections[0] : (recentInspections.length > 0 ? recentInspections[0] : null)
+  const currentMainStatus = fullVendor ? getNewMainStatus(fullVendor.status, latestInspection) : vendor.status
+  const currentInspectionStatus = fullVendor ? getNewInspectionStatus(fullVendor.status, latestInspection) : vendor.inspectionStatus
+
   // Delegate to the parent, which mounts <InspectionForm />. InspectionForm
   // handles the SCHEDULED → IN_PROGRESS transition itself, so we must NOT call
   // the start API here (calling it on an already IN_PROGRESS inspection 400s).
@@ -96,17 +190,18 @@ export default function VendorDetail({
   const isContinuing = firstUpcoming?.status === 'IN_PROGRESS'
 
   const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      active: "bg-emerald-100 text-emerald-800 border-emerald-200",
-      approved: "bg-emerald-100 text-emerald-800 border-emerald-200",
-      pending: "bg-amber-100 text-amber-800 border-amber-200",
-      review: "bg-blue-100 text-blue-800 border-blue-200",
-      under_review: "bg-blue-100 text-blue-800 border-blue-200",
-      completed: "bg-slate-100 text-slate-800 border-slate-200",
-      passed: "bg-emerald-100 text-emerald-800 border-emerald-200",
-      failed: "bg-red-100 text-red-800 border-red-200",
-    }
-    return colors[status?.toLowerCase()] || colors.active
+    return MAIN_STATUS_COLORS[status] || "bg-amber-50 text-amber-700 border-amber-200/85"
+  }
+
+  const getInspectionStatusColor = (status?: string | null) => {
+    const s = status || "Pending"
+    return INSPECTION_STATUS_COLORS[s] || INSPECTION_STATUS_COLORS.Pending
+  }
+
+  const getResultColor = (result: string) => {
+    if (result?.toUpperCase() === 'PASSED') return "bg-emerald-50 text-emerald-700 border-emerald-200/85"
+    if (result?.toUpperCase() === 'FAILED') return "bg-red-50 text-red-700 border-red-200/85"
+    return "bg-slate-50 text-slate-700 border-slate-200/85"
   }
 
   const getPriorityColor = (priority: string) => {
@@ -121,8 +216,7 @@ export default function VendorDetail({
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'history', label: 'Inspection History' },
-    { id: 'upcoming', label: 'Upcoming Inspections' },
-    { id: 'performance', label: 'Performance' }
+    { id: 'upcoming', label: 'Upcoming Inspections' }
   ]
 
   const companyName = fullVendor?.companyName || vendor.name
@@ -133,6 +227,467 @@ export default function VendorDetail({
   const productCategories: string[] = fullVendor?.productCategories || []
   const certifications: any[] = fullVendor?.certifications || []
   const paymentTerms: string[] = fullVendor?.paymentTerms || []
+
+  const renderOverviewTab = () => {
+    if (!fullVendor) return null
+
+    // Helper to format addresses with city, state, zipCode, country
+    const formatAddressHelper = (address?: string, city?: string, state?: string, zipCode?: string, country?: string) => {
+      const parts = [address, city, state, zipCode, country].map(p => (p ?? "").toString().trim()).filter(Boolean)
+      return parts.length > 0 ? parts.join(", ") : null
+    }
+
+    // Helper to determine if an object/array has any active items
+    const hasData = (val: any) => {
+      if (val === null || val === undefined || val === "") return false
+      if (Array.isArray(val)) return val.length > 0
+      if (typeof val === 'object') return Object.keys(val).length > 0
+      return true
+    }
+
+    interface SectionField {
+      key: string
+      label: string
+      type?: string
+      valueOverride?: any
+      condition?: any
+      transform?: (val: any) => any
+    }
+
+    // Define the sections and their standard fields
+    const sections: Array<{
+      id: string
+      title: string
+      icon: React.ReactNode
+      fields: SectionField[]
+    }> = [
+      {
+        id: "company",
+        title: "Company Details",
+        icon: <Briefcase className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "companyName", label: "Company Name" },
+          { key: "companyType", label: "Company Type", type: "badge" },
+          { key: "businessType", label: "Business Type", transform: (val: string) => getBusinessTypeLabel(val) },
+          { key: "establishedYear", label: "Year Established" },
+          { key: "gstNumber", label: "GST Number" },
+          { key: "companyIdNumber", label: getCompanyIdLabel(fullVendor.businessType), condition: fullVendor.companyIdNumber },
+          { key: "panNumber", label: "PAN Number" },
+          { key: "website", label: "Website", type: "url" },
+          { key: "companyDescription", label: "Company Description" }
+        ]
+      },
+      {
+        id: "contact",
+        title: "Contact Information",
+        icon: <Phone className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "ownerName", label: "Owner Name" },
+          { key: "designation", label: "Designation" },
+          { key: "businessPhone", label: "Business Phone" },
+          { key: "businessEmail", label: "Business Email" },
+          { key: "phoneNumber2", label: "Alternate Phone" },
+          { key: "businessEmail2", label: "Alternate Email" },
+          { key: "landlineNumber", label: "Landline Number" },
+          { 
+            key: "businessAddress", 
+            label: "Business Address", 
+            valueOverride: formatAddressHelper(
+              fullVendor.businessAddress,
+              fullVendor.businessCity,
+              fullVendor.businessState,
+              fullVendor.businessZipCode,
+              fullVendor.businessCountry
+            )
+          }
+        ]
+      },
+      {
+        id: "owner_profile",
+        title: "Owner Profile Details",
+        icon: <UserCircle className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "ownerEmail", label: "Owner Email" },
+          { key: "ownerEmail2", label: "Owner Email 2" },
+          { key: "ownerPhone", label: "Owner Phone" },
+          { key: "ownerPhone2", label: "Owner Phone 2" },
+          { key: "ownerLandline", label: "Owner Landline" },
+          {
+            key: "ownerAddress",
+            label: "Owner Address",
+            valueOverride: formatAddressHelper(
+              fullVendor.ownerAddress,
+              fullVendor.ownerCity,
+              fullVendor.ownerState,
+              fullVendor.ownerZipCode,
+              fullVendor.ownerCountry
+            )
+          },
+          { key: "businessStartDate", label: "Business Start Date", type: "date" },
+          { key: "employeeCount", label: "Employee Count", transform: (val: string) => getEmployeeCountLabel(val) }
+        ]
+      },
+      {
+        id: "warehouse",
+        title: "Warehouse / Factory Address",
+        icon: <Warehouse className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "ownershipType", label: "Ownership Type", transform: (val: string) => getOwnershipTypeLabel(val) },
+          {
+            key: "warehouseAddress",
+            label: "Warehouse Address",
+            valueOverride: formatAddressHelper(
+              fullVendor.warehouseAddress,
+              fullVendor.warehouseCity,
+              fullVendor.warehouseState,
+              fullVendor.warehouseZipCode,
+              fullVendor.warehouseCountry
+            )
+          },
+          { key: "warehouseSize", label: "Warehouse Size" },
+          { key: "storageCapacity", label: "Storage Capacity" },
+          { key: "mapLink", label: "Google Maps Link", type: "url" }
+        ]
+      },
+      {
+        id: "capabilities",
+        title: "Capabilities & Catalogue Focus",
+        icon: <Package className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "vendorType", label: "Vendor Role Type", type: "badge" },
+          { key: "productionCapacity", label: "Production Capacity" },
+          { key: "minimumOrderQuantity", label: "Minimum Order Quantity" },
+          { key: "deliveryTime", label: "Delivery Time" },
+          { key: "qualityControl", label: "Quality Control Measures" },
+          { key: "productCategories", label: "Product Categories", type: "list" },
+          { key: "productTypes", label: "Product Types", type: "list" },
+          { key: "specializations", label: "Specializations", type: "list" },
+          { key: "categoryRemarks", label: "Category Remarks" }
+        ]
+      },
+      {
+        id: "facilities",
+        title: "Manufacturing Facilities",
+        icon: <Factory className="w-5 h-5 text-brand-600" />,
+        fields: [] // Custom rendered
+      },
+      {
+        id: "certifications",
+        title: "Certifications & Compliance",
+        icon: <Award className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "complianceStandards", label: "Compliance Standards" },
+          { key: "packagingCapabilities", label: "Packaging Capabilities" },
+          { key: "logisticsPartners", label: "Logistics Partners" },
+          { key: "shippingMethods", label: "Shipping Methods", type: "list" }
+        ]
+      },
+      {
+        id: "trade",
+        title: "Trade & Regulatory ID Details",
+        icon: <FileText className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "tradeLicenseNumber", label: "Trade License Number" },
+          { key: "businessRegistrationNumber", label: "Business Registration Number" },
+          { key: "taxIdentificationNumber", label: "Tax Identification Number" }
+        ]
+      },
+      {
+        id: "bank",
+        title: "Banking Details",
+        icon: <Briefcase className="w-5 h-5 text-brand-600" />,
+        fields: [] // Custom rendered
+      }
+    ]
+
+    return (
+      <div className="space-y-8 animate-in fade-in duration-300">
+        {sections.map((section) => {
+          // 1. Collect standard fields that have data
+          const activeFields = section.fields.map(field => {
+            const rawVal = field.valueOverride !== undefined ? field.valueOverride : fullVendor[field.key]
+            if (!hasData(rawVal)) return null
+            if (field.condition === false) return null
+            const finalVal = field.transform ? field.transform(rawVal) : rawVal
+            return {
+              label: field.label,
+              value: finalVal,
+              type: field.type
+            }
+          }).filter(Boolean) as Array<{ label: string; value: any; type?: string }>
+
+          // 2. Check for custom section data
+          let hasCustomData = false
+          let customContent: React.ReactNode = null
+
+          if (section.id === "owner_profile") {
+            const additional = fullVendor.additionalOwners
+            if (Array.isArray(additional) && additional.length > 0) {
+              hasCustomData = true
+              customContent = (
+                <div className="col-span-full border-t border-slate-100 pt-6 mt-4">
+                  <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-1.5">
+                    <UserCircle className="w-4.5 h-4.5 text-slate-400" /> Additional Owners ({additional.length})
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {additional.map((owner: any, idx: number) => (
+                      <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                        <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
+                        {owner.name && <Field label="Name" value={owner.name} />}
+                        {owner.designation && <Field label="Designation" value={owner.designation} />}
+                        {owner.email && <Field label="Email" value={owner.email} />}
+                        {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
+                        {owner.phone && <Field label="Phone" value={owner.phone} />}
+                        {owner.phone2 && <Field label="Secondary Phone" value={owner.phone2} />}
+                        {owner.landline && <Field label="Landline" value={owner.landline} />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
+          } else if (section.id === "facilities") {
+            const hasSpinning = fullVendor.enabledFacilities || fullVendor.facilityDetails
+            if (hasSpinning) {
+              const enabledList: string[] = []
+              const detailsMap = fullVendor.facilityDetails || {}
+              const enabledFacilities = fullVendor.enabledFacilities || {}
+              
+              for (const [fac, enabled] of Object.entries(enabledFacilities)) {
+                if (enabled) {
+                  const labelMap: Record<string, string> = {
+                    spinning: 'Spinning',
+                    weaving: 'Weaving',
+                    dyeing: 'Dyeing',
+                    printing: 'Printing',
+                    stitching: 'Stitching',
+                    finishing: 'Finishing',
+                  }
+                  enabledList.push(labelMap[fac] || fac)
+                }
+              }
+
+              if (enabledList.length > 0 || Object.keys(detailsMap).length > 0) {
+                hasCustomData = true
+                customContent = (
+                  <div className="col-span-full space-y-6">
+                    {enabledList.length > 0 && (
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Active Facilities</label>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {enabledList.map((f, i) => (
+                            <span key={i} className="px-2.5 py-1 bg-brand-50 text-brand-700 text-xs font-bold rounded-lg border border-brand-100">{f}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {Object.entries(detailsMap).map(([facilityId, details]: [string, any]) => {
+                      if (!enabledFacilities[facilityId]) return null
+                      const facilityName = enabledList.find((f) => f.toLowerCase().includes(facilityId)) || facilityId
+                      const hasDetailFields = Object.values(details || {}).some(v => v !== null && v !== undefined && v !== "")
+                      if (!hasDetailFields) return null
+
+                      return (
+                        <div key={facilityId} className="border-l-2 border-brand-500/80 pl-4 py-1 space-y-4">
+                          <p className="font-bold text-sm text-slate-800 uppercase tracking-wide">{facilityName} Facility Details</p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {Object.entries(details || {}).map(([key, value]: [string, any]) => {
+                              if (value === null || value === undefined || value === "") return null
+                              const fieldLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())
+                              return (
+                                <div key={key}>
+                                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">{fieldLabel}</label>
+                                  <p className="text-sm font-semibold text-slate-900">{value.toString()}</p>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              }
+            }
+          } else if (section.id === "certifications") {
+            const certs = fullVendor.certifications || []
+            if (certs.length > 0) {
+              hasCustomData = true
+              customContent = (
+                <div className="col-span-full border-t border-slate-100 pt-6 mt-4">
+                  <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-1.5">
+                    <Award className="w-4.5 h-4.5 text-slate-400" /> Catalog Certifications ({certs.length})
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {certs.map((cert: any, idx: number) => {
+                      const status = cert.expiryDate ? getCertificateStatus(cert.expiryDate) : null
+                      return (
+                        <div key={cert.id || idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center px-2.5 py-0.5 bg-brand-50 text-brand-700 border border-brand-100 rounded text-xs font-bold">
+                              {cert.name}
+                            </span>
+                            {cert.documentUrl && (
+                              <a
+                                href={cert.documentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1"
+                              >
+                                <FileText className="w-3.5 h-3.5" /> View File
+                              </a>
+                            )}
+                          </div>
+                          {cert.issuedBy && <Field label="Issued By" value={cert.issuedBy} />}
+                          {cert.certificateNumber && <Field label="Certificate #" value={cert.certificateNumber} />}
+                          {cert.expiryDate ? (
+                            <div>
+                              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Expiry Date</label>
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-slate-400" />
+                                <span className="text-sm font-semibold text-slate-800">
+                                  {new Date(cert.expiryDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                </span>
+                                {status && (
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full border ${status.color}`}>
+                                    {status.message}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400">No expiry date set</p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            }
+          } else if (section.id === "trade") {
+            const alternate = fullVendor.alternateContacts
+            if (Array.isArray(alternate) && alternate.length > 0) {
+              hasCustomData = true
+              customContent = (
+                <div className="col-span-full border-t border-slate-100 pt-6 mt-4">
+                  <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-1.5">
+                    <UserCircle className="w-4.5 h-4.5 text-slate-400" /> Alternate Contacts ({alternate.length})
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {alternate.map((contact: any, idx: number) => (
+                      <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                        <p className="text-sm font-bold text-slate-800">Contact {idx + 1}</p>
+                        {contact.name && <Field label="Name" value={contact.name} />}
+                        {(contact.customDesignation || contact.designation) && (
+                          <Field label="Designation" value={contact.customDesignation || contact.designation} />
+                        )}
+                        {(contact.email1 || contact.email) && (
+                          <Field label="Email" value={contact.email1 || contact.email} />
+                        )}
+                        {contact.email2 && <Field label="Secondary Email" value={contact.email2} />}
+                        {(contact.phone1 || contact.phone) && (
+                          <Field label="Phone" value={contact.phone1 || contact.phone} />
+                        )}
+                        {contact.phone2 && <Field label="Secondary Phone" value={contact.phone2} />}
+                        {contact.landline && <Field label="Landline" value={contact.landline} />}
+                        {(contact.customDepartment || contact.department) && (
+                          <Field label="Department" value={contact.customDepartment || contact.department} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
+          } else if (section.id === "bank") {
+            const bank = fullVendor.bankDetails
+            if (bank && bank.bankName) {
+              hasCustomData = true
+              customContent = (
+                <div className="col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {bank.bankName && <Field label="Bank Name" value={bank.bankName} />}
+                  {bank.accountNumber && (
+                    <Field 
+                      label="Account Number" 
+                      value={bank.accountNumber.length > 4 ? `**** **** ${bank.accountNumber.slice(-4)}` : bank.accountNumber} 
+                    />
+                  )}
+                  {bank.ifscCode && <Field label="IFSC Code" value={bank.ifscCode} />}
+                  {bank.swiftCode && <Field label="SWIFT / BIC Code" value={bank.swiftCode} />}
+                  {bank.iban && <Field label="IBAN Number" value={bank.iban} />}
+                  {bank.accountType && <Field label="Account Type" value={bank.accountType} />}
+                  {bank.accountHolderName && <Field label="Account Holder Name" value={bank.accountHolderName} />}
+                  {bank.branchName && <Field label="Branch Name" value={bank.branchName} />}
+                  {bank.branchAddress && <Field label="Branch Address" value={bank.branchAddress} />}
+                  {bank.isVerified && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Verification Status</label>
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-100">
+                        <CheckCircle className="w-3.5 h-3.5" /> Verified
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+          }
+
+          // If there is no data in this section, hide it completely!
+          if (activeFields.length === 0 && !hasCustomData) return null
+
+          return (
+            <div key={section.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 hover:shadow-sm transition-all duration-200">
+              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2.5 pb-3 border-b border-slate-100">
+                <span className="p-2 bg-brand-50 rounded-xl text-brand-600">{section.icon}</span>
+                {section.title}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                {activeFields.map((field) => (
+                  <div key={field.label}>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">{field.label}</label>
+                    <div className="text-sm font-semibold text-slate-900 leading-relaxed">
+                      {field.type === 'list' && Array.isArray(field.value) ? (
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {field.value.map((item, idx) => (
+                            <span key={idx} className="px-2.5 py-0.5 bg-slate-100 text-slate-800 text-xs font-bold rounded-lg border border-slate-200">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      ) : field.type === 'badge' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-100 capitalize mt-1">
+                          {field.value.toString().replace(/_/g, " ").toLowerCase()}
+                        </span>
+                      ) : field.type === 'url' ? (
+                        (() => {
+                          const url = safeExternalUrl(field.value)
+                          return url ? (
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1 mt-1 break-all">
+                              <Globe className="w-4 h-4 shrink-0" /> {field.value}
+                            </a>
+                          ) : (
+                            <span className="text-slate-700 font-semibold flex items-center gap-1 mt-1 break-all">
+                              <Globe className="w-4 h-4 shrink-0 text-slate-400" /> {field.value}
+                            </span>
+                          )
+                        })()
+                      ) : field.type === 'date' ? (
+                        <span className="text-slate-800 font-semibold">{formatDate(field.value)}</span>
+                      ) : (
+                        <span className="text-slate-800 font-semibold">{field.value.toString()}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {customContent}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   // Only show full skeleton on initial load; later refreshes keep existing data visible
   // to avoid jarring layout resets when clicking Refresh or Load More.
@@ -160,9 +715,9 @@ export default function VendorDetail({
   }
 
   return (
-    <div className="p-8 font-sans">
+    <div className="pt-2 pb-8 px-6 font-sans">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-4">
         <div className="flex items-center gap-4 mb-4">
           <button
             onClick={onBack}
@@ -173,9 +728,14 @@ export default function VendorDetail({
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h1 className="text-3xl font-bold text-slate-900">Vendor Details</h1>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(fullVendor?.status || vendor.status)}`}>
-                {(fullVendor?.status || vendor.status).toString().replace(/_/g, " ")}
+              <span className={`px-3 py-1 rounded-full text-sm font-bold border ${getStatusColor(currentMainStatus)}`}>
+                {currentMainStatus}
               </span>
+              {currentInspectionStatus && (
+                <span className={`px-3 py-1 rounded-full text-sm font-bold border ${getInspectionStatusColor(currentInspectionStatus)}`}>
+                  Inspection: {currentInspectionStatus}
+                </span>
+              )}
               {fullVendor?.assignedQc?.name && (
                 <span className="px-3 py-1 rounded-full text-xs font-medium border bg-slate-100 text-slate-700 border-slate-200">
                   QC: {fullVendor.assignedQc.name}
@@ -197,7 +757,7 @@ export default function VendorDetail({
             {firstUpcoming && onStartInspection && (
               <button
                 onClick={handleOpenInspection}
-                className="flex items-center gap-2 px-6 py-3 bg-linear-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
               >
                 <Play className="w-4 h-4" />
                 {isContinuing ? 'Continue' : 'Start Now'}
@@ -209,47 +769,47 @@ export default function VendorDetail({
       </div>
 
       {/* Vendor Summary Card */}
-      <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-2xl p-6 text-white mb-8">
+      <div className="bg-brand-50/40 border border-brand-100/60 rounded-2xl p-6 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
+            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg">
               <Factory className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-blue-100 text-sm">Vendor</p>
-              <p className="font-semibold">{companyName}</p>
+              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Vendor</p>
+              <p className="font-semibold text-slate-900">{companyName}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
+            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg">
               <MapPin className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-blue-100 text-sm">Location</p>
-              <p className="font-semibold">{location}</p>
+              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Location</p>
+              <p className="font-semibold text-slate-900">{location}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
+            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg">
               <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-blue-100 text-sm">Last Inspection</p>
-              <p className="font-semibold">
+              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Last Inspection</p>
+              <p className="font-semibold text-slate-900">
                 {stats?.lastInspectionDate ? formatDate(stats.lastInspectionDate) : "No inspections yet"}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
+            <div className="p-2 bg-brand-100/80 text-brand-700 rounded-lg">
               <BarChart3 className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-blue-100 text-sm">Total Inspections</p>
-              <p className="font-semibold">{stats?.totalInspections ?? 0}</p>
+              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Total Inspections</p>
+              <p className="font-semibold text-slate-900">{stats?.totalInspections ?? 0}</p>
             </div>
           </div>
         </div>
@@ -264,7 +824,7 @@ export default function VendorDetail({
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-brand-500 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                   }`}
               >
@@ -274,231 +834,15 @@ export default function VendorDetail({
           </nav>
         </div>
       </div>
-
       {/* Overview Tab */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Company Information */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-blue-600" /> Company Information
-              </h3>
-              <div className="space-y-4">
-                <Field label="Company Name" value={companyName} />
-                <Field label="Company Type" value={fullVendor?.companyType} />
-                <Field label="Vendor Type" value={fullVendor?.vendorType} />
-                <Field label="Established" value={fullVendor?.establishedYear?.toString()} />
-                <Field label="GST Number" value={fullVendor?.gstNumber} />
-                <Field label="Annual Turnover" value={fullVendor?.annualTurnover} />
-                {fullVendor?.website && (
-                  <div>
-                    <label className="text-sm font-medium text-slate-600">Website</label>
-                    {safeExternalUrl(fullVendor.website) ? (
-                      <a
-                        href={safeExternalUrl(fullVendor.website)!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-blue-600 hover:underline mt-1 break-all"
-                      >
-                        <Globe className="w-4 h-4 shrink-0" /> {fullVendor.website}
-                      </a>
-                    ) : (
-                      <p className="flex items-center gap-1 text-slate-700 text-sm mt-1 break-all">
-                        <Globe className="w-4 h-4 shrink-0 text-slate-400" /> {fullVendor.website}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {fullVendor?.companyDescription && (
-                  <div>
-                    <label className="text-sm font-medium text-slate-600">Description</label>
-                    <p className="text-slate-900 text-sm mt-1">{fullVendor.companyDescription}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Contact Information */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <Phone className="w-5 h-5 text-blue-600" /> Contact Information
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-600">Primary Contact</label>
-                  <div className="mt-1">
-                    <p className="text-slate-900 font-medium">{fullVendor?.ownerName || "—"}</p>
-                    <p className="text-sm text-slate-600">Owner</p>
-                    <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-slate-600">
-                      {fullVendor?.businessPhone && (
-                        <div className="flex items-center gap-1">
-                          <Phone className="w-4 h-4" />
-                          <span>{fullVendor.businessPhone}</span>
-                        </div>
-                      )}
-                      {fullVendor?.businessEmail && (
-                        <div className="flex items-center gap-1">
-                          <Mail className="w-4 h-4" />
-                          <span>{fullVendor.businessEmail}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {fullVendor?.assignedQc && (
-                  <div className="border-t border-slate-100 pt-4">
-                    <label className="text-sm font-medium text-slate-600">Assigned QC Checker</label>
-                    <div className="mt-1">
-                      <p className="text-slate-900 font-medium">{fullVendor.assignedQc.name}</p>
-                      {fullVendor.assignedQc.checkerId && (
-                        <p className="text-xs text-slate-500">ID: {fullVendor.assignedQc.checkerId}</p>
-                      )}
-                      <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-slate-600">
-                        {fullVendor.assignedQc.phone && (
-                          <a
-                            href={`tel:${fullVendor.assignedQc.phone}`}
-                            className="flex items-center gap-1 hover:text-blue-600"
-                          >
-                            <Phone className="w-4 h-4" />
-                            <span>{fullVendor.assignedQc.phone}</span>
-                          </a>
-                        )}
-                        {fullVendor.assignedQc.email && (
-                          <a
-                            href={`mailto:${fullVendor.assignedQc.email}`}
-                            className="flex items-center gap-1 hover:text-blue-600"
-                          >
-                            <Mail className="w-4 h-4" />
-                            <span>{fullVendor.assignedQc.email}</span>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {fullVendor?.businessAddress && (
-                  <div>
-                    <label className="text-sm font-medium text-slate-600">Business Address</label>
-                    <p className="text-slate-700 text-sm mt-1">
-                      {formatAddress(
-                        fullVendor.businessAddress,
-                        fullVendor.businessCity,
-                        fullVendor.businessState,
-                        fullVendor.businessZipCode
-                      )}
-                    </p>
-                  </div>
-                )}
-
-                {fullVendor?.factoryAddress && (
-                  <div>
-                    <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
-                      <Factory className="w-4 h-4" /> Factory
-                    </label>
-                    <p className="text-slate-700 text-sm mt-1">
-                      {formatAddress(
-                        fullVendor.factoryAddress,
-                        fullVendor.factoryCity,
-                        fullVendor.factoryState,
-                        fullVendor.factoryZipCode
-                      )}
-                    </p>
-                    {fullVendor.factorySize && (
-                      <p className="text-xs text-slate-500 mt-1">Size: {fullVendor.factorySize}</p>
-                    )}
-                  </div>
-                )}
-
-                {fullVendor?.warehouseAddress && (
-                  <div>
-                    <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
-                      <Warehouse className="w-4 h-4" /> Warehouse
-                    </label>
-                    <p className="text-slate-700 text-sm mt-1">
-                      {formatAddress(
-                        fullVendor.warehouseAddress,
-                        fullVendor.warehouseCity,
-                        fullVendor.warehouseState
-                      )}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Capabilities */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <Package className="w-5 h-5 text-blue-600" /> Capabilities & Products
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Production Capacity" value={fullVendor?.productionCapacity} />
-              <Field label="Minimum Order Quantity" value={fullVendor?.minimumOrderQuantity} />
-              <Field label="Delivery Time" value={fullVendor?.deliveryTime} />
-              <Field label="Quality Control" value={fullVendor?.qualityControl} />
-
-              {productCategories.length > 0 && (
-                <div className="md:col-span-2">
-                  <label className="text-sm font-medium text-slate-600">Product Categories</label>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {productCategories.map((c, i) => (
-                      <span key={i} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-200">{c}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {specializations.length > 0 && (
-                <div className="md:col-span-2">
-                  <label className="text-sm font-medium text-slate-600">Specializations</label>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {specializations.map((s, i) => (
-                      <span key={i} className="px-2 py-1 bg-purple-50 text-purple-700 text-xs rounded-full border border-purple-200">{s}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {paymentTerms.length > 0 && (
-                <div className="md:col-span-2">
-                  <label className="text-sm font-medium text-slate-600">Payment Terms</label>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {paymentTerms.map((t, i) => (
-                      <span key={i} className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded-full border border-slate-200">{t}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {certifications.length > 0 && (
-                <div className="md:col-span-2">
-                  <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
-                    <Award className="w-4 h-4" /> Certifications
-                  </label>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {certifications.map((c: any, i: number) => (
-                      <span key={i} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full border border-green-200">
-                        {c.name}{c.issuedBy ? ` — ${c.issuedBy}` : ""}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {activeTab === 'overview' && renderOverviewTab()}
 
       {/* Inspection History */}
       {activeTab === 'history' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600" /> Recent Inspection History
+              <FileText className="w-5 h-5 text-brand-600" /> Recent Inspection History
             </h3>
             {historyMeta && historyMeta.total > 0 && (
               <span className="text-sm text-slate-500">
@@ -511,13 +855,13 @@ export default function VendorDetail({
               <div key={insp.id} className="border border-slate-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                    <span className="font-mono text-sm text-brand-600 bg-brand-50 px-2 py-1 rounded border border-brand-200">
                       {insp.poNumber}
                     </span>
                     <span className="font-medium text-slate-900">{insp.clientName}</span>
                   </div>
                   {insp.result && (
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(insp.result)}`}>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getResultColor(insp.result)}`}>
                       {insp.result.replace(/_/g, " ")}
                     </span>
                   )}
@@ -562,7 +906,7 @@ export default function VendorDetail({
               <div key={inspection.id} className="border border-slate-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                    <span className="font-mono text-sm text-brand-600 bg-brand-50 px-2 py-1 rounded border border-brand-200">
                       {inspection.poNumber}
                     </span>
                     <span className="font-medium text-slate-900">{inspection.clientName}</span>
@@ -588,58 +932,77 @@ export default function VendorDetail({
           </div>
         </div>
       )}
-
-      {/* Performance */}
-      {activeTab === 'performance' && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <StatCard
-            icon={<Calendar className="w-6 h-6 text-blue-600" />}
-            bg="bg-blue-100"
-            value={stats?.scheduledCount ?? 0}
-            label="Scheduled"
-          />
-          <StatCard
-            icon={<Clock className="w-6 h-6 text-amber-600" />}
-            bg="bg-amber-100"
-            value={stats?.inProgressCount ?? 0}
-            label="In Progress"
-          />
-          <StatCard
-            icon={<CheckCircle className="w-6 h-6 text-emerald-600" />}
-            bg="bg-emerald-100"
-            value={stats?.completedCount ?? 0}
-            label="Completed"
-          />
-          <StatCard
-            icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
-            bg="bg-purple-100"
-            value={`${stats?.passRate ?? 0}%`}
-            label="Pass Rate"
-          />
-        </div>
-      )}
     </div>
   )
 }
 
-function Field({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null
+function Field({ label, value }: { label: string; value?: string | number | null }) {
+  if (value === null || value === undefined || value === "") return null
   return (
     <div>
-      <label className="text-sm font-medium text-slate-600">{label}</label>
-      <p className="text-slate-900">{value}</p>
+      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">{label}</label>
+      <p className="text-sm font-semibold text-slate-900 leading-normal">{value.toString()}</p>
     </div>
   )
 }
 
-function StatCard({ icon, bg, value, label }: { icon: React.ReactNode; bg: string; value: React.ReactNode; label: string }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center">
-      <div className={`p-3 ${bg} rounded-lg w-fit mx-auto mb-3`}>{icon}</div>
-      <p className="text-2xl font-bold text-slate-900">{value}</p>
-      <p className="text-sm text-slate-600">{label}</p>
-    </div>
-  )
+const getEmployeeCountLabel = (count: string): string => {
+  const labels: Record<string, string> = {
+    '10-20': '10-20 employees',
+    '20-50': '20-50 employees',
+    '50-100': '50-100 employees',
+    '100+': '100+ employees',
+  }
+  return labels[count] || count
+}
+
+const getOwnershipTypeLabel = (type: string): string => {
+  const labels: Record<string, string> = {
+    'owned': 'Owned',
+    'rented': 'Rented',
+    'lease': 'Lease',
+  }
+  return labels[type] || type
+}
+
+const getBusinessTypeLabel = (type: string): string => {
+  const labels: Record<string, string> = {
+    'proprietorship': 'Proprietorship',
+    'pvt-ltd': 'Pvt Ltd',
+    'partnership-firm': 'Partnership Firm',
+    'llp': 'LLP',
+    'sole': 'Sole Proprietorship',
+    'partnership': 'Partnership',
+    'corporation': 'Corporation',
+    'llc': 'Limited Liability Company (LLC)',
+  }
+  return labels[type] || type
+}
+
+const getCompanyIdLabel = (businessType: string): string => {
+  const labels: Record<string, string> = {
+    'proprietorship': 'IEC Code',
+    'pvt-ltd': 'CIN Number',
+    'partnership-firm': 'Partnership Deed',
+    'llp': 'LLPIN Number',
+  }
+  return labels[businessType] || 'Business Registration ID'
+}
+
+const getCertificateStatus = (expiryDate: string) => {
+  if (!expiryDate) return null
+  const today = new Date()
+  const expiry = new Date(expiryDate)
+  const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (daysUntilExpiry < 0) {
+    return { status: 'expired', message: 'Expired', color: 'text-red-700 bg-red-50 border border-red-200/50' }
+  } else if (daysUntilExpiry <= 30) {
+    return { status: 'expiring', message: `Expires in ${daysUntilExpiry} days`, color: 'text-amber-700 bg-amber-50 border border-amber-200/50 font-medium' }
+  } else if (daysUntilExpiry <= 90) {
+    return { status: 'warning', message: `Expires in ${daysUntilExpiry} days`, color: 'text-yellow-700 bg-yellow-50 border border-yellow-200/50 font-medium' }
+  } else {
+    return { status: 'valid', message: `Valid until ${expiry.toLocaleDateString()}`, color: 'text-emerald-700 bg-emerald-50 border border-emerald-200/50 font-medium' }
+  }
 }
 
 function VendorDetailSkeleton() {

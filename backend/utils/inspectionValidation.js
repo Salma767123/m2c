@@ -40,6 +40,13 @@ const isFutureDate = (v) => {
 const MAX_PHOTO_CHARS = 8 * 1024 * 1024;
 const MAX_PHOTOS = 20;
 
+// Named factory-photo slots the checker must provide. Mirrors the required
+// slots in frontend Steps/factoryImageSlots.ts.
+const REQUIRED_PHOTO_SLOTS = [
+    { id: 'nameBoard', label: 'Factory Name Board' },
+    { id: 'frontView', label: 'Front View' },
+];
+
 function validateInspectionPayload(d = {}) {
     const errors = {};
 
@@ -87,20 +94,36 @@ function validateInspectionPayload(d = {}) {
         errors.inspectorRemarks = 'Remarks are required when rejecting';
     }
 
-    // Evidence — frontend sends `[{ name, data }]`. `data` is either a base64
-    // data URL (gets converted to Cloudinary URL post-validation by
-    // resolveBase64InValue) or an already-hosted https URL. Either is accepted.
+    // Evidence — frontend sends named slots `[{ slotId, label, name, data }]`.
+    // `data` is either a base64 data URL (converted to a Cloudinary URL
+    // post-validation by resolveBase64InValue) or an already-hosted https URL.
     const photos = Array.isArray(d.factoryPhotos) ? d.factoryPhotos : [];
-    if (photos.length === 0) {
-        errors.factoryPhotos = 'At least one factory photo is required';
-    } else if (photos.length > MAX_PHOTOS) {
+    const photoSrc = (raw) =>
+        typeof raw === 'string'
+            ? raw
+            : (raw && typeof raw === 'object' ? (raw.data || raw.url || null) : null);
+    const hasSlot = (slotId) =>
+        photos.some((p) => p && typeof p === 'object' && p.slotId === slotId && photoSrc(p));
+
+    if (photos.length > MAX_PHOTOS) {
         errors.factoryPhotos = `At most ${MAX_PHOTOS} photos allowed`;
     } else {
+        // Required named slots must each have an image.
+        for (const slot of REQUIRED_PHOTO_SLOTS) {
+            if (!hasSlot(slot.id)) {
+                errors[`factoryImage:${slot.id}`] = `${slot.label} photo is required`;
+            }
+        }
+        if (REQUIRED_PHOTO_SLOTS.some((s) => !hasSlot(s.id))) {
+            const missing = REQUIRED_PHOTO_SLOTS.filter((s) => !hasSlot(s.id)).map((s) => s.label);
+            errors.factoryPhotos = `Upload the required photos: ${missing.join(', ')}`;
+        }
+
+        // Per-photo integrity checks (applies to every uploaded slot).
         const DATA_URL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,/i;
         const HTTP_URL_RE = /^https?:\/\//i;
         for (let i = 0; i < photos.length; i++) {
-            const raw = photos[i];
-            const p = typeof raw === 'string' ? raw : (raw && typeof raw === 'object' ? raw.data : null);
+            const p = photoSrc(photos[i]);
             if (typeof p !== 'string' || p.length === 0) {
                 errors.factoryPhotos = 'Invalid photo data';
                 break;

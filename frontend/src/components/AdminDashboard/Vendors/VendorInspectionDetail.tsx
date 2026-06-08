@@ -37,7 +37,7 @@ interface InspectionData {
   inspectorName?: string;
   inspectionStatus?: string;
   inspectorRemarks?: string;
-  factoryPhotos?: { name: string; data: string | null }[];
+  factoryPhotos?: { name: string; data: string | null; url?: string | null; slotId?: string; label?: string }[];
   documentsUpload?: { name: string; data: string | null }[];
 }
 
@@ -348,16 +348,20 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
               <Camera className="h-5 w-5 text-blue-600" /> Factory Photos
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {factoryPhotos.map((photo, idx) => (
-                <div key={idx} className="border rounded-lg overflow-hidden">
-                  {photo.data ? (
-                    <img src={photo.data} alt={photo.name} className="w-full h-40 object-cover" />
-                  ) : (
-                    <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">{photo.name}</div>
-                  )}
-                  <div className="p-2 text-xs text-gray-600 truncate">{photo.name}</div>
-                </div>
-              ))}
+              {factoryPhotos.map((photo, idx) => {
+                const src = photo.data || photo.url || null;
+                const caption = photo.label || photo.name || `Photo ${idx + 1}`;
+                return (
+                  <div key={idx} className="border rounded-lg overflow-hidden">
+                    {src ? (
+                      <img src={src} alt={caption} className="w-full h-40 object-cover" />
+                    ) : (
+                      <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">{caption}</div>
+                    )}
+                    <div className="p-2 text-xs font-semibold text-gray-700 truncate" title={caption}>{caption}</div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

@@ -104,7 +104,7 @@ export default function PayoutsEnhanced() {
   };
 
   const handleDownloadReceipt = async (settlement: Settlement) => {
-    const { jsPDF } = await import('jspdf');
+    const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = doc.internal.pageSize.getWidth();
 

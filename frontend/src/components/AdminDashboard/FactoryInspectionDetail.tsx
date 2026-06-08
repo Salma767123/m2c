@@ -351,27 +351,27 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                         {formData.factoryPhotos.map((p: any, i: number) => {
                                             const src = p?.data || p?.url || null
                                             const isImage = src && typeof src === 'string' && (src.startsWith('data:image') || src.startsWith('http'))
+                                            const caption = p?.label || p?.name || `Photo ${i + 1}`
                                             return isImage ? (
                                                 <div
                                                     key={i}
-                                                    className="relative group cursor-pointer"
-                                                    onClick={() => setSelectedImage({ src, alt: p.name || `Photo ${i + 1}` })}
+                                                    className="cursor-pointer"
+                                                    onClick={() => setSelectedImage({ src, alt: caption })}
                                                 >
                                                     <img
                                                         src={src}
-                                                        alt={p.name || `Photo ${i + 1}`}
+                                                        alt={caption}
                                                         onError={(e) => { e.currentTarget.style.display = "none" }}
-                                                        className="w-full h-32 object-cover rounded-xl border border-slate-200 shadow-sm transition-transform group-hover:scale-[1.02]"
+                                                        className="w-full h-32 object-cover rounded-xl border border-slate-200 shadow-sm transition-transform hover:scale-[1.02]"
                                                     />
-                                                    {p.name && (
-                                                        <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] px-2 py-1 rounded-b-xl truncate opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            {p.name}
-                                                        </div>
-                                                    )}
+                                                    <p className="mt-1.5 text-[11px] font-semibold text-slate-700 truncate" title={caption}>{caption}</p>
                                                 </div>
                                             ) : (
-                                                <div key={i} className="flex items-center justify-center h-32 bg-slate-100 rounded-xl border border-dashed border-slate-300">
-                                                    <span className="text-xs text-slate-500 text-center px-2">{p?.name || `Photo ${i + 1}`}</span>
+                                                <div key={i}>
+                                                    <div className="flex items-center justify-center h-32 bg-slate-100 rounded-xl border border-dashed border-slate-300">
+                                                        <span className="text-xs text-slate-500 text-center px-2">{caption}</span>
+                                                    </div>
+                                                    <p className="mt-1.5 text-[11px] font-semibold text-slate-700 truncate" title={caption}>{caption}</p>
                                                 </div>
                                             )
                                         })}

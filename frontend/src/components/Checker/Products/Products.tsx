@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Button } from '@/components/UI/Button'
-import { Badge } from '@/components/UI/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
 import {
@@ -44,8 +42,9 @@ const PAGE_SIZE = 12
 const DEFAULT_SORT = 'createdAt:desc'
 
 // Mirrors the ProductApprovalStatus enum in backend/prisma/schema.prisma.
-const STATUS_OPTIONS = [
-    { value: '', label: 'All statuses' },
+// Rendered as tabs at the top of the page (same pattern as Vendor Management).
+const STATUS_TABS = [
+    { value: '', label: 'All Statuses' },
     { value: 'PENDING', label: 'Pending' },
     { value: 'REINSPECTION', label: 'Reinspection' },
     { value: 'QC_APPROVED', label: 'Approved by QC' },
@@ -60,12 +59,14 @@ const SORT_OPTIONS = [
     { value: 'basePrice:desc', label: 'Price high–low' },
 ]
 
+// Pill styling — soft tinted background + matching border, mirrors the
+// status pills used across the Vendor Management data grid.
 const APPROVAL_BADGE: Record<string, string> = {
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    REINSPECTION: 'bg-orange-100 text-orange-800',
-    QC_APPROVED: 'bg-emerald-100 text-emerald-800',
-    APPROVED: 'bg-green-100 text-green-800',
-    REJECTED: 'bg-red-100 text-red-800',
+    PENDING: 'bg-amber-50 text-amber-700 border-amber-200/85',
+    REINSPECTION: 'bg-purple-50 text-purple-700 border-purple-200/85',
+    QC_APPROVED: 'bg-blue-50 text-blue-700 border-blue-200/85',
+    APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200/85',
+    REJECTED: 'bg-red-50 text-red-700 border-red-200/85',
 }
 
 const APPROVAL_LABELS: Record<string, string> = {
@@ -258,73 +259,90 @@ export default function Products() {
     }
 
     return (
-        <div className="p-8 font-sans space-y-6">
-            <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                    <h1 className="text-4xl font-bold text-slate-900 mb-2">Assigned Products</h1>
-                    <p className="text-slate-600 text-lg">Review and approve or reject vendor products</p>
+        <div className="min-h-screen pt-1 pb-6 px-6 font-sans flex flex-col">
+            <div className="mb-4">
+                <h1 className="text-2xl font-bold text-slate-900 mb-1">Assigned Products</h1>
+                <p className="text-slate-500 text-sm">Review and approve or reject vendor products</p>
+            </div>
+
+            {/* Status Tabs and Actions */}
+            <div className="flex items-center justify-between gap-4 mb-4">
+                <div className="overflow-x-auto pb-1 scrollbar-none flex-1">
+                    <div className="flex gap-2 min-w-max">
+                        {STATUS_TABS.map((tab) => {
+                            const isActive = status === tab.value
+                            return (
+                                <button
+                                    key={tab.value}
+                                    type="button"
+                                    onClick={() => {
+                                        setStatus(tab.value)
+                                        setPage(1)
+                                    }}
+                                    className={`px-4 py-2.5 text-sm font-semibold rounded-xl border transition-all duration-200 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
+                                        isActive
+                                            ? "border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10 text-brand-700 font-bold"
+                                            : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800"
+                                    }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            )
+                        })}
+                    </div>
                 </div>
                 <button
                     onClick={loadProducts}
                     disabled={loading}
                     title="Refresh"
                     aria-label="Refresh products"
-                    className="p-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50"
+                    className="p-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50 shrink-0"
                 >
                     <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
 
             {/* Filter bar */}
-            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-start">
-                <div className="relative">
-                    <label htmlFor="product-search" className="sr-only">Search products</label>
-                    <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 pointer-events-none" />
-                    <input
-                        id="product-search"
-                        type="text"
-                        placeholder="Search by product, SKU, category, or vendor..."
-                        value={searchInput}
-                        onChange={(e) => setSearchInput(e.target.value)}
-                        className="w-full pl-12 pr-10 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white shadow-sm"
-                    />
-                    {searchInput && (
-                        <button
-                            onClick={() => setSearchInput('')}
-                            aria-label="Clear search"
-                            className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    )}
-                </div>
-                <div className="min-w-45">
-                    <Dropdown
-                        id="product-status-filter"
-                        value={status}
-                        options={STATUS_OPTIONS}
-                        onChange={(v) => {
-                            setStatus(v as string)
-                            setPage(1)
-                        }}
-                        placeholder="All statuses"
-                    />
-                </div>
-                <div className="min-w-45">
-                    <Dropdown
-                        id="product-sort-filter"
-                        value={sort}
-                        options={SORT_OPTIONS}
-                        onChange={(v) => {
-                            setSort(v as string)
-                            setPage(1)
-                        }}
-                    />
+            <div className="mb-4">
+                <div className="grid gap-4 md:grid-cols-[1fr_auto] items-center">
+                    <div className="relative flex-1">
+                        <label htmlFor="product-search" className="sr-only">Search products</label>
+                        <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 pointer-events-none" />
+                        <input
+                            id="product-search"
+                            type="text"
+                            placeholder="Search by product, SKU, category, or vendor..."
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs"
+                        />
+                        {searchInput && (
+                            <button
+                                onClick={() => setSearchInput('')}
+                                aria-label="Clear search"
+                                className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                    <div className="min-w-45">
+                        <Dropdown
+                            id="product-sort-filter"
+                            value={sort}
+                            buttonClassName="py-3 rounded-xl"
+                            options={SORT_OPTIONS}
+                            onChange={(v) => {
+                                setSort(v as string)
+                                setPage(1)
+                            }}
+                        />
+                    </div>
                 </div>
             </div>
 
             {/* Results summary */}
-            <div className="flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
+            <div className="mb-4 flex items-center justify-between gap-4 flex-wrap text-sm text-slate-600">
                 <span>
                     {loading
                         ? 'Loading products...'
@@ -334,17 +352,19 @@ export default function Products() {
                 </span>
                 {hasActiveFilters && (
                     <button
+                        type="button"
                         onClick={handleClearFilters}
-                        className="text-blue-600 hover:text-blue-700 font-medium underline underline-offset-2"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs shadow-brand-500/10 shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-500/40 outline-none"
                     >
-                        Clear filters
+                        <X className="w-3.5 h-3.5 text-white" />
+                        Clear Filters
                     </button>
                 )}
             </div>
 
             {/* Error state */}
             {error && !loading && (
-                <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-6 flex items-center justify-between gap-4 flex-wrap">
+                <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-6 mb-6 flex items-center justify-between gap-4 flex-wrap">
                     <span>{error}</span>
                     <button
                         onClick={loadProducts}
@@ -355,120 +375,167 @@ export default function Products() {
                 </div>
             )}
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
-                    {loading && products.length === 0 ? (
-                        <div className="animate-pulse">
-                            <div className="grid grid-cols-5 gap-4 px-6 py-4 border-b border-slate-100">
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                    <div key={i} className="h-4 bg-slate-200 rounded w-20" />
-                                ))}
-                            </div>
+            {/* Skeleton on initial load — mirrors the data-grid table layout below */}
+            {loading && products.length === 0 && !error && (
+                <div className="overflow-x-auto bg-white border border-slate-200/80 rounded-2xl shadow-xs scrollbar-none mb-6">
+                    <Table>
+                        <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
+                            <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Product</TableHead>
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Approval</TableHead>
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {Array.from({ length: 6 }).map((_, i) => (
-                                <div key={i} className="grid grid-cols-5 gap-4 px-6 py-5 border-b border-slate-50 items-center">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 bg-slate-200 rounded-lg shrink-0" />
-                                        <div className="space-y-2 flex-1">
-                                            <div className="h-4 bg-slate-200 rounded w-32" />
-                                            <div className="h-3 bg-slate-100 rounded w-20" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <div className="h-4 bg-slate-100 rounded w-28" />
-                                        <div className="h-3 bg-slate-50 rounded w-20" />
-                                    </div>
-                                    <div className="h-4 bg-slate-100 rounded w-16" />
-                                    <div className="h-6 bg-slate-200 rounded-full w-20" />
-                                    <div className="h-8 bg-slate-100 rounded-lg w-20" />
-                                </div>
-                            ))}
-                        </div>
-                    ) : !loading && products.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <AlertCircle className="h-12 w-12 text-slate-300 mb-4" />
-                            <p className="text-slate-500 font-medium">
-                                {hasActiveFilters ? 'No products match your filters' : 'No assigned products at this time'}
-                            </p>
-                            {hasActiveFilters && (
-                                <button
-                                    onClick={handleClearFilters}
-                                    className="mt-4 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    Clear filters
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Product</TableHead>
-                                    <TableHead>Vendor</TableHead>
-                                    <TableHead>Category</TableHead>
-                                    <TableHead>Approval</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {products.map((product) => (
-                                    <TableRow key={product.id}>
-                                        <TableCell>
-                                            <div className="flex items-center space-x-3">
-                                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                                                    {product.images?.[0]?.url ? (
-                                                        <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-xs text-slate-400">No Image</span>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-slate-900">{product.name}</p>
-                                                    <p className="text-xs text-slate-500">SKU: {product.baseSku}</p>
-                                                </div>
+                                <TableRow key={i} className="hover:!bg-transparent">
+                                    <TableCell className="py-4 px-5 align-middle">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 bg-slate-200 rounded-lg shrink-0 animate-pulse" />
+                                            <div className="space-y-2">
+                                                <div className="h-3.5 w-32 bg-slate-200 rounded animate-pulse" />
+                                                <div className="h-2.5 w-20 bg-slate-100 rounded animate-pulse" />
                                             </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <p className="font-medium text-slate-900">{product.vendor.companyName}</p>
-                                            <p className="text-sm text-slate-500">{product.vendor.ownerName}</p>
-                                        </TableCell>
-                                        <TableCell>
-                                            <p className="text-sm text-slate-800">{product.category}</p>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge className={APPROVAL_BADGE[product.approvalStatus] || 'bg-slate-100 text-slate-800'}>
-                                                {APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex items-center justify-end space-x-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleViewDetails(product.id)}
-                                                    className="text-slate-700 border-slate-200 hover:bg-slate-50 font-medium"
-                                                    aria-label={`View details for ${product.name}`}
-                                                >
-                                                    <Eye className="h-4 w-4 mr-2" />
-                                                    View
-                                                </Button>
-                                                {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'REINSPECTION') && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleStartInspection(product)}
-                                                        className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 font-medium"
-                                                    >
-                                                        <FileText className="h-4 w-4 mr-2" />
-                                                        Start Inspection
-                                                    </Button>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="py-4 px-4 align-middle">
+                                        <div className="space-y-2">
+                                            <div className="h-3.5 w-28 bg-slate-200 rounded animate-pulse" />
+                                            <div className="h-2.5 w-20 bg-slate-100 rounded animate-pulse" />
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="py-4 px-4 align-middle">
+                                        <div className="h-3.5 w-20 bg-slate-200 rounded animate-pulse" />
+                                    </TableCell>
+                                    <TableCell className="py-4 px-4 align-middle">
+                                        <div className="h-6 w-24 bg-slate-200 rounded-full animate-pulse" />
+                                    </TableCell>
+                                    <TableCell className="py-4 px-5 align-middle">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <div className="h-8 w-16 bg-slate-200 rounded-lg animate-pulse" />
+                                            <div className="h-8 w-28 bg-slate-200 rounded-lg animate-pulse" />
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+
+            {/* Product data grid */}
+            {!error && products.length > 0 && (
+                <div className="overflow-x-auto bg-white border border-slate-200/80 rounded-2xl shadow-xs scrollbar-none mb-6">
+                    <Table>
+                        <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
+                            <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Product</TableHead>
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Category</TableHead>
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-4 text-[10px] uppercase tracking-wider">Approval</TableHead>
+                                <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {products.map((product) => (
+                                <TableRow
+                                    key={product.id}
+                                    onClick={() => handleViewDetails(product.id)}
+                                    className="cursor-pointer transition-all duration-150 group select-none hover:bg-slate-50/40"
+                                >
+                                    {/* Product Column */}
+                                    <TableCell className="py-4 px-5 align-middle">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-slate-200/60">
+                                                {product.images?.[0]?.url ? (
+                                                    <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-[10px] text-slate-400">No Image</span>
                                                 )}
                                             </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                            <div>
+                                                <p className="font-bold text-slate-900 group-hover:text-brand-500 transition-colors text-sm leading-tight">{product.name}</p>
+                                                <p className="text-[10px] font-mono text-slate-400 mt-1 uppercase tracking-wider">SKU: {product.baseSku}</p>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+
+                                    {/* Vendor Column */}
+                                    <TableCell className="py-4 px-4 align-middle text-sm">
+                                        <p className="font-semibold text-slate-700">{product.vendor.companyName}</p>
+                                        <p className="text-slate-400 font-medium">{product.vendor.ownerName}</p>
+                                    </TableCell>
+
+                                    {/* Category Column */}
+                                    <TableCell className="py-4 px-4 align-middle text-sm font-semibold text-slate-600">
+                                        {product.category}
+                                    </TableCell>
+
+                                    {/* Approval Column */}
+                                    <TableCell className="py-4 px-4 align-middle">
+                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${APPROVAL_BADGE[product.approvalStatus] || 'bg-slate-50 text-slate-700 border-slate-200/85'}`}>
+                                            {APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus}
+                                        </span>
+                                    </TableCell>
+
+                                    {/* Actions Column */}
+                                    <TableCell className="py-4 px-5 align-middle text-right" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewDetails(product.id)}
+                                                aria-label={`View details for ${product.name}`}
+                                                title="View Details"
+                                                className="p-1.5 text-slate-500 hover:text-brand-500 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            {(product.approvalStatus === 'PENDING' || product.approvalStatus === 'REINSPECTION') && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleStartInspection(product)}
+                                                    aria-label={`Start inspection for ${product.name}`}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs shadow-brand-500/10 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                                                >
+                                                    <FileText className="w-3.5 h-3.5" />
+                                                    Inspect
+                                                </button>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+
+            {/* Empty state */}
+            {!loading && !error && products.length === 0 && (
+                <div className="text-center py-16">
+                    <div className="bg-slate-100 p-6 rounded-2xl inline-block mb-4">
+                        <AlertCircle className="w-16 h-16 text-slate-400 mx-auto" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-slate-900 mb-2">
+                        {hasActiveFilters ? 'No products match your filters' : 'No assigned products yet'}
+                    </h3>
+                    <p className="text-slate-600 mb-4">
+                        {hasActiveFilters
+                            ? 'Try adjusting or clearing your filters.'
+                            : 'Products assigned to you by the admin will appear here.'}
+                    </p>
+                    {hasActiveFilters && (
+                        <button
+                            onClick={handleClearFilters}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold rounded-xl text-sm transition-all shadow-xs shadow-brand-500/10"
+                        >
+                            <X className="w-4 h-4" /> Clear Filters
+                        </button>
                     )}
-            </div>
+                </div>
+            )}
 
             {pagination.totalPages > 1 && (
                 <Pagination
@@ -517,7 +584,7 @@ function Pagination({
                         aria-current={p === page ? 'page' : undefined}
                         aria-label={`Go to page ${p}`}
                         className={`min-w-9 px-3 py-2 rounded-lg border font-medium ${p === page
-                            ? 'bg-blue-600 text-white border-blue-600'
+                            ? 'bg-brand-500 text-white border-brand-500'
                             : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                             } disabled:opacity-40 disabled:cursor-not-allowed`}
                     >
