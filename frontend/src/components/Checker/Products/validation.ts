@@ -142,15 +142,20 @@ function validateTesting(d: any): StepErrors {
 }
 
 // ---------------- Documentation ----------------
+// Inspector signature is auto-derived from the logged-in checker profile, and
+// the photocopy upload was removed. A company ID card is still required, plus
+// at least one signed document — either a manually-signed scan OR the
+// digitally-signed (merged) report (either path is enough to submit).
 function validateDocumentation(d: any): StepErrors {
     const e: StepErrors = {}
-    if (isBlank(d.inspectorSignature)) e.inspectorSignature = "Inspector signature is required"
-    const docs = Array.isArray(d.documentationPhotos) ? d.documentationPhotos : []
-    if (docs.length === 0) e.documentationPhotos = "Upload at least one general documentation photo"
-    const photocopies = Array.isArray(d.photocopyDocuments) ? d.photocopyDocuments : []
-    if (photocopies.length === 0) e.photocopyDocuments = "Upload at least one photocopy document"
     const ids = Array.isArray(d.companyIdCards) ? d.companyIdCards : []
     if (ids.length === 0) e.companyIdCards = "Upload at least one company ID card"
+    const signedScans = Array.isArray(d.signedDocuments) ? d.signedDocuments : []
+    const signedReport = Array.isArray(d.signedReport) ? d.signedReport : []
+    if (signedScans.length === 0 && signedReport.length === 0) {
+        e.signedDocuments =
+            "Upload a signed report, or generate the digitally-signed report"
+    }
     return e
 }
 

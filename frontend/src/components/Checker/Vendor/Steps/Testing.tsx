@@ -157,6 +157,25 @@ export default function Testing({ formData, setFormData }: TestingProps) {
     setFormData({ ...formData, tests: updatedTests })
   }
 
+  // Toggle Pass/Fail in a single update so the two stay mutually exclusive and
+  // the now-disabled side's photos are cleared. Selecting Pass enables only the
+  // Right photo upload (and clears any Wrong photos); selecting Fail enables
+  // only the Wrong photo upload (and clears any Right photos).
+  const handleResultToggle = (testId: string, field: "pass" | "fail", checked: boolean) => {
+    const updatedTests = tests.map(t => {
+      if (t.id !== testId) return t
+      if (field === "pass") {
+        return checked
+          ? { ...t, pass: true, fail: false, wrongPhotos: [] }
+          : { ...t, pass: false }
+      }
+      return checked
+        ? { ...t, fail: true, pass: false, rightPhotos: [] }
+        : { ...t, fail: false }
+    })
+    setFormData({ ...formData, tests: updatedTests })
+  }
+
   const handleRightPhotoUpload = async (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
 
@@ -249,12 +268,7 @@ export default function Testing({ formData, setFormData }: TestingProps) {
                 <input
                   type="checkbox"
                   checked={test.pass}
-                  onChange={(e) => {
-                    updateTest(test.id, 'pass', e.target.checked)
-                    if (e.target.checked && test.fail) {
-                      updateTest(test.id, 'fail', false)
-                    }
-                  }}
+                  onChange={(e) => handleResultToggle(test.id, 'pass', e.target.checked)}
                   className="w-5 h-5 rounded border-slate-300 text-emerald-600 cursor-pointer"
                 />
                 <span className="text-slate-700 font-medium">Pass</span>
@@ -264,12 +278,7 @@ export default function Testing({ formData, setFormData }: TestingProps) {
                 <input
                   type="checkbox"
                   checked={test.fail}
-                  onChange={(e) => {
-                    updateTest(test.id, 'fail', e.target.checked)
-                    if (e.target.checked && test.pass) {
-                      updateTest(test.id, 'pass', false)
-                    }
-                  }}
+                  onChange={(e) => handleResultToggle(test.id, 'fail', e.target.checked)}
                   className="w-5 h-5 rounded border-slate-300 text-red-600 cursor-pointer"
                 />
                 <span className="text-slate-700 font-medium">Fail</span>
@@ -281,7 +290,10 @@ export default function Testing({ formData, setFormData }: TestingProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-slate-600 font-medium mb-2 text-sm p-2 rounded">✓ Right/Correct Photo{test.pass && <span className="text-red-500 ml-0.5" aria-label="required">*</span>}</label>
-                  <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-400 transition-colors cursor-pointer bg-green-50">
+                  <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${test.pass
+                    ? "border-green-300 hover:border-green-400 cursor-pointer bg-green-50"
+                    : "border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed"
+                    }`}>
                     <input
                       ref={(el) => {
                         if (el) rightPhotoRefs.current[test.id] = el
@@ -289,15 +301,20 @@ export default function Testing({ formData, setFormData }: TestingProps) {
                       type="file"
                       multiple
                       accept="image/*"
+                      disabled={!test.pass}
                       onChange={(e) => handleRightPhotoUpload(test.id, e)}
                       className="hidden"
                     />
                     <button
-                      onClick={() => rightPhotoRefs.current[test.id]?.click()}
-                      className="flex flex-col items-center justify-center w-full"
+                      type="button"
+                      disabled={!test.pass}
+                      onClick={() => test.pass && rightPhotoRefs.current[test.id]?.click()}
+                      className="flex flex-col items-center justify-center w-full disabled:cursor-not-allowed"
                     >
-                      <Upload className="w-6 h-6 text-green-400 mb-2" />
-                      <p className="text-slate-600 text-sm font-medium">Upload right photos</p>
+                      <Upload className={`w-6 h-6 mb-2 ${test.pass ? "text-green-400" : "text-slate-300"}`} />
+                      <p className={`text-sm font-medium ${test.pass ? "text-slate-600" : "text-slate-400"}`}>
+                        {test.pass ? "Upload right photos" : 'Select "Pass" to enable'}
+                      </p>
                     </button>
                   </div>
 
@@ -325,7 +342,10 @@ export default function Testing({ formData, setFormData }: TestingProps) {
 
                 <div>
                   <label className="block text-slate-600 font-medium mb-2 text-sm p-2 rounded">✗ Wrong/Incorrect Photo{test.fail && <span className="text-red-500 ml-0.5" aria-label="required">*</span>}</label>
-                  <div className="border-2 border-dashed border-red-300 bg-red-50 rounded-lg p-4 text-center hover:border-red-400 transition-colors cursor-pointer">
+                  <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${test.fail
+                    ? "border-red-300 bg-red-50 hover:border-red-400 cursor-pointer"
+                    : "border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed"
+                    }`}>
                     <input
                       ref={(el) => {
                         if (el) wrongPhotoRefs.current[test.id] = el
@@ -333,15 +353,20 @@ export default function Testing({ formData, setFormData }: TestingProps) {
                       type="file"
                       multiple
                       accept="image/*"
+                      disabled={!test.fail}
                       onChange={(e) => handleWrongPhotoUpload(test.id, e)}
                       className="hidden"
                     />
                     <button
-                      onClick={() => wrongPhotoRefs.current[test.id]?.click()}
-                      className="flex flex-col items-center justify-center w-full"
+                      type="button"
+                      disabled={!test.fail}
+                      onClick={() => test.fail && wrongPhotoRefs.current[test.id]?.click()}
+                      className="flex flex-col items-center justify-center w-full disabled:cursor-not-allowed"
                     >
-                      <Upload className="w-6 h-6 text-red-400 mb-2" />
-                      <p className="text-slate-600 text-sm font-medium">Upload wrong photos</p>
+                      <Upload className={`w-6 h-6 mb-2 ${test.fail ? "text-red-400" : "text-slate-300"}`} />
+                      <p className={`text-sm font-medium ${test.fail ? "text-slate-600" : "text-slate-400"}`}>
+                        {test.fail ? "Upload wrong photos" : 'Select "Fail" to enable'}
+                      </p>
                     </button>
                   </div>
 

@@ -3,37 +3,9 @@
 import { CheckCircle, AlertTriangle, Camera } from "lucide-react"
 
 interface ReviewProps {
-  formData: {
-    // General Information
-    client: string
-    vendor: string
-    factory: string
-    serviceLocation: string
-    serviceStartDate: string
-    serviceType: string
-    // Order Information
-    items: Array<{
-      id: number
-      itemName: string
-      itemDescription: string
-      totalQuantity: number
-      inspectionQuantity: number
-    }>
-    // Packaging Remarks (single selection 1-10)
-    shipperCartonRemark: string
-    innerCartonRemark: string
-    retailPackagingRemark: string
-    productTypeRemark: string
-    aqlWorkmanshipRemark: string
-    onSiteTestsRemark: string
-    // Quality Metrics
-    criticalDefects: number
-    majorDefects: number
-    minorDefects: number
-    maxAllowedCritical: number
-    maxAllowedMajor: number
-    maxAllowedMinor: number
-  }
+  // Full inspection formData — Review summarises every prior step, so keep
+  // this permissive rather than re-declaring the entire schema here.
+  formData: any
 }
 
 export default function Review({ formData }: ReviewProps) {
@@ -106,6 +78,19 @@ export default function Review({ formData }: ReviewProps) {
 
   const overallResult = calculateOverallResult()
 
+  // Measurements have a flexible per-sample shape; derive a stable column set
+  // from whatever keys are present so the review table renders generically.
+  const measurements: any[] = Array.isArray(formData.measurements) ? formData.measurements : []
+  const measurementKeys: string[] = Array.from(
+    measurements.reduce((set: Set<string>, m: any) => {
+      Object.keys(m || {}).forEach((k) => {
+        if (!["id", "name", "label"].includes(k)) set.add(k)
+      })
+      return set
+    }, new Set<string>())
+  )
+  const tests: any[] = Array.isArray(formData.tests) ? formData.tests : []
+
   return (
     <div className="space-y-8">
       <div className="border-b border-slate-200 pb-6">
@@ -177,8 +162,8 @@ export default function Review({ formData }: ReviewProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {formData.items.map((item, index) => (
-                  <tr key={item.id}>
+                {formData.items.map((item: any, index: number) => (
+                  <tr key={item.id ?? index}>
                     <td className="py-3 px-3 text-slate-900 font-medium">{item.itemName}</td>
                     <td className="py-3 px-3 text-slate-600">{item.itemDescription}</td>
                     <td className="py-3 px-3 text-slate-900">{item.totalQuantity}</td>
@@ -191,6 +176,77 @@ export default function Review({ formData }: ReviewProps) {
         </div>
       )
       }
+
+      {/* Measurements */}
+      {measurements.length > 0 && (
+        <div className="bg-slate-50 rounded-xl p-6">
+          <h3 className="text-slate-900 font-semibold mb-4 flex items-center gap-2">
+            <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+            Measurements ({measurements.length} sample{measurements.length > 1 ? "s" : ""})
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-300">
+                  <th className="text-left py-2 px-3 font-semibold text-slate-700">Sample</th>
+                  {measurementKeys.map((k) => (
+                    <th key={k} className="text-left py-2 px-3 font-semibold text-slate-700 capitalize">{k}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {measurements.map((m: any, i: number) => (
+                  <tr key={m.id || i}>
+                    <td className="py-2 px-3 text-slate-900 font-medium">{m.name || m.label || `Sample ${i + 1}`}</td>
+                    {measurementKeys.map((k) => (
+                      <td key={k} className="py-2 px-3 text-slate-600">{m?.[k] != null && m[k] !== "" ? String(m[k]) : "—"}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* On-site Tests Results */}
+      {tests.length > 0 && (
+        <div className="bg-slate-50 rounded-xl p-6">
+          <h3 className="text-slate-900 font-semibold mb-4 flex items-center gap-2">
+            <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+            On-site Tests
+          </h3>
+          <div className="space-y-3">
+            {tests.map((test: any, i: number) => (
+              <div key={test.id || i} className="bg-white rounded-lg p-4 border border-slate-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-slate-900">{test.label}</span>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold border ${test.pass
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200/85"
+                      : test.fail
+                        ? "bg-red-50 text-red-700 border-red-200/85"
+                        : "bg-slate-100 text-slate-500 border-slate-200"
+                      }`}
+                  >
+                    {test.pass ? "PASS" : test.fail ? "FAIL" : "Not decided"}
+                  </span>
+                </div>
+                {(test.rightPhotos?.length > 0 || test.wrongPhotos?.length > 0) && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {(test.rightPhotos || []).map((p: any, idx: number) => (
+                      <img key={`r${idx}`} src={p.url || p.data} alt="Right" className="w-14 h-14 object-cover rounded-lg border-2 border-emerald-200" />
+                    ))}
+                    {(test.wrongPhotos || []).map((p: any, idx: number) => (
+                      <img key={`w${idx}`} src={p.url || p.data} alt="Wrong" className="w-14 h-14 object-cover rounded-lg border-2 border-red-200" />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Inspection Result Summary */}
       <div className="bg-white rounded-xl p-6 border-2 border-slate-300">
@@ -305,6 +361,36 @@ export default function Review({ formData }: ReviewProps) {
           </div>
         </div>
       </div>
+
+      {/* Defect Details */}
+      {(formData.criticalDefectDetails || formData.majorDefectDetails || formData.minorDefectDetails) && (
+        <div className="bg-slate-50 rounded-xl p-6">
+          <h3 className="text-slate-900 font-semibold mb-4 flex items-center gap-2">
+            <div className="w-2 h-2 bg-rose-500 rounded-full"></div>
+            Defect Details
+          </h3>
+          <div className="space-y-3 text-sm">
+            {formData.criticalDefectDetails && (
+              <div>
+                <span className="font-semibold text-red-600">Critical:</span>
+                <span className="text-slate-700 ml-2">{formData.criticalDefectDetails}</span>
+              </div>
+            )}
+            {formData.majorDefectDetails && (
+              <div>
+                <span className="font-semibold text-amber-600">Major:</span>
+                <span className="text-slate-700 ml-2">{formData.majorDefectDetails}</span>
+              </div>
+            )}
+            {formData.minorDefectDetails && (
+              <div>
+                <span className="font-semibold text-slate-600">Minor:</span>
+                <span className="text-slate-700 ml-2">{formData.minorDefectDetails}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Overall Result - Based on Remark Code Average */}
       <div className="bg-white rounded-xl p-6 border-2 border-slate-300">
@@ -465,12 +551,27 @@ export default function Review({ formData }: ReviewProps) {
               </div>
             </div>
           )}
+
+          {/* Testing Photos */}
+          {(formData as any).testingPhotos?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Testing Photos</h4>
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                {(formData as any).testingPhotos.map((photo: any, i: number) => (
+                  <div key={i} className="aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                    <img src={photo.url || photo.data} alt="Testing" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {!(formData as any).warehousePhotoEvidences?.length &&
           !(formData as any).measurementPhotos?.length &&
           !(formData as any).packagingPhotos?.length &&
-          !(formData as any).defectPhotos?.length && (
+          !(formData as any).defectPhotos?.length &&
+          !(formData as any).testingPhotos?.length && (
             <p className="text-slate-500 text-sm text-center py-4 bg-slate-50 rounded-lg">No photos uploaded for this inspection.</p>
           )}
       </div>

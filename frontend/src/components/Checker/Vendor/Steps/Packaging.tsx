@@ -92,6 +92,41 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
         <p className="text-slate-600">Select remark codes for packaging, product type, AQL, and on-site tests</p>
       </div>
 
+      {/* Remark Code Scoring Guide — mirrors the scoring system applied on the
+          Review step. The final result is calculated from the AVERAGE of all
+          six remark codes below, so checkers can see how each code they pick
+          contributes to PASS / RE-INSPECTION / REJECTED. */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+        <h3 className="font-semibold text-slate-900 mb-1">Remark Code Scoring Guide</h3>
+        <p className="text-sm text-slate-600 mb-4">
+          The final result is based on the <span className="font-medium text-slate-800">average</span> of all six remark codes below
+          (1 = poorest, 10 = best).
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+            <span className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-600 text-white font-bold text-sm flex items-center justify-center">8-10</span>
+            <div>
+              <div className="font-bold text-emerald-700 text-sm">PASS</div>
+              <div className="text-xs text-emerald-600/90">Quality standards met</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+            <span className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-500 text-white font-bold text-sm flex items-center justify-center">6-7</span>
+            <div>
+              <div className="font-bold text-amber-700 text-sm">RE-INSPECTION</div>
+              <div className="text-xs text-amber-600/90">Quality concerns found</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+            <span className="flex-shrink-0 w-10 h-10 rounded-full bg-red-600 text-white font-bold text-sm flex items-center justify-center">1-5</span>
+            <div>
+              <div className="font-bold text-red-700 text-sm">REJECTED</div>
+              <div className="text-xs text-red-600/90">Standards not met</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {[
         { key: "shipperCartonQuality", label: "Shipper Carton Packaging", detail: "Front, side, top views", remarkKey: "shipperCartonRemark" },
         { key: "innerCartonPackaging", label: "Inner Carton Packaging", detail: "Inner packaging condition", remarkKey: "innerCartonRemark" },

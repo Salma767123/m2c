@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Check, ArrowLeft, ArrowRight, AlertTriangle } from "lucide-react"
+import { Check, ArrowLeft, ArrowRight, AlertTriangle, Lock } from "lucide-react"
 
 // Import steps from the actual paths
 import GeneralInformation from "@/components/Checker/Vendor/Steps/GeneralInformation"
@@ -212,6 +212,10 @@ export default function ProductInspectionForm({
         documentationPhotos: [] as any[],
         photocopyDocuments: [] as any[],
         companyIdCards: [] as any[],
+        // Final report / sign-off
+        signedDocuments: [] as any[],   // manually-signed scan(s) of the report
+        signedReport: [] as any[],      // digitally-signed (merged) PDF report
+        clientSignature: "",            // uploaded client signature image (data URL)
 
         // Review / Final Decision
         finalDecision: "Approved", // Approved, Rejected
@@ -284,12 +288,31 @@ export default function ProductInspectionForm({
         { id: "packaging", label: "Packaging", description: "Carton, retail and workmanship" },
         { id: "defects", label: "Defects", description: "AQL sampling and defect counts" },
         { id: "testing", label: "Testing", description: "On-site test battery results" },
-        { id: "documentation", label: "Documentation", description: "Signatures and supporting docs" },
-        { id: "review", label: "Review", description: "Final decision and sign-off" },
+        { id: "review", label: "Review", description: "Full overview of all inspection data" },
+        { id: "documentation", label: "Documentation", description: "Report, signatures and final submit" },
     ]
 
     const currentStepIndex = steps.findIndex((s) => s.id === currentStep)
     const isLastStep = currentStepIndex === steps.length - 1
+
+    // How far forward the checker is allowed to jump. Steps are sequential:
+    // you can always revisit anything up to (and one past) the furthest
+    // *valid* prefix. Concretely, starting from step 0 we walk forward while
+    // each step validates clean; the first step that fails is the furthest
+    // you can reach (so you land on it to fix it), and everything beyond it
+    // stays locked. The current step is always reachable.
+    const maxReachableIndex = (() => {
+        let reach = 0
+        for (let i = 0; i < steps.length; i++) {
+            if (hasErrors(validateStep(steps[i].id, formData))) {
+                reach = i
+                break
+            }
+            reach = i + 1
+        }
+        // Clamp to the last step and never lock the step we're currently on.
+        return Math.max(currentStepIndex, Math.min(reach, steps.length - 1))
+    })()
 
     const nextStep = () => {
         // Validate the current step before advancing so half-filled inspection
@@ -316,11 +339,49 @@ export default function ProductInspectionForm({
         }
     }
 
-    // Allow clicking any step circle to jump there, but revalidate the step
-    // we're leaving so errors stay surfaced.
+    // Step-tab navigation is gated: you can always go backward (or stay), but
+    // jumping forward is only allowed once every step in between is complete.
+    // Forward clicks revalidate the path; if anything is missing we surface the
+    // error and snap to the first incomplete step instead of the target.
     const goToStep = (target: Step) => {
-        const stepErrors = validateStep(currentStep, formData)
-        setErrors((prev) => ({ ...prev, [currentStep]: stepErrors }))
+        const targetIndex = steps.findIndex((s) => s.id === target)
+        if (targetIndex === -1 || targetIndex === currentStepIndex) return
+
+        // Backward / re-visiting: always allowed. Still revalidate the step we
+        // leave so its error badge stays accurate.
+        if (targetIndex < currentStepIndex) {
+            const stepErrors = validateStep(currentStep, formData)
+            setErrors((prev) => ({ ...prev, [currentStep]: stepErrors }))
+            setCurrentStep(target)
+            return
+        }
+
+        // Forward: validate the current step and every step up to (but not
+        // including) the target. The first incomplete step blocks the jump.
+        const updatedErrors: AllErrors = {}
+        let firstBlocking: Step | null = null
+        for (let i = currentStepIndex; i < targetIndex; i++) {
+            const id = steps[i].id
+            const stepErrors = validateStep(id, formData)
+            if (Object.keys(stepErrors).length > 0) {
+                updatedErrors[id] = stepErrors
+                if (firstBlocking === null) firstBlocking = id
+            }
+        }
+        setErrors((prev) => ({ ...prev, ...updatedErrors }))
+
+        if (firstBlocking) {
+            const blockingErrs = updatedErrors[firstBlocking]
+            showErrorToast(
+                "Complete this step first",
+                firstErrorMessage(blockingErrs) ||
+                    "Finish the current step before moving ahead."
+            )
+            setCurrentStep(firstBlocking)
+            window.scrollTo({ top: 0, behavior: "smooth" })
+            return
+        }
+
         setCurrentStep(target)
     }
 
@@ -364,6 +425,8 @@ export default function ProductInspectionForm({
                 documentationPhotos: cleanPhotos(formData.documentationPhotos),
                 photocopyDocuments: cleanPhotos(formData.photocopyDocuments),
                 companyIdCards: cleanPhotos(formData.companyIdCards),
+                signedDocuments: cleanPhotos(formData.signedDocuments),
+                signedReport: cleanPhotos(formData.signedReport),
                 // Also clean nested test photos if they exist
                 tests: (formData.tests || []).map((test: any) => ({
                     ...test,
@@ -420,31 +483,37 @@ export default function ProductInspectionForm({
                         <div className="flex items-center justify-between">
                             {steps.map((step, index) => {
                                 const stepHasErrors = hasErrors(errors[step.id])
+                                // Locked = a forward step the checker hasn't earned
+                                // access to yet (an earlier step is incomplete).
+                                const isLocked = index > maxReachableIndex
                                 return (
                                     <div key={step.id} className="flex flex-col items-center relative z-10 flex-1">
                                         {/* Step Circle */}
                                         <div
-                                            className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 cursor-pointer text-sm border-2 ${stepHasErrors
-                                                ? "bg-red-50 border-red-500 text-red-600 ring-4 ring-red-100"
+                                            className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 text-sm border-2 ${stepHasErrors
+                                                ? "bg-red-50 border-red-500 text-red-600 ring-4 ring-red-100 cursor-pointer"
                                                 : index < currentStepIndex
-                                                    ? "bg-brand-500 text-white border-brand-500 shadow-sm shadow-brand-500/10"
+                                                    ? "bg-brand-500 text-white border-brand-500 shadow-sm shadow-brand-500/10 cursor-pointer"
                                                     : index === currentStepIndex
-                                                        ? "bg-brand-500 text-white border-brand-500 shadow-sm shadow-brand-500/10 ring-4 ring-brand-100"
-                                                        : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+                                                        ? "bg-brand-500 text-white border-brand-500 shadow-sm shadow-brand-500/10 ring-4 ring-brand-100 cursor-pointer"
+                                                        : isLocked
+                                                            ? "bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed"
+                                                            : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 cursor-pointer"
                                                 }`}
-                                            onClick={() => goToStep(step.id)}
+                                            onClick={() => { if (!isLocked) goToStep(step.id) }}
                                             onKeyDown={(e) => {
-                                                if (e.key === "Enter" || e.key === " ") {
+                                                if (!isLocked && (e.key === "Enter" || e.key === " ")) {
                                                     e.preventDefault()
                                                     goToStep(step.id)
                                                 }
                                             }}
                                             role="button"
-                                            tabIndex={0}
+                                            tabIndex={isLocked ? -1 : 0}
+                                            aria-disabled={isLocked || undefined}
                                             aria-current={index === currentStepIndex ? "step" : undefined}
-                                            aria-label={`Go to ${step.label}${stepHasErrors ? " (has errors)" : ""}`}
+                                            aria-label={`Go to ${step.label}${stepHasErrors ? " (has errors)" : ""}${isLocked ? " (locked — complete previous steps first)" : ""}`}
                                         >
-                                            {stepHasErrors ? "!" : index < currentStepIndex ? <Check className="w-5 h-5" /> : index + 1}
+                                            {stepHasErrors ? "!" : index < currentStepIndex ? <Check className="w-5 h-5" /> : isLocked ? <Lock className="w-4 h-4" /> : index + 1}
                                         </div>
 
                                         {/* Step Label */}
@@ -452,7 +521,9 @@ export default function ProductInspectionForm({
                                             <p
                                                 className={`text-xs font-medium leading-tight ${stepHasErrors
                                                     ? "text-red-600"
-                                                    : index <= currentStepIndex ? "text-slate-900" : "text-slate-500"
+                                                    : index === currentStepIndex ? "text-slate-900"
+                                                        : isLocked ? "text-slate-300"
+                                                            : index < currentStepIndex ? "text-slate-900" : "text-slate-500"
                                                     }`}
                                             >
                                                 {step.label}
