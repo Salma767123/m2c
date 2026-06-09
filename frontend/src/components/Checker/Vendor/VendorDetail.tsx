@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   Calendar,
@@ -126,6 +127,7 @@ export default function VendorDetail({
   onBack,
   onStartInspection,
 }: VendorDetailProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('overview')
   const [inspections, setInspections] = useState<any[]>([])
   const [fullVendor, setFullVendor] = useState<any>(null)
@@ -177,6 +179,11 @@ export default function VendorDetail({
   const latestInspection = inspections.length > 0 ? inspections[0] : (recentInspections.length > 0 ? recentInspections[0] : null)
   const currentMainStatus = fullVendor ? getNewMainStatus(fullVendor.status, latestInspection) : vendor.status
   const currentInspectionStatus = fullVendor ? getNewInspectionStatus(fullVendor.status, latestInspection) : vendor.inspectionStatus
+
+  // Once the assignment is completed, the QC checker no longer needs the full
+  // vendor profile — only a compact summary + a link to the inspection report.
+  const isCompleted = currentInspectionStatus === 'Completed'
+  const reportInspectionId = recentInspections[0]?.id ?? null
 
   // Delegate to the parent, which mounts <InspectionForm />. InspectionForm
   // handles the SCHEDULED → IN_PROGRESS transition itself, so we must NOT call
@@ -768,6 +775,79 @@ export default function VendorDetail({
         </div>
       </div>
 
+      {isCompleted ? (
+        /* Compact completed view — assignment done, full vendor profile hidden */
+        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
+                <Factory className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Vendor Name</p>
+                <p className="font-bold text-slate-900 truncate">{companyName}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Location</p>
+                <p className="font-bold text-slate-900 truncate">{location || "—"}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
+                <BarChart3 className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Inspection Status</p>
+                <span className={`inline-flex mt-0.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${getInspectionStatusColor(currentInspectionStatus)}`}>
+                  {currentInspectionStatus}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Submitted Date</p>
+                <p className="font-bold text-slate-900">{fullVendor?.submittedAt ? formatDate(fullVendor.submittedAt) : "—"}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
+                <CheckCircle className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Approved Date</p>
+                <p className="font-bold text-slate-900">{fullVendor?.approvedAt ? formatDate(fullVendor.approvedAt) : "—"}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center">
+              {reportInspectionId ? (
+                <button
+                  onClick={() => router.push(`/checker/dashboard/report/${reportInspectionId}`)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-xs shadow-brand-500/20 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                >
+                  <FileText className="w-4 h-4" />
+                  Details View
+                </button>
+              ) : (
+                <span className="text-sm text-slate-400">Report unavailable</span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Vendor Summary Card */}
       <div className="bg-brand-50/40 border border-brand-100/60 rounded-2xl p-6 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -931,6 +1011,8 @@ export default function VendorDetail({
             )) : <p className="text-sm text-slate-500 text-center py-8">No pending inspections found.</p>}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   )

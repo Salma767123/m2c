@@ -19,6 +19,8 @@ import {
     UserCheck,
     X,
     ImageIcon,
+    ClipboardCheck,
+    History,
 } from "lucide-react"
 import { qcCheckerService } from "@/services/qcCheckerService"
 
@@ -238,10 +240,26 @@ export default function ProductDetail({ productId, onBack, onStartInspection }: 
                 {/* Summary Card */}
                 <div className="bg-brand-50/40 border border-brand-100/60 rounded-2xl p-6 mb-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        <SummaryStat icon={<IndianRupee className="w-5 h-5" />} label="Base Price" value={formatCurrency(product.basePrice)} />
-                        <SummaryStat icon={<Package className="w-5 h-5" />} label="Total Stock" value={String(product.totalStock ?? 0)} />
-                        <SummaryStat icon={<Layers className="w-5 h-5" />} label="Variants" value={String(product.variants?.length ?? 0)} />
-                        <SummaryStat icon={<Clock className="w-5 h-5" />} label="Listed" value={formatDate(product.createdAt)} />
+                        <SummaryStat
+                            icon={<ClipboardCheck className="w-5 h-5" />}
+                            label="Inspection Status"
+                            value={APPROVAL_LABELS[product.approvalStatus] || product.approvalStatus}
+                        />
+                        <SummaryStat
+                            icon={<History className="w-5 h-5" />}
+                            label="Inspection Cycle"
+                            value={`#${product.inspectionCycleNumber ?? 1}`}
+                        />
+                        <SummaryStat
+                            icon={<CheckCircle className="w-5 h-5" />}
+                            label="Last Inspected"
+                            value={formatDate(product.approvedAt)}
+                        />
+                        <SummaryStat
+                            icon={<Clock className="w-5 h-5" />}
+                            label="Listed"
+                            value={formatDate(product.createdAt)}
+                        />
                     </div>
                 </div>
 

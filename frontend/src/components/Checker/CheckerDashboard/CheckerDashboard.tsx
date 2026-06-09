@@ -313,10 +313,10 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
                             </div>
                           </div>
                           <button
-                            onClick={() => window.location.href = '/checker/dashboard/products'}
+                            onClick={() => window.location.href = `/checker/dashboard/products?view=detail&id=${product.id}`}
                             className="w-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors duration-200 shadow-sm shadow-brand-500/10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                           >
-                            Go to Products
+                            Go to Product
                           </button>
                         </div>
                       ))}
@@ -350,10 +350,10 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
                             </span>
                           </div>
                           <button
-                            onClick={() => window.location.href = '/checker/dashboard/vendors'}
+                            onClick={() => window.location.href = `/checker/dashboard/vendors?view=detail&vendorId=${vendor.id}`}
                             className="w-full bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors duration-200 shadow-sm shadow-brand-500/10 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                           >
-                            Go to Vendors
+                            Go to Vendor
                           </button>
                         </div>
                       ))}
