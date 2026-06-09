@@ -13,6 +13,48 @@ interface DashboardHomeProps {
   onSelectVendor: (vendor: string) => void
 }
 
+// Keep vendor status display in sync with the Vendor module (VendorList /
+// VendorDetail). The raw DB status (UNDER_REVIEW / PENDING / ...) is mapped to
+// the same human-facing label + colour the vendor pages show, derived from the
+// vendor's latest inspection.
+const VENDOR_MAIN_STATUS_COLORS: Record<string, string> = {
+  "New Assignment": "bg-blue-50 text-blue-700 border-blue-200",
+  "Under Review by Admin": "bg-orange-50 text-orange-700 border-orange-200",
+  "Re-Inspection": "bg-purple-50 text-purple-700 border-purple-200",
+  "Re-Inspection Under Review by Admin": "bg-amber-50 text-amber-700 border-amber-200",
+  "Re-Inspection Under Review": "bg-amber-50 text-amber-700 border-amber-200",
+  "Approved": "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Rejected": "bg-red-50 text-red-700 border-red-200",
+}
+
+function getVendorMainStatus(
+  dbStatus: string,
+  latestInspection?: { status?: string | null; result?: string | null; cycleNumber?: number | null } | null
+): string {
+  const status = dbStatus?.toUpperCase() || 'PENDING'
+  if (status === 'APPROVED') return 'Approved'
+  if (status === 'REJECTED') return 'Rejected'
+  if (status === 'REINSPECTION') return 'Re-Inspection'
+  if (status === 'UNDER_REVIEW') {
+    if (latestInspection) {
+      const inspStatus = latestInspection.status?.toUpperCase()
+      const cycle = latestInspection.cycleNumber ?? 1
+      if (inspStatus === 'SCHEDULED' || inspStatus === 'IN_PROGRESS') {
+        return cycle > 1 ? 'Re-Inspection' : 'New Assignment'
+      }
+      if (inspStatus === 'SUBMITTED' || inspStatus === 'UNDER_ADMIN_REVIEW') {
+        return cycle > 1 ? 'Re-Inspection Under Review by Admin' : 'Under Review by Admin'
+      }
+    }
+    return 'Under Review by Admin'
+  }
+  if (status === 'PENDING') return 'New Assignment'
+  return status.replace(/_/g, " ").toLowerCase()
+}
+
+const getVendorStatusBadge = (status: string) =>
+  `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${VENDOR_MAIN_STATUS_COLORS[status] || "bg-amber-50 text-amber-700 border-amber-200"}`
+
 export default function DashboardHome({ checkerID }: DashboardHomeProps) {
   const router = useRouter()
   const [selectedInspection, setSelectedInspection] = useState<any | null>(null)
@@ -345,9 +387,14 @@ export default function DashboardHome({ checkerID }: DashboardHomeProps) {
                                 <p className="text-xs text-slate-400 mt-0.5">Factory Onboarding</p>
                               </div>
                             </div>
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(vendor.status)}`}>
-                              {formatStatus(vendor.status)}
-                            </span>
+                            {(() => {
+                              const vendorStatus = getVendorMainStatus(vendor.status, vendor.inspections?.[0] ?? null)
+                              return (
+                                <span className={getVendorStatusBadge(vendorStatus)}>
+                                  {vendorStatus}
+                                </span>
+                              )
+                            })()}
                           </div>
                           <button
                             onClick={() => window.location.href = `/checker/dashboard/vendors?view=detail&vendorId=${vendor.id}`}
