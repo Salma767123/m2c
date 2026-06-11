@@ -121,6 +121,7 @@ const getCompanyTypeEnum = (vendorTypes) => {
     'manufacturer': 'MANUFACTURER',
     'importer': 'IMPORTER',
     'exporter': 'EXPORTER',
+    'trader': 'TRADER',
   };
   return mapping[first] || 'MANUFACTURER';
 };
@@ -130,7 +131,8 @@ const getVendorTypeEnum = (vendorType) => {
   const mapping = {
     'manufacturer': 'TEXTILE_MANUFACTURER',
     'importer': 'TRADING_COMPANY',
-    'exporter': 'TRADING_COMPANY'
+    'exporter': 'TRADING_COMPANY',
+    'trader': 'TRADING_COMPANY'
   };
 
   if (Array.isArray(vendorType)) {
@@ -189,8 +191,10 @@ const registerVendor = async (req, res) => {
       businessType,
       companyName,
       gstNumber,
-      companyIdNumber,        // IEC / CIN / Partnership Deed / LLPIN
+      companyIdNumber,        // CIN / Partnership Deed / LLPIN
+      iecCode,                // Import Export Code — optional, any type
       panNumber,
+      aadhaarNumber,          // Unregistered Vendor identity proof
       email,
       email2,
       phone,
@@ -284,14 +288,36 @@ const registerVendor = async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedOwnerEmail = ownerEmail ? ownerEmail.trim().toLowerCase() : ownerEmail;
 
-    // Check if vendor already exists
+    // Check if vendor already exists — GST number is the unique business
+    // identity used to detect duplicate registrations. GST is normalized
+    // (trimmed + uppercased) so casing/whitespace differences don't slip
+    // through. Only enforced when a GST number is actually provided.
+    const normalizedGst = gstNumber ? gstNumber.trim().toUpperCase() : '';
+    if (normalizedGst) {
+      const existingByGst = await prisma.vendor.findFirst({
+        where: { gstNumber: normalizedGst }
+      });
+      if (existingByGst) {
+        return res.status(409).json({
+          code: 'DUPLICATE_GST',
+          field: 'gstNumber',
+          error: 'A vendor is already registered with this GST number.'
+        });
+      }
+    }
+
+    // Email remains a unique login identifier at the database level, so also
+    // guard against a duplicate email to surface a clean message instead of a
+    // raw Prisma unique-constraint (E11000) error.
     const existingVendor = await prisma.vendor.findUnique({
       where: { email: normalizedEmail }
     });
 
     if (existingVendor) {
-      return res.status(400).json({
-        error: 'Vendor already exists with this email'
+      return res.status(409).json({
+        code: 'DUPLICATE_EMAIL',
+        field: 'email',
+        error: 'A vendor is already registered with this email.'
       });
     }
 
@@ -306,6 +332,7 @@ const registerVendor = async (req, res) => {
     let gstDocumentUrl = null;
     let panCardUrl = null;
     let typeCertUrl = null;
+    let aadhaarUrl = null;
     let ownerPhotoUrl = null;
     // Factory images carry slot identity (nameBoard / frontView / etc.) so the
     // resulting VendorDocument rows have human-readable names instead of a
@@ -343,6 +370,14 @@ const registerVendor = async (req, res) => {
         const typeCertResult = await uploadFiles([req.files.typeCertFile[0]], 'vendor-documents/business-cert');
         typeCertUrl = typeCertResult[0].cloudinaryUrl;
         if (typeCertResult[0].publicId) uploadedPublicIds.push(typeCertResult[0].publicId);
+      }
+
+      // Upload Aadhaar card (Unregistered Vendor identity proof).
+      // Stored as DocumentType.AADHAAR_CARD.
+      if (req.files?.aadhaarFile?.[0]) {
+        const aadhaarResult = await uploadFiles([req.files.aadhaarFile[0]], 'vendor-documents/aadhaar');
+        aadhaarUrl = aadhaarResult[0].cloudinaryUrl;
+        if (aadhaarResult[0].publicId) uploadedPublicIds.push(aadhaarResult[0].publicId);
       }
 
       // Upload owner photo
@@ -526,7 +561,9 @@ const registerVendor = async (req, res) => {
         : `${companyName} - ${businessType}`,
       companyLogo: logoUrl,
       companyIdNumber: companyIdNumber || null,
+      iecCode: iecCode || null,
       panNumber: panNumber || null,
+      aadhaarNumber: aadhaarNumber || null,
       factoryOwnershipType: factoryOwnershipType || null,
 
       // Contact & Trade Information
@@ -544,7 +581,7 @@ const registerVendor = async (req, res) => {
       businessZipCode: zipCode,
       businessCountry: country || 'India',
       website,
-      gstNumber: gstNumber || null,
+      gstNumber: normalizedGst || null,
 
       // Trade Information
       // annualTurnover is intentionally not set here — the form doesn't
@@ -769,6 +806,15 @@ const registerVendor = async (req, res) => {
         type: 'COMPANY_REGISTRATION',
         name: certLabelMap[businessType] || 'Business Registration Certificate',
         documentUrl: typeCertUrl
+      });
+    }
+
+    if (aadhaarUrl) {
+      documents.push({
+        vendorId: vendor.id,
+        type: 'AADHAAR_CARD',
+        name: 'Aadhaar Card',
+        documentUrl: aadhaarUrl
       });
     }
 
@@ -1298,6 +1344,7 @@ const updateVendorById = async (req, res) => {
       await replaceVendorDoc('gstDocument', 'GST_CERTIFICATE', 'vendor-documents/gst', 'GST Certificate');
       await replaceVendorDoc('panCardFile', 'PAN_CARD', 'vendor-documents/pan', 'PAN Card');
       await replaceVendorDoc('typeCertFile', 'COMPANY_REGISTRATION', 'vendor-documents/business-cert', typeCertDisplayName);
+      await replaceVendorDoc('aadhaarFile', 'AADHAAR_CARD', 'vendor-documents/aadhaar', 'Aadhaar Card');
     } catch (uploadError) {
       console.error('Admin document upload error:', uploadError);
       return res.status(500).json({
@@ -1435,7 +1482,9 @@ const updateVendorById = async (req, res) => {
       businessType: updateData.businessType || null,
       gstNumber: updateData.gstNumber || null,
       companyIdNumber: updateData.companyIdNumber || null,
+      iecCode: updateData.iecCode || null,
       panNumber: updateData.panNumber || null,
+      aadhaarNumber: updateData.aadhaarNumber || null,
       businessEmail: updateData.email,
       businessEmail2: updateData.email2 || null,
       businessPhone: updateData.phone,

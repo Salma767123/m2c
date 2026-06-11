@@ -114,10 +114,10 @@ export default function VendorProtectedRoute({ children }: VendorProtectedRouteP
   // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
           <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-600">Verifying authentication...</p>
+          <p className="mt-4 text-slate-600">Verifying authentication...</p>
         </div>
       </div>
     )

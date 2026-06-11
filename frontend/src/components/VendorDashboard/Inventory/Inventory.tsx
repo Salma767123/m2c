@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
-import { Badge } from '@/components/UI/Badge'
 import {
   Table,
   TableBody,
@@ -12,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/UI/Table'
-import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Edit, Trash2, History, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Edit, Trash2, History, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import inventoryService, { InventoryItem as APIInventoryItem, InventoryStats } from '@/services/inventoryService'
@@ -32,25 +31,27 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
   return pages;
 }
 
+const pill = 'px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap'
+
 const getStatusBadge = (status: string, currentStock: number, lowStockAlert: number) => {
   if (currentStock === 0) {
-    return <Badge className="bg-red-100 text-red-800">Out of Stock</Badge>
+    return <span className={`${pill} bg-red-50 text-red-700 border-red-200`}>Out of Stock</span>
   }
   if (currentStock <= lowStockAlert) {
-    return <Badge className="bg-yellow-100 text-yellow-800">Low Stock</Badge>
+    return <span className={`${pill} bg-yellow-50 text-yellow-700 border-yellow-200`}>Low Stock</span>
   }
-  return <Badge className="bg-green-100 text-green-800">In Stock</Badge>
+  return <span className={`${pill} bg-green-50 text-green-700 border-green-200`}>In Stock</span>
 }
 
 const getApprovalBadge = (item: APIInventoryItem) => {
-  if (!item.hasProductCreated) return <Badge className="bg-gray-100 text-gray-600">No Product</Badge>
+  if (!item.hasProductCreated) return <span className={`${pill} bg-slate-50 text-slate-600 border-slate-200`}>No Product</span>
   switch (item.productApprovalStatus) {
-    case 'APPROVED': return <Badge className="bg-green-100 text-green-800">Approved</Badge>
-    case 'PENDING': return <Badge className="bg-yellow-100 text-yellow-800">Pending Approval</Badge>
-    case 'QC_APPROVED': return <Badge className="bg-blue-100 text-blue-800">QC Approved</Badge>
-    case 'REJECTED': return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
-    case 'REINSPECTION': return <Badge className="bg-orange-100 text-orange-800">Reinspection</Badge>
-    default: return <Badge className="bg-gray-100 text-gray-600">Unknown</Badge>
+    case 'APPROVED': return <span className={`${pill} bg-green-50 text-green-700 border-green-200`}>Approved</span>
+    case 'PENDING': return <span className={`${pill} bg-yellow-50 text-yellow-700 border-yellow-200`}>Pending Approval</span>
+    case 'QC_APPROVED': return <span className={`${pill} bg-brand-50 text-brand-600 border-brand-200`}>QC Approved</span>
+    case 'REJECTED': return <span className={`${pill} bg-red-50 text-red-700 border-red-200`}>Rejected</span>
+    case 'REINSPECTION': return <span className={`${pill} bg-orange-50 text-orange-700 border-orange-200`}>Reinspection</span>
+    default: return <span className={`${pill} bg-slate-50 text-slate-600 border-slate-200`}>Unknown</span>
   }
 }
 
@@ -77,6 +78,9 @@ export default function Inventory() {
     isOpen: boolean
     item: APIInventoryItem | null
   }>({ isOpen: false, item: null })
+
+  // View details modal state
+  const [viewItem, setViewItem] = useState<APIInventoryItem | null>(null)
 
   // Calculate stats
   const totalItems = inventoryStats?.totalItems || 0
@@ -204,14 +208,14 @@ export default function Inventory() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#222222]">Inventory Management</h1>
+            <h1 className="text-xl font-bold text-slate-900">Inventory Management</h1>
             <p className="text-slate-600">Loading your inventory...</p>
           </div>
         </div>
         <Card>
           <CardContent className="p-8">
             <div className="flex items-center jusbnmtify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#222222]"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
               <span className="ml-3 text-slate-600">Loading inventory data...</span>
             </div>
           </CardContent>
@@ -221,16 +225,16 @@ export default function Inventory() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Inventory Management</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Manage your product inventory and stock levels</p>
+            <h1 className="text-xl font-bold text-slate-900">Inventory Management</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Manage your product inventory and stock levels</p>
           </div>
           <Link href="/vendor/dashboard/inventory/add">
-            <Button className="bg-gray-900 text-white hover:bg-black">
+            <Button className="bg-brand-500 text-white hover:bg-brand-600">
               <Plus className="h-4 w-4 mr-2" />
               Add Inventory Item
             </Button>
@@ -239,52 +243,52 @@ export default function Inventory() {
       </div>
 
       {/* Inventory Stats */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Items</span>
-            <div className="p-1.5 bg-blue-50 rounded-lg"><Package className="h-4 w-4 text-blue-600" /></div>
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Items</span>
+            <div className="p-1.5 bg-brand-50 rounded-lg"><Package className="h-4 w-4 text-brand-600" /></div>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Unique products</p>
+          <p className="text-xl font-bold text-slate-900">{totalItems}</p>
+          <p className="text-xs text-slate-500 mt-0.5">Unique products</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Low Stock</span>
+        <div className="bg-white rounded-xl border border-slate-200 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Low Stock</span>
             <div className="p-1.5 bg-yellow-50 rounded-lg"><AlertTriangle className="h-4 w-4 text-yellow-600" /></div>
           </div>
-          <p className={`text-2xl font-bold ${lowStockItems > 0 ? 'text-yellow-600' : 'text-gray-900'}`}>{lowStockItems}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Need restocking</p>
+          <p className={`text-xl font-bold ${lowStockItems > 0 ? 'text-yellow-600' : 'text-slate-900'}`}>{lowStockItems}</p>
+          <p className="text-xs text-slate-500 mt-0.5">Need restocking</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Out of Stock</span>
+        <div className="bg-white rounded-xl border border-slate-200 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Out of Stock</span>
             <div className="p-1.5 bg-red-50 rounded-lg"><TrendingDown className="h-4 w-4 text-red-600" /></div>
           </div>
-          <p className={`text-2xl font-bold ${outOfStockItems > 0 ? 'text-red-600' : 'text-gray-900'}`}>{outOfStockItems}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Urgent attention</p>
+          <p className={`text-xl font-bold ${outOfStockItems > 0 ? 'text-red-600' : 'text-slate-900'}`}>{outOfStockItems}</p>
+          <p className="text-xs text-slate-500 mt-0.5">Urgent attention</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Stock</span>
+        <div className="bg-white rounded-xl border border-slate-200 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Stock</span>
             <div className="p-1.5 bg-green-50 rounded-lg"><TrendingUp className="h-4 w-4 text-green-600" /></div>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{totalValue.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Total units</p>
+          <p className="text-xl font-bold text-slate-900">{totalValue.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-0.5">Total units</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-3">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
             <input
               type="text"
               placeholder="Search inventory..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
           <div className="flex items-center gap-3">
@@ -313,20 +317,20 @@ export default function Inventory() {
 
       {/* Results summary */}
       {inventoryItems.length > 0 && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-500">
           Showing {inventoryItems.length} item{inventoryItems.length === 1 ? '' : 's'}
         </p>
       )}
 
       {/* Inventory Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Inventory Items</h2>
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-200/80">
+          <h2 className="text-sm font-semibold text-slate-900">Inventory Items</h2>
         </div>
-        <div>
+        <div className="overflow-x-auto">
           <Table>
-            <TableHeader>
-              <TableRow>
+            <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b [&_tr]:border-slate-200/80 [&_th]:!text-slate-500 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+              <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
                 <TableHead>Product</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead>Product Status</TableHead>
@@ -350,10 +354,10 @@ export default function Inventory() {
                 </TableRow>
               ) : (
                 inventoryItems.map((item) => (
-                  <TableRow key={item.id} className="hover:bg-gray-50">
+                  <TableRow key={item.id} className="hover:bg-slate-50">
                     <TableCell>
                       <div>
-                        <div className="font-medium text-[#222222]">{item.name}</div>
+                        <div className="font-medium text-slate-900">{item.name}</div>
                         <div className="text-sm text-slate-500">
                           {item.category}{item.subcategory ? ` > ${item.subcategory}` : ''}
                         </div>
@@ -364,12 +368,12 @@ export default function Inventory() {
                       {getApprovalBadge(item)}
                     </TableCell>
                     <TableCell>
-                      <span className={item.currentStock <= item.lowStockAlert ? 'text-red-600 font-bold' : 'text-[#222222] font-semibold'}>
+                      <span className={item.currentStock <= item.lowStockAlert ? 'text-red-600 font-bold' : 'text-slate-900 font-semibold'}>
                         {item.currentStock}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className="text-[#222222] font-medium">
+                      <span className="text-slate-900 font-medium">
                         {item.baseStock || 0}
                       </span>
                     </TableCell>
@@ -383,6 +387,13 @@ export default function Inventory() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <button
+                          onClick={() => setViewItem(item)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => {
                             if (item.hasProductCreated && item.productApprovalStatus === 'APPROVED') {
                               handleRestock(item)
@@ -394,15 +405,15 @@ export default function Inventory() {
                           }}
                           className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors ${
                             item.hasProductCreated && item.productApprovalStatus === 'APPROVED'
-                              ? 'border-gray-200 text-gray-700 hover:bg-gray-50'
-                              : 'border-gray-100 text-gray-400 cursor-not-allowed'
+                              ? 'border-brand-200 text-brand-600 hover:bg-brand-50'
+                              : 'border-slate-100 text-slate-400 cursor-not-allowed'
                           }`}
                         >
                           Update Stock
                         </button>
                         <button
                           onClick={() => handleViewHistory(item)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                           title="Stock History"
                         >
                           <History className="h-4 w-4" />
@@ -410,14 +421,14 @@ export default function Inventory() {
                         {item.hasProductCreated && item.productApprovalStatus === 'APPROVED' ? (
                           <button
                             onClick={() => showWarningToast('Edit Restricted', 'This product has been approved. Only admin can edit the inventory.')}
-                            className="p-1.5 rounded-lg text-gray-300 cursor-not-allowed"
+                            className="p-1.5 rounded-lg text-slate-300 cursor-not-allowed"
                             title="Approved — admin only"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                         ) : (
                           <Link href={`/vendor/dashboard/inventory/edit/${item.id}`}>
-                            <span className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors inline-flex" title="Edit">
+                            <span className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors inline-flex" title="Edit">
                               <Edit className="h-4 w-4" />
                             </span>
                           </Link>
@@ -427,8 +438,8 @@ export default function Inventory() {
                           disabled={item.hasProductCreated}
                           className={`p-1.5 rounded-lg transition-colors ${
                             item.hasProductCreated
-                              ? 'text-gray-300 cursor-not-allowed'
-                              : 'text-gray-500 hover:text-red-600 hover:bg-red-50'
+                              ? 'text-slate-300 cursor-not-allowed'
+                              : 'text-slate-500 hover:text-red-600 hover:bg-red-50'
                           }`}
                           title={item.hasProductCreated ? 'Has linked product' : 'Delete'}
                         >
@@ -442,10 +453,10 @@ export default function Inventory() {
             </TableBody>
           </Table>
           {totalPages > 1 && (
-            <div className="flex items-center justify-end gap-3 text-sm px-5 py-3 border-t border-gray-200">
+            <div className="flex items-center justify-end gap-3 text-sm px-5 py-3 border-t border-slate-200">
               <div className="flex items-center gap-1">
                 <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-                {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
                 <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>
@@ -475,6 +486,94 @@ export default function Inventory() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteModal({ show: false, item: null, loading: false })}
       />
+
+      {/* View Details Modal */}
+      {viewItem && (
+        <div
+          className="fixed inset-0 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          style={{ zIndex: 'var(--z-modal-backdrop)' }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="inventory-view-title"
+          onClick={() => setViewItem(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-lg w-full animate-in zoom-in-95 fade-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-brand-500 rounded-t-xl">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+                  <Package className="h-4.5 w-4.5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h3 id="inventory-view-title" className="text-base font-bold text-white truncate">{viewItem.name}</h3>
+                  <p className="text-xs text-white/80 truncate">{viewItem.category}{viewItem.subcategory ? ` > ${viewItem.subcategory}` : ''}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewItem(null)}
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition-colors shrink-0"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {getApprovalBadge(viewItem)}
+                {getStatusBadge(viewItem.status, viewItem.currentStock, viewItem.lowStockAlert)}
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">SKU</p>
+                  <p className="font-mono text-slate-800 mt-0.5">{viewItem.sku}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Last Restocked</p>
+                  <p className="text-slate-800 mt-0.5">{viewItem.lastRestocked ? new Date(viewItem.lastRestocked).toLocaleDateString() : 'Never'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Current Stock</p>
+                  <p className={`font-semibold mt-0.5 ${viewItem.currentStock <= viewItem.lowStockAlert ? 'text-red-600' : 'text-slate-900'}`}>{viewItem.currentStock}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Base Stock</p>
+                  <p className="font-semibold text-slate-900 mt-0.5">{viewItem.baseStock || 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Min Stock</p>
+                  <p className="text-slate-800 mt-0.5">{viewItem.lowStockAlert}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Category</p>
+                  <p className="text-slate-800 mt-0.5">{viewItem.category}{viewItem.subcategory ? ` > ${viewItem.subcategory}` : ''}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
+              <button
+                onClick={() => setViewItem(null)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => { handleViewHistory(viewItem); setViewItem(null); }}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-brand-500 text-white hover:bg-brand-600 transition-colors inline-flex items-center gap-2"
+              >
+                <History className="h-4 w-4" />
+                Stock History
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

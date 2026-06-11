@@ -63,10 +63,10 @@ const TrendChip = ({ current, previous }: { current: number; previous: number })
   const change = calcChange(current, previous);
   const val = parseFloat(change);
   return (
-    <div className={`flex items-center gap-1 text-sm font-medium ${val > 0 ? 'text-green-600' : val < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+    <div className={`flex items-center gap-1 text-sm font-medium ${val > 0 ? 'text-green-600' : val < 0 ? 'text-red-600' : 'text-slate-500'}`}>
       {val > 0 ? <ArrowUp className="w-4 h-4" /> : val < 0 ? <ArrowDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
       <span>{Math.abs(val)}%</span>
-      <span className="text-gray-500 text-xs ml-1">vs last period</span>
+      <span className="text-slate-500 text-xs ml-1">vs last period</span>
     </div>
   );
 };
@@ -80,7 +80,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     CANCELLED: 'bg-red-100 text-red-800',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${map[s] || 'bg-gray-100 text-gray-800'}`}>
+    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${map[s] || 'bg-slate-100 text-slate-800'}`}>
       {status?.replace(/_/g, ' ')}
     </span>
   );
@@ -193,8 +193,8 @@ export default function VendorReports() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-gray-600 mt-1">Track your store performance and insights</p>
+          <h1 className="text-3xl font-bold text-slate-900">Reports & Analytics</h1>
+          <p className="text-slate-600 mt-1">Track your store performance and insights</p>
         </div>
         <div className="flex flex-wrap gap-3 items-center">
           <div className="w-44">
@@ -232,7 +232,7 @@ export default function VendorReports() {
                   key={type.id}
                   variant="outline"
                   onClick={() => setReportType(type.id as ReportTab)}
-                  className={`gap-2 ${isActive ? 'bg-gray-900 text-white hover:bg-gray-800' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                  className={`gap-2 ${isActive ? 'bg-brand-500 text-white hover:bg-brand-700' : 'bg-white text-slate-700 hover:bg-slate-50'}`}
                 >
                   <Icon className="w-4 h-4" />
                   {type.label}
@@ -246,8 +246,8 @@ export default function VendorReports() {
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-          <span className="ml-3 text-gray-500 text-lg">Loading report…</span>
+          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+          <span className="ml-3 text-slate-500 text-lg">Loading report…</span>
         </div>
       )}
 
@@ -265,8 +265,8 @@ export default function VendorReports() {
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-600 mb-1">{m.label}</p>
-                      <p className="text-2xl font-bold text-gray-900 mb-2">{m.value}</p>
+                      <p className="text-sm font-medium text-slate-600 mb-1">{m.label}</p>
+                      <p className="text-2xl font-bold text-slate-900 mb-2">{m.value}</p>
                       <TrendChip current={m.current} previous={m.previous} />
                     </div>
                     <div className={`p-3 rounded-lg ${m.bgColor}`}>
@@ -280,7 +280,7 @@ export default function VendorReports() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="w-5 h-5 text-gray-600" />Revenue Trend</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="w-5 h-5 text-slate-600" />Revenue Trend</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <AreaChart data={data.charts?.revenueChartData || []}>
@@ -301,7 +301,7 @@ export default function VendorReports() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2"><PieChart className="w-5 h-5 text-gray-600" />Order Status Distribution</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><PieChart className="w-5 h-5 text-slate-600" />Order Status Distribution</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <RechartsPieChart>
@@ -326,7 +326,7 @@ export default function VendorReports() {
           </div>
 
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Package className="w-5 h-5 text-gray-600" />Top Selling Products</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Package className="w-5 h-5 text-slate-600" />Top Selling Products</CardTitle></CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
@@ -340,9 +340,9 @@ export default function VendorReports() {
                 <TableBody>
                   {(data.tables?.topProducts || []).map((product: any, idx: number) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-medium text-gray-900">{product.name}</TableCell>
-                      <TableCell className="text-gray-600">{product.sales}</TableCell>
-                      <TableCell className="font-semibold text-gray-900">{fmt(product.revenue)}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{product.name}</TableCell>
+                      <TableCell className="text-slate-600">{product.sales}</TableCell>
+                      <TableCell className="font-semibold text-slate-900">{fmt(product.revenue)}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.stock > 10 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                           {product.stock} items left
@@ -351,7 +351,7 @@ export default function VendorReports() {
                     </TableRow>
                   ))}
                   {(data.tables?.topProducts || []).length === 0 && (
-                    <TableRow><TableCell colSpan={4} className="text-center text-gray-400 py-8">No products sold in this period.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center text-slate-400 py-8">No products sold in this period.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -368,8 +368,8 @@ export default function VendorReports() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Total Orders</p>
-                    <p className="text-2xl font-bold text-gray-900">{fmtN(data.metrics?.orders)}</p>
+                    <p className="text-sm text-slate-600 mb-1">Total Orders</p>
+                    <p className="text-2xl font-bold text-slate-900">{fmtN(data.metrics?.orders)}</p>
                   </div>
                   <ShoppingCart className="w-10 h-10 text-blue-600" />
                 </div>
@@ -379,8 +379,8 @@ export default function VendorReports() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Avg Order Item Value</p>
-                    <p className="text-2xl font-bold text-gray-900">{fmt(data.metrics?.avgOrderValue)}</p>
+                    <p className="text-sm text-slate-600 mb-1">Avg Order Item Value</p>
+                    <p className="text-2xl font-bold text-slate-900">{fmt(data.metrics?.avgOrderValue)}</p>
                   </div>
                   <TrendingUp className="w-10 h-10 text-green-600" />
                 </div>
@@ -405,16 +405,16 @@ export default function VendorReports() {
                 <TableBody>
                   {(data.tables?.orders || []).map((order: any, idx: number) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-medium text-gray-900">{order.orderId}</TableCell>
-                      <TableCell className="text-gray-600">{order.product}</TableCell>
-                      <TableCell className="text-gray-600">{order.quantity}</TableCell>
-                      <TableCell className="font-semibold text-gray-900">{fmt(order.amount)}</TableCell>
-                      <TableCell className="text-gray-500 text-sm">{new Date(order.date).toLocaleDateString()}</TableCell>
+                      <TableCell className="font-medium text-slate-900">{order.orderId}</TableCell>
+                      <TableCell className="text-slate-600">{order.product}</TableCell>
+                      <TableCell className="text-slate-600">{order.quantity}</TableCell>
+                      <TableCell className="font-semibold text-slate-900">{fmt(order.amount)}</TableCell>
+                      <TableCell className="text-slate-500 text-sm">{new Date(order.date).toLocaleDateString()}</TableCell>
                       <TableCell><StatusBadge status={order.status} /></TableCell>
                     </TableRow>
                   ))}
                   {(data.tables?.orders || []).length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-gray-400 py-8">No order data for this period.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center text-slate-400 py-8">No order data for this period.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>

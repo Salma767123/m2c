@@ -7,7 +7,6 @@ import {
   Shield,
   ShieldCheck,
   Upload,
-  Package,
   Award,
   CheckCircle,
   X,
@@ -215,15 +214,12 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
   }
 
   // ── Accordion Section State ────────────────────────────────────────
-  type SectionKey = 'certifications' | 'quality' | 'logistics';
+  type SectionKey = 'certifications' | 'quality';
   const [activeSection, setActiveSection] = useState<SectionKey>('certifications');
 
   const FIELD_SECTION_MAP: Record<string, SectionKey> = {
     qualityControlProcess: 'quality',
     complianceStandards: 'quality',
-    packagingCapabilities: 'logistics',
-    logisticsPartners: 'logistics',
-    shippingMethods: 'logistics',
   };
 
   const getSectionStatus = (section: SectionKey): 'complete' | 'partial' | 'empty' => {
@@ -241,14 +237,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       const filled = required.filter(Boolean).length;
       if (filled === required.length) return 'complete';
       if (filled > 0) return 'partial';
-      return 'empty';
-    }
-    if (section === 'logistics') {
-      const required = [formData.packagingCapabilities, formData.logisticsPartners];
-      const hasShipping = formData.shippingMethods.length > 0;
-      const filledText = required.filter(Boolean).length;
-      if (filledText === required.length && hasShipping) return 'complete';
-      if (filledText > 0 || hasShipping) return 'partial';
       return 'empty';
     }
     return 'empty';
@@ -270,9 +258,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
         (errors[`otherCertExpiry_${c.id}`] && touched[`otherCertExpiry_${c.id}`])
       );
       return hasCertErrors || hasOtherErrors;
-    }
-    if (section === 'logistics') {
-      if (errors['shippingMethods'] && touched['shippingMethods']) return true;
     }
     return false;
   };
@@ -404,16 +389,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       return next;
     });
   }, []);
-
-  const handleShippingMethodToggle = (method: string) => {
-    setFormData(prev => {
-      const next = prev.shippingMethods.includes(method)
-        ? prev.shippingMethods.filter((m: string) => m !== method)
-        : [...prev.shippingMethods, method];
-      if (next.length > 0) clearError('shippingMethods');
-      return { ...prev, shippingMethods: next };
-    });
-  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -595,16 +570,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
       }
     });
 
-    if (!formData.packagingCapabilities.trim()) {
-      newErrors.packagingCapabilities = 'Packaging Capabilities are required';
-    }
-    if (!formData.logisticsPartners.trim()) {
-      newErrors.logisticsPartners = 'Logistics Partners are required';
-    }
-    if (formData.shippingMethods.length === 0) {
-      newErrors.shippingMethods = 'Select at least one shipping method';
-    }
-
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       const allTouched: Record<string, boolean> = { ...touched };
@@ -618,8 +583,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
         setActiveSection('certifications');
       } else if (newErrors.qualityControlProcess || newErrors.complianceStandards) {
         setActiveSection('quality');
-      } else if (newErrors.packagingCapabilities || newErrors.logisticsPartners || newErrors.shippingMethods) {
-        setActiveSection('logistics');
       }
 
       setTimeout(() => {
@@ -1227,86 +1190,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
             />
             {errors.complianceStandards && touched.complianceStandards && (
               <p className="text-red-500 text-sm mt-1">{errors.complianceStandards}</p>
-            )}
-          </div>
-        </div>
-      </AccordionSection>
-
-      {/* Packaging & Logistics */}
-      <AccordionSection
-        {...sectionProps('logistics')}
-        icon={<Package className="w-4.5 h-4.5" aria-hidden="true" />}
-        title="Packaging & Logistics"
-        subtitle="Detail your packaging capabilities and shipping methods"
-      >
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Packaging Capabilities <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                id="packagingCapabilities"
-                name="packagingCapabilities"
-                value={formData.packagingCapabilities}
-                onChange={(e) => handleInputChange('packagingCapabilities', e.target.value)}
-                onBlur={() => handleBlur('packagingCapabilities')}
-                rows={3}
-                className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                  errors.packagingCapabilities && touched.packagingCapabilities
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="Custom packaging, eco-friendly options, bulk packaging..."
-              />
-              {errors.packagingCapabilities && touched.packagingCapabilities && (
-                <p className="text-red-500 text-sm mt-1">{errors.packagingCapabilities}</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Logistics Partners <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="logisticsPartners"
-              name="logisticsPartners"
-              type="text"
-              value={formData.logisticsPartners}
-              onChange={(e) => handleInputChange('logisticsPartners', e.target.value)}
-              onBlur={() => handleBlur('logisticsPartners')}
-              className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                errors.logisticsPartners && touched.logisticsPartners
-                  ? 'border-red-500 bg-red-50'
-                  : 'border-slate-300 hover:border-slate-400'
-              }`}
-              placeholder="DHL, FedEx, UPS, Local carriers..."
-            />
-            {errors.logisticsPartners && touched.logisticsPartners && (
-              <p className="text-red-500 text-sm mt-1">{errors.logisticsPartners}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Shipping Methods <span className="text-red-500">*</span>
-            </label>
-            <div id="shippingMethodsContainer" className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {['Air Freight', 'Sea Freight', 'Road Transport', 'Express Delivery'].map((method) => (
-                <label key={method} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.shippingMethods.includes(method)}
-                    onChange={() => handleShippingMethodToggle(method)}
-                    className="w-4 h-4 accent-brand-500 rounded border-slate-300 focus-visible:ring-2 focus-visible:ring-brand-500/40 cursor-pointer"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">{method}</span>
-                </label>
-              ))}
-            </div>
-            {errors.shippingMethods && touched.shippingMethods && (
-              <p className="text-red-500 text-sm mt-2">{errors.shippingMethods}</p>
             )}
           </div>
         </div>

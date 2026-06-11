@@ -42,6 +42,47 @@ const InfoRow: React.FC<{ label: string; value: string | React.ReactNode }> = ({
   </div>
 );
 
+// Resolve a previewable URL from the many shapes a stored file/photo can take:
+// a plain string (blob/data/remote URL), a File object, or a wrapper
+// `{ file, preview/url/name }` produced by the upload helpers.
+const resolveImageUrl = (val: any): string | null => {
+  if (!val) return null;
+  if (typeof val === 'string') return val;
+  if (typeof File !== 'undefined' && val instanceof File) {
+    try { return URL.createObjectURL(val); } catch { return null; }
+  }
+  if (typeof val === 'object') {
+    return val.preview || val.url || val.dataUrl || null;
+  }
+  return null;
+};
+
+// Small thumbnail used for photos (owner, contact) and image documents.
+// Uses a plain <img> because previews are blob:/data: URLs that next/image
+// can't optimize.
+const Thumb: React.FC<{ src: string; alt: string; rounded?: boolean }> = ({ src, alt, rounded }) => (
+  // eslint-disable-next-line @next/next/no-img-element
+  <img
+    src={src}
+    alt={alt}
+    className={`w-20 h-20 object-cover border border-slate-200 ${rounded ? 'rounded-full' : 'rounded-lg'}`}
+  />
+);
+
+// Render either an image thumbnail (when previewable) or an "Uploaded"/
+// "Not uploaded" badge for non-image documents (e.g. PDFs).
+const DocValue: React.FC<{ src: any; alt: string }> = ({ src, alt }) => {
+  const url = resolveImageUrl(src);
+  if (url && /^(blob:|data:image|https?:)/.test(url) && !/\.pdf($|\?)/i.test(url)) {
+    return <Thumb src={url} alt={alt} />;
+  }
+  return (
+    <span className={src ? 'text-success-700 font-semibold' : 'text-slate-400'}>
+      {src ? 'Uploaded' : 'Not uploaded'}
+    </span>
+  );
+};
+
 // ── Label resolvers ─────────────────────────────────────────────────────
 
 const getVendorTypeLabel = (types: string | string[]): string => {
@@ -49,6 +90,7 @@ const getVendorTypeLabel = (types: string | string[]): string => {
     'manufacturer': 'Manufacturer',
     'importer': 'Importer',
     'exporter': 'Exporter',
+    'trader': 'Trader',
   };
   if (Array.isArray(types)) return types.map((t) => labels[t] || t).join(', ');
   return labels[types] || types;
@@ -242,11 +284,13 @@ export default function VendorDataSummary({
               value={data.companyIdNumber}
             />
           )}
+          {data.iecCode && <InfoRow label="IEC Code" value={data.iecCode} />}
           {data.panNumber && <InfoRow label="PAN Number" value={data.panNumber} />}
-          <InfoRow label="Email 1" value={data.email} />
-          {data.email2 && <InfoRow label="Email 2" value={data.email2} />}
-          <InfoRow label="Phone" value={data.phone} />
-          {data.phoneNumber2 && <InfoRow label="Phone 2" value={data.phoneNumber2} />}
+          {data.aadhaarNumber && <InfoRow label="Aadhaar Number" value={data.aadhaarNumber} />}
+          <InfoRow label="Primary Email" value={data.email} />
+          {data.email2 && <InfoRow label="Secondary Email" value={data.email2} />}
+          <InfoRow label="Primary Phone" value={data.phone} />
+          {data.phoneNumber2 && <InfoRow label="Secondary Phone" value={data.phoneNumber2} />}
           {data.landlineNumber && <InfoRow label="Landline" value={data.landlineNumber} />}
           <InfoRow label="Website" value={data.website} />
           {/* Address rendered multi-line so Line 2 / 3 / landmark are visible. */}
@@ -276,11 +320,14 @@ export default function VendorDataSummary({
             />
           )}
           <InfoRow label="Same as Warehouse" value={data.sameAsWarehouse ? 'Yes' : 'No'} />
-          <InfoRow label="Company Logo" value={data.logo ? 'Uploaded' : 'Not uploaded'} />
-          <InfoRow label="GST Certificate" value={data.gstFile || data.gstDocument ? 'Uploaded' : 'Not uploaded'} />
-          <InfoRow label="PAN Card" value={data.panCardFile || data.panCardDocument ? 'Uploaded' : 'Not uploaded'} />
+          <InfoRow label="Company Logo" value={<DocValue src={data.logo || data.logoFile} alt="Company logo" />} />
+          <InfoRow label="GST Certificate" value={<DocValue src={data.gstDocument || data.gstFile} alt="GST certificate" />} />
+          <InfoRow label="PAN Card" value={<DocValue src={data.panCardDocument || data.panCardFile} alt="PAN card" />} />
           {(data.typeCertFile || data.typeCertDocument) && (
-            <InfoRow label="Business Reg. Certificate" value="Uploaded" />
+            <InfoRow label="Business Reg. Certificate" value={<DocValue src={data.typeCertDocument || data.typeCertFile} alt="Business registration certificate" />} />
+          )}
+          {(data.aadhaarFile || data.aadhaarDocument) && (
+            <InfoRow label="Aadhaar Card" value={<DocValue src={data.aadhaarDocument || data.aadhaarFile} alt="Aadhaar card" />} />
           )}
         </div>
       </AccordionSection>
@@ -307,13 +354,45 @@ export default function VendorDataSummary({
             }
           />
           <InfoRow label="Country" value={data.warehouseCountry} />
-          <InfoRow label="Factory Images" value={`${(data.factoryImages ? (Array.isArray(data.factoryImages) ? data.factoryImages.length : Object.keys(data.factoryImages).length) : 0)} file(s) uploaded`} />
+          {(() => {
+            const fi = data.factoryImages;
+            const entries: { key: string; val: any }[] = fi
+              ? Array.isArray(fi)
+                ? fi.map((v: any, i: number) => ({ key: String(i), val: v }))
+                : Object.entries(fi).map(([k, v]) => ({ key: k, val: v }))
+              : [];
+            const thumbs = entries
+              .map((e) => ({ key: e.key, url: resolveImageUrl(e.val?.preview || e.val?.url || e.val?.file || e.val) }))
+              .filter((t) => !!t.url);
+            return (
+              <InfoRow
+                label="Factory Images"
+                value={
+                  thumbs.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {thumbs.map((t) => (
+                        <Thumb key={t.key} src={t.url as string} alt="Factory image" />
+                      ))}
+                    </div>
+                  ) : (
+                    `${entries.length} file(s) uploaded`
+                  )
+                }
+              />
+            );
+          })()}
           <InfoRow label="Map Link" value={data.mapLink ? 'Provided' : 'Not provided'} />
         </div>
       </AccordionSection>
 
       <AccordionSection {...sectionProps('owner', 'Owner Profile', 'Key personnel details', <UserCircle className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('owner'))}>
         <div className="flex flex-col">
+          {(() => {
+            const ownerPhotoUrl = resolveImageUrl(data.ownerPhoto || data.ownerPhotoFile);
+            return ownerPhotoUrl ? (
+              <InfoRow label="Profile Photo" value={<Thumb src={ownerPhotoUrl} alt="Owner profile photo" rounded />} />
+            ) : null;
+          })()}
           <InfoRow label="Owner Name" value={data.ownerName} />
           {data.designation && (
             <InfoRow
@@ -321,10 +400,10 @@ export default function VendorDataSummary({
               value={<span className="capitalize">{data.designation}</span>}
             />
           )}
-          <InfoRow label="Email 1" value={data.ownerEmail} />
-          {data.ownerEmail2 && <InfoRow label="Email 2" value={data.ownerEmail2} />}
-          <InfoRow label="Phone 1" value={data.ownerPhone} />
-          {data.ownerPhone2 && <InfoRow label="Phone 2" value={data.ownerPhone2} />}
+          <InfoRow label="Primary Email" value={data.ownerEmail} />
+          {data.ownerEmail2 && <InfoRow label="Secondary Email" value={data.ownerEmail2} />}
+          <InfoRow label="Primary Phone" value={data.ownerPhone} />
+          {data.ownerPhone2 && <InfoRow label="Secondary Phone" value={data.ownerPhone2} />}
           {data.ownerLandline && <InfoRow label="Landline" value={data.ownerLandline} />}
           {data.businessStartDate ? (
             <InfoRow
@@ -388,6 +467,60 @@ export default function VendorDataSummary({
               )
             }
           />
+          {(() => {
+            const categoryProducts: Record<string, any[]> = data.categoryProducts || {};
+            const additionalCategories: any[] = data.additionalCategories || [];
+            const groups: { name: string; products: any[] }[] = [];
+            Object.entries(categoryProducts).forEach(([catId, products]) => {
+              if (Array.isArray(products) && products.length > 0) {
+                groups.push({ name: categoryNameMap[catId] || catId, products });
+              }
+            });
+            additionalCategories.forEach((cat) => {
+              if (cat && Array.isArray(cat.products) && cat.products.length > 0) {
+                groups.push({ name: cat.name || 'Custom Category', products: cat.products });
+              }
+            });
+            if (groups.length === 0) return null;
+            return (
+              <InfoRow
+                label="Products"
+                value={
+                  <div className="space-y-3">
+                    {groups.map((group, gi) => (
+                      <div key={gi}>
+                        <p className="text-xs font-semibold text-slate-500 mb-1.5">{group.name}</p>
+                        <div className="space-y-2">
+                          {group.products.map((product: any, pi: number) => {
+                            const photos = Array.isArray(product.photos) ? product.photos : [];
+                            return (
+                              <div key={product.id || pi} className="flex items-center gap-2 flex-wrap">
+                                <span className="inline-flex items-center px-2.5 py-0.5 bg-slate-100 text-slate-800 rounded text-xs font-semibold border border-slate-200">
+                                  {product.name || `Product ${pi + 1}`}
+                                </span>
+                                {photos.map((photo: any, phi: number) => {
+                                  const url = resolveImageUrl(photo?.preview || photo?.file || photo);
+                                  return url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      key={phi}
+                                      src={url}
+                                      alt={product.name || 'Product photo'}
+                                      className="w-12 h-12 object-cover rounded border border-slate-200"
+                                    />
+                                  ) : null;
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                }
+              />
+            );
+          })()}
           {data.categoryRemarks && (
             <InfoRow
               label="Category Remarks"
@@ -503,13 +636,13 @@ export default function VendorDataSummary({
           )}
           <InfoRow label="Quality Control Process" value={data.qualityControlProcess || 'Not provided'} />
           <InfoRow label="Compliance Standards" value={data.complianceStandards || 'Not provided'} />
-          <InfoRow label="Packaging Capabilities" value={data.packagingCapabilities || 'Not provided'} />
-          <InfoRow label="Warehousing Capacity" value={data.warehousingCapacity ? `${data.warehousingCapacity} sq ft` : 'Not provided'} />
-          <InfoRow label="Logistics Partners" value={data.logisticsPartners || 'Not provided'} />
-          <InfoRow
-            label="Shipping Methods"
-            value={
-              (data.shippingMethods || []).length > 0 ? (
+          {data.packagingCapabilities && <InfoRow label="Packaging Capabilities" value={data.packagingCapabilities} />}
+          {data.warehousingCapacity && <InfoRow label="Warehousing Capacity" value={`${data.warehousingCapacity} sq ft`} />}
+          {data.logisticsPartners && <InfoRow label="Logistics Partners" value={data.logisticsPartners} />}
+          {Array.isArray(data.shippingMethods) && data.shippingMethods.length > 0 && (
+            <InfoRow
+              label="Shipping Methods"
+              value={
                 <div className="flex flex-wrap gap-2">
                   {data.shippingMethods.map((method: string) => (
                     <span key={method} className="inline-flex items-center px-2.5 py-0.5 bg-slate-100 text-slate-800 rounded text-xs font-semibold border border-slate-200">
@@ -517,28 +650,32 @@ export default function VendorDataSummary({
                     </span>
                   ))}
                 </div>
-              ) : (
-                'None selected'
-              )
-            }
-          />
+              }
+            />
+          )}
         </div>
       </AccordionSection>
 
       <AccordionSection {...sectionProps('contact', 'Contact & Trade', 'Key contacts and regulatory IDs', <Briefcase className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('contact'))}>
         <div className="flex flex-col">
+          {(() => {
+            const contactPhotoUrl = resolveImageUrl(data.mainContact?.photo || data.mainContact?.photoFile);
+            return contactPhotoUrl ? (
+              <InfoRow label="Profile Photo" value={<Thumb src={contactPhotoUrl} alt="Main contact photo" rounded />} />
+            ) : null;
+          })()}
           <InfoRow label="Main Contact Name" value={data.mainContact?.name || 'Not provided'} />
           <InfoRow
             label="Main Contact Designation"
             value={data.mainContact?.customDesignation || data.mainContact?.designation || 'Not provided'}
           />
-          <InfoRow label="Main Contact Email" value={data.mainContact?.email1 || data.mainContact?.email || 'Not provided'} />
+          <InfoRow label="Main Contact Primary Email" value={data.mainContact?.email1 || data.mainContact?.email || 'Not provided'} />
           {data.mainContact?.email2 && (
-            <InfoRow label="Main Contact Email 2" value={data.mainContact.email2} />
+            <InfoRow label="Main Contact Secondary Email" value={data.mainContact.email2} />
           )}
-          <InfoRow label="Main Contact Phone" value={data.mainContact?.phone1 || data.mainContact?.phone || 'Not provided'} />
+          <InfoRow label="Main Contact Primary Phone" value={data.mainContact?.phone1 || data.mainContact?.phone || 'Not provided'} />
           {data.mainContact?.phone2 && (
-            <InfoRow label="Main Contact Phone 2" value={data.mainContact.phone2} />
+            <InfoRow label="Main Contact Secondary Phone" value={data.mainContact.phone2} />
           )}
           {data.mainContact?.landline && (
             <InfoRow label="Main Contact Landline" value={data.mainContact.landline} />
@@ -558,10 +695,10 @@ export default function VendorDataSummary({
                     label="Designation"
                     value={contact.customDesignation || contact.designation || 'Not provided'}
                   />
-                  <InfoRow label="Email" value={contact.email1 || contact.email || 'Not provided'} />
-                  {contact.email2 && <InfoRow label="Email 2" value={contact.email2} />}
-                  <InfoRow label="Phone" value={contact.phone1 || contact.phone || 'Not provided'} />
-                  {contact.phone2 && <InfoRow label="Phone 2" value={contact.phone2} />}
+                  <InfoRow label="Primary Email" value={contact.email1 || contact.email || 'Not provided'} />
+                  {contact.email2 && <InfoRow label="Secondary Email" value={contact.email2} />}
+                  <InfoRow label="Primary Phone" value={contact.phone1 || contact.phone || 'Not provided'} />
+                  {contact.phone2 && <InfoRow label="Secondary Phone" value={contact.phone2} />}
                   {contact.landline && <InfoRow label="Landline" value={contact.landline} />}
                   {(contact.customDepartment || contact.department) && (
                     <InfoRow

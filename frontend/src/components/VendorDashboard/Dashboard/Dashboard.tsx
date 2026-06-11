@@ -56,27 +56,30 @@ export default function Dashboard() {
       value: data.stats.totalProducts.toString(),
       change: '0%',
       icon: Package,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50 border-purple-200',
-      iconBg: 'bg-purple-100',
+      color: 'text-brand-500',
+      bgColor: 'bg-white border-slate-200/80',
+      iconBg: 'bg-brand-50',
+      href: '/vendor/dashboard/products',
     },
     {
       title: 'Revenue',
       value: `₹${data.stats.totalRevenue.toLocaleString()}`,
       change: '0%',
       icon: DollarSign,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50 border-green-200',
-      iconBg: 'bg-green-100',
+      color: 'text-emerald-600',
+      bgColor: 'bg-white border-slate-200/80',
+      iconBg: 'bg-emerald-50',
+      href: '/vendor/dashboard/earnings/payouts',
     },
     {
       title: 'Total Orders',
       value: data.stats.totalOrders.toString(),
       change: '0%',
       icon: ShoppingCart,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50 border-blue-200',
-      iconBg: 'bg-blue-100',
+      color: 'text-blue-500',
+      bgColor: 'bg-white border-slate-200/80',
+      iconBg: 'bg-blue-50',
+      href: '/vendor/dashboard/orders',
     },
     {
       title: 'Admin Rating',
@@ -93,9 +96,10 @@ export default function Dashboard() {
             ? `${rating.ratingCount} review${rating.ratingCount === 1 ? '' : 's'}`
             : 'Ship your first order',
       icon: Star,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-50 border-yellow-200',
-      iconBg: 'bg-yellow-100',
+      color: 'text-amber-500',
+      bgColor: 'bg-white border-slate-200/80',
+      iconBg: 'bg-amber-50',
+      href: '/vendor/dashboard/reviews',
     }
   ];
 
@@ -105,7 +109,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[#222222] mb-2">Vendor Dashboard</h1>
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Vendor Dashboard</h1>
         <p className="text-slate-600">Welcome back! Here's what's happening with your store.</p>
       </div>
 

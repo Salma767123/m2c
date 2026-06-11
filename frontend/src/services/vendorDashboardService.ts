@@ -35,6 +35,30 @@ export interface VendorDashboardStats {
     }[];
 }
 
+export type ChartRange =
+    | 'this_week'
+    | 'last_week'
+    | 'last_month'
+    | 'last_3_months'
+    | 'last_year'
+    | 'last_3_years'
+    | 'custom';
+
+export interface ChartPoint {
+    name: string;
+    revenue: number;
+    orders: number;
+}
+
+export interface ChartResponse {
+    range: ChartRange;
+    granularity: 'day' | 'week' | 'month';
+    start: string;
+    end: string;
+    hasData: boolean;
+    data: ChartPoint[];
+}
+
 class VendorDashboardService {
     static async getDashboardStats(): Promise<VendorDashboardStats> {
         try {
@@ -42,6 +66,19 @@ class VendorDashboardService {
             return response.data;
         } catch (error: any) {
             throw new Error(error.message || 'Failed to fetch dashboard stats');
+        }
+    }
+
+    static async getChartData(params: {
+        range: ChartRange;
+        start?: string;
+        end?: string;
+    }): Promise<ChartResponse> {
+        try {
+            const response = await axiosInstance.get('/vendor-dashboard/chart', { params });
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.message || 'Failed to fetch chart data');
         }
     }
 }

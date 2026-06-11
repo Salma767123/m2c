@@ -9,10 +9,14 @@ export interface VendorRegistrationData {
   businessType: string;
   companyName: string;
   gstNumber?: string;
-  /** Type-specific regulatory ID — IEC / CIN / Deed details / LLPIN. */
+  /** Type-specific regulatory ID — CIN / Deed details / LLPIN. */
   companyIdNumber?: string;
+  /** IEC (Import Export Code) — optional, available for every business type. */
+  iecCode?: string;
   /** PAN Number — required for all 4 supported businessType values. */
   panNumber?: string;
+  /** Aadhaar Number — required only for the "Unregistered Vendor" type. */
+  aadhaarNumber?: string;
   email: string;
   email2?: string;
   phone: string;
@@ -168,6 +172,8 @@ export interface VendorFiles {
   /** Type-specific business registration certificate
    *  (IEC / CIN / Partnership Deed / LLPIN). */
   typeCertFile?: File;
+  /** Aadhaar card upload — required only for "Unregistered Vendor". */
+  aadhaarFile?: File;
   ownerPhoto?: File;
   /** Factory images keyed by slot ID (nameBoard / frontView / backView /
    *  leftView / rightView / roadView / insideFactory / others). Each slot
@@ -201,10 +207,14 @@ export interface VendorProfile {
   businessType?: string;
   companyLogo?: string;
   gstNumber?: string;
-  /** Type-specific regulatory ID — IEC / CIN / Partnership Deed / LLPIN. */
+  /** Type-specific regulatory ID — CIN / Partnership Deed / LLPIN. */
   companyIdNumber?: string;
+  /** IEC (Import Export Code) — optional, any business type. */
+  iecCode?: string;
   /** PAN Number — required across the 4 supported business types. */
   panNumber?: string;
+  /** Aadhaar Number — present only for "Unregistered Vendor" registrations. */
+  aadhaarNumber?: string;
   status: string;
   ownerName: string;
   /** Owner designation chip (Proprietor / CEO / Director / etc.). */
@@ -492,6 +502,9 @@ class VendorService {
     }
     if (files.typeCertFile) {
       form.append('typeCertFile', files.typeCertFile);
+    }
+    if (files.aadhaarFile) {
+      form.append('aadhaarFile', files.aadhaarFile);
     }
     if (files.ownerPhoto) {
       form.append('ownerPhoto', files.ownerPhoto);

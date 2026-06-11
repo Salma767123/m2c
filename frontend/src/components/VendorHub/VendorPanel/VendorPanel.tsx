@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CompanyDetails from "../CompanyDetails/CompanyDetails";
 import WarehouseDetails from "../WarehouseDetails/WarehouseDetails";
 import OwnerProfile from "../OwnerProfile/OwnerProfile";
@@ -34,6 +34,29 @@ export default function VendorPanel() {
   const [formData, setFormData] = useState<FormData>({});
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isEditingFromReview, setIsEditingFromReview] = useState(false);
+
+  // Whenever the active step changes (Next / Back / sidebar jump), scroll the
+  // viewport back to the top so each step opens at its heading instead of
+  // retaining the previous step's scroll position (which landed mid/bottom).
+  // The new step renders taller content (maps, image grids) that reflows AFTER
+  // the effect fires, so we run the scroll across two animation frames to win
+  // against late layout shifts / scroll-anchoring.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const toTop = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      // Fallbacks for browsers where the scrolling root is the element.
+      if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+    toTop();
+    const raf1 = requestAnimationFrame(() => {
+      toTop();
+      requestAnimationFrame(toTop);
+    });
+    return () => cancelAnimationFrame(raf1);
+  }, [currentStep]);
 
   const isManufacturer = () => {
     const vendorTypes = formData.vendorType || [];

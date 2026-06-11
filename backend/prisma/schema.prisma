@@ -302,9 +302,14 @@ model Vendor {
   // Partnership Deed details / LLPIN. Optional because "Other" businessType
   // values skip this in the frontend validation.
   companyIdNumber    String?
+  // IEC (Import Export Code) — optional, available for every business type.
+  iecCode            String?
   // PAN Number — required for the 4 supported business types in the form,
   // optional at the column level so "Other" submissions still persist.
   panNumber          String?
+  // Aadhaar Number — required only for the "Unregistered Vendor" business
+  // type (which has no GST/PAN). Optional at the column level for all others.
+  aadhaarNumber      String?
   // Factory ownership type — owned / rented / lease. Distinct from the
   // warehouse `ownershipType` column above; mirrored to it when the vendor
   // ticks "Same as warehouse" in CompanyDetails.
@@ -599,6 +604,7 @@ enum DocumentType {
   COMPANY_REGISTRATION
   GST_CERTIFICATE
   PAN_CARD
+  AADHAAR_CARD
   TRADE_LICENSE
   EXPORT_LICENSE
   FACTORY_LICENSE

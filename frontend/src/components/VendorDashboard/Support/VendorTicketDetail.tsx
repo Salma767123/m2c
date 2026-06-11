@@ -73,8 +73,8 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700"></div>
-                <span className="ml-3 text-gray-600">Loading ticket...</span>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
+                <span className="ml-3 text-slate-600">Loading ticket...</span>
             </div>
         );
     }
@@ -82,8 +82,8 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
     if (!ticket) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
-                <AlertCircle className="h-12 w-12 text-gray-300 mb-3" />
-                <p className="text-gray-500 font-medium">Ticket not found</p>
+                <AlertCircle className="h-12 w-12 text-slate-300 mb-3" />
+                <p className="text-slate-500 font-medium">Ticket not found</p>
                 <Link href="/vendor/dashboard/support" className="mt-4 text-sm text-blue-600 hover:underline">
                     Back to Support
                 </Link>
@@ -96,8 +96,8 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
             case "open": return { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", icon: <AlertCircle className="h-3.5 w-3.5" />, label: "Open" };
             case "in-progress": return { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", icon: <Clock className="h-3.5 w-3.5" />, label: "In Progress" };
             case "resolved": return { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", icon: <CheckCircle className="h-3.5 w-3.5" />, label: "Resolved" };
-            case "closed": return { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", icon: <Shield className="h-3.5 w-3.5" />, label: "Closed" };
-            default: return { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", icon: null, label: status };
+            case "closed": return { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", icon: <Shield className="h-3.5 w-3.5" />, label: "Closed" };
+            default: return { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", icon: null, label: status };
         }
     };
 
@@ -107,7 +107,7 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
             case "high": return { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", label: "High" };
             case "medium": return { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200", label: "Medium" };
             case "low": return { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", label: "Low" };
-            default: return { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200", label: priority };
+            default: return { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", label: priority };
         }
     };
 
@@ -118,18 +118,18 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <Link
                         href="/vendor/dashboard/support"
-                        className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors self-start"
+                        className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors self-start"
                     >
-                        <ArrowLeft className="h-4 w-4 text-gray-600" />
+                        <ArrowLeft className="h-4 w-4 text-slate-600" />
                     </Link>
                     <div className="flex-1 min-w-0">
-                        <h1 className="text-xl font-bold text-gray-900 truncate">{ticket.subject}</h1>
+                        <h1 className="text-xl font-bold text-slate-900 truncate">{ticket.subject}</h1>
                         <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                            <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                            <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                                 {ticket.ticketId}
                             </span>
                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
@@ -158,13 +158,13 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
                 <div className="lg:col-span-2 space-y-6">
 
                     {/* Conversation */}
-                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                        <div className="p-4 border-b border-gray-100">
-                            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                                <MessageSquare className="h-4 w-4 text-gray-500" />
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="p-4 border-b border-slate-100">
+                            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4 text-slate-500" />
                                 Conversation
                                 {messages.length > 0 && (
-                                    <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                    <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                                         {messages.length}
                                     </span>
                                 )}
@@ -173,8 +173,8 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
                         <div className="p-4 max-h-96 overflow-y-auto">
                             {messages.length === 0 ? (
                                 <div className="text-center py-12">
-                                    <MessageSquare className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-                                    <p className="text-sm text-gray-400">No messages yet. Start the conversation below.</p>
+                                    <MessageSquare className="h-10 w-10 text-slate-200 mx-auto mb-3" />
+                                    <p className="text-sm text-slate-400">No messages yet. Start the conversation below.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
@@ -184,12 +184,12 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
                                             <div key={message.id} className={`flex ${isVendor ? "justify-end" : "justify-start"}`}>
                                                 <div className={`max-w-[80%] rounded-xl p-4 ${
                                                     isVendor
-                                                        ? "bg-gray-900 text-white"
-                                                        : "bg-gray-100 text-gray-900"
+                                                        ? "bg-brand-500 text-white"
+                                                        : "bg-slate-100 text-slate-900"
                                                 }`}>
                                                     <div className="flex items-center gap-2 mb-1.5">
                                                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                                            isVendor ? "bg-white/20 text-white" : "bg-gray-300 text-gray-700"
+                                                            isVendor ? "bg-white/20 text-white" : "bg-slate-300 text-slate-700"
                                                         }`}>
                                                             {isVendor ? "Y" : "S"}
                                                         </div>
@@ -198,7 +198,7 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
                                                         </span>
                                                     </div>
                                                     <p className="text-sm leading-relaxed">{message.message}</p>
-                                                    <p className={`text-xs mt-2 ${isVendor ? "text-gray-400" : "text-gray-500"}`}>
+                                                    <p className={`text-xs mt-2 ${isVendor ? "text-slate-400" : "text-slate-500"}`}>
                                                         {new Date(message.createdAt).toLocaleString('en-IN', {
                                                             day: 'numeric', month: 'short', year: 'numeric',
                                                             hour: '2-digit', minute: '2-digit'
@@ -215,21 +215,21 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
 
                         {/* Reply Form — inline at bottom of conversation */}
                         {isOpen && (
-                            <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+                            <div className="p-4 border-t border-slate-100 bg-slate-50/50">
                                 <form onSubmit={handleSubmitReply}>
                                     <textarea
                                         value={replyMessage}
                                         onChange={(e) => setReplyMessage(e.target.value)}
                                         placeholder="Type your reply..."
                                         rows={3}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none text-sm bg-white"
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none text-sm bg-white"
                                         required
                                     />
                                     <div className="flex justify-end mt-3">
                                         <button
                                             type="submit"
                                             disabled={isSubmitting || !replyMessage.trim()}
-                                            className="flex items-center gap-2 bg-gray-900 hover:bg-black disabled:bg-gray-300 text-white font-medium py-2 px-5 rounded-lg transition-colors text-sm"
+                                            className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-slate-300 text-white font-medium py-2 px-5 rounded-lg transition-colors text-sm"
                                         >
                                             <Send className="w-3.5 h-3.5" />
                                             {isSubmitting ? "Sending..." : "Send Reply"}
@@ -241,7 +241,7 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
 
                         {/* Resolved/Closed state */}
                         {!isOpen && (
-                            <div className="p-4 border-t border-gray-100 bg-green-50 text-center">
+                            <div className="p-4 border-t border-slate-100 bg-green-50 text-center">
                                 <p className="text-sm text-green-700 font-medium flex items-center justify-center gap-2">
                                     <CheckCircle className="h-4 w-4" />
                                     This ticket has been {ticket.status}. No further replies can be sent.
@@ -254,37 +254,37 @@ export default function VendorTicketDetail({ ticketId }: { ticketId: string }) {
                 {/* Sidebar */}
                 <div className="space-y-6">
                     {/* Ticket Info */}
-                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                        <div className="p-4 border-b border-gray-100">
-                            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                                <Tag className="h-4 w-4 text-gray-500" />
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="p-4 border-b border-slate-100">
+                            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                                <Tag className="h-4 w-4 text-slate-500" />
                                 Ticket Details
                             </h2>
                         </div>
                         <div className="p-4 space-y-4">
                             <div>
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</p>
+                                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Status</p>
                                 <span className={`inline-flex items-center gap-1 mt-1 px-2.5 py-1 rounded-full text-xs font-medium border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
                                     {statusCfg.icon}
                                     {statusCfg.label}
                                 </span>
                             </div>
                             <div>
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Priority</p>
+                                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Priority</p>
                                 <span className={`inline-flex items-center mt-1 px-2.5 py-1 rounded-full text-xs font-medium border ${priorityCfg.bg} ${priorityCfg.text} ${priorityCfg.border}`}>
                                     {priorityCfg.label}
                                 </span>
                             </div>
                             <div>
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Category</p>
-                                <p className="text-sm text-gray-900 mt-1 capitalize">{ticket.category}</p>
+                                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Category</p>
+                                <p className="text-sm text-slate-900 mt-1 capitalize">{ticket.category}</p>
                             </div>
-                            <div className="pt-3 border-t border-gray-100">
-                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <div className="pt-3 border-t border-slate-100">
+                                <div className="flex items-center gap-2 text-xs text-slate-500">
                                     <Calendar className="h-3.5 w-3.5" />
                                     Created {new Date(ticket.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </div>
-                                <div className="flex items-center gap-2 text-xs text-gray-500 mt-1.5">
+                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1.5">
                                     <Clock className="h-3.5 w-3.5" />
                                     Updated {new Date(ticket.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </div>

@@ -2,10 +2,10 @@
 
 import { useCallback, useState } from 'react';
 import { Button } from '@/components/UI/Button';
-import { User, Calendar, Users, Mail, Plus, Trash2, ArrowLeft, ArrowRight, IdCard, Phone as PhoneIcon } from 'lucide-react';
+import { User, Calendar, Users, Mail, Plus, Trash2, ArrowLeft, ArrowRight, IdCard, Phone as PhoneIcon, Image as ImageIcon } from 'lucide-react';
 import { ToggleButton, PhoneInput, validatePhoneE164, AccordionSection } from '@/components/VendorHub/FormUI';
 import { scrollToFirstError } from '@/lib/formErrorScroll';
-import { showErrorToast } from '@/lib/toast-utils';
+import { showErrorToast, handleUpload } from '@/lib/toast-utils';
 
 interface OwnerProfileProps {
   onNext: () => void;
@@ -45,7 +45,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // section toggles by whether any partial rows exist), so they're not
 // listed here. Keep these in lockstep with the validation in handleNext.
 const SECTION_FIELDS: Record<string, string[]> = {
-  identity: ['designation', 'ownerName'],
+  identity: ['designation', 'ownerName', 'ownerPhoto'],
   contact: ['ownerEmail', 'ownerEmail2', 'ownerPhone', 'ownerPhone2', 'ownerLandline'],
   team: [],
   history: ['businessStartDate'],
@@ -153,7 +153,11 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     /** Optional landline. */
     ownerLandline: data.ownerLandline || '',
     businessStartDate: data.businessStartDate || data.yearEstablished || '',
-    employeeCount: data.employeeCount || ''
+    employeeCount: data.employeeCount || '',
+    /** Owner profile photo — preview URL (object URL or remote) for display. */
+    ownerPhoto: data.ownerPhoto || null,
+    /** Owner profile photo — the File pending upload (optional). */
+    ownerPhotoFile: data.ownerPhotoFile || null
   });
 
   // Additional contact shape mirrors the primary owner so admins reading a
@@ -187,6 +191,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   const FIELD_SECTION_MAP: Record<string, SectionKey> = {
     ownerName: 'identity',
     designation: 'identity',
+    ownerPhoto: 'identity',
     ownerEmail: 'contact',
     ownerEmail2: 'contact',
     ownerPhone: 'contact',
@@ -212,6 +217,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       ownerLandline: data.ownerLandline || '',
       businessStartDate: data.businessStartDate || data.yearEstablished || '',
       employeeCount: data.employeeCount || '',
+      ownerPhoto: data.ownerPhoto || null,
+      ownerPhotoFile: data.ownerPhotoFile || null,
     });
     // Business-rule guard: when the upstream company type only allows a
     // single owner (proprietorship), drop any additional contacts that
@@ -268,8 +275,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       // edits a previously-flagged number.
       if (field === 'ownerPhone' || field === 'ownerPhone2') {
         const labelMap: Record<string, string> = {
-          ownerPhone: 'Phone Number 1',
-          ownerPhone2: 'Phone Number 2',
+          ownerPhone: 'Primary Phone',
+          ownerPhone2: 'Secondary Phone',
         };
         const liveErr = value
           ? validatePhoneE164(value, {
@@ -293,8 +300,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
     // Strict (non-live) phone validation on blur — flags too-short/empty.
     const phoneLabels: Record<string, string> = {
-      ownerPhone: 'Phone Number 1',
-      ownerPhone2: 'Phone Number 2',
+      ownerPhone: 'Primary Phone',
+      ownerPhone2: 'Secondary Phone',
     };
     if (field in phoneLabels) {
       const value = (formData as any)[field] as string;
@@ -312,10 +319,70 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     }
   }, [formData]);
 
+  // ── Owner profile photo upload ────────────────────────────────────────
+  // Image-only, optional. Mirrors CompanyDetails' logo upload: validate via
+  // handleUpload, store the File + an object-URL preview, revoke the prior
+  // object URL on replace/remove to avoid leaks.
+  const [ownerPhotoError, setOwnerPhotoError] = useState<string | null>(null);
+
+  const handleOwnerPhotoFile = useCallback((file: File) => {
+    const result = handleUpload(file, {
+      label: 'Owner photo',
+      allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
+      allowedLabel: 'PNG, JPG, or WEBP',
+      maxBytes: 2 * 1024 * 1024,
+      maxLabel: '2,048 KB',
+    });
+    if (!result.ok) {
+      setOwnerPhotoError(result.message);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setFormData((prev) => {
+      if (prev.ownerPhotoFile && typeof prev.ownerPhoto === 'string' && prev.ownerPhoto.startsWith('blob:')) {
+        URL.revokeObjectURL(prev.ownerPhoto);
+      }
+      return { ...prev, ownerPhotoFile: file, ownerPhoto: url };
+    });
+    setOwnerPhotoError(null);
+    setErrors((prev) => (prev.ownerPhoto ? { ...prev, ownerPhoto: '' } : prev));
+  }, []);
+
+  const handleOwnerPhotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleOwnerPhotoFile(file);
+  }, [handleOwnerPhotoFile]);
+
+  const handleOwnerPhotoDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleOwnerPhotoFile(file);
+  }, [handleOwnerPhotoFile]);
+
+  const handleRemoveOwnerPhoto = useCallback(() => {
+    setFormData((prev) => {
+      if (prev.ownerPhotoFile && typeof prev.ownerPhoto === 'string' && prev.ownerPhoto.startsWith('blob:')) {
+        URL.revokeObjectURL(prev.ownerPhoto);
+      }
+      return { ...prev, ownerPhotoFile: null, ownerPhoto: null };
+    });
+    setOwnerPhotoError(null);
+  }, []);
+
+  const handleOwnerPhotoDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  }, []);
+
   const handleNext = useCallback(() => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.ownerName) newErrors.ownerName = 'Owner full name is required';
+
+    // Owner profile photo is mandatory — accept either a freshly chosen File
+    // or an existing uploaded photo (edit mode).
+    if (!formData.ownerPhotoFile && !formData.ownerPhoto) {
+      newErrors.ownerPhoto = 'Owner profile photo is required';
+    }
 
     // Designation: required, with "Other" requiring a typed value
     const dRaw = formData.designation;
@@ -327,13 +394,13 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       newErrors.designation = 'Please type your designation';
     }
 
-    // Email 1 (required)
+    // Primary email (required)
     if (!formData.ownerEmail) {
-      newErrors.ownerEmail = 'Email ID 1 is required';
+      newErrors.ownerEmail = 'Primary Email is required';
     } else if (!EMAIL_RE.test(formData.ownerEmail)) {
       newErrors.ownerEmail = 'Please enter a valid email address';
     }
-    // Email 2 (optional but must be valid + distinct when supplied)
+    // Secondary email (optional but must be valid + distinct when supplied)
     if (formData.ownerEmail2 && !EMAIL_RE.test(formData.ownerEmail2)) {
       newErrors.ownerEmail2 = 'Please enter a valid email address';
     } else if (
@@ -341,18 +408,18 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       formData.ownerEmail &&
       formData.ownerEmail2.trim().toLowerCase() === formData.ownerEmail.trim().toLowerCase()
     ) {
-      newErrors.ownerEmail2 = 'Email ID 2 must be different from Email ID 1';
+      newErrors.ownerEmail2 = 'Secondary Email must be different from Primary Email';
     }
 
     // Phones — libphonenumber-js validates per country
     const phoneErr = validatePhoneE164(formData.ownerPhone, {
       required: true,
-      label: 'Phone Number 1',
+      label: 'Primary Phone',
     });
     if (phoneErr) newErrors.ownerPhone = phoneErr;
     const phone2Err = validatePhoneE164(formData.ownerPhone2, {
       required: false,
-      label: 'Phone Number 2',
+      label: 'Secondary Phone',
     });
     if (phone2Err) newErrors.ownerPhone2 = phone2Err;
     if (formData.ownerLandline) {
@@ -392,6 +459,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       const fieldOrder = [
         'designation',
         'ownerName',
+        'ownerPhoto',
         'ownerEmail',
         'ownerEmail2',
         'ownerPhone',
@@ -422,6 +490,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
           fieldOrder: [
             'designation',
             'ownerName',
+            'ownerPhoto',
             'ownerEmail',
             'ownerEmail2',
             'ownerPhone',
@@ -432,6 +501,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
           ],
           selectorMap: {
             designation: '[data-field="designation"]',
+            ownerPhoto: '[data-field="ownerPhoto"]',
             ownerPhone: '[name="ownerPhone"]',
             ownerPhone2: '[name="ownerPhone2"]',
             ownerLandline: '[name="ownerLandline"]',
@@ -460,7 +530,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   const allowMultipleOwners = resolveOwnerStructure(data.businessType).allowMultiple;
   const getSectionStatus = (section: SectionKey): 'complete' | 'partial' | 'empty' => {
     if (section === 'identity') {
-      const required = [formData.ownerName, formData.designation];
+      const required = [formData.ownerName, formData.designation, formData.ownerPhoto];
       const filled = required.filter(Boolean).length;
       if (filled === required.length) return 'complete';
       if (filled > 0) return 'partial';
@@ -574,7 +644,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                       key={opt.id}
                       selected={d === opt.id}
                       invalid={invalid && !d}
-                      onClick={() => handleInputChange('designation', opt.id)}
+                      onClick={() => handleInputChange('designation', d === opt.id ? '' : opt.id)}
                     >
                       {opt.label}
                     </ToggleButton>
@@ -583,7 +653,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                     selected={otherSelected}
                     invalid={invalid && !d}
                     onClick={() => {
-                      if (!otherSelected) handleInputChange('designation', DESIGNATION_OTHER);
+                      handleInputChange('designation', otherSelected ? '' : DESIGNATION_OTHER);
                     }}
                   >
                     Other
@@ -628,7 +698,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
             );
           })()}
 
-          {/* Owner Name */}
+          {/* Owner Name + Profile Photo — 2 fields per row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <div>
             <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-1.5">
               Owner Full Name <span className="text-red-500" aria-hidden="true">*</span>
@@ -654,6 +725,58 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               </p>
             )}
           </div>
+
+          {/* Owner Profile Photo — mandatory, image-only upload */}
+          {(() => {
+            const photoInvalid = !!(errors.ownerPhoto && touched.ownerPhoto) || !!ownerPhotoError;
+            return (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Owner Profile Photo <span className="text-red-500" aria-hidden="true">*</span>
+              </label>
+              <div
+                className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-3 transition-all duration-200 ${
+                  photoInvalid ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                }`}
+                onDragOver={handleOwnerPhotoDragOver}
+                onDrop={handleOwnerPhotoDrop}
+                role="region"
+                aria-label="Owner photo upload dropzone"
+                data-field="ownerPhoto"
+                tabIndex={-1}
+              >
+                <div className="w-12 h-12 shrink-0 bg-white rounded-full border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                  {formData.ownerPhoto ? (
+                    <img src={formData.ownerPhoto as string} alt="Owner Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon className="w-5 h-5 text-slate-300" aria-hidden="true" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs text-slate-500 truncate">
+                    {formData.ownerPhoto ? (formData.ownerPhotoFile?.name || 'photo.png') : 'Drag & drop or browse'}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">PNG, JPG, WEBP — max 2 MB</p>
+                </div>
+                <input id="ownerPhotoUpload" type="file" accept="image/*" onChange={handleOwnerPhotoChange} className="hidden" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <label htmlFor="ownerPhotoUpload" className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors duration-200">
+                    Browse
+                  </label>
+                  {formData.ownerPhoto && (
+                    <button type="button" onClick={handleRemoveOwnerPhoto} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+              {(ownerPhotoError || (errors.ownerPhoto && touched.ownerPhoto)) && (
+                <p className="text-red-500 text-xs mt-1">{ownerPhotoError || errors.ownerPhoto}</p>
+              )}
+            </div>
+            );
+          })()}
+          </div>
       </AccordionSection>
 
       <AccordionSection
@@ -662,77 +785,70 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         title="Owner Contact"
         subtitle="Email + phone numbers we'll use to reach the owner"
       >
-          {/* Emails — primary required, secondary optional, 2-col on sm+ */}
+          {/* Emails — primary required, secondary optional, 2-col on sm+.
+              Format mirrors Step 1 → Contact & Communication. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="ownerEmail" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email ID 1 <span className="text-red-500" aria-hidden="true">*</span>
+              <label htmlFor="ownerEmail" className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                <span>Primary Email</span>
+                <span className="text-brand-500" aria-hidden="true">*</span>
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
-                <input
-                  id="ownerEmail"
-                  type="email"
-                  name="ownerEmail"
-                  value={formData.ownerEmail}
-                  onChange={(e) => handleInputChange('ownerEmail', e.target.value)}
-                  onBlur={() => handleBlur('ownerEmail')}
-                  autoComplete="email"
-                  inputMode="email"
-                  spellCheck={false}
-                  className={`w-full pl-9 pr-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                    errors.ownerEmail && touched.ownerEmail
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                  placeholder="owner@company.com"
-                />
-              </div>
+              <input
+                id="ownerEmail"
+                type="email"
+                name="ownerEmail"
+                value={formData.ownerEmail}
+                onChange={(e) => handleInputChange('ownerEmail', e.target.value)}
+                onBlur={() => handleBlur('ownerEmail')}
+                autoComplete="email"
+                inputMode="email"
+                spellCheck={false}
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.ownerEmail && touched.ownerEmail ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="owner@company.com"
+              />
               {errors.ownerEmail && touched.ownerEmail && (
-                <p className="text-red-600 text-sm mt-1 font-medium" role="alert">
-                  {errors.ownerEmail}
-                </p>
+                <p className="text-red-500 text-xs mt-1">{errors.ownerEmail}</p>
               )}
             </div>
 
             <div>
-              <label htmlFor="ownerEmail2" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email ID 2{' '}
-                <span className="text-gray-400 text-xs font-normal">(optional)</span>
+              <label htmlFor="ownerEmail2" className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                <span>Secondary Email</span>
+                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
-                <input
-                  id="ownerEmail2"
-                  type="email"
-                  name="ownerEmail2"
-                  value={formData.ownerEmail2}
-                  onChange={(e) => handleInputChange('ownerEmail2', e.target.value)}
-                  onBlur={() => handleBlur('ownerEmail2')}
-                  autoComplete="off"
-                  inputMode="email"
-                  spellCheck={false}
-                  className={`w-full pl-9 pr-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                    errors.ownerEmail2 && touched.ownerEmail2
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                  placeholder="alternate@company.com"
-                />
-              </div>
+              <input
+                id="ownerEmail2"
+                type="email"
+                name="ownerEmail2"
+                value={formData.ownerEmail2}
+                onChange={(e) => handleInputChange('ownerEmail2', e.target.value)}
+                onBlur={() => handleBlur('ownerEmail2')}
+                autoComplete="off"
+                inputMode="email"
+                spellCheck={false}
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.ownerEmail2 && touched.ownerEmail2 ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="alternate@company.com"
+              />
               {errors.ownerEmail2 && touched.ownerEmail2 && (
-                <p className="text-red-600 text-sm mt-1 font-medium" role="alert">
-                  {errors.ownerEmail2}
-                </p>
+                <p className="text-red-500 text-xs mt-1">{errors.ownerEmail2}</p>
               )}
             </div>
           </div>
 
-          {/* Phones — Phone 1 required, Phone 2 + Landline optional */}
+          {/* Phones — Primary required, Secondary + Landline optional.
+              Format mirrors Step 1 → Contact & Communication. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Phone Number 1 <span className="text-red-500" aria-hidden="true">*</span>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                <span>Primary Phone</span>
+                <span className="text-brand-500" aria-hidden="true">*</span>
               </label>
               <PhoneInput
                 name="ownerPhone"
@@ -744,16 +860,15 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                 autoComplete="tel"
               />
               {errors.ownerPhone && touched.ownerPhone && (
-                <p className="text-red-600 text-sm mt-1 font-medium" role="alert">
-                  {errors.ownerPhone}
-                </p>
+                <p className="text-red-500 text-xs mt-1">{errors.ownerPhone}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Phone Number 2{' '}
-                <span className="text-gray-400 text-xs font-normal">(optional)</span>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                <span>Secondary Phone</span>
+                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
               <PhoneInput
                 name="ownerPhone2"
@@ -765,16 +880,15 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                 autoComplete="off"
               />
               {errors.ownerPhone2 && touched.ownerPhone2 && (
-                <p className="text-red-600 text-sm mt-1 font-medium" role="alert">
-                  {errors.ownerPhone2}
-                </p>
+                <p className="text-red-500 text-xs mt-1">{errors.ownerPhone2}</p>
               )}
             </div>
 
             <div className="sm:col-span-2 sm:max-w-md">
-              <label htmlFor="ownerLandline" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Landline Number{' '}
-                <span className="text-gray-400 text-xs font-normal">(optional)</span>
+              <label htmlFor="ownerLandline" className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                <span>Landline Number</span>
+                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
               <input
                 id="ownerLandline"
@@ -785,17 +899,13 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                 onBlur={() => handleBlur('ownerLandline')}
                 inputMode="tel"
                 autoComplete="off"
-                className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                  errors.ownerLandline && touched.ownerLandline
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-slate-200 hover:border-slate-300'
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.ownerLandline && touched.ownerLandline ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
                 }`}
                 placeholder="2228175000"
               />
               {errors.ownerLandline && touched.ownerLandline && (
-                <p className="text-red-600 text-sm mt-1 font-medium" role="alert">
-                  {errors.ownerLandline}
-                </p>
+                <p className="text-red-500 text-xs mt-1">{errors.ownerLandline}</p>
               )}
             </div>
           </div>
@@ -1013,7 +1123,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <label htmlFor="businessStartDate" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Start Business <span className="text-red-500">*</span>
+                Start Business Date <span className="text-red-500">*</span>
               </label>
               <input
                 id="businessStartDate"
@@ -1036,13 +1146,14 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
             
             <div>
               <label htmlFor="tillDate" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Till Date
+                Present Date
               </label>
               <input
                 id="tillDate"
-                type="text"
-                value="Present"
+                type="date"
+                value={new Date().toISOString().split('T')[0]}
                 disabled
+                readOnly
                 className="w-full px-4 py-3 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed"
               />
             </div>

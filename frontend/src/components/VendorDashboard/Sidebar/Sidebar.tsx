@@ -17,6 +17,7 @@ import {
   Settings,
   ShoppingCart,
   Star,
+  Store,
 } from "lucide-react";
 
 interface SubMenuItem {
@@ -158,17 +159,19 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
   };
 
   return (
-    <div className="flex h-full w-64 flex-col font-sans bg-white border-r border-gray-200 shadow-sm">
+    <div className="flex h-full w-64 flex-col font-sans bg-white border-r border-slate-200 shadow-xs">
       {/* Logo */}
-      <div className="flex h-16 items-center justify-center border-b border-gray-200 px-4">
+      <div className="flex h-20 items-center justify-center border-b border-slate-200 px-6">
         <Link
           href="/vendor/dashboard"
-          className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
         >
+          <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
+            <Store className="w-4 h-4 text-brand-500" />
+          </div>
           <div>
-            <span className="text-lg text-center font-bold text-gray-900 block">
-              Vendor Management
-            </span>
+            <h1 className="text-base font-bold text-slate-900 leading-tight">M2C MarkDowns</h1>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-brand-500 mt-0.5">Vendor Portal</p>
           </div>
         </Link>
       </div>
@@ -188,16 +191,16 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
                 key={item.title}
                 href={item.href}
                 className={cn(
-                  "w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 group",
+                  "w-full flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 group border-l-4",
                   itemIsActive
-                    ? "bg-gray-900 text-white shadow-sm"
-                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
+                    ? "bg-brand-50/60 border-brand-500 text-brand-700 font-bold shadow-xs shadow-brand-500/5"
+                    : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900",
                 )}
               >
                 <Icon
                   className={cn(
                     "mr-3 h-5 w-5 transition-colors",
-                    itemIsActive ? "text-white" : "text-gray-500 group-hover:text-gray-700",
+                    itemIsActive ? "text-brand-500" : "text-slate-400 group-hover:text-slate-600",
                   )}
                 />
                 <span className="font-medium">{item.title}</span>
@@ -214,11 +217,11 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
               <button
                 onClick={() => toggleExpanded(item.title)}
                 className={cn(
-                  "w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 group",
+                  "w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 group border-l-4",
                   parentHasActiveChild
-                    ? "bg-gray-100 text-gray-900 border border-gray-300"
-                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
-                  "focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2",
+                    ? "bg-brand-50/60 border-brand-500 text-brand-700"
+                    : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                  "focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2",
                 )}
               >
                 <div className="flex items-center">
@@ -226,25 +229,25 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
                     className={cn(
                       "mr-3 h-5 w-5 transition-colors",
                       parentHasActiveChild
-                        ? "text-gray-900"
-                        : "text-gray-500 group-hover:text-gray-700"
+                        ? "text-brand-500"
+                        : "text-slate-400 group-hover:text-slate-600"
                     )}
                   />
                   <span className="font-medium">{item.title}</span>
                 </div>
                 <div className="flex items-center">
                   {parentHasActiveChild && (
-                    <div className="w-2 h-2 bg-gray-900 rounded-full mr-2" />
+                    <div className="w-2 h-2 bg-brand-500 rounded-full mr-2" />
                   )}
                   {isExpanded ? (
                     <ChevronDown className={cn(
                       "h-4 w-4 transition-transform duration-200",
-                      parentHasActiveChild ? "text-gray-900" : "text-gray-400"
+                      parentHasActiveChild ? "text-brand-500" : "text-slate-400"
                     )} />
                   ) : (
                     <ChevronRight className={cn(
                       "h-4 w-4 transition-transform duration-200",
-                      parentHasActiveChild ? "text-gray-900" : "text-gray-400"
+                      parentHasActiveChild ? "text-brand-500" : "text-slate-400"
                     )} />
                   )}
                 </div>
@@ -252,7 +255,7 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
 
               {/* Sub Menu Items */}
               {isExpanded && item.subItems && (
-                <div className="ml-6 space-y-1 border-l-2 border-gray-100 pl-4 py-1">
+                <div className="ml-6 space-y-1 border-l-2 border-slate-100 pl-4 py-1">
                   {item.subItems.map((subItem) => {
                     const subItemIsActive = isSubItemActive(subItem.href);
 
@@ -263,12 +266,12 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
                         className={cn(
                           "flex items-center px-3 py-2 text-sm rounded-lg transition-all duration-200 group relative",
                           subItemIsActive
-                            ? "bg-gray-900 text-white shadow-sm font-medium"
-                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+                            ? "bg-brand-50/60 text-brand-700 font-semibold"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
                         )}
                       >
                         {subItemIsActive && (
-                          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-gray-900 rounded-r-full -ml-4" />
+                          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-brand-500 rounded-r-full -ml-4" />
                         )}
                         <span>{subItem.title}</span>
                       </Link>
@@ -282,14 +285,14 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-slate-200 p-4">
         <div className="flex items-center">
-          <div className="h-10 w-10 rounded-full bg-linear-to-br from-gray-700 to-gray-900 flex items-center justify-center shadow-md">
+          <div className="h-10 w-10 rounded-full bg-linear-to-br from-brand-500 to-brand-600 flex items-center justify-center shadow-md">
             <User className="h-5 w-5 text-white" />
           </div>
           <div className="ml-3 flex-1">
-            <p className="text-sm font-semibold text-gray-900">Vendor Store</p>
-            <p className="text-xs text-gray-500">Premium Plan</p>
+            <p className="text-sm font-semibold text-slate-900">Vendor Store</p>
+            <p className="text-xs text-slate-500">Premium Plan</p>
           </div>
         </div>
       </div>

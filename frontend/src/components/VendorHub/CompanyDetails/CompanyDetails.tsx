@@ -19,10 +19,14 @@ interface FormData {
   businessType: string;
   companyName: string;
   gstNumber: string;
-  /** Type-specific regulatory ID — IEC / CIN / Deed details / LLPIN. */
+  /** Type-specific regulatory ID — CIN / Deed details / LLPIN. */
   companyIdNumber: string;
+  /** IEC (Import Export Code) — shown for every business type, optional. */
+  iecCode: string;
   /** PAN Number — required across all four supported business types. */
   panNumber: string;
+  /** Aadhaar Number — required ONLY for the "Unregistered Vendor" type. */
+  aadhaarNumber: string;
   email: string;
   email2: string;
   phone: string;
@@ -55,6 +59,12 @@ interface FormData {
   /** Type-specific business certificate (IEC / CIN / Deed / LLPIN). */
   typeCertDocument: string | null;
   typeCertFile: File | null;
+  /** IEC Certificate upload — optional, available for every business type. */
+  iecCertDocument: string | null;
+  iecCertFile: File | null;
+  /** Aadhaar card upload — required ONLY for "Unregistered Vendor". */
+  aadhaarDocument: string | null;
+  aadhaarFile: File | null;
   /** Per-business-type bucket of regulatory-ID values. The active
    *  type's value lives in `companyIdNumber`; this map remembers what
    *  the vendor previously typed for each OTHER type so toggling chips
@@ -77,7 +87,14 @@ const businessTypes = [
   { id: "pvt-ltd", label: "Pvt Ltd" },
   { id: "partnership-firm", label: "Partnership Firm" },
   { id: "llp", label: "LLP" },
+  { id: "unregistered", label: "Unregistered Vendor" },
 ];
+
+// "Unregistered Vendor" — a special business type that has no statutory
+// company registration. For these vendors GST, PAN and the type-specific
+// certificate become OPTIONAL, and instead an Aadhaar number + Aadhaar card
+// upload are REQUIRED for identity verification.
+const UNREGISTERED_TYPE_ID = 'unregistered';
 
 // Factory facility ownership — same shape and copy as WarehouseDetails so
 // admins reading vendor profiles can compare warehouse vs factory ownership
@@ -111,6 +128,9 @@ interface CompanyTypeFieldMeta {
   uppercase?: boolean;
   /** Upload label for the type-specific certificate (Change 6) */
   certLabel: string;
+  /** When true the regulatory ID is optional — no `*` marker and the
+   *  validator only checks format when a value is supplied. */
+  optionalId?: boolean;
 }
 
 const COMPANY_TYPE_META: Record<CompanyTypeId, CompanyTypeFieldMeta> = {
@@ -120,9 +140,12 @@ const COMPANY_TYPE_META: Record<CompanyTypeId, CompanyTypeFieldMeta> = {
     maxLength: 10,
     uppercase: true,
     certLabel: 'IEC Certificate',
+    optionalId: true,
+    // IEC Code is optional for proprietorships — only validate the format
+    // when the vendor actually enters a value.
     validate: (v) =>
       !v
-        ? 'IEC Code is required'
+        ? ''
         : !/^[A-Z0-9]{10}$/i.test(v)
         ? 'IEC Code must be exactly 10 alphanumeric characters'
         : '',
@@ -170,6 +193,9 @@ const COMPANY_TYPE_META: Record<CompanyTypeId, CompanyTypeFieldMeta> = {
 // PAN: 5 letters + 4 digits + 1 letter (e.g. AAAAA0000A)
 const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/i;
 
+// Aadhaar: exactly 12 digits.
+const AADHAAR_PATTERN = /^\d{12}$/;
+
 // Document upload constraints — shared by GST, PAN Card, and the
 // type-specific business certificate. (Logo uses its own image-only
 // constraint kept inline below.)
@@ -196,7 +222,9 @@ export default function CompanyDetails({
     companyName: data.companyName || "",
     gstNumber: data.gstNumber || "",
     companyIdNumber: data.companyIdNumber || "",
+    iecCode: data.iecCode || "",
     panNumber: data.panNumber || "",
+    aadhaarNumber: data.aadhaarNumber || "",
     email: data.email || "",
     email2: data.email2 || "",
     phone: data.phone || "",
@@ -226,6 +254,10 @@ export default function CompanyDetails({
     panCardFile: data.panCardFile || null,
     typeCertDocument: data.typeCertDocument || null,
     typeCertFile: data.typeCertFile || null,
+    iecCertDocument: data.iecCertDocument || null,
+    iecCertFile: data.iecCertFile || null,
+    aadhaarDocument: data.aadhaarDocument || null,
+    aadhaarFile: data.aadhaarFile || null,
     // Per-business-type stash for the type-specific regulatory ID +
     // certificate. The active type's values live in
     // `companyIdNumber` / `typeCertFile` / `typeCertDocument` (which is
@@ -263,7 +295,9 @@ export default function CompanyDetails({
     companyName: 'profile',
     gstNumber: 'profile',
     companyIdNumber: 'profile',
+    iecCode: 'profile',
     panNumber: 'profile',
+    aadhaarNumber: 'profile',
     email: 'contact',
     email2: 'contact',
     phone: 'contact',
@@ -279,6 +313,7 @@ export default function CompanyDetails({
     gstDocument: 'documents',
     panCardDocument: 'documents',
     typeCertDocument: 'documents',
+    aadhaarDocument: 'documents',
   };
 
   // ── ZIP / postal-code auto-fill ─────────────────────────────────
@@ -351,7 +386,9 @@ export default function CompanyDetails({
       companyName: data.companyName || "",
       gstNumber: data.gstNumber || "",
       companyIdNumber: data.companyIdNumber || "",
+      iecCode: data.iecCode || "",
       panNumber: data.panNumber || "",
+      aadhaarNumber: data.aadhaarNumber || "",
       email: data.email || "",
       email2: data.email2 || "",
       phone: data.phone || "",
@@ -379,6 +416,10 @@ export default function CompanyDetails({
       panCardFile: data.panCardFile || null,
       typeCertDocument: data.typeCertDocument || null,
       typeCertFile: data.typeCertFile || null,
+      iecCertDocument: data.iecCertDocument || null,
+      iecCertFile: data.iecCertFile || null,
+      aadhaarDocument: data.aadhaarDocument || null,
+      aadhaarFile: data.aadhaarFile || null,
       // See useState init for the rationale on these per-type buckets.
       companyIdByType: data.companyIdByType || (
         data.businessType && data.companyIdNumber
@@ -479,6 +520,16 @@ export default function CompanyDetails({
         if (field === 'businessType') {
           updated.companyIdNumber = '';
           updated.typeCertDocument = '';
+          // Clear cross-type stale errors so switching to/from
+          // "Unregistered Vendor" / "Others" doesn't leave irrelevant errors
+          // showing on fields that are now hidden.
+          updated.gstNumber = '';
+          updated.gstDocument = '';
+          updated.panNumber = '';
+          updated.panCardDocument = '';
+          updated.iecCode = '';
+          updated.aadhaarNumber = '';
+          updated.aadhaarDocument = '';
         }
         return updated;
       }
@@ -735,6 +786,100 @@ export default function CompanyDetails({
     setTypeCertError(null);
   }, []);
 
+  // ── IEC Certificate upload (OPTIONAL — available for every type) ───
+  const [iecCertError, setIecCertError] = useState<string | null>(null);
+
+  const handleIecCertFile = useCallback((file: File) => {
+    const result = handleUpload(file, {
+      label: 'IEC certificate',
+      allowedTypes: ALLOWED_DOC_TYPES,
+      allowedLabel: ALLOWED_DOC_LABEL,
+      maxBytes: MAX_DOC_BYTES,
+      maxLabel: MAX_DOC_LABEL,
+    });
+    if (!result.ok) {
+      setIecCertError(result.message);
+      return;
+    }
+    const currentFormData = formDataRef.current;
+    if (currentFormData.iecCertFile && typeof currentFormData.iecCertDocument === 'string') {
+      URL.revokeObjectURL(currentFormData.iecCertDocument);
+    }
+    const url = URL.createObjectURL(file);
+    setFormData((prev) => ({ ...prev, iecCertFile: file, iecCertDocument: url }));
+    setIecCertError(null);
+  }, []);
+
+  const handleIecCertChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleIecCertFile(file);
+  }, [handleIecCertFile]);
+
+  const handleIecCertDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleIecCertFile(file);
+  }, [handleIecCertFile]);
+
+  const handleRemoveIecCert = useCallback(() => {
+    const currentFormData = formDataRef.current;
+    if (currentFormData.iecCertFile && typeof currentFormData.iecCertDocument === "string") {
+      URL.revokeObjectURL(currentFormData.iecCertDocument);
+    }
+    setFormData((prev) => ({ ...prev, iecCertFile: null, iecCertDocument: null }));
+    setIecCertError(null);
+  }, []);
+
+  // ── Aadhaar card upload (Unregistered Vendor only) ─────────────────
+  const [aadhaarError, setAadhaarError] = useState<string | null>(null);
+
+  const handleAadhaarFile = useCallback((file: File) => {
+    const result = handleUpload(file, {
+      label: 'Aadhaar card',
+      allowedTypes: ALLOWED_DOC_TYPES,
+      allowedLabel: ALLOWED_DOC_LABEL,
+      maxBytes: MAX_DOC_BYTES,
+      maxLabel: MAX_DOC_LABEL,
+    });
+    if (!result.ok) {
+      setAadhaarError(result.message);
+      return;
+    }
+    const currentFormData = formDataRef.current;
+    if (currentFormData.aadhaarFile && typeof currentFormData.aadhaarDocument === 'string') {
+      URL.revokeObjectURL(currentFormData.aadhaarDocument);
+    }
+    const url = URL.createObjectURL(file);
+    setFormData((prev) => ({ ...prev, aadhaarFile: file, aadhaarDocument: url }));
+    setAadhaarError(null);
+    setErrors((prev) => {
+      if (prev.aadhaarDocument) {
+        return { ...prev, aadhaarDocument: '' };
+      }
+      return prev;
+    });
+  }, []);
+
+  const handleAadhaarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleAadhaarFile(file);
+  }, [handleAadhaarFile]);
+
+  const handleAadhaarDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleAadhaarFile(file);
+  }, [handleAadhaarFile]);
+
+  const handleRemoveAadhaar = useCallback(() => {
+    const currentFormData = formDataRef.current;
+    if (currentFormData.aadhaarFile && typeof currentFormData.aadhaarDocument === "string") {
+      URL.revokeObjectURL(currentFormData.aadhaarDocument);
+    }
+    setFormData((prev) => ({ ...prev, aadhaarFile: null, aadhaarDocument: null }));
+    setAadhaarError(null);
+  }, []);
+
   // Helper function to get file icon and color based on file type
   const getFileIcon = useCallback((file: File | null) => {
     if (!file) return { Icon: IconFileText, color: "text-gray-400" };
@@ -763,27 +908,65 @@ export default function CompanyDetails({
     // Validate required fields
     const newErrors: Record<string, string> = {};
     
+    // "Unregistered Vendor" has no statutory registration, so GST, PAN and
+    // the type-specific certificate are all OPTIONAL — instead the vendor
+    // proves identity with an Aadhaar number + Aadhaar card.
+    const isUnregistered = currentFormData.businessType === UNREGISTERED_TYPE_ID;
+
     if (!currentFormData.businessType) newErrors.businessType = 'Business Type is required';
     if (!currentFormData.companyName) newErrors.companyName = 'Company Name is required';
-    if (!currentFormData.gstNumber) {
-      newErrors.gstNumber = 'GST Number is required';
-    } else if (!/^[A-Z0-9]{15}$/i.test(currentFormData.gstNumber)) {
-      newErrors.gstNumber = 'GST Number must be exactly 15 alphanumeric characters';
+    if (isUnregistered) {
+      // GST is optional for unregistered vendors — only validate format if
+      // the vendor chose to enter one.
+      if (currentFormData.gstNumber && !/^[A-Z0-9]{15}$/i.test(currentFormData.gstNumber)) {
+        newErrors.gstNumber = 'GST Number must be exactly 15 alphanumeric characters';
+      }
+      // Aadhaar number is mandatory.
+      if (!currentFormData.aadhaarNumber) {
+        newErrors.aadhaarNumber = 'Aadhaar Number is required';
+      } else if (!AADHAAR_PATTERN.test(currentFormData.aadhaarNumber)) {
+        newErrors.aadhaarNumber = 'Aadhaar Number must be exactly 12 digits';
+      }
+    } else {
+      if (!currentFormData.gstNumber) {
+        newErrors.gstNumber = 'GST Number is required';
+      } else if (!/^[A-Z0-9]{15}$/i.test(currentFormData.gstNumber)) {
+        newErrors.gstNumber = 'GST Number must be exactly 15 alphanumeric characters';
+      }
     }
 
     // Type-specific regulatory ID + PAN — only enforced when the user has
     // picked one of the four supported types. For "Other" / user-typed
-    // values we don't know the regulatory shape, so we skip these checks.
+    // values and "Unregistered Vendor" we don't know the regulatory shape,
+    // so we skip these checks.
     const typeMeta = COMPANY_TYPE_META[currentFormData.businessType as CompanyTypeId];
     if (typeMeta) {
-      const idErr = typeMeta.validate(currentFormData.companyIdNumber);
-      if (idErr) newErrors.companyIdNumber = idErr;
+      // The type-specific regulatory ID (CIN / Deed / LLPIN) is only shown
+      // and enforced for Pvt Ltd / Partnership / LLP. Proprietorship has no
+      // separate company ID — it just uses the universal IEC Code below.
+      if (currentFormData.businessType !== 'proprietorship') {
+        const idErr = typeMeta.validate(currentFormData.companyIdNumber);
+        if (idErr) newErrors.companyIdNumber = idErr;
+      }
 
       if (!currentFormData.panNumber) {
         newErrors.panNumber = 'PAN Number is required';
       } else if (!PAN_PATTERN.test(currentFormData.panNumber)) {
         newErrors.panNumber = 'PAN must be 5 letters + 4 digits + 1 letter (e.g. AAAAA0000A)';
       }
+    }
+    // NOTE: PAN is NOT validated for custom "Others" / "Unregistered" types —
+    // the PAN field is hidden for those, so validating a stale value left over
+    // from a previously-selected type would surface a "Fix required" error on
+    // a field the user can't see (and can't fix). Only the supported types
+    // (handled inside the `if (typeMeta)` block above) validate PAN.
+
+    // IEC Code (Import Export Code) — only rendered when a supported business
+    // type is selected (inside the `typeMeta` block in the JSX). Skip the
+    // format check when the field is hidden so a leftover value can't block
+    // submission on an invisible field. Never mandatory.
+    if (typeMeta && currentFormData.iecCode && !/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
+      newErrors.iecCode = 'IEC Code must be exactly 10 alphanumeric characters';
     }
 
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -849,14 +1032,24 @@ export default function CompanyDetails({
     // CIN / Deed / LLPIN) is only required when one of the four supported
     // types is selected — "Other" vendors aren't blocked on this.
 
-    if (!currentFormData.gstDocument) {
-      newErrors.gstDocument = 'GST Certificate upload is required';
-    }
-    if (!currentFormData.panCardDocument) {
-      newErrors.panCardDocument = 'PAN Card upload is required';
-    }
-    if (typeMeta && !currentFormData.typeCertDocument) {
-      newErrors.typeCertDocument = `${typeMeta.certLabel} upload is required`;
+    // For "Unregistered Vendor" the GST / PAN / type-cert uploads are all
+    // optional; instead the Aadhaar card upload is mandatory.
+    if (isUnregistered) {
+      if (!currentFormData.aadhaarDocument) {
+        newErrors.aadhaarDocument = 'Aadhaar Card upload is required';
+      }
+    } else {
+      if (!currentFormData.gstDocument) {
+        newErrors.gstDocument = 'GST Certificate upload is required';
+      }
+      if (!currentFormData.panCardDocument) {
+        newErrors.panCardDocument = 'PAN Card upload is required';
+      }
+      // The IEC Certificate (Proprietorship) is optional; every other
+      // type-specific certificate (CIN / Deed / LLPIN) stays mandatory.
+      if (typeMeta && typeMeta.certLabel !== 'IEC Certificate' && !currentFormData.typeCertDocument) {
+        newErrors.typeCertDocument = `${typeMeta.certLabel} upload is required`;
+      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -876,7 +1069,9 @@ export default function CompanyDetails({
         'companyName',
         'gstNumber',
         'companyIdNumber',
+        'iecCode',
         'panNumber',
+        'aadhaarNumber',
         'email',
         'email2',
         'phone',
@@ -892,6 +1087,7 @@ export default function CompanyDetails({
         'gstDocument',
         'panCardDocument',
         'typeCertDocument',
+        'aadhaarDocument',
       ];
 
       const firstErrorField = FIELD_ORDER.find(f => newErrors[f]);
@@ -919,6 +1115,7 @@ export default function CompanyDetails({
             gstDocument: '[data-field="gstDocument"]',
             panCardDocument: '[data-field="panCardDocument"]',
             typeCertDocument: '[data-field="typeCertDocument"]',
+            aadhaarDocument: '[data-field="aadhaarDocument"]',
           },
         });
       });
@@ -990,7 +1187,9 @@ export default function CompanyDetails({
       const required = [
         formData.gstDocument,
         formData.panCardDocument,
-        ...(typeMeta ? [formData.typeCertDocument] : []),
+        // IEC Certificate (Proprietorship) is optional — don't gate the
+        // section's "complete" status on it.
+        ...(typeMeta && typeMeta.certLabel !== 'IEC Certificate' ? [formData.typeCertDocument] : []),
       ];
       const filled = required.filter(Boolean).length;
       if (filled === required.length) return 'complete';
@@ -1078,7 +1277,7 @@ export default function CompanyDetails({
                           selected={bt === type.id}
                           invalid={invalid && !bt}
                           icon={iconMap[type.id]}
-                          onClick={() => handleInputChange("businessType", type.id)}
+                          onClick={() => handleInputChange("businessType", bt === type.id ? '' : type.id)}
                         >
                           {type.label}
                         </ToggleButton>
@@ -1089,7 +1288,7 @@ export default function CompanyDetails({
                       invalid={invalid && !bt}
                       icon={HelpCircle}
                       onClick={() => {
-                        if (!othersSelected) handleInputChange("businessType", OTHERS_PLACEHOLDER);
+                        handleInputChange("businessType", othersSelected ? '' : OTHERS_PLACEHOLDER);
                       }}
                     >
                       Others
@@ -1151,7 +1350,12 @@ export default function CompanyDetails({
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">
-                GST Number <span className="text-brand-500" aria-hidden="true">*</span>
+                GST Number{' '}
+                {formData.businessType === UNREGISTERED_TYPE_ID ? (
+                  <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+                ) : (
+                  <span className="text-brand-500" aria-hidden="true">*</span>
+                )}
               </label>
               <input
                 type="text"
@@ -1172,15 +1376,84 @@ export default function CompanyDetails({
             </div>
           </div>
 
+          {/* Aadhaar Number — only for "Unregistered Vendor". GST/PAN are not
+              required for these vendors, so Aadhaar is the identity proof. */}
+          {formData.businessType === UNREGISTERED_TYPE_ID && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg bg-brand-50/40 border border-brand-100">
+              <div>
+                <label htmlFor="aadhaarNumber" className="block text-sm font-semibold text-slate-700 mb-1">
+                  Aadhaar Number <span className="text-brand-500" aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="aadhaarNumber"
+                  type="text"
+                  name="aadhaarNumber"
+                  inputMode="numeric"
+                  value={formData.aadhaarNumber}
+                  onChange={(e) => handleInputChange("aadhaarNumber", e.target.value.replace(/\D/g, '').slice(0, 12))}
+                  onBlur={() => handleBlur("aadhaarNumber")}
+                  maxLength={12}
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-describedby={errors.aadhaarNumber && touched.aadhaarNumber ? 'aadhaarNumber-error' : undefined}
+                  aria-invalid={!!(errors.aadhaarNumber && touched.aadhaarNumber)}
+                  className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                    errors.aadhaarNumber && touched.aadhaarNumber ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="123412341234"
+                  style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+                />
+                {errors.aadhaarNumber && touched.aadhaarNumber && (
+                  <p id="aadhaarNumber-error" className="text-red-500 text-xs mt-1" role="alert">{errors.aadhaarNumber}</p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Dynamic Regulatory Fields — only shown when a supported type is selected */}
           {(() => {
             const meta = COMPANY_TYPE_META[formData.businessType as CompanyTypeId];
             if (!meta) return null;
             const idErr = !!(errors.companyIdNumber && touched.companyIdNumber);
             const panErr = !!(errors.panNumber && touched.panNumber);
+            const iecErr = !!(errors.iecCode && touched.iecCode);
+            // Proprietorships have no separate company registration ID — they
+            // only use the universal IEC Code field.
+            const showCompanyId = formData.businessType !== 'proprietorship';
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg bg-brand-50/40 border border-brand-100">
-                {/* Regulatory ID (IEC / CIN / Deed / LLPIN) */}
+                {/* IEC Code (Import Export Code) — shown for every business
+                    type and never mandatory. */}
+                <div>
+                  <label htmlFor="iecCode" className="block text-sm font-semibold text-slate-700 mb-1">
+                    IEC Code
+                  </label>
+                  <input
+                    id="iecCode"
+                    type="text"
+                    name="iecCode"
+                    value={formData.iecCode}
+                    onChange={(e) => handleInputChange('iecCode', e.target.value.toUpperCase())}
+                    onBlur={() => handleBlur('iecCode')}
+                    maxLength={10}
+                    spellCheck={false}
+                    autoComplete="off"
+                    aria-describedby={iecErr ? 'iecCode-error' : undefined}
+                    aria-invalid={iecErr}
+                    className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                      iecErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                    }`}
+                    placeholder="AAAAA1234A"
+                    style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+                  />
+                  {iecErr && (
+                    <p id="iecCode-error" className="text-red-500 text-xs mt-1" role="alert">{errors.iecCode}</p>
+                  )}
+                </div>
+
+                {/* Type-specific regulatory ID (CIN / Deed / LLPIN) — not
+                    shown for proprietorships. */}
+                {showCompanyId && (
                 <div>
                   <label htmlFor="companyIdNumber" className="block text-sm font-semibold text-slate-700 mb-1">
                     {meta.idLabel} <span className="text-brand-500" aria-hidden="true">*</span>
@@ -1210,11 +1483,12 @@ export default function CompanyDetails({
                     <p id="companyIdNumber-error" className="text-red-500 text-xs mt-1" role="alert">{errors.companyIdNumber}</p>
                   )}
                 </div>
+                )}
 
                 {/* PAN Number — constant across all 4 types */}
                 <div>
                   <label htmlFor="panNumber" className="block text-sm font-semibold text-slate-700 mb-1">
-                    PAN Number <span className="text-brand-500" aria-hidden="true">*</span>
+                    Company PAN Number <span className="text-brand-500" aria-hidden="true">*</span>
                   </label>
                   <input
                     id="panNumber"
@@ -1434,7 +1708,7 @@ export default function CompanyDetails({
                     selected={selected}
                     invalid={invalid}
                     onClick={() => {
-                      handleInputChange('factoryOwnershipType', type.id);
+                      handleInputChange('factoryOwnershipType', selected ? '' : type.id);
                       handleBlur('factoryOwnershipType');
                     }}
                   >
@@ -1480,31 +1754,30 @@ export default function CompanyDetails({
             />
           </div>
 
-          {/* Address Line 1 */}
-          <div>
-            <label htmlFor="addressLine1" className="block text-sm font-semibold text-slate-700 mb-1">
-              Address Line 1 <span className="text-brand-500" aria-hidden="true">*</span>
-            </label>
-            <input
-              id="addressLine1"
-              type="text"
-              name="address"
-              value={formData.address}
-              onChange={(e) => handleInputChange("address", e.target.value)}
-              onBlur={() => handleBlur("address")}
-              autoComplete="address-line1"
-              className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                errors.address && touched.address ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
-              }`}
-              placeholder="House / building / street"
-            />
-            {errors.address && touched.address && (
-              <p className="text-red-500 text-xs mt-1" role="alert">{errors.address}</p>
-            )}
-          </div>
+          {/* Address Line 1 + Line 2 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="addressLine1" className="block text-sm font-semibold text-slate-700 mb-1">
+                Address Line 1 <span className="text-brand-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="addressLine1"
+                type="text"
+                name="address"
+                value={formData.address}
+                onChange={(e) => handleInputChange("address", e.target.value)}
+                onBlur={() => handleBlur("address")}
+                autoComplete="address-line1"
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  errors.address && touched.address ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="House / building / street"
+              />
+              {errors.address && touched.address && (
+                <p className="text-red-500 text-xs mt-1" role="alert">{errors.address}</p>
+              )}
+            </div>
 
-          {/* Address Line 2 + Line 3 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="addressLine2" className="block text-sm font-semibold text-slate-700 mb-1">
                 Address Line 2 <span className="text-slate-400 text-xs font-normal">(optional)</span>
@@ -1520,7 +1793,10 @@ export default function CompanyDetails({
                 placeholder="Apartment, suite, floor"
               />
             </div>
+          </div>
 
+          {/* Address Line 3 + Landmark */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="addressLine3" className="block text-sm font-semibold text-slate-700 mb-1">
                 Address Line 3 <span className="text-slate-400 text-xs font-normal">(optional)</span>
@@ -1536,23 +1812,22 @@ export default function CompanyDetails({
                 placeholder="Building name, block, complex"
               />
             </div>
-          </div>
 
-          {/* Landmark */}
-          <div>
-            <label htmlFor="landmark" className="block text-sm font-semibold text-slate-700 mb-1">
-              Landmark <span className="text-slate-400 text-xs font-normal">(optional)</span>
-            </label>
-            <input
-              id="landmark"
-              type="text"
-              name="landmark"
-              value={formData.landmark}
-              onChange={(e) => handleInputChange("landmark", e.target.value)}
-              autoComplete="off"
-              className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
-              placeholder="e.g. Near Central Mall, opposite Park View School"
-            />
+            <div>
+              <label htmlFor="landmark" className="block text-sm font-semibold text-slate-700 mb-1">
+                Landmark <span className="text-slate-400 text-xs font-normal">(optional)</span>
+              </label>
+              <input
+                id="landmark"
+                type="text"
+                name="landmark"
+                value={formData.landmark}
+                onChange={(e) => handleInputChange("landmark", e.target.value)}
+                autoComplete="off"
+                className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
+                placeholder="e.g. Near Central Mall, opposite Park View School"
+              />
+            </div>
           </div>
 
           {/* City + State / Province (Row 1) */}
@@ -1706,10 +1981,10 @@ export default function CompanyDetails({
               Upload clear, legible copies of all required documents (PDF, PNG, JPG, WEBP or DOC — max 5 MB each).
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
             {/* Card: Company Logo */}
-            <div className="flex flex-col bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+            <div className="flex flex-col bg-slate-50/60 rounded-xl p-3 border border-slate-100">
               <div className="mb-3">
                 <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <span>Company Logo</span>
@@ -1718,7 +1993,7 @@ export default function CompanyDetails({
                 <p className="text-xs text-slate-400 mt-0.5">PNG, JPG, WEBP, SVG — max 2 MB</p>
               </div>
               <div
-                className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 transition-all duration-200 min-h-[140px] ${
+                className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-2.5 transition-all duration-200 min-h-[104px] ${
                   errors.logo ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
                 }`}
                 onDragOver={handleDragOver}
@@ -1730,7 +2005,7 @@ export default function CompanyDetails({
               >
                 {formData.logo ? (
                   <div className="flex flex-col items-center justify-center w-full">
-                    <div className="w-16 h-16 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                    <div className="w-12 h-12 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
                       <img src={formData.logo as string} alt="Company Logo" className="w-full h-full object-contain" />
                     </div>
                     <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
@@ -1739,7 +2014,7 @@ export default function CompanyDetails({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center text-center">
-                    <Image className="w-7 h-7 text-slate-300 mb-1.5" />
+                    <Image className="w-5 h-5 text-slate-300 mb-1" />
                     <span className="text-xs text-slate-400">Drag & drop or browse</span>
                   </div>
                 )}
@@ -1759,16 +2034,20 @@ export default function CompanyDetails({
             </div>
 
             {/* Card: GST Certificate */}
-            <div className="flex flex-col bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+            <div className="flex flex-col bg-slate-50/60 rounded-xl p-3 border border-slate-100">
               <div className="mb-3">
                 <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <span>GST Certificate</span>
-                  <span className="text-brand-500 font-semibold">*</span>
+                  {formData.businessType === UNREGISTERED_TYPE_ID ? (
+                    <span className="text-slate-400 text-[11px] font-medium">(Optional)</span>
+                  ) : (
+                    <span className="text-brand-500 font-semibold">*</span>
+                  )}
                 </h4>
                 <p className="text-xs text-slate-400 mt-0.5">PDF, PNG, JPG, WEBP, DOC — max 5 MB</p>
               </div>
               <div
-                className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 transition-all duration-200 min-h-[140px] ${
+                className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-2.5 transition-all duration-200 min-h-[104px] ${
                   errors.gstDocument ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
                 }`}
                 onDragOver={handleDragOver}
@@ -1780,11 +2059,11 @@ export default function CompanyDetails({
               >
                 {formData.gstDocument ? (
                   <div className="flex flex-col items-center justify-center w-full">
-                    <div className="w-16 h-16 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                    <div className="w-12 h-12 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
                       {formData.gstFile?.type.startsWith("image/") ? (
                         <img src={formData.gstDocument as string} alt="GST Certificate" className="w-full h-full object-contain" />
                       ) : (
-                        <IconFileText className="w-9 h-9 text-brand-400" />
+                        <IconFileText className="w-7 h-7 text-brand-400" />
                       )}
                     </div>
                     <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
@@ -1793,7 +2072,7 @@ export default function CompanyDetails({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center text-center">
-                    <IconFileText className="w-7 h-7 text-slate-300 mb-1.5" />
+                    <IconFileText className="w-5 h-5 text-slate-300 mb-1" />
                     <span className="text-xs text-slate-400">Drag & drop or browse</span>
                   </div>
                 )}
@@ -1816,16 +2095,20 @@ export default function CompanyDetails({
             </div>
 
             {/* Card: PAN Card */}
-            <div className="flex flex-col bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+            <div className="flex flex-col bg-slate-50/60 rounded-xl p-3 border border-slate-100">
               <div className="mb-3">
                 <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <span>PAN Card</span>
-                  <span className="text-brand-500 font-semibold">*</span>
+                  {formData.businessType === UNREGISTERED_TYPE_ID ? (
+                    <span className="text-slate-400 text-[11px] font-medium">(Optional)</span>
+                  ) : (
+                    <span className="text-brand-500 font-semibold">*</span>
+                  )}
                 </h4>
                 <p className="text-xs text-slate-400 mt-0.5">PDF, PNG, JPG, WEBP, DOC — max 5 MB</p>
               </div>
               <div
-                className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 transition-all duration-200 min-h-[140px] ${
+                className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-2.5 transition-all duration-200 min-h-[104px] ${
                   errors.panCardDocument ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
                 }`}
                 onDragOver={handleDragOver}
@@ -1837,11 +2120,11 @@ export default function CompanyDetails({
               >
                 {formData.panCardDocument ? (
                   <div className="flex flex-col items-center justify-center w-full">
-                    <div className="w-16 h-16 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                    <div className="w-12 h-12 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
                       {formData.panCardFile?.type.startsWith("image/") ? (
                         <img src={formData.panCardDocument as string} alt="PAN Card preview" className="w-full h-full object-contain" />
                       ) : (
-                        <IconFileText className="w-9 h-9 text-brand-400" />
+                        <IconFileText className="w-7 h-7 text-brand-400" />
                       )}
                     </div>
                     <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
@@ -1850,7 +2133,7 @@ export default function CompanyDetails({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center text-center">
-                    <IconFileText className="w-7 h-7 text-slate-300 mb-1.5" />
+                    <IconFileText className="w-5 h-5 text-slate-300 mb-1" />
                     <span className="text-xs text-slate-400">Drag & drop or browse</span>
                   </div>
                 )}
@@ -1877,16 +2160,18 @@ export default function CompanyDetails({
               const meta = COMPANY_TYPE_META[formData.businessType as CompanyTypeId];
               if (!meta) return null;
               return (
-                <div className="flex flex-col bg-slate-50/60 rounded-xl p-4 border border-slate-100">
+                <div className="flex flex-col bg-slate-50/60 rounded-xl p-3 border border-slate-100">
                   <div className="mb-3">
                     <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                       <span>{meta.certLabel}</span>
-                      <span className="text-brand-500 font-semibold">*</span>
+                      {meta.certLabel !== 'IEC Certificate' && (
+                        <span className="text-brand-500 font-semibold">*</span>
+                      )}
                     </h4>
                     <p className="text-xs text-slate-400 mt-0.5">PDF, PNG, JPG, WEBP, DOC — max 5 MB</p>
                   </div>
                   <div
-                    className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 transition-all duration-200 min-h-[140px] ${
+                    className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-2.5 transition-all duration-200 min-h-[104px] ${
                       errors.typeCertDocument ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
                     }`}
                     onDragOver={handleDragOver}
@@ -1898,11 +2183,11 @@ export default function CompanyDetails({
                   >
                     {formData.typeCertDocument ? (
                       <div className="flex flex-col items-center justify-center w-full">
-                        <div className="w-16 h-16 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                        <div className="w-12 h-12 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
                           {formData.typeCertFile?.type.startsWith("image/") ? (
                             <img src={formData.typeCertDocument as string} alt={`${meta.certLabel} preview`} className="w-full h-full object-contain" />
                           ) : (
-                            <IconFileText className="w-9 h-9 text-brand-400" />
+                            <IconFileText className="w-7 h-7 text-brand-400" />
                           )}
                         </div>
                         <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
@@ -1911,7 +2196,7 @@ export default function CompanyDetails({
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center text-center">
-                        <IconFileText className="w-7 h-7 text-slate-300 mb-1.5" />
+                        <IconFileText className="w-5 h-5 text-slate-300 mb-1" />
                         <span className="text-xs text-slate-400">Drag & drop or browse</span>
                       </div>
                     )}
@@ -1934,6 +2219,120 @@ export default function CompanyDetails({
                 </div>
               );
             })()}
+
+            {/* Card: IEC Certificate (OPTIONAL — shown for every business type
+                EXCEPT when the type-specific certificate is already the IEC
+                Certificate, e.g. Proprietorship, to avoid a duplicate field) */}
+            {COMPANY_TYPE_META[formData.businessType as CompanyTypeId]?.certLabel !== 'IEC Certificate' && (
+            <div className="flex flex-col bg-slate-50/60 rounded-xl p-3 border border-slate-100">
+              <div className="mb-3">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span>IEC Certificate</span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">PDF, PNG, JPG, WEBP, DOC — max 5 MB</p>
+              </div>
+              <div
+                className="flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-2.5 transition-all duration-200 min-h-[104px] border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10"
+                onDragOver={handleDragOver}
+                onDrop={handleIecCertDrop}
+                role="region"
+                aria-label="IEC Certificate upload dropzone"
+                data-field="iecCertDocument"
+                tabIndex={-1}
+              >
+                {formData.iecCertDocument ? (
+                  <div className="flex flex-col items-center justify-center w-full">
+                    <div className="w-12 h-12 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                      {formData.iecCertFile?.type.startsWith("image/") ? (
+                        <img src={formData.iecCertDocument as string} alt="IEC Certificate preview" className="w-full h-full object-contain" />
+                      ) : (
+                        <IconFileText className="w-7 h-7 text-brand-400" />
+                      )}
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
+                      {formData.iecCertFile?.name || "iec_certificate.pdf"}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <IconFileText className="w-5 h-5 text-slate-300 mb-1" />
+                    <span className="text-xs text-slate-400">Drag & drop or browse</span>
+                  </div>
+                )}
+                <input id="iecCertUpload" type="file" accept="application/pdf,image/*,.doc,.docx" onChange={handleIecCertChange} className="hidden" />
+                <div className="mt-2.5 flex items-center gap-2">
+                  <label htmlFor="iecCertUpload" className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors duration-200">
+                    Browse
+                  </label>
+                  {formData.iecCertDocument && (
+                    <button type="button" onClick={handleRemoveIecCert} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {iecCertError && <div className="mt-2 text-xs text-red-500 font-medium text-center">{iecCertError}</div>}
+              </div>
+            </div>
+            )}
+
+            {/* Card: Aadhaar Card (Unregistered Vendor only — mandatory) */}
+            {formData.businessType === UNREGISTERED_TYPE_ID && (
+              <div className="flex flex-col bg-slate-50/60 rounded-xl p-3 border border-slate-100">
+                <div className="mb-3">
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>Aadhaar Card</span>
+                    <span className="text-brand-500 font-semibold">*</span>
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">PDF, PNG, JPG, WEBP, DOC — max 5 MB</p>
+                </div>
+                <div
+                  className={`flex-1 flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-2.5 transition-all duration-200 min-h-[104px] ${
+                    errors.aadhaarDocument ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDrop={handleAadhaarDrop}
+                  role="region"
+                  aria-label="Aadhaar Card upload dropzone"
+                  data-field="aadhaarDocument"
+                  tabIndex={-1}
+                >
+                  {formData.aadhaarDocument ? (
+                    <div className="flex flex-col items-center justify-center w-full">
+                      <div className="w-12 h-12 bg-white rounded-lg border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                        {formData.aadhaarFile?.type.startsWith("image/") ? (
+                          <img src={formData.aadhaarDocument as string} alt="Aadhaar Card preview" className="w-full h-full object-contain" />
+                        ) : (
+                          <IconFileText className="w-7 h-7 text-brand-400" />
+                        )}
+                      </div>
+                      <div className="mt-2 text-xs text-slate-500 truncate max-w-[180px] text-center">
+                        {formData.aadhaarFile?.name || "aadhaar_card.pdf"}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <IconFileText className="w-5 h-5 text-slate-300 mb-1" />
+                      <span className="text-xs text-slate-400">Drag & drop or browse</span>
+                    </div>
+                  )}
+                  <input id="aadhaarUpload" type="file" accept="application/pdf,image/*,.doc,.docx" onChange={handleAadhaarChange} className="hidden" />
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <label htmlFor="aadhaarUpload" className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors duration-200">
+                      Browse
+                    </label>
+                    {formData.aadhaarDocument && (
+                      <button type="button" onClick={handleRemoveAadhaar} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {aadhaarError && <div className="mt-2 text-xs text-red-500 font-medium text-center">{aadhaarError}</div>}
+                  {errors.aadhaarDocument && (
+                    <p className="mt-1.5 text-xs font-semibold text-red-500 text-center" role="alert">{errors.aadhaarDocument}</p>
+                  )}
+                </div>
+              </div>
+            )}
             </div>
           </div>
         </AccordionSection>

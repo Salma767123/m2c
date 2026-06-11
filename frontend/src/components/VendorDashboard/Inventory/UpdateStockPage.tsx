@@ -255,8 +255,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-        <span className="ml-3 text-gray-600">Loading...</span>
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <span className="ml-3 text-slate-600">Loading...</span>
       </div>
     )
   }
@@ -265,7 +265,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-lg font-medium text-gray-900">Inventory item not found</p>
+          <p className="text-lg font-medium text-slate-900">Inventory item not found</p>
           <Button onClick={() => router.push('/vendor/dashboard/inventory')} className="mt-4">
             Back to Inventory
           </Button>
@@ -278,13 +278,13 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   if (!inventoryItem.hasProductCreated || !product || productApprovalStatus !== 'APPROVED') {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Card className="max-w-md w-full border border-gray-200">
+        <Card className="max-w-md w-full border border-slate-200">
           <CardContent className="p-8 text-center space-y-4">
             <div className="w-16 h-16 mx-auto bg-yellow-100 rounded-full flex items-center justify-center">
               <Package className="h-8 w-8 text-yellow-600" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">Stock Update Not Available</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-slate-900">Stock Update Not Available</h2>
+            <p className="text-sm text-slate-600">
               {!inventoryItem.hasProductCreated
                 ? 'A product must be created from this inventory item before stock can be updated.'
                 : `Stock updates are only available after the product has been approved by admin. Current status: ${productApprovalStatus || 'Unknown'}`
@@ -312,13 +312,13 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
           <Button
             variant="outline"
             onClick={() => router.push('/vendor/dashboard/inventory')}
-            className="hover:bg-gray-50"
+            className="hover:bg-slate-50"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-[#222222]">Update Stock</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Update Stock</h1>
             <p className="text-slate-600">Manage inventory stock levels</p>
           </div>
         </div>
@@ -326,14 +326,14 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Product Information */}
-        <Card className="lg:col-span-1 border border-gray-200">
-          <CardHeader className="bg-gray-50 border-b border-gray-200">
-            <CardTitle className="text-[#222222]">Product Information</CardTitle>
+        <Card className="lg:col-span-1 border border-slate-200">
+          <CardHeader className="bg-slate-50 border-b border-slate-200">
+            <CardTitle className="text-slate-900">Product Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
             {/* Product Image */}
             {primaryImage && (
-              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-100">
+              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-slate-100">
                 <Image
                   src={primaryImage}
                   alt={inventoryItem.name}
@@ -347,26 +347,26 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
             <div className="space-y-3">
               <div>
                 <label className="text-sm font-medium text-slate-500">Product Name</label>
-                <p className="text-base font-semibold text-[#222222]">{inventoryItem.name}</p>
+                <p className="text-base font-semibold text-slate-900">{inventoryItem.name}</p>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-500">SKU</label>
-                <p className="text-base font-mono text-[#222222]">{inventoryItem.sku}</p>
+                <p className="text-base font-mono text-slate-900">{inventoryItem.sku}</p>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-500">Category</label>
-                <p className="text-base text-[#222222]">
+                <p className="text-base text-slate-900">
                   {inventoryItem.category}
                   {inventoryItem.subcategory && ` / ${inventoryItem.subcategory}`}
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-gray-200">
+              <div className="pt-3 border-t border-slate-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-slate-500">Current Stock</span>
-                  <span className="text-2xl font-bold text-[#222222]">
+                  <span className="text-2xl font-bold text-slate-900">
                     {originalAggregate}
                   </span>
                 </div>
@@ -377,8 +377,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
               </div>
 
               {product?.hasVariants && (
-                <div className="pt-3 border-t border-gray-200">
-                  <Badge className="bg-blue-100 text-blue-800">
+                <div className="pt-3 border-t border-slate-200">
+                  <Badge className="bg-brand-100 text-brand-700">
                     Has {product.variants.length} Variants
                   </Badge>
                 </div>
@@ -388,9 +388,9 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
         </Card>
 
         {/* Stock Update Form */}
-        <Card className="lg:col-span-2 border border-gray-200">
-          <CardHeader className="bg-gray-50 border-b border-gray-200">
-            <CardTitle className="text-[#222222]">
+        <Card className="lg:col-span-2 border border-slate-200">
+          <CardHeader className="bg-slate-50 border-b border-slate-200">
+            <CardTitle className="text-slate-900">
               {product?.hasVariants ? 'Update Variant Stocks' : 'Update Stock Quantity'}
             </CardTitle>
           </CardHeader>
@@ -406,11 +406,11 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     {product.variants.map((variant) => (
                       <div
                         key={variant.id}
-                        className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+                        className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors"
                       >
                         {/* Variant Image */}
                         {variant.images && variant.images.length > 0 && (
-                          <div className="relative w-16 h-16 rounded-md overflow-hidden bg-gray-100 shrink-0">
+                          <div className="relative w-16 h-16 rounded-md overflow-hidden bg-slate-100 shrink-0">
                             <Image
                               src={variant.images[0]}
                               alt={`${variant.size} - ${variant.color}`}
@@ -424,12 +424,12 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                         {/* Variant Info */}
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-[#222222]">{variant.size}</span>
-                            <span className="text-gray-400">•</span>
+                            <span className="font-medium text-slate-900">{variant.size}</span>
+                            <span className="text-slate-400">•</span>
                             <div className="flex items-center gap-2">
                               {variant.colorHex && (
                                 <div
-                                  className="w-4 h-4 rounded-full border border-gray-300"
+                                  className="w-4 h-4 rounded-full border border-slate-300"
                                   style={{ backgroundColor: variant.colorHex }}
                                 />
                               )}
@@ -446,7 +446,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                             type="number"
                             value={variantStocks[variant.id] || 0}
                             onChange={(e) => handleVariantStockChange(variant.id, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                             min="0"
                             disabled={isSaving}
                           />
@@ -456,10 +456,10 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                   </div>
 
                   {/* Total Stock Summary */}
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-700">Total Stock</span>
-                      <span className="text-xl font-bold text-[#222222]">
+                      <span className="text-xl font-bold text-slate-900">
                         {getAggregateStock()} units
                       </span>
                     </div>
@@ -481,7 +481,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                           ({product.singleUnitSize} - {product.singleUnitColor})
                           {product.singleUnitColorHex && (
                             <span
-                              className="inline-block w-3 h-3 rounded-full ml-1 border border-gray-200 align-middle"
+                              className="inline-block w-3 h-3 rounded-full ml-1 border border-slate-200 align-middle"
                               style={{ backgroundColor: product.singleUnitColorHex }}
                             />
                           )}
@@ -504,7 +504,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     setNewStock(e.target.value)
                     setErrors({ ...errors, newStock: undefined })
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent ${errors.newStock ? 'border-red-500' : 'border-gray-200'
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent ${errors.newStock ? 'border-red-500' : 'border-slate-200'
                     }`}
                   placeholder="Enter stock quantity"
                   min="0"
@@ -545,7 +545,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     setReason(e.target.value)
                     setErrors({ ...errors, reason: undefined })
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent resize-none ${errors.reason ? 'border-red-500' : 'border-gray-200'
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none ${errors.reason ? 'border-red-500' : 'border-slate-200'
                     }`}
                   placeholder="e.g., New shipment received, Damaged items removed, Inventory correction"
                   rows={3}
@@ -563,7 +563,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent resize-none"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none"
                   placeholder="Any additional information..."
                   rows={2}
                   disabled={isSaving}
@@ -576,14 +576,14 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                   type="button"
                   onClick={() => router.push('/vendor/dashboard/inventory')}
                   variant="outline"
-                  className="flex-1 hover:bg-gray-50"
+                  className="flex-1 hover:bg-slate-50"
                   disabled={isSaving}
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1 bg-[#222222] hover:bg-[#313131] text-white"
+                  className="flex-1 bg-brand-500 hover:bg-[#313131] text-white"
                   disabled={isSaving}
                 >
                   {isSaving ? (

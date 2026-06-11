@@ -221,7 +221,7 @@ export default function PayoutsEnhanced() {
       case 'Failed':
         return <AlertCircle className="w-5 h-5 text-red-600" />;
       case 'Cancelled':
-        return <XCircle className="w-5 h-5 text-gray-500" />;
+        return <XCircle className="w-5 h-5 text-slate-500" />;
       default:
         return null;
     }
@@ -238,9 +238,9 @@ export default function PayoutsEnhanced() {
       case 'Failed':
         return 'bg-red-100 text-red-800';
       case 'Cancelled':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-slate-100 text-slate-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-slate-100 text-slate-800';
     }
   };
 
@@ -281,13 +281,13 @@ export default function PayoutsEnhanced() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settlements & Payouts</h1>
-          <p className="text-sm text-gray-600 mt-1">View and manage your payout history</p>
+          <h1 className="text-2xl font-bold text-slate-900">Settlements & Payouts</h1>
+          <p className="text-sm text-slate-600 mt-1">View and manage your payout history</p>
         </div>
         <button
           onClick={handleDownloadReport}
           disabled={filteredSettlements.length === 0}
-          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 bg-brand-500 hover:bg-slate-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Download className="w-4 h-4" />
           Download Report
@@ -300,9 +300,9 @@ export default function PayoutsEnhanced() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Paid</p>
-                <p className="text-2xl font-bold text-gray-900">₹{totalCompleted.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-sm text-slate-600 mb-1">Total Paid</p>
+                <p className="text-2xl font-bold text-slate-900">₹{totalCompleted.toLocaleString('en-IN')}</p>
+                <p className="text-xs text-slate-600 mt-1">
                   {settlements.filter((p) => p.status === 'Paid').length} payouts
                 </p>
               </div>
@@ -317,9 +317,9 @@ export default function PayoutsEnhanced() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">This Month</p>
-                <p className="text-2xl font-bold text-gray-900">₹{thisMonthPayouts.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-gray-600 mt-1">Current month payouts</p>
+                <p className="text-sm text-slate-600 mb-1">This Month</p>
+                <p className="text-2xl font-bold text-slate-900">₹{thisMonthPayouts.toLocaleString('en-IN')}</p>
+                <p className="text-xs text-slate-600 mt-1">Current month payouts</p>
               </div>
               <div className="p-3 rounded-lg bg-blue-100">
                 <Calendar className="w-6 h-6 text-blue-600" />
@@ -332,9 +332,9 @@ export default function PayoutsEnhanced() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Pending/Processing</p>
-                <p className="text-2xl font-bold text-gray-900">₹{totalPending.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-sm text-slate-600 mb-1">Pending/Processing</p>
+                <p className="text-2xl font-bold text-slate-900">₹{totalPending.toLocaleString('en-IN')}</p>
+                <p className="text-xs text-slate-600 mt-1">
                   {settlements.filter((p) => p.status === 'Pending' || p.status === 'Processing').length} payouts
                 </p>
               </div>
@@ -349,9 +349,9 @@ export default function PayoutsEnhanced() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Failed</p>
-                <p className="text-2xl font-bold text-gray-900">₹{totalFailed.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-sm text-slate-600 mb-1">Failed</p>
+                <p className="text-2xl font-bold text-slate-900">₹{totalFailed.toLocaleString('en-IN')}</p>
+                <p className="text-xs text-slate-600 mt-1">
                   {settlements.filter((p) => p.status === 'Failed').length} payouts
                 </p>
               </div>
@@ -369,7 +369,7 @@ export default function PayoutsEnhanced() {
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-gray-600" />
+                <DollarSign className="w-5 h-5 text-slate-600" />
                 Bank Account
               </CardTitle>
               <Link href="/vendor/dashboard/settings/bank">
@@ -383,8 +383,8 @@ export default function PayoutsEnhanced() {
           <CardContent>
             {bankLoading ? (
               <div className="flex items-center justify-center py-6">
-                <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />
-                <span className="ml-2 text-sm text-gray-500">Loading bank details...</span>
+                <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
+                <span className="ml-2 text-sm text-slate-500">Loading bank details...</span>
               </div>
             ) : bankDetails ? (
               <div className="space-y-4">
@@ -397,31 +397,31 @@ export default function PayoutsEnhanced() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Bank Name</p>
-                    <p className="font-semibold text-gray-900">{bankDetails.bankName}</p>
+                    <p className="text-sm text-slate-600 mb-1">Bank Name</p>
+                    <p className="font-semibold text-slate-900">{bankDetails.bankName}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Account Holder</p>
-                    <p className="font-semibold text-gray-900">{bankDetails.accountHolderName}</p>
+                    <p className="text-sm text-slate-600 mb-1">Account Holder</p>
+                    <p className="font-semibold text-slate-900">{bankDetails.accountHolderName}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Account Number</p>
-                    <p className="font-semibold font-mono text-gray-900">{maskAccountNumber(bankDetails.accountNumber)}</p>
+                    <p className="text-sm text-slate-600 mb-1">Account Number</p>
+                    <p className="font-semibold font-mono text-slate-900">{maskAccountNumber(bankDetails.accountNumber)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">IFSC Code</p>
-                    <p className="font-semibold text-gray-900">{bankDetails.ifscCode}</p>
+                    <p className="text-sm text-slate-600 mb-1">IFSC Code</p>
+                    <p className="font-semibold text-slate-900">{bankDetails.ifscCode}</p>
                   </div>
                   {bankDetails.accountType && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Account Type</p>
-                      <p className="font-semibold text-gray-900 capitalize">{bankDetails.accountType}</p>
+                      <p className="text-sm text-slate-600 mb-1">Account Type</p>
+                      <p className="font-semibold text-slate-900 capitalize">{bankDetails.accountType}</p>
                     </div>
                   )}
                   {bankDetails.branchName && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Branch</p>
-                      <p className="font-semibold text-gray-900">{bankDetails.branchName}</p>
+                      <p className="text-sm text-slate-600 mb-1">Branch</p>
+                      <p className="font-semibold text-slate-900">{bankDetails.branchName}</p>
                     </div>
                   )}
                 </div>
@@ -429,10 +429,10 @@ export default function PayoutsEnhanced() {
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
                 <AlertCircle className="w-10 h-10 text-yellow-500" />
-                <p className="text-sm font-semibold text-gray-700">No bank details added yet</p>
-                <p className="text-xs text-gray-500">Add your bank account to receive payouts from settlements.</p>
+                <p className="text-sm font-semibold text-slate-700">No bank details added yet</p>
+                <p className="text-xs text-slate-500">Add your bank account to receive payouts from settlements.</p>
                 <Link href="/vendor/dashboard/settings/bank">
-                  <Button size="sm" className="gap-2 bg-gray-900 hover:bg-gray-700 text-white mt-1">
+                  <Button size="sm" className="gap-2 bg-brand-500 hover:bg-slate-700 text-white mt-1">
                     <ExternalLink className="w-4 h-4" />
                     Add Bank Details
                   </Button>
@@ -449,13 +449,13 @@ export default function PayoutsEnhanced() {
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 z-10" />
               <input
                 type="text"
                 placeholder="Search by settlement number or order number..."
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 transition"
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition"
               />
             </div>
 
@@ -471,7 +471,7 @@ export default function PayoutsEnhanced() {
             <button
               onClick={fetchSettlements}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -493,8 +493,8 @@ export default function PayoutsEnhanced() {
       <Card>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
-            <span className="ml-3 text-gray-500 font-medium">Loading Settlements...</span>
+            <RefreshCw className="w-8 h-8 text-slate-400 animate-spin" />
+            <span className="ml-3 text-slate-500 font-medium">Loading Settlements...</span>
           </div>
         ) : (
           <Table>
@@ -512,25 +512,25 @@ export default function PayoutsEnhanced() {
             <TableBody>
               {paginatedSettlements.length > 0 ? (
                 paginatedSettlements.map((settlement) => (
-                  <TableRow key={settlement.id} className="hover:bg-gray-50">
+                  <TableRow key={settlement.id} className="hover:bg-slate-50">
                     <TableCell>
                       <div className="font-semibold text-indigo-600">{settlement.settlementNumber}</div>
                       {settlement.transactionId && (
-                        <div className="text-xs text-gray-500 mt-1 font-mono">
+                        <div className="text-xs text-slate-500 mt-1 font-mono">
                           TXN: {settlement.transactionId}
                         </div>
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-900">{settlement.billingNumber}</div>
+                      <div className="text-sm text-slate-900">{settlement.billingNumber}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-semibold text-gray-900">
+                      <div className="font-semibold text-slate-900">
                         ₹{settlement.amount.toLocaleString('en-IN')}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-900">{settlement.period}</div>
+                      <div className="text-sm text-slate-900">{settlement.period}</div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -544,17 +544,17 @@ export default function PayoutsEnhanced() {
                     </TableCell>
                     <TableCell>
                       {settlement.paymentDate ? (
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-slate-600">
                           Paid: {new Date(settlement.paymentDate).toLocaleDateString('en-IN')}
                         </div>
                       ) : settlement.dueDate ? (
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-slate-600">
                           Due: {new Date(settlement.dueDate).toLocaleDateString('en-IN')}
                         </div>
                       ) : settlement.status === 'Pending' ? (
                         <div className="text-sm text-amber-600 font-medium">Awaiting Approval</div>
                       ) : (
-                        <div className="text-sm text-gray-400">—</div>
+                        <div className="text-sm text-slate-400">—</div>
                       )}
                     </TableCell>
                     <TableCell>
@@ -572,7 +572,7 @@ export default function PayoutsEnhanced() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-gray-500 py-12">
+                  <TableCell colSpan={7} className="text-center text-slate-500 py-12">
                     <p className="text-sm">No settlements found matching your filters</p>
                   </TableCell>
                 </TableRow>
@@ -581,10 +581,10 @@ export default function PayoutsEnhanced() {
           </Table>
         )}
         {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-end gap-3 text-sm px-5 py-3 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 text-sm px-5 py-3 border-t border-slate-200">
             <div className="flex items-center gap-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-              {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+              {getPageRange(currentPage, totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
             </div>
           </div>
@@ -595,35 +595,35 @@ export default function PayoutsEnhanced() {
       {showDetailsModal && selectedSettlement && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">Settlement Details</h2>
+            <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-900">Settlement Details</h2>
               <button
                 onClick={() => setShowDetailsModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <X className="w-6 h-6 text-gray-600" />
+                <X className="w-6 h-6 text-slate-600" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
               {/* Settlement Information */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payout Information</h3>
-                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Payout Information</h3>
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Settlement Number</p>
-                    <p className="font-semibold text-gray-900">{selectedSettlement.settlementNumber}</p>
+                    <p className="text-sm text-slate-600 mb-1">Settlement Number</p>
+                    <p className="font-semibold text-slate-900">{selectedSettlement.settlementNumber}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Billing Number</p>
-                    <p className="font-semibold text-gray-900">{selectedSettlement.billingNumber}</p>
+                    <p className="text-sm text-slate-600 mb-1">Billing Number</p>
+                    <p className="font-semibold text-slate-900">{selectedSettlement.billingNumber}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Period</p>
-                    <p className="font-semibold text-gray-900">{selectedSettlement.period}</p>
+                    <p className="text-sm text-slate-600 mb-1">Period</p>
+                    <p className="font-semibold text-slate-900">{selectedSettlement.period}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Status</p>
+                    <p className="text-sm text-slate-600 mb-1">Status</p>
                     <span
                       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(selectedSettlement.status)}`}
                     >
@@ -631,29 +631,29 @@ export default function PayoutsEnhanced() {
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Created At</p>
-                    <p className="font-semibold text-gray-900">
+                    <p className="text-sm text-slate-600 mb-1">Created At</p>
+                    <p className="font-semibold text-slate-900">
                       {selectedSettlement.createdAt ? new Date(selectedSettlement.createdAt).toLocaleDateString('en-IN') : '-'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Due Date</p>
-                    <p className="font-semibold text-gray-900">
+                    <p className="text-sm text-slate-600 mb-1">Due Date</p>
+                    <p className="font-semibold text-slate-900">
                       {selectedSettlement.dueDate ? new Date(selectedSettlement.dueDate).toLocaleDateString('en-IN') : selectedSettlement.status === 'Pending' ? 'Awaiting Approval' : '—'}
                     </p>
                   </div>
                   {selectedSettlement.paymentDate && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Payment Date</p>
-                      <p className="font-semibold text-gray-900">
+                      <p className="text-sm text-slate-600 mb-1">Payment Date</p>
+                      <p className="font-semibold text-slate-900">
                         {new Date(selectedSettlement.paymentDate).toLocaleDateString('en-IN')}
                       </p>
                     </div>
                   )}
                   {selectedSettlement.transactionId && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Transaction ID</p>
-                      <p className="font-semibold font-mono text-gray-900">{selectedSettlement.transactionId}</p>
+                      <p className="text-sm text-slate-600 mb-1">Transaction ID</p>
+                      <p className="font-semibold font-mono text-slate-900">{selectedSettlement.transactionId}</p>
                     </div>
                   )}
                 </div>
@@ -661,11 +661,11 @@ export default function PayoutsEnhanced() {
 
               {/* Financial Breakdown */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Overview</h3>
-                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                  <div className="flex justify-between items-center border-t border-gray-300 pt-3">
-                    <span className="font-bold text-gray-900 text-lg">Settlement Amount</span>
-                    <span className="font-bold text-gray-900 text-lg">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Financial Overview</h3>
+                <div className="bg-slate-50 p-4 rounded-lg space-y-3">
+                  <div className="flex justify-between items-center border-t border-slate-300 pt-3">
+                    <span className="font-bold text-slate-900 text-lg">Settlement Amount</span>
+                    <span className="font-bold text-slate-900 text-lg">
                       ₹{selectedSettlement.amount.toLocaleString('en-IN')}
                     </span>
                   </div>
@@ -677,7 +677,7 @@ export default function PayoutsEnhanced() {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); handleDownloadReceipt(selectedSettlement); }}
-                  className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200"
+                  className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-slate-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200"
                 >
                   <Download className="w-4 h-4" />
                   Download Receipt
@@ -689,9 +689,9 @@ export default function PayoutsEnhanced() {
       )}
 
       {/* Info Box */}
-      <Card className="bg-gray-50 border-gray-200">
+      <Card className="bg-slate-50 border-slate-200">
         <CardContent className="p-4">
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-slate-700">
             <span className="font-semibold">Note:</span> Payouts are processed
             to your registered bank account. You will receive a confirmation email for each payout.
           </p>

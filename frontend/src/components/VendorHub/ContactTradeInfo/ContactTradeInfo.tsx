@@ -388,16 +388,16 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       }
     };
 
-    checkEmailUniqueness(main.email1, 'mainContact.email1', 'Main Contact (Email 1)');
-    checkEmailUniqueness(main.email2, 'mainContact.email2', 'Main Contact (Email 2)');
+    checkEmailUniqueness(main.email1, 'mainContact.email1', 'Main Contact (Primary Email)');
+    checkEmailUniqueness(main.email2, 'mainContact.email2', 'Main Contact (Secondary Email)');
 
-    const phone1Err = validatePhoneE164(main.phone1, { required: true, label: 'Phone Number 1' });
+    const phone1Err = validatePhoneE164(main.phone1, { required: true, label: 'Primary Phone' });
     if (phone1Err) {
       newErrors['mainContact.phone1'] = phone1Err;
     }
 
     if (main.phone2) {
-      const phoneErr = validatePhoneE164(main.phone2, { label: 'Phone Number 2' });
+      const phoneErr = validatePhoneE164(main.phone2, { label: 'Secondary Phone' });
       if (phoneErr) newErrors['mainContact.phone2'] = phoneErr;
     }
 
@@ -455,16 +455,16 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         newErrors[`${prefix}_email2`] = 'Valid email is required';
       }
 
-      checkEmailUniqueness(alt.email1, `${prefix}_email1`, `Contact Person ${idx + 2} (Email 1)`);
-      checkEmailUniqueness(alt.email2, `${prefix}_email2`, `Contact Person ${idx + 2} (Email 2)`);
+      checkEmailUniqueness(alt.email1, `${prefix}_email1`, `Contact Person ${idx + 2} (Primary Email)`);
+      checkEmailUniqueness(alt.email2, `${prefix}_email2`, `Contact Person ${idx + 2} (Secondary Email)`);
 
-      const altPhone1Err = validatePhoneE164(alt.phone1, { required: true, label: 'Phone Number 1' });
+      const altPhone1Err = validatePhoneE164(alt.phone1, { required: true, label: 'Primary Phone' });
       if (altPhone1Err) {
         newErrors[`${prefix}_phone1`] = altPhone1Err;
       }
 
       if (alt.phone2) {
-        const phoneErr = validatePhoneE164(alt.phone2, { label: 'Phone Number 2' });
+        const phoneErr = validatePhoneE164(alt.phone2, { label: 'Secondary Phone' });
         if (phoneErr) newErrors[`${prefix}_phone2`] = phoneErr;
       }
 
@@ -587,7 +587,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             {/* Profile Photo Upload moved to the top */}
-            <div className="md:col-span-2 mb-2" id="mainContact.photo">
+            <div className="mb-2" id="mainContact.photo">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Profile Photo
               </label>
@@ -716,6 +716,26 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                Department <span className="text-red-500 text-lg">*</span>
+              </label>
+              <div id="mainContact.department">
+                <Dropdown
+                  id="main-contact-department"
+                  value={formData.mainContact.department}
+                  options={DEPARTMENT_OPTIONS}
+                  onChange={(v) => updateMainContact('department', String(v))}
+                  onBlur={() => handleBlur('mainContact.department')}
+                  placeholder="Select department"
+                  error={errors['mainContact.department'] && touched['mainContact.department']}
+                />
+              </div>
+              {errors['mainContact.department'] && touched['mainContact.department'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['mainContact.department']}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Designation <span className="text-red-500 text-lg">*</span>
               </label>
               <div id="mainContact.designation">
@@ -758,9 +778,33 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
               </div>
             )}
 
+            {formData.mainContact.department === 'Others' && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Custom Department <span className="text-red-500 text-lg">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="mainContact.customDepartment"
+                  value={formData.mainContact.customDepartment}
+                  onChange={(e) => updateMainContact('customDepartment', e.target.value)}
+                  onBlur={() => handleBlur('mainContact.customDepartment')}
+                  className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
+                    errors['mainContact.customDepartment'] && touched['mainContact.customDepartment']
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="Enter custom department"
+                />
+                {errors['mainContact.customDepartment'] && touched['mainContact.customDepartment'] && (
+                  <p className="text-red-500 text-sm mt-1">{errors['mainContact.customDepartment']}</p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address 1 <span className="text-red-500 text-lg">*</span>
+                Primary Email <span className="text-red-500 text-lg">*</span>
               </label>
               <input
                 type="email"
@@ -783,7 +827,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address 2 (Optional)
+                Secondary Email (Optional)
               </label>
               <input
                 type="email"
@@ -805,7 +849,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number 1 <span className="text-red-500 text-lg">*</span>
+                Primary Phone <span className="text-red-500 text-lg">*</span>
               </label>
               <PhoneInput
                 name="mainContact.phone1"
@@ -822,7 +866,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number 2 (Optional)
+                Secondary Phone (Optional)
               </label>
               <div id="mainContact.phone2">
                 <PhoneInput
@@ -863,50 +907,6 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                 <p className="text-red-500 text-sm mt-1">{errors['mainContact.landline']}</p>
               )}
             </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Department <span className="text-red-500 text-lg">*</span>
-              </label>
-              <div id="mainContact.department">
-                <Dropdown
-                  id="main-contact-department"
-                  value={formData.mainContact.department}
-                  options={DEPARTMENT_OPTIONS}
-                  onChange={(v) => updateMainContact('department', String(v))}
-                  onBlur={() => handleBlur('mainContact.department')}
-                  placeholder="Select department"
-                  error={errors['mainContact.department'] && touched['mainContact.department']}
-                />
-              </div>
-              {errors['mainContact.department'] && touched['mainContact.department'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['mainContact.department']}</p>
-              )}
-            </div>
-
-            {formData.mainContact.department === 'Others' && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Custom Department <span className="text-red-500 text-lg">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="mainContact.customDepartment"
-                  value={formData.mainContact.customDepartment}
-                  onChange={(e) => updateMainContact('customDepartment', e.target.value)}
-                  onBlur={() => handleBlur('mainContact.customDepartment')}
-                  className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                    errors['mainContact.customDepartment'] && touched['mainContact.customDepartment']
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-slate-300 hover:border-slate-400'
-                  }`}
-                  placeholder="Enter custom department"
-                />
-                {errors['mainContact.customDepartment'] && touched['mainContact.customDepartment'] && (
-                  <p className="text-red-500 text-sm mt-1">{errors['mainContact.customDepartment']}</p>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </AccordionSection>
@@ -943,6 +943,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                     </Button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">First Name <span className="text-red-500">*</span></label>
                       <input
@@ -1000,6 +1001,23 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                         <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_lastName`]}</p>
                       )}
                     </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Department <span className="text-red-500">*</span></label>
+                      <div id={`altContact_${contact.id}_department`}>
+                        <Dropdown
+                          options={DEPARTMENT_OPTIONS}
+                          value={contact.department}
+                          onChange={(val) => updateAlternateContact(contact.id, 'department', String(val))}
+                          onBlur={() => handleBlur(`altContact_${contact.id}_department`)}
+                          placeholder="Select Department"
+                          error={errors[`altContact_${contact.id}_department`] && touched[`altContact_${contact.id}_department`]}
+                        />
+                        {errors[`altContact_${contact.id}_department`] && touched[`altContact_${contact.id}_department`] && (
+                          <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_department`]}</p>
+                        )}
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Designation <span className="text-red-500">*</span></label>
                       <div id={`altContact_${contact.id}_designation`}>
@@ -1037,8 +1055,29 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                         )}
                       </div>
                     )}
+                    {contact.department === 'Others' && (
+                      <div className="md:col-span-2 animate-in fade-in slide-in-from-top-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Custom Department <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          name={`altContact_${contact.id}_customDepartment`}
+                          value={contact.customDepartment || ''}
+                          onChange={(e) => updateAlternateContact(contact.id, 'customDepartment', e.target.value)}
+                          onBlur={() => handleBlur(`altContact_${contact.id}_customDepartment`)}
+                          className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
+                            errors[`altContact_${contact.id}_customDepartment`] && touched[`altContact_${contact.id}_customDepartment`]
+                              ? 'border-red-500 bg-red-50'
+                              : 'border-slate-300 hover:border-slate-400'
+                          }`}
+                          placeholder="Enter custom department"
+                        />
+                        {errors[`altContact_${contact.id}_customDepartment`] && touched[`altContact_${contact.id}_customDepartment`] && (
+                          <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_customDepartment`]}</p>
+                        )}
+                      </div>
+                    )}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Email Address 1 <span className="text-red-500">*</span></label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Primary Email <span className="text-red-500">*</span></label>
                       <input
                         type="email"
                         name={`altContact_${contact.id}_email1`}
@@ -1057,7 +1096,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Email Address 2 (Optional)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Secondary Email (Optional)</label>
                       <input
                         type="email"
                         name={`altContact_${contact.id}_email2`}
@@ -1076,7 +1115,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number 1 <span className="text-red-500">*</span></label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Primary Phone <span className="text-red-500">*</span></label>
                       <div id={`altContact_${contact.id}_phone1`}>
                         <PhoneInput
                           name={`altContact_${contact.id}_phone1`}
@@ -1092,7 +1131,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number 2 (Optional)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Secondary Phone (Optional)</label>
                       <div id={`altContact_${contact.id}_phone2`}>
                         <PhoneInput
                           name={`altContact_${contact.id}_phone2`}
@@ -1129,43 +1168,6 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                         <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_landline`]}</p>
                       )}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Department <span className="text-red-500">*</span></label>
-                      <div id={`altContact_${contact.id}_department`}>
-                        <Dropdown
-                          options={DEPARTMENT_OPTIONS}
-                          value={contact.department}
-                          onChange={(val) => updateAlternateContact(contact.id, 'department', String(val))}
-                          onBlur={() => handleBlur(`altContact_${contact.id}_department`)}
-                          placeholder="Select Department"
-                          error={errors[`altContact_${contact.id}_department`] && touched[`altContact_${contact.id}_department`]}
-                        />
-                        {errors[`altContact_${contact.id}_department`] && touched[`altContact_${contact.id}_department`] && (
-                          <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_department`]}</p>
-                        )}
-                      </div>
-                    </div>
-                    {contact.department === 'Others' && (
-                      <div className="animate-in fade-in slide-in-from-top-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Custom Department <span className="text-red-500">*</span></label>
-                        <input
-                          type="text"
-                          name={`altContact_${contact.id}_customDepartment`}
-                          value={contact.customDepartment || ''}
-                          onChange={(e) => updateAlternateContact(contact.id, 'customDepartment', e.target.value)}
-                          onBlur={() => handleBlur(`altContact_${contact.id}_customDepartment`)}
-                          className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                            errors[`altContact_${contact.id}_customDepartment`] && touched[`altContact_${contact.id}_customDepartment`]
-                              ? 'border-red-500 bg-red-50'
-                              : 'border-slate-300 hover:border-slate-400'
-                          }`}
-                          placeholder="Enter custom department"
-                        />
-                        {errors[`altContact_${contact.id}_customDepartment`] && touched[`altContact_${contact.id}_customDepartment`] && (
-                          <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_customDepartment`]}</p>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}

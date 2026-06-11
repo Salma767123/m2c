@@ -489,7 +489,7 @@ export default function WarehouseDetails({
                   selected={formData.ownershipType === type.id}
                   invalid={!isLinked && !!(errors.ownershipType && touched.ownershipType)}
                   disabled={isLinked}
-                  onClick={() => handleInputChange('ownershipType', type.id)}
+                  onClick={() => handleInputChange('ownershipType', formData.ownershipType === type.id ? '' : type.id)}
                 >
                   <span className="font-semibold">{type.label}</span>
                 </ToggleButton>
@@ -516,7 +516,7 @@ export default function WarehouseDetails({
                 value={formData.warehousingCapacity}
                 onChange={(e) => handleInputChange('warehousingCapacity', e.target.value)}
                 onBlur={() => handleBlur('warehousingCapacity')}
-                className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
+                className="w-full text-sm font-medium pl-4 pr-14 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 placeholder="e.g. 50000"
                 min="0"
               />
@@ -534,39 +534,38 @@ export default function WarehouseDetails({
           title="Warehouse Address"
           subtitle="Physical location of your warehouse facility"
         >
-          {/* Address Line 1 */}
-          <div>
-            <label htmlFor="warehouseAddress" className="block text-sm font-semibold text-slate-700 mb-1">
-              Address Line 1{' '}
-              {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
-            </label>
-            <input
-              id="warehouseAddress"
-              type="text"
-              name="warehouseAddress"
-              value={formData.warehouseAddress}
-              onChange={(e) => handleInputChange('warehouseAddress', e.target.value)}
-              onBlur={() => handleBlur('warehouseAddress')}
-              disabled={isLinked}
-              readOnly={isLinked}
-              aria-readonly={isLinked}
-              autoComplete="address-line1"
-              className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                isLinked
-                  ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
-                  : errors.warehouseAddress && touched.warehouseAddress
-                  ? 'border-red-500 bg-red-50'
-                  : 'border-slate-300 hover:border-slate-400'
-              }`}
-              placeholder="House / building / street"
-            />
-            {errors.warehouseAddress && touched.warehouseAddress && !isLinked && (
-              <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseAddress}</p>
-            )}
-          </div>
+          {/* Address Line 1 + Line 2 — 2-col grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="warehouseAddress" className="block text-sm font-semibold text-slate-700 mb-1">
+                Address Line 1{' '}
+                {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
+              </label>
+              <input
+                id="warehouseAddress"
+                type="text"
+                name="warehouseAddress"
+                value={formData.warehouseAddress}
+                onChange={(e) => handleInputChange('warehouseAddress', e.target.value)}
+                onBlur={() => handleBlur('warehouseAddress')}
+                disabled={isLinked}
+                readOnly={isLinked}
+                aria-readonly={isLinked}
+                autoComplete="address-line1"
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  isLinked
+                    ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
+                    : errors.warehouseAddress && touched.warehouseAddress
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="House / building / street"
+              />
+              {errors.warehouseAddress && touched.warehouseAddress && !isLinked && (
+                <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseAddress}</p>
+              )}
+            </div>
 
-          {/* Address Line 2 + 3 — 2-col grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="warehouseAddressLine2" className="block text-sm font-semibold text-slate-700 mb-1">
                 Address Line 2 <span className="text-slate-400 text-xs font-normal">(optional)</span>
@@ -587,6 +586,10 @@ export default function WarehouseDetails({
                 placeholder="Apartment, suite, floor"
               />
             </div>
+          </div>
+
+          {/* Address Line 3 + Landmark — 2-col grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="warehouseAddressLine3" className="block text-sm font-semibold text-slate-700 mb-1">
                 Address Line 3 <span className="text-slate-400 text-xs font-normal">(optional)</span>
@@ -607,32 +610,31 @@ export default function WarehouseDetails({
                 placeholder="Building name, block, complex"
               />
             </div>
+
+            <div>
+              <label htmlFor="warehouseLandmark" className="block text-sm font-semibold text-slate-700 mb-1">
+                Landmark <span className="text-slate-400 text-xs font-normal">(optional)</span>
+              </label>
+              <input
+                id="warehouseLandmark"
+                type="text"
+                name="warehouseLandmark"
+                value={formData.warehouseLandmark}
+                onChange={(e) => handleInputChange('warehouseLandmark', e.target.value)}
+                disabled={isLinked}
+                readOnly={isLinked}
+                aria-readonly={isLinked}
+                autoComplete="off"
+                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                  isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed' : 'border-slate-300 hover:border-slate-400'
+                }`}
+                placeholder="e.g. Near Central Mall, opposite Park View School"
+              />
+            </div>
           </div>
 
-          {/* Landmark */}
-          <div>
-            <label htmlFor="warehouseLandmark" className="block text-sm font-semibold text-slate-700 mb-1">
-              Landmark <span className="text-slate-400 text-xs font-normal">(optional)</span>
-            </label>
-            <input
-              id="warehouseLandmark"
-              type="text"
-              name="warehouseLandmark"
-              value={formData.warehouseLandmark}
-              onChange={(e) => handleInputChange('warehouseLandmark', e.target.value)}
-              disabled={isLinked}
-              readOnly={isLinked}
-              aria-readonly={isLinked}
-              autoComplete="off"
-              className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed' : 'border-slate-300 hover:border-slate-400'
-              }`}
-              placeholder="e.g. Near Central Mall, opposite Park View School"
-            />
-          </div>
-
-          {/* City + State + ZIP — 3-col */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* City + State — 2-col */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="warehouseCity" className="block text-sm font-semibold text-slate-700 mb-1">
                 City {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
@@ -687,6 +689,37 @@ export default function WarehouseDetails({
               )}
             </div>
 
+          </div>
+
+          {/* Country + ZIP / Postal Code — 2-col */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="warehouse-country-select" className="block text-sm font-semibold text-slate-700 mb-1">
+                Country {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
+              </label>
+              <div data-field="warehouseCountry">
+                <CountrySelect
+                  id="warehouse-country-select"
+                  value={formData.warehouseCountry}
+                  onChange={(name) => handleInputChange('warehouseCountry', name)}
+                  onBlur={() => handleBlur('warehouseCountry')}
+                  invalid={!!(errors.warehouseCountry && touched.warehouseCountry)}
+                  disabled={isLinked}
+                  placeholder="Select a country…"
+                  ariaDescribedBy={
+                    errors.warehouseCountry && touched.warehouseCountry
+                      ? 'warehouse-country-error'
+                      : undefined
+                  }
+                />
+              </div>
+              {errors.warehouseCountry && touched.warehouseCountry && !isLinked && (
+                <p id="warehouse-country-error" className="text-red-600 text-xs mt-1 font-medium" role="alert">
+                  {errors.warehouseCountry}
+                </p>
+              )}
+            </div>
+
             <div>
               <label htmlFor="warehouseZip" className="block text-sm font-semibold text-slate-700 mb-1">
                 ZIP / Postal Code {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
@@ -713,34 +746,6 @@ export default function WarehouseDetails({
                 <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseZip}</p>
               )}
             </div>
-          </div>
-
-          {/* Country */}
-          <div>
-            <label htmlFor="warehouse-country-select" className="block text-sm font-semibold text-slate-700 mb-1">
-              Country {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
-            </label>
-            <div data-field="warehouseCountry">
-              <CountrySelect
-                id="warehouse-country-select"
-                value={formData.warehouseCountry}
-                onChange={(name) => handleInputChange('warehouseCountry', name)}
-                onBlur={() => handleBlur('warehouseCountry')}
-                invalid={!!(errors.warehouseCountry && touched.warehouseCountry)}
-                disabled={isLinked}
-                placeholder="Select a country…"
-                ariaDescribedBy={
-                  errors.warehouseCountry && touched.warehouseCountry
-                    ? 'warehouse-country-error'
-                    : undefined
-                }
-              />
-            </div>
-            {errors.warehouseCountry && touched.warehouseCountry && !isLinked && (
-              <p id="warehouse-country-error" className="text-red-600 text-xs mt-1 font-medium" role="alert">
-                {errors.warehouseCountry}
-              </p>
-            )}
           </div>
         </AccordionSection>
 

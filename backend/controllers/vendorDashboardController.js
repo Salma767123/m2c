@@ -128,6 +128,192 @@ const getVendorDashboardStats = async (req, res) => {
     }
 };
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const startOfDay = (d) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+};
+const endOfDay = (d) => {
+    const x = new Date(d);
+    x.setHours(23, 59, 59, 999);
+    return x;
+};
+
+/**
+ * Build contiguous, sorted buckets covering [startDate, endDate] at the
+ * requested granularity ('day' | 'week' | 'month'). Each bucket carries a
+ * display label and its half-open [start, end) boundaries.
+ */
+const buildBuckets = (granularity, startDate, endDate, multiYear) => {
+    const buckets = [];
+
+    if (granularity === 'day' || granularity === 'week') {
+        const step = granularity === 'week' ? 7 : 1;
+        let cursor = startOfDay(startDate);
+        const limit = endOfDay(endDate);
+        while (cursor <= limit) {
+            const next = new Date(cursor);
+            next.setDate(next.getDate() + step);
+            buckets.push({
+                start: new Date(cursor),
+                end: new Date(next),
+                label: `${cursor.getDate()} ${MONTH_LABELS[cursor.getMonth()]}`,
+            });
+            cursor = next;
+        }
+    } else {
+        // month
+        let cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+        while (cursor <= lastMonth) {
+            const next = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+            buckets.push({
+                start: new Date(cursor),
+                end: new Date(next),
+                label: multiYear
+                    ? `${MONTH_LABELS[cursor.getMonth()]} ${String(cursor.getFullYear()).slice(2)}`
+                    : MONTH_LABELS[cursor.getMonth()],
+            });
+            cursor = next;
+        }
+    }
+    return buckets;
+};
+
+/**
+ * Trend data for the Revenue & Orders charts, aggregated from real order
+ * records for the authenticated vendor within the selected date range.
+ * Query: ?range=last_week|last_month|last_3_months|last_year|last_3_years|custom
+ *        &start=ISO&end=ISO  (start/end required only for custom)
+ */
+const getVendorDashboardChart = async (req, res) => {
+    try {
+        const vendorId = req.userId;
+        const { range = 'last_year', start, end } = req.query;
+
+        const now = new Date();
+        let startDate;
+        let endDate = endOfDay(now);
+        let granularity;
+
+        switch (range) {
+            case 'this_week':
+                // From the start of the current week (Sunday) through today.
+                startDate = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()));
+                granularity = 'day';
+                break;
+            case 'last_week':
+                startDate = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6));
+                granularity = 'day';
+                break;
+            case 'last_month':
+                startDate = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
+                granularity = 'day';
+                break;
+            case 'last_3_months':
+                startDate = startOfDay(new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()));
+                granularity = 'week';
+                break;
+            case 'last_year':
+                startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+                granularity = 'month';
+                break;
+            case 'last_3_years':
+                startDate = new Date(now.getFullYear(), now.getMonth() - 35, 1);
+                granularity = 'month';
+                break;
+            case 'custom': {
+                if (!start || !end) {
+                    return res.status(400).json({ error: 'start and end are required for a custom range' });
+                }
+                let s = new Date(start);
+                let e = new Date(end);
+                if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+                    return res.status(400).json({ error: 'Invalid start or end date' });
+                }
+                // Validate / normalise: ensure start is not after end.
+                if (s > e) {
+                    const tmp = s;
+                    s = e;
+                    e = tmp;
+                }
+                startDate = startOfDay(s);
+                endDate = endOfDay(e);
+                const spanDays = Math.round((endDate - startDate) / 86400000);
+                granularity = spanDays <= 31 ? 'day' : spanDays <= 180 ? 'week' : 'month';
+                break;
+            }
+            default:
+                startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+                granularity = 'month';
+        }
+
+        const multiYear = startDate.getFullYear() !== endDate.getFullYear();
+        const buckets = buildBuckets(granularity, startDate, endDate, multiYear);
+
+        // Pull only the records that fall inside the selected window.
+        const orderItems = await prisma.orderItem.findMany({
+            where: {
+                vendorId,
+                createdAt: { gte: startDate, lte: endDate },
+            },
+            select: { totalPrice: true, orderId: true, createdAt: true },
+        });
+
+        const revenue = new Array(buckets.length).fill(0);
+        const orderSets = Array.from({ length: buckets.length }, () => new Set());
+
+        const firstStart = buckets.length ? buckets[0].start.getTime() : 0;
+        const dayMs = 86400000;
+
+        const indexFor = (date) => {
+            if (!buckets.length) return -1;
+            if (granularity === 'day') {
+                return Math.floor((startOfDay(date).getTime() - firstStart) / dayMs);
+            }
+            if (granularity === 'week') {
+                return Math.floor((startOfDay(date).getTime() - firstStart) / (dayMs * 7));
+            }
+            // month
+            return (
+                (date.getFullYear() - buckets[0].start.getFullYear()) * 12 +
+                (date.getMonth() - buckets[0].start.getMonth())
+            );
+        };
+
+        orderItems.forEach((item) => {
+            const date = new Date(item.createdAt);
+            const idx = indexFor(date);
+            if (idx < 0 || idx >= buckets.length) return;
+            revenue[idx] += item.totalPrice ? Number(item.totalPrice) : 0;
+            if (item.orderId) orderSets[idx].add(item.orderId);
+        });
+
+        const data = buckets.map((b, i) => ({
+            name: b.label,
+            revenue: Math.round(revenue[i] * 100) / 100,
+            orders: orderSets[i].size,
+        }));
+
+        const hasData = data.some((d) => d.revenue > 0 || d.orders > 0);
+
+        res.json({
+            range,
+            granularity,
+            start: startDate,
+            end: endDate,
+            hasData,
+            data,
+        });
+    } catch (error) {
+        console.error('Error fetching vendor dashboard chart:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 module.exports = {
-    getVendorDashboardStats
+    getVendorDashboardStats,
+    getVendorDashboardChart
 };

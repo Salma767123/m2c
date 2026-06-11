@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Home, ArrowLeft, Send } from 'lucide-react';
+import { CheckCircle2, Home, ArrowLeft, Send, AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/UI/Button';
 import VendorService, { VendorRegistrationData, VendorFiles } from '@/services/vendorService';
 import { categoryService } from '@/services/categoryService';
@@ -28,6 +28,10 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
   });
   const [privacyChecked, setPrivacyChecked] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Duplicate-registration warning surfaced as a modal popup (not an inline
+  // alert). `field` lets the "Edit details" button jump back to the relevant
+  // step so the user can correct the GST number / email.
+  const [duplicateWarning, setDuplicateWarning] = useState<{ message: string; field?: string } | null>(null);
   const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -63,7 +67,8 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
     
     setIsSubmitting(true);
     setSubmitError(null);
-    
+    setDuplicateWarning(null);
+
     try {
       // Prepare form data
       const registrationData: VendorRegistrationData = {
@@ -72,7 +77,9 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         companyName: data.companyName || '',
         gstNumber: data.gstNumber || '',
         companyIdNumber: data.companyIdNumber || '',
+        iecCode: data.iecCode || '',
         panNumber: data.panNumber || '',
+        aadhaarNumber: data.aadhaarNumber || '',
         email: data.email || '',
         email2: data.email2 || '',
         phone: data.phone || '',
@@ -166,10 +173,13 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         gstDocument: data.gstFile,
         panCardFile: data.panCardFile,
         typeCertFile: data.typeCertFile,
+        aadhaarFile: data.aadhaarFile,
+        // Owner profile photo — captured in OwnerProfile (Owner Identity
+        // section) as a File and uploaded to Cloudinary via the backend's
+        // `ownerPhoto` multer field.
+        ownerPhoto: data.ownerPhotoFile,
         // Contact photo flows through `mainContact.photo` (base64 data URI)
         // and is uploaded to Cloudinary server-side via `resolveBase64InValue`.
-        // The previous `ownerPhoto: data.ownerPhotoFile` line was dead code —
-        // `data.ownerPhotoFile` was never set anywhere in the form chain.
         // Factory images come in as a slot-keyed record from WarehouseDetails
         // (Change 11): { nameBoard: {file,url,name}, frontView: {...}, ... }.
         // Extract just the File objects keyed by slot ID — the upload path
@@ -229,7 +239,16 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         error?.data?.message ||
         error?.message ||
         'Registration failed. Please try again.';
-      setSubmitError(message);
+
+      // Duplicate vendor (GST / email already registered) is shown as a
+      // dedicated popup warning rather than the inline alert.
+      const code = error?.data?.code || error?.response?.data?.code;
+      const field = error?.data?.field || error?.response?.data?.field;
+      if (code === 'DUPLICATE_GST' || code === 'DUPLICATE_EMAIL') {
+        setDuplicateWarning({ message, field });
+      } else {
+        setSubmitError(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -446,6 +465,60 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
           </Button>
         </div>
       </form>
+
+      {/* Duplicate-registration warning popup. Shown when the backend reports
+          a vendor already exists with the submitted GST number (or email). */}
+      {duplicateWarning && (
+        <div
+          className="fixed inset-0 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          style={{ zIndex: 'var(--z-modal-backdrop)' }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="duplicate-warning-title"
+          onClick={() => setDuplicateWarning(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6 text-amber-500" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 id="duplicate-warning-title" className="text-lg font-bold text-slate-900">
+                  Vendor Already Registered
+                </h3>
+                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
+                  {duplicateWarning.message}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDuplicateWarning(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-end mt-6">
+              <Button
+                onClick={() => setDuplicateWarning(null)}
+                className="inline-flex items-center justify-center h-10 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => { setDuplicateWarning(null); onGoToStep(0); }}
+                className="inline-flex items-center justify-center h-10 px-5 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+              >
+                Edit Details
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

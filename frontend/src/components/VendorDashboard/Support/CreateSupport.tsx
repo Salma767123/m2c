@@ -86,12 +86,12 @@ export default function CreateSupport() {
     <div className="max-w-420 mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/vendor/dashboard/support" className="text-white bg-gray-900 p-2 rounded">
+        <Link href="/vendor/dashboard/support" className="text-white bg-brand-500 p-2 rounded">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Create Support Ticket</h1>
-          <p className="text-gray-600 mt-1">Report an issue and get help from our support team</p>
+          <h1 className="text-2xl font-bold text-slate-900">Create Support Ticket</h1>
+          <p className="text-slate-600 mt-1">Report an issue and get help from our support team</p>
         </div>
       </div>
 
@@ -99,7 +99,7 @@ export default function CreateSupport() {
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
         {/* Subject */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Subject <span className="text-red-500">*</span>
           </label>
           <input
@@ -108,7 +108,7 @@ export default function CreateSupport() {
             value={formData.subject}
             onChange={handleInputChange}
             placeholder="Brief description of your issue"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
         </div>
@@ -152,7 +152,7 @@ export default function CreateSupport() {
 
         {/* Description */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Description <span className="text-red-500">*</span>
           </label>
           <textarea
@@ -161,20 +161,20 @@ export default function CreateSupport() {
             onChange={handleInputChange}
             placeholder="Provide detailed information about your issue..."
             rows={6}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
-          <p className="text-xs text-gray-500 mt-1">Minimum 20 characters</p>
+          <p className="text-xs text-slate-500 mt-1">Minimum 20 characters</p>
         </div>
 
         {/* Attachments */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             Attachments (Optional)
           </label>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            <Paperclip className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-600 mb-2">Drag and drop files here, or</p>
+          <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+            <Paperclip className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <p className="text-sm text-slate-600 mb-2">Drag and drop files here, or</p>
             <label className="text-blue-600 hover:text-blue-700 cursor-pointer">
               click to browse
               <input
@@ -185,16 +185,16 @@ export default function CreateSupport() {
                 accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
               />
             </label>
-            <p className="text-xs text-gray-500 mt-2">Max 5 files, 10MB each</p>
+            <p className="text-xs text-slate-500 mt-2">Max 5 files, 10MB each</p>
           </div>
 
           {/* Attached Files */}
           {formData.attachments.length > 0 && (
             <div className="mt-4 space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">Attached Files:</h4>
+              <h4 className="text-sm font-medium text-slate-700">Attached Files:</h4>
               <ul className="space-y-1">
                 {formData.attachments.map((file, index) => (
-                  <li key={index} className="flex items-center justify-between text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                  <li key={index} className="flex items-center justify-between text-sm text-slate-600 bg-slate-50 p-2 rounded">
                     <span className="truncate">{file.name}</span>
                     <button
                       type="button"
@@ -215,14 +215,14 @@ export default function CreateSupport() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-700 disabled:bg-gray-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 bg-brand-500 hover:bg-slate-700 disabled:bg-slate-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
           >
             <Send className="w-4 h-4" />
             {isSubmitting ? 'Submitting...' : 'Submit Ticket'}
           </button>
           <Link
             href="/vendor/dashboard/support"
-            className="flex items-center justify-center px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-center px-6 py-2 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
           >
             Cancel
           </Link>

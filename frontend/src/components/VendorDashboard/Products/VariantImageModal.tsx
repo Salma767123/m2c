@@ -70,19 +70,19 @@ export default function VariantImageModal({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-50">
                     <div>
-                        <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                             <ImageIcon className="w-5 h-5" />
                             Variant Image
                         </h3>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-slate-500 mt-1">
                             {variantData.size} / {variantData.color}
                         </p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                        className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -92,7 +92,7 @@ export default function VariantImageModal({
                 <div className="p-6">
                     {existingImage ? (
                         <div className="space-y-4">
-                            <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200 group">
+                            <div className="relative aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 group">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src={existingImage}
@@ -110,7 +110,7 @@ export default function VariantImageModal({
                                 </div>
                             </div>
                             <div className="text-center">
-                                <p className="text-sm text-gray-500 mb-2">Want to change this image?</p>
+                                <p className="text-sm text-slate-500 mb-2">Want to change this image?</p>
                                 <div className="relative inline-block">
                                     <input
                                         type="file"
@@ -126,7 +126,7 @@ export default function VariantImageModal({
                             </div>
                         </div>
                     ) : (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center hover:bg-gray-50 transition-colors relative group">
+                        <div className="border-2 border-dashed border-slate-300 rounded-lg p-10 text-center hover:bg-slate-50 transition-colors relative group">
                             <input
                                 type="file"
                                 accept="image/*"
@@ -138,10 +138,10 @@ export default function VariantImageModal({
                                 <div className="p-4 bg-blue-50 rounded-full text-blue-600 mb-4 group-hover:scale-110 transition-transform">
                                     <Upload className="w-8 h-8" />
                                 </div>
-                                <p className="font-semibold text-gray-900 mb-1">
+                                <p className="font-semibold text-slate-900 mb-1">
                                     {isUploading ? 'Uploading...' : 'Click to upload image'}
                                 </p>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-slate-500">
                                     PNG, JPG, WEBP up to 5MB
                                 </p>
                             </div>
@@ -150,7 +150,7 @@ export default function VariantImageModal({
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end">
+                <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end">
                     <Button onClick={onClose}>
                         Done
                     </Button>

@@ -109,7 +109,6 @@ const facilityTypes: FacilityType[] = [
     icon: Factory,
     description: 'Final processing and quality control',
     fields: [
-      { id: 'finishingStations', label: 'Number of Machines', type: 'number', kind: 'integer' },
       { id: 'finishingCapacity', label: 'Daily Capacity (kg)', type: 'number', kind: 'decimal' },
       remarksField,
     ],

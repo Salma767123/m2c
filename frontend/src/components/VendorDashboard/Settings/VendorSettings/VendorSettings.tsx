@@ -177,7 +177,7 @@ export default function VendorSettings() {
       <div className="flex items-center justify-center min-h-100">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading vendor settings...</p>
+          <p className="text-slate-600">Loading vendor settings...</p>
         </div>
       </div>
     );
@@ -187,7 +187,7 @@ export default function VendorSettings() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[#222222]">Vendor Settings</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Vendor Settings</h1>
           <p className="text-slate-600">
             Manage your vendor information and preferences
           </p>
@@ -195,7 +195,7 @@ export default function VendorSettings() {
         <Button
           onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
           disabled={isSaving}
-          className="bg-[#222222] text-[#ffffff] hover:bg-[#313131]"
+          className="bg-brand-500 text-[#ffffff] hover:bg-[#313131]"
         >
           {isSaving ? (
             <>
@@ -215,9 +215,9 @@ export default function VendorSettings() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card className="border border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="flex items-center text-[#222222]">
+          <Card className="border border-slate-200">
+            <CardHeader className="bg-slate-50 border-b border-slate-200">
+              <CardTitle className="flex items-center text-slate-900">
                 <Store className="w-5 h-5 mr-2" />
                 Basic Information
               </CardTitle>
@@ -234,7 +234,7 @@ export default function VendorSettings() {
                     handleInputChange("companyName", e.target.value)
                   }
                   disabled={!isEditing}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                 />
               </div>
 
@@ -250,7 +250,7 @@ export default function VendorSettings() {
                       handleInputChange("businessPhone", e.target.value)
                     }
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                   />
                 </div>
 
@@ -265,7 +265,7 @@ export default function VendorSettings() {
                       handleInputChange("businessEmail", e.target.value)
                     }
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                   />
                 </div>
               </div>
@@ -282,7 +282,7 @@ export default function VendorSettings() {
                     }
                     disabled={!isEditing}
                     placeholder="Enter GST number"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                   />
                 </div>
                 <div>
@@ -296,16 +296,16 @@ export default function VendorSettings() {
                       handleInputChange("website", e.target.value)
                     }
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                   />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="flex items-center text-[#222222]">
+          <Card className="border border-slate-200">
+            <CardHeader className="bg-slate-50 border-b border-slate-200">
+              <CardTitle className="flex items-center text-slate-900">
                 <MapPin className="w-5 h-5 mr-2" />
                 Business Address
               </CardTitle>
@@ -322,7 +322,7 @@ export default function VendorSettings() {
                     handleInputChange("businessAddress", e.target.value)
                   }
                   disabled={!isEditing}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                 />
               </div>
 
@@ -338,7 +338,7 @@ export default function VendorSettings() {
                       handleInputChange("businessCity", e.target.value)
                     }
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                   />
                 </div>
                 <div>
@@ -352,7 +352,7 @@ export default function VendorSettings() {
                       handleInputChange("businessState", e.target.value)
                     }
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                   />
                 </div>
               </div>
@@ -369,7 +369,7 @@ export default function VendorSettings() {
                       handleInputChange("businessZipCode", e.target.value)
                     }
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                   />
                 </div>
                 <div>
@@ -383,7 +383,7 @@ export default function VendorSettings() {
                       handleInputChange("businessCountry", e.target.value)
                     }
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                   />
                 </div>
               </div>
@@ -392,9 +392,9 @@ export default function VendorSettings() {
         </div>
 
         <div className="space-y-6">
-          <Card className="border border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="text-[#222222]">Company Logo</CardTitle>
+          <Card className="border border-slate-200">
+            <CardHeader className="bg-slate-50 border-b border-slate-200">
+              <CardTitle className="text-slate-900">Company Logo</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {(logoPreview || vendorInfo.companyLogo) && (
@@ -402,14 +402,14 @@ export default function VendorSettings() {
                   <img
                     src={logoPreview || vendorInfo.companyLogo}
                     alt="Company Logo"
-                    className="w-32 h-32 object-contain border border-gray-200 rounded-lg"
+                    className="w-32 h-32 object-contain border border-slate-200 rounded-lg"
                   />
                 </div>
               )}
 
               {!logoPreview && !vendorInfo.companyLogo && (
-                <div className="flex justify-center items-center w-32 h-32 mx-auto border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <Upload className="w-8 h-8 text-gray-400" />
+                <div className="flex justify-center items-center w-32 h-32 mx-auto border-2 border-dashed border-slate-300 rounded-lg bg-slate-50">
+                  <Upload className="w-8 h-8 text-slate-400" />
                 </div>
               )}
 
@@ -422,9 +422,9 @@ export default function VendorSettings() {
                     type="file"
                     accept="image/*"
                     onChange={handleLogoChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     PNG, JPG, WEBP, SVG (max 10MB)
                   </p>
                 </div>
@@ -432,9 +432,9 @@ export default function VendorSettings() {
             </CardContent>
           </Card>
 
-          <Card className="border border-gray-200">
-            <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="text-[#222222]">
+          <Card className="border border-slate-200">
+            <CardHeader className="bg-slate-50 border-b border-slate-200">
+              <CardTitle className="text-slate-900">
                 Owner Information
               </CardTitle>
             </CardHeader>
@@ -450,7 +450,7 @@ export default function VendorSettings() {
                     handleInputChange("ownerName", e.target.value)
                   }
                   disabled={!isEditing}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                 />
               </div>
 
@@ -465,7 +465,7 @@ export default function VendorSettings() {
                     handleInputChange("ownerEmail", e.target.value)
                   }
                   disabled={!isEditing}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                 />
               </div>
 
@@ -480,7 +480,7 @@ export default function VendorSettings() {
                     handleInputChange("ownerPhone", e.target.value)
                   }
                   disabled={!isEditing}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-700 focus:border-gray-700 disabled:bg-gray-50"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
                 />
               </div>
             </CardContent>

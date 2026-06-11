@@ -121,7 +121,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
   };
 
   if (isLoading) {
-    return <div className="p-6 text-center text-gray-500">Loading order details...</div>;
+    return <div className="p-6 text-center text-slate-500">Loading order details...</div>;
   }
 
   if (!shipment) {
@@ -137,13 +137,13 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+            <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
-            <p className="text-sm text-gray-600 mt-1">Order ID: {shipment.order?.orderId || shipment.shipmentId}</p>
+            <h1 className="text-2xl font-bold text-slate-900">Order Details</h1>
+            <p className="text-sm text-slate-600 mt-1">Order ID: {shipment.order?.orderId || shipment.shipmentId}</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -153,7 +153,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
               disabled={!shipment.assignedHubId}
               className={`px-6 py-2 rounded-lg transition-colors font-medium ${shipment.assignedHubId
                   ? "bg-purple-600 text-white hover:bg-purple-700"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
                 }`}
               title={!shipment.assignedHubId ? "Wait for admin to assign a hub" : ""}
             >
@@ -165,8 +165,8 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
               onClick={handleOpenShippingModal}
               disabled={!shipment.assignedHubId}
               className={`px-6 py-2 rounded-lg transition-colors font-medium ${shipment.assignedHubId
-                  ? "bg-gray-900 text-white hover:bg-gray-800"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  ? "bg-brand-500 text-white hover:bg-brand-700"
+                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
                 }`}
               title={!shipment.assignedHubId ? "Wait for admin to assign a hub" : ""}
             >
@@ -196,20 +196,20 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       </div>
 
       {/* Order Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <Package className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Order Information</h2>
+          <Package className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Order Information</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Order Date</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Order Date</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               {new Date(shipment.order?.createdAt || shipment.createdAt).toLocaleDateString("en-IN")}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Status</p>
+            <p className="text-sm text-slate-600">Status</p>
             <p className={`text-base font-medium mt-1 ${status === "VENDOR_PROCESSING" ? "text-blue-600" :
               status === "PACKED_BY_VENDOR" ? "text-purple-600" :
                 status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
@@ -221,8 +221,8 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Total Amount</p>
-            <p className="text-base font-medium text-gray-900 mt-1">
+            <p className="text-sm text-slate-600">Total Amount</p>
+            <p className="text-base font-medium text-slate-900 mt-1">
               ₹{shipment.items.reduce((acc: number, item: any) => acc + item.totalPrice, 0).toLocaleString("en-IN")}
             </p>
           </div>
@@ -230,30 +230,30 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       </div>
 
       {/* Product Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h2>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Product Details</h2>
         <div className="space-y-4">
           {shipment.items.map((item: any) => (
-            <div key={item.id} className="flex gap-4 p-4 border border-gray-100 rounded-lg">
+            <div key={item.id} className="flex gap-4 p-4 border border-slate-100 rounded-lg">
               <img
                 src={item.productImage || "/assets/images/placeholder.jpg"}
                 alt={item.productName}
-                className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                className="w-24 h-24 object-cover rounded-lg border border-slate-200"
               />
               <div className="flex-1">
-                <h3 className="text-base font-semibold text-gray-900">{item.productName}</h3>
-                <p className="text-sm text-gray-600 mt-1">SKU: {item.sku}</p>
+                <h3 className="text-base font-semibold text-slate-900">{item.productName}</h3>
+                <p className="text-sm text-slate-600 mt-1">SKU: {item.sku}</p>
                 {item.variantId && (
-                  <p className="text-sm text-gray-600 mt-1">Size: {item.size} | Color: {item.color}</p>
+                  <p className="text-sm text-slate-600 mt-1">Size: {item.size} | Color: {item.color}</p>
                 )}
                 <div className="flex gap-6 mt-2">
                   <div>
-                    <p className="text-sm text-gray-600">Quantity</p>
-                    <p className="text-base font-medium text-gray-900">{item.quantity}</p>
+                    <p className="text-sm text-slate-600">Quantity</p>
+                    <p className="text-base font-medium text-slate-900">{item.quantity}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Price per Unit</p>
-                    <p className="text-base font-medium text-gray-900">
+                    <p className="text-sm text-slate-600">Price per Unit</p>
+                    <p className="text-base font-medium text-slate-900">
                       ₹{item.unitPrice.toLocaleString("en-IN")}
                     </p>
                   </div>
@@ -265,29 +265,29 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       </div>
 
       {/* Hub Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2 mb-4">
-          <MapPin className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Delivery Hub</h2>
+          <MapPin className="h-5 w-5 text-slate-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Delivery Hub</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {shipment.assignedHubId ? (
             <>
               <div>
-                <p className="text-sm text-gray-600">Hub Name</p>
-                <p className="text-base font-medium text-gray-900 mt-1">
+                <p className="text-sm text-slate-600">Hub Name</p>
+                <p className="text-base font-medium text-slate-900 mt-1">
                   {shipment.hub?.name || "Admin Central Hub"}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Contact</p>
-                <p className="text-base font-medium text-gray-900 mt-1">
+                <p className="text-sm text-slate-600">Contact</p>
+                <p className="text-base font-medium text-slate-900 mt-1">
                   {shipment.hub?.phone || shipment.hub?.email || "System Generated"}
                 </p>
               </div>
               <div className="md:col-span-2">
-                <p className="text-sm text-gray-600">Address</p>
-                <p className="text-base font-medium text-gray-900 mt-1 leading-relaxed">
+                <p className="text-sm text-slate-600">Address</p>
+                <p className="text-base font-medium text-slate-900 mt-1 leading-relaxed">
                   {shipment.hub ? (
                     <>
                       {shipment.hub.address}
@@ -313,26 +313,26 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
       {/* Shipping Details — shown once vendor has shipped */}
       {shipment.vendorCarrier && shipment.vendorTrackingId && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 mb-4">
-            <Truck className="h-5 w-5 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Shipping Details</h2>
+            <Truck className="h-5 w-5 text-slate-600" />
+            <h2 className="text-lg font-semibold text-slate-900">Shipping Details</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm text-gray-600">Courier</p>
-              <p className="text-base font-medium text-gray-900 mt-1">{shipment.vendorCarrier}</p>
+              <p className="text-sm text-slate-600">Courier</p>
+              <p className="text-base font-medium text-slate-900 mt-1">{shipment.vendorCarrier}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Tracking ID</p>
-              <p className="text-base font-mono font-medium text-gray-900 mt-1 break-all">
+              <p className="text-sm text-slate-600">Tracking ID</p>
+              <p className="text-base font-mono font-medium text-slate-900 mt-1 break-all">
                 {shipment.vendorTrackingId}
               </p>
             </div>
             {shipment.vendorShippedAt && (
               <div>
-                <p className="text-sm text-gray-600">Shipped On</p>
-                <p className="text-base font-medium text-gray-900 mt-1">
+                <p className="text-sm text-slate-600">Shipped On</p>
+                <p className="text-base font-medium text-slate-900 mt-1">
                   {new Date(shipment.vendorShippedAt).toLocaleString("en-IN")}
                 </p>
               </div>
@@ -343,13 +343,13 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
       {/* Admin Review & Feedback */}
       {shipment.adminReview && (
-        <div className={`rounded-lg shadow-sm border p-6 ${shipment.adminReview.approved ? "bg-white border-gray-200" : "bg-red-50 border-red-200"}`}>
+        <div className={`rounded-lg shadow-sm border p-6 ${shipment.adminReview.approved ? "bg-white border-slate-200" : "bg-red-50 border-red-200"}`}>
           <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              <h2 className="text-lg font-semibold text-gray-900">Admin Hub Feedback</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Admin Hub Feedback</h2>
             </div>
             <span className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full ${shipment.adminReview.approved ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
               {shipment.adminReview.approved ? "Approved" : "Rejected"}
@@ -358,19 +358,19 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
           {typeof shipment.adminReview.rating === "number" && shipment.adminReview.rating > 0 && (
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-1">Rating</p>
+              <p className="text-sm text-slate-600 mb-1">Rating</p>
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <svg
                     key={n}
-                    className={`h-5 w-5 ${n <= (shipment.adminReview?.rating ?? 0) ? "text-yellow-400" : "text-gray-300"}`}
+                    className={`h-5 w-5 ${n <= (shipment.adminReview?.rating ?? 0) ? "text-yellow-400" : "text-slate-300"}`}
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.966a1 1 0 00.95.69h4.169c.969 0 1.371 1.24.588 1.81l-3.375 2.455a1 1 0 00-.363 1.118l1.287 3.966c.3.921-.755 1.688-1.54 1.118l-3.376-2.455a1 1 0 00-1.175 0l-3.375 2.455c-.784.57-1.838-.197-1.539-1.118l1.287-3.966a1 1 0 00-.363-1.118L2.05 9.393c-.783-.57-.38-1.81.588-1.81h4.17a1 1 0 00.95-.69l1.286-3.966z" />
                   </svg>
                 ))}
-                <span className="ml-2 text-sm text-gray-700 font-medium">
+                <span className="ml-2 text-sm text-slate-700 font-medium">
                   {shipment.adminReview.rating} out of 5
                 </span>
               </div>
@@ -380,14 +380,14 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {shipment.adminReview.reviewComments && (
               <div>
-                <p className="text-sm font-semibold text-gray-700 mb-1">Review</p>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">{shipment.adminReview.reviewComments}</p>
+                <p className="text-sm font-semibold text-slate-700 mb-1">Review</p>
+                <p className="text-sm text-slate-800 whitespace-pre-wrap">{shipment.adminReview.reviewComments}</p>
               </div>
             )}
             {shipment.adminReview.qualityCheckNotes && (
               <div>
-                <p className="text-sm font-semibold text-gray-700 mb-1">Quality Check Notes</p>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">{shipment.adminReview.qualityCheckNotes}</p>
+                <p className="text-sm font-semibold text-slate-700 mb-1">Quality Check Notes</p>
+                <p className="text-sm text-slate-800 whitespace-pre-wrap">{shipment.adminReview.qualityCheckNotes}</p>
               </div>
             )}
             {!shipment.adminReview.approved && shipment.adminReview.rejectionReason && (
@@ -402,7 +402,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           </div>
 
           {shipment.adminReview.reviewedAt && (
-            <p className="text-xs text-gray-500 mt-4">
+            <p className="text-xs text-slate-500 mt-4">
               Reviewed on {new Date(shipment.adminReview.reviewedAt).toLocaleString("en-IN")}
             </p>
           )}
@@ -437,16 +437,16 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       {showShippingModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Ship to Hub</h2>
-                <p className="text-sm text-gray-600 mt-1">Enter shipping details</p>
+                <h2 className="text-xl font-bold text-slate-900">Ship to Hub</h2>
+                <p className="text-sm text-slate-600 mt-1">Enter shipping details</p>
               </div>
               <button
                 onClick={() => setShowShippingModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-slate-600" />
               </button>
             </div>
 
@@ -461,32 +461,32 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Tracking ID
                 </label>
                 <div className="relative">
-                  <Truck className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                  <Truck className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
                   <input
                     type="text"
                     value={trackingId}
                     onChange={(e) => setTrackingId(e.target.value)}
                     placeholder="Enter tracking ID"
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowShippingModal(false)}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmShipping}
-                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium"
               >
                 Confirm Shipping
               </button>
@@ -499,14 +499,14 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       {showReshipModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200">
+            <div className="p-6 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <RefreshCw className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Reship Order</h2>
-                  <p className="text-sm text-gray-600">Create a replacement shipment</p>
+                  <h2 className="text-lg font-bold text-slate-900">Reship Order</h2>
+                  <p className="text-sm text-slate-600">Create a replacement shipment</p>
                 </div>
               </div>
             </div>
@@ -534,11 +534,11 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowReshipModal(false)}
                 disabled={reshipLoading}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
               >
                 Cancel
               </button>

@@ -43,14 +43,19 @@ const vendorTypes = [
     label: "Exporter",
     description: "You export goods internationally",
   },
+  {
+    id: "trader",
+    label: "Trader",
+    description: "You buy and resell goods",
+  },
 ];
 
 const marketTypes = [
-  { id: "domestic", label: "Domestic", description: "Local market only" },
+  { id: "domestic", label: "Domestic", description: "" },
   {
     id: "international",
     label: "International",
-    description: "Global markets",
+    description: "",
   },
 ];
 
@@ -696,7 +701,7 @@ export default function VendorTypeProducts({
           subtitle="What is your primary business model?"
         >
           <div data-section="vendorType">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {vendorTypes.map((type) => {
                 const isSelected = (formData.vendorType || []).includes(
                   type.id,
@@ -708,7 +713,7 @@ export default function VendorTypeProducts({
                     type="button"
                     key={type.id}
                     onClick={() => toggleVendorType(type.id)}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 active:scale-[0.98] ${
+                    className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 active:scale-[0.98] ${
                       isSelected
                         ? "border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10"
                         : hasError
@@ -717,12 +722,12 @@ export default function VendorTypeProducts({
                     }`}
                   >
                     <div
-                      className={`font-semibold text-base ${isSelected ? "text-brand-900" : "text-slate-900"}`}
+                      className={`font-semibold text-sm ${isSelected ? "text-brand-900" : "text-slate-900"}`}
                     >
                       {type.label}
                     </div>
                     <div
-                      className={`text-sm mt-1 ${isSelected ? "text-brand-700" : "text-slate-500"}`}
+                      className={`text-xs mt-0.5 ${isSelected ? "text-brand-700" : "text-slate-500"}`}
                     >
                       {type.description}
                     </div>
@@ -768,11 +773,13 @@ export default function VendorTypeProducts({
                     >
                       {type.label}
                     </div>
-                    <div
-                      className={`text-sm mt-1 ${isSelected ? "text-brand-700" : "text-slate-500"}`}
-                    >
-                      {type.description}
-                    </div>
+                    {type.description && (
+                      <div
+                        className={`text-sm mt-1 ${isSelected ? "text-brand-700" : "text-slate-500"}`}
+                      >
+                        {type.description}
+                      </div>
+                    )}
                   </button>
                 );
               })}

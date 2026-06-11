@@ -96,22 +96,22 @@ export default function Products() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#222222]">My Products</h1>
+            <h1 className="text-2xl font-bold text-slate-900">My Products</h1>
             <p className="text-slate-600">Manage your product catalog</p>
           </div>
           <Button
             onClick={handleAddProduct}
-            className="bg-[#222222] text-white text-base font-semibold hover:bg-[#313131]"
+            className="bg-brand-500 text-white text-base font-semibold hover:bg-[#313131]"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Product
           </Button>
         </div>
-        <Card className="border border-gray-200">
+        <Card className="border border-slate-200">
           <CardContent className="p-8">
             <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700"></div>
-              <span className="ml-3 text-gray-600">Loading products...</span>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
+              <span className="ml-3 text-slate-600">Loading products...</span>
             </div>
           </CardContent>
         </Card>
@@ -122,15 +122,15 @@ export default function Products() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">My Products</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Manage your product catalog</p>
+            <h1 className="text-xl font-bold text-slate-900">My Products</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Manage your product catalog</p>
           </div>
           <Button
             onClick={handleAddProduct}
-            className="bg-gray-900 text-white font-semibold hover:bg-black"
+            className="bg-brand-500 text-white font-semibold hover:bg-brand-600"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Product
@@ -140,28 +140,28 @@ export default function Products() {
 
       {/* Results summary */}
       {products.length > 0 && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-500">
           Showing {((pagination.currentPage - 1) * 10) + 1}–{Math.min(pagination.currentPage * 10, pagination.totalItems)} of {pagination.totalItems} product{pagination.totalItems === 1 ? '' : 's'}
         </p>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Product Inventory</h2>
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-200/80">
+          <h2 className="text-sm font-semibold text-slate-900">Product Inventory</h2>
         </div>
-        <div>
+        <div className="overflow-x-auto">
           {products.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">No products found</p>
-              <Button onClick={handleAddProduct} className="bg-[#222222] text-white hover:bg-[#313131]">
+              <p className="text-slate-600 mb-4">No products found</p>
+              <Button onClick={handleAddProduct} className="bg-brand-500 text-white hover:bg-[#313131]">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Product
               </Button>
             </div>
           ) : (
             <Table>
-              <TableHeader>
-                <TableRow>
+              <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b [&_tr]:border-slate-200/80 [&_th]:!text-slate-500 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+                <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
                   <TableHead>Product</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Price</TableHead>
@@ -174,18 +174,18 @@ export default function Products() {
               </TableHeader>
               <TableBody>
                 {products.map((product) => (
-                  <TableRow key={product.id} className="hover:bg-gray-50">
+                  <TableRow key={product.id} className="hover:bg-slate-50">
                     <TableCell>
-                      <div className="font-medium text-[#222222]">{product.name}</div>
-                      <div className="text-xs text-gray-500 font-mono">{product.baseSku}</div>
+                      <div className="font-medium text-slate-900">{product.name}</div>
+                      <div className="text-xs text-slate-500 font-mono">{product.baseSku}</div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">{product.category}</span>
+                      <span className="text-xs bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-full font-medium">{product.category}</span>
                     </TableCell>
-                    <TableCell className="font-semibold text-gray-900">
+                    <TableCell className="font-semibold text-slate-900">
                       ₹{product.basePrice.toFixed(2)}
                       {product.hasVariants && product.variants && product.variants.length > 0 && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-slate-500">
                           Range: ₹{Math.min(...product.variants.map(v => v.price)).toFixed(2)} - ₹{Math.max(...product.variants.map(v => v.price)).toFixed(2)}
                         </div>
                       )}
@@ -196,7 +196,7 @@ export default function Products() {
                           ? product.variants.reduce((sum, v) => sum + v.stock, 0)
                           : product.totalStock;
                         return (
-                          <span className={`font-semibold ${stock === 0 ? 'text-red-600' : stock < 10 ? 'text-orange-600' : 'text-gray-900'}`}>
+                          <span className={`font-semibold ${stock === 0 ? 'text-red-600' : stock < 10 ? 'text-orange-600' : 'text-slate-900'}`}>
                             {stock}
                             {stock > 0 && stock < 10 ? <span className="text-xs font-normal text-orange-500 ml-1">Low</span> : null}
                           </span>
@@ -204,24 +204,24 @@ export default function Products() {
                       })()}
                     </TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs capitalize ${product.status === 'ACTIVE'
-                          ? 'bg-green-100 text-green-800'
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap capitalize ${product.status === 'ACTIVE'
+                          ? 'bg-green-50 text-green-700 border-green-200'
                           : product.status === 'INACTIVE'
-                            ? 'bg-gray-100 text-gray-800'
+                            ? 'bg-slate-50 text-slate-700 border-slate-200'
                             : product.status === 'OUT_OF_STOCK'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-gray-100 text-gray-800'
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : 'bg-slate-50 text-slate-700 border-slate-200'
                         }`}>
                         {product.status?.toLowerCase().replace('_', ' ')}
                       </span>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${product.approvalStatus === 'APPROVED'
-                            ? 'bg-green-100 text-green-800'
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap capitalize ${product.approvalStatus === 'APPROVED'
+                            ? 'bg-green-50 text-green-700 border-green-200'
                             : product.approvalStatus === 'REINSPECTION'
-                              ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                              : 'bg-gray-100 text-gray-800'
+                              ? 'bg-orange-50 text-orange-700 border-orange-200'
+                              : 'bg-slate-50 text-slate-700 border-slate-200'
                           }`}>
                           {product.approvalStatus === 'REINSPECTION' ? 'Reinspection Required' : product.approvalStatus?.toLowerCase()}
                         </span>
@@ -239,7 +239,7 @@ export default function Products() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleViewProduct(product)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-brand-500 hover:bg-brand-50 transition-colors"
                           title="View"
                         >
                           <Eye className="h-4 w-4" />
@@ -252,7 +252,7 @@ export default function Products() {
                               handleEditProduct(product)
                             }
                           }}
-                          className={`p-1.5 rounded-lg transition-colors ${product.approvalStatus === 'APPROVED' ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                          className={`p-1.5 rounded-lg transition-colors ${product.approvalStatus === 'APPROVED' ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:text-brand-500 hover:bg-brand-50'}`}
                           title={product.approvalStatus === 'APPROVED' ? 'Approved — admin only' : 'Edit'}
                         >
                           <Edit className="h-4 w-4" />
@@ -265,7 +265,7 @@ export default function Products() {
                               handleDeleteProduct(product)
                             }
                           }}
-                          className={`p-1.5 rounded-lg transition-colors ${product.approvalStatus === 'APPROVED' ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-red-600 hover:bg-red-50'}`}
+                          className={`p-1.5 rounded-lg transition-colors ${product.approvalStatus === 'APPROVED' ? 'text-slate-300 cursor-not-allowed' : 'text-slate-500 hover:text-red-600 hover:bg-red-50'}`}
                           title={product.approvalStatus === 'APPROVED' ? 'Approved — admin only' : 'Delete'}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -280,10 +280,10 @@ export default function Products() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-end gap-3 text-sm px-5 py-3 border-t border-gray-200">
+            <div className="flex items-center justify-end gap-3 text-sm px-5 py-3 border-t border-slate-200">
               <div className="flex items-center gap-1">
                 <button onClick={() => loadProducts(pagination.currentPage - 1)} disabled={!pagination.hasPrevPage} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-                {getPageRange(pagination.currentPage, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => loadProducts(p as number)} aria-current={p === pagination.currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+                {getPageRange(pagination.currentPage, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => loadProducts(p as number)} aria-current={p === pagination.currentPage ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
                 <button onClick={() => loadProducts(pagination.currentPage + 1)} disabled={!pagination.hasNextPage} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>

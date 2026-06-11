@@ -159,7 +159,7 @@ export default function BankDetails() {
       case 'webp':
         return <Image className="w-5 h-5 text-blue-600 mr-2" />
       default:
-        return <File className="w-5 h-5 text-gray-600 mr-2" />
+        return <File className="w-5 h-5 text-slate-600 mr-2" />
     }
   }
 
@@ -188,8 +188,8 @@ export default function BankDetails() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bank Details</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage your bank account information for payouts</p>
+          <h1 className="text-2xl font-bold text-slate-900">Bank Details</h1>
+          <p className="text-sm text-slate-600 mt-1">Manage your bank account information for payouts</p>
         </div>
       </div>
 
@@ -238,7 +238,7 @@ export default function BankDetails() {
               }
             </p>
             {bankDetails.isVerified && (
-              <p className="text-xs text-gray-600 mt-2">
+              <p className="text-xs text-slate-600 mt-2">
                 <strong>Note:</strong> Verified bank details cannot be changed. Contact admin for modifications.
               </p>
             )}
@@ -259,7 +259,7 @@ export default function BankDetails() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Account Holder Name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
               Account Holder Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -268,7 +268,7 @@ export default function BankDetails() {
               value={formData.accountHolderName || ''}
               onChange={handleChange}
               placeholder="Enter full name"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-slate-100 disabled:cursor-not-allowed"
               required
               disabled={bankDetails?.isVerified}
             />
@@ -276,7 +276,7 @@ export default function BankDetails() {
 
           {/* Bank Name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
               Bank Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -285,7 +285,7 @@ export default function BankDetails() {
               value={formData.bankName}
               onChange={handleChange}
               placeholder="Enter bank name"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-slate-100 disabled:cursor-not-allowed"
               required
               disabled={bankDetails?.isVerified}
             />
@@ -293,7 +293,7 @@ export default function BankDetails() {
 
           {/* Account Number */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
               Account Number <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -303,7 +303,7 @@ export default function BankDetails() {
                 value={formData.accountNumber}
                 onChange={handleChange}
                 placeholder="Enter account number"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition pr-10 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition pr-10 disabled:bg-slate-100 disabled:cursor-not-allowed"
                 required
                 disabled={bankDetails?.isVerified}
               />
@@ -326,7 +326,7 @@ export default function BankDetails() {
 
           {/* IFSC Code */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
               IFSC Code <span className="text-red-500">*</span>
             </label>
             <input
@@ -335,7 +335,7 @@ export default function BankDetails() {
               value={formData.ifscCode}
               onChange={handleChange}
               placeholder="Enter IFSC code"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition uppercase disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition uppercase disabled:bg-slate-100 disabled:cursor-not-allowed"
               required
               disabled={bankDetails?.isVerified}
             />
@@ -343,7 +343,7 @@ export default function BankDetails() {
 
           {/* Account Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Account Type <span className="text-red-500">*</span>
             </label>
             <Dropdown
@@ -361,7 +361,7 @@ export default function BankDetails() {
 
           {/* Branch Name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
               Branch Name
             </label>
             <input
@@ -370,14 +370,14 @@ export default function BankDetails() {
               value={formData.branchName || ''}
               onChange={handleChange}
               placeholder="Enter branch name"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-slate-100 disabled:cursor-not-allowed"
               disabled={bankDetails?.isVerified}
             />
           </div>
 
           {/* Branch Address */}
           <div className="md:col-span-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
               Branch Address
             </label>
             <input
@@ -386,7 +386,7 @@ export default function BankDetails() {
               value={formData.branchAddress || ''}
               onChange={handleChange}
               placeholder="Enter branch address"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition disabled:bg-slate-100 disabled:cursor-not-allowed"
               disabled={bankDetails?.isVerified}
             />
           </div>
@@ -419,7 +419,7 @@ export default function BankDetails() {
       {/* KYC Documents Section */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">KYC Documents</h1>
+          <h1 className="text-2xl font-bold text-slate-900">KYC Documents</h1>
           <div className="flex items-center space-x-2">
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
               Upload Required
@@ -440,16 +440,16 @@ export default function BankDetails() {
               const status = getDocumentStatus(type)
               return (
                 <div key={type} className={`flex items-center justify-between p-4 border rounded-lg ${
-                  status === 'verified' ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                  status === 'verified' ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'
                 }`}>
                   <div className="flex items-center">
                     <div className={`w-3 h-3 rounded-full mr-3 ${
-                      status === 'verified' ? 'bg-green-500' : 'bg-gray-400'
+                      status === 'verified' ? 'bg-green-500' : 'bg-slate-400'
                     }`}></div>
                     <span className="font-medium">{label}</span>
                   </div>
                   <span className={`font-medium ${
-                    status === 'verified' ? 'text-green-600' : 'text-gray-600'
+                    status === 'verified' ? 'text-green-600' : 'text-slate-600'
                   }`}>
                     {status === 'verified' ? 'Uploaded' : 'Not Submitted'}
                   </span>
@@ -471,10 +471,10 @@ export default function BankDetails() {
               { type: 'TRADE_LICENSE', label: 'Trade License', description: 'Business/Trade License from Local Authority' }
             ].map(({ type, label, description }) => (
               <div key={type}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   {label}
                 </label>
-                <p className="text-xs text-gray-500 mb-2">{description}</p>
+                <p className="text-xs text-slate-500 mb-2">{description}</p>
                 
                 {getDocumentStatus(type) === 'verified' ? (
                   <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -487,11 +487,11 @@ export default function BankDetails() {
                         <span className="text-sm text-green-800 font-medium">Document uploaded</span>
                         <p className="text-xs text-green-600 mt-1">
                           {documents.find(d => d.type === type)?.name || `${label} document`} 
-                          <span className="ml-1 text-gray-500">
+                          <span className="ml-1 text-slate-500">
                             (.{getFileExtension(documents.find(d => d.type === type)?.documentUrl || '')})
                           </span>
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-slate-500 mt-1">
                           Uploaded: {new Date(documents.find(d => d.type === type)?.uploadedAt || '').toLocaleDateString()}
                         </p>
                       </div>
@@ -524,23 +524,23 @@ export default function BankDetails() {
                         size="sm"
                         onClick={() => handleDocumentDelete(documents.find(d => d.type === type)?.id || '', label)}
                         disabled={uploadingDoc === 'deleting'}
-                        className="h-auto p-0 text-red-600 hover:text-red-700 disabled:text-gray-400"
+                        className="h-auto p-0 text-red-600 hover:text-red-700 disabled:text-slate-400"
                       >
                         {uploadingDoc === 'deleting' ? 'Deleting...' : 'Delete'}
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
                     {uploadingDoc === type ? (
                       <div className="space-y-2">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                        <p className="text-sm text-gray-600">Uploading...</p>
+                        <p className="text-sm text-slate-600">Uploading...</p>
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                        <div className="text-sm text-gray-600">
+                        <Upload className="mx-auto h-12 w-12 text-slate-400" />
+                        <div className="text-sm text-slate-600">
                           <Button
                             type="button"
                             variant="link"
@@ -551,7 +551,7 @@ export default function BankDetails() {
                           </Button>
                           <span> or drag and drop</span>
                         </div>
-                        <p className="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
+                        <p className="text-xs text-slate-500">PNG, JPG, PDF up to 10MB</p>
                       </div>
                     )}
                   </div>
