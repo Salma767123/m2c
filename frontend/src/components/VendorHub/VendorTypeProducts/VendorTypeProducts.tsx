@@ -27,6 +27,44 @@ interface VendorTypeProductsProps {
   data: any;
 }
 
+// Downscale + re-encode an uploaded image to a compact JPEG data URI before it
+// is stored as a product photo. Photos travel to the backend as base64 nested
+// inside categoryProducts/additionalCategories JSON; uncompressed multi-MB
+// originals blow up the multipart body and crash the browser tab on submit
+// (renderer OOM). Capping the longest edge at 1280px and using JPEG q0.72
+// keeps the body small while staying legible for verification. Falls back to
+// the raw data URI if canvas encoding is unavailable.
+const MAX_PHOTO_EDGE = 1280;
+const compressImageToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onerror = () => resolve("");
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new window.Image();
+      img.onerror = () => resolve(dataUrl);
+      img.onload = () => {
+        const { width, height } = img;
+        const scale = Math.min(1, MAX_PHOTO_EDGE / Math.max(width, height));
+        const w = Math.round(width * scale);
+        const h = Math.round(height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(dataUrl);
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          resolve(canvas.toDataURL("image/jpeg", 0.72));
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+
 const vendorTypes = [
   {
     id: "manufacturer",
@@ -142,8 +180,8 @@ export default function VendorTypeProducts({
     );
 
     validFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      compressImageToDataUrl(file).then((preview) => {
+        if (!preview) return;
         setCategoryProducts((prev) => {
           const categoryList = prev[categoryId] || [];
           return {
@@ -153,18 +191,14 @@ export default function VendorTypeProducts({
                 if (p.photos.length >= 5) return p;
                 return {
                   ...p,
-                  photos: [
-                    ...p.photos,
-                    { file, preview: reader.result as string },
-                  ],
+                  photos: [...p.photos, { file, preview }],
                 };
               }
               return p;
             }),
           };
         });
-      };
-      reader.readAsDataURL(file);
+      });
     });
     e.target.value = "";
   };
@@ -291,8 +325,8 @@ export default function VendorTypeProducts({
     );
 
     validFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      compressImageToDataUrl(file).then((preview) => {
+        if (!preview) return;
         setAdditionalCategories((prev) =>
           prev.map((c) => {
             if (c.id === categoryId) {
@@ -303,10 +337,7 @@ export default function VendorTypeProducts({
                     if (p.photos.length >= 5) return p;
                     return {
                       ...p,
-                      photos: [
-                        ...p.photos,
-                        { file, preview: reader.result as string },
-                      ],
+                      photos: [...p.photos, { file, preview }],
                     };
                   }
                   return p;
@@ -316,8 +347,7 @@ export default function VendorTypeProducts({
             return c;
           }),
         );
-      };
-      reader.readAsDataURL(file);
+      });
     });
     e.target.value = "";
   };
