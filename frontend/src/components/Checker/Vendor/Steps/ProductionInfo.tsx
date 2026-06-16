@@ -1,5 +1,6 @@
 "use client"
 
+import { Package, Image as ImageIcon } from "lucide-react"
 import type { StepErrors } from "../validation"
 import {
     READONLY_CLS,
@@ -7,6 +8,9 @@ import {
     RequiredMark,
     inputCls,
 } from "./fieldHelpers"
+
+const isImageUrl = (url?: string | null) =>
+    !!url && /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url)
 
 interface StepProps {
     formData: any
@@ -103,6 +107,75 @@ export default function ProductionInfo({ formData, setFormData, errors = {}, aut
                     />
                     <ErrorText msg={errors.numberOfProductionWorkers} />
                 </div>
+            </div>
+
+            <VendorProducts products={formData.vendorProducts} />
+        </div>
+    )
+}
+
+// Read-only list of the products the vendor registered, grouped by category,
+// with the product name and any uploaded photos. Lets the checker match the
+// declared catalogue against what they see on-site. Renders nothing when the
+// vendor registered no products.
+function VendorProducts({ products }: { products?: any[] }) {
+    const list = Array.isArray(products) ? products : []
+    if (list.length === 0) return null
+
+    // Group by category, preserving first-seen order.
+    const groups: { category: string; items: any[] }[] = []
+    const indexByCategory = new Map<string, number>()
+    for (const p of list) {
+        const category = p?.category || "Uncategorised"
+        if (!indexByCategory.has(category)) {
+            indexByCategory.set(category, groups.length)
+            groups.push({ category, items: [] })
+        }
+        groups[indexByCategory.get(category)!].items.push(p)
+    }
+
+    return (
+        <div className="space-y-5">
+            <div className="border-b border-slate-200 pb-3">
+                <h3 className="text-lg font-bold text-slate-900">Vendor Products</h3>
+                <p className="text-slate-500 text-sm">Registered by the vendor — read-only reference for on-site verification.</p>
+            </div>
+
+            <div className="space-y-6">
+                {groups.map((group, gi) => (
+                    <div key={gi}>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{group.category}</p>
+                        <div className="space-y-4">
+                            {group.items.map((product, pi) => {
+                                const photos: string[] = Array.isArray(product?.photos) ? product.photos.filter(Boolean) : []
+                                return (
+                                    <div key={pi} className="rounded-xl border border-slate-200 p-4 bg-white">
+                                        <p className="text-sm font-semibold text-slate-800 mb-3">{product?.name || `Product ${pi + 1}`}</p>
+                                        {photos.length > 0 ? (
+                                            <div className="flex flex-wrap gap-3">
+                                                {photos.map((url, idx) => (
+                                                    <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block w-24">
+                                                        {isImageUrl(url) ? (
+                                                            <img src={url} alt={product?.name || "Product"} className="w-24 h-24 object-cover rounded-lg border border-slate-200" />
+                                                        ) : (
+                                                            <div className="w-24 h-24 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center">
+                                                                <ImageIcon className="w-7 h-7 text-slate-400" />
+                                                            </div>
+                                                        )}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                                                <Package className="w-3.5 h-3.5" /> No photos provided
+                                            </p>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     )

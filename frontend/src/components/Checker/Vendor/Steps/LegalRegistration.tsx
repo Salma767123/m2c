@@ -1,5 +1,6 @@
 "use client"
 
+import { FileText, Download } from "lucide-react"
 import type { StepErrors } from "../validation"
 import {
     READONLY_CLS,
@@ -7,6 +8,26 @@ import {
     RequiredMark,
     inputCls,
 } from "./fieldHelpers"
+
+const isImageUrl = (url?: string | null) =>
+    !!url && /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url)
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+    COMPANY_REGISTRATION: "Company Registration",
+    GST_CERTIFICATE: "GST Certificate",
+    PAN_CARD: "PAN Card",
+    AADHAAR_CARD: "Aadhaar Card",
+    TRADE_LICENSE: "Trade License",
+    EXPORT_LICENSE: "Export License",
+    FACTORY_LICENSE: "Factory License",
+    POLLUTION_CERTIFICATE: "Pollution Certificate",
+    FIRE_SAFETY_CERTIFICATE: "Fire Safety Certificate",
+    BANK_STATEMENT: "Bank Statement",
+    AUDITED_FINANCIALS: "Audited Financials",
+    PRODUCT_CATALOG: "Product Catalog",
+    QUALITY_CERTIFICATES: "Quality Certificates",
+    INSURANCE_CERTIFICATE: "Insurance Certificate",
+}
 
 interface StepProps {
     formData: any
@@ -111,6 +132,56 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                         </>
                     )}
                 </div>
+            </div>
+
+            <VendorLegalDocuments documents={formData.vendorDocuments} />
+        </div>
+    )
+}
+
+// Read-only list of the registration/legal documents the vendor uploaded.
+// Factory images (DocumentType OTHER) are shown on Step 1, so they're excluded
+// here to avoid duplicating the same media across steps. Renders nothing when
+// the vendor uploaded no legal documents.
+function VendorLegalDocuments({ documents }: { documents?: any[] }) {
+    const docs = (Array.isArray(documents) ? documents : [])
+        .filter((d) => d?.type && d.type !== "OTHER" && d?.documentUrl)
+
+    if (docs.length === 0) return null
+
+    return (
+        <div className="space-y-5">
+            <div className="border-b border-slate-200 pb-3">
+                <h3 className="text-lg font-bold text-slate-900">Registration Documents</h3>
+                <p className="text-slate-500 text-sm">Uploaded by the vendor — read-only reference for verification.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {docs.map((doc, idx) => {
+                    const label = DOC_TYPE_LABELS[doc.type] || doc.name || doc.type
+                    return (
+                        <a
+                            key={idx}
+                            href={doc.documentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group flex items-center gap-3 rounded-xl border border-slate-200 p-3 bg-white hover:border-brand-300 hover:bg-brand-50/40 transition-colors"
+                        >
+                            {isImageUrl(doc.documentUrl) ? (
+                                <img src={doc.documentUrl} alt={label} className="w-12 h-12 object-cover rounded-lg border border-slate-200 shrink-0" />
+                            ) : (
+                                <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                                    <FileText className="w-6 h-6 text-slate-400" />
+                                </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-slate-800 truncate">{label}</p>
+                                {doc.name && <p className="text-xs text-slate-500 truncate">{doc.name}</p>}
+                            </div>
+                            <Download className="w-4 h-4 text-slate-400 group-hover:text-brand-500 shrink-0" />
+                        </a>
+                    )
+                })}
             </div>
         </div>
     )

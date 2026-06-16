@@ -479,19 +479,35 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 <p className="text-sm text-slate-600">This will be the master product data</p>
               </CardHeader>
               <CardContent className="space-y-4 p-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Product Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
-                    placeholder="Enter product name"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Product Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                      placeholder="Enter product name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      SKU *
+                    </label>
+                    <input
+                      type="text"
+                      name="sku"
+                      value={formData.sku}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                      placeholder="Enter SKU"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -525,24 +541,6 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     {formData.category && filteredSubcategories.length === 0 && (
                       <p className="text-xs text-slate-500 mt-1">No subcategories available for this category</p>
                     )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div></div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      SKU *
-                    </label>
-                    <input
-                      type="text"
-                      name="sku"
-                      value={formData.sku}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
-                      placeholder="Enter SKU"
-                    />
                   </div>
                 </div>
 

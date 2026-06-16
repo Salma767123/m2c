@@ -25,6 +25,8 @@ import {
   Tags,
   Building2,
   ShieldCheck,
+  Image as ImageIcon,
+  Download,
 } from "lucide-react"
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
@@ -262,6 +264,12 @@ export default function VendorDetail({
     }
 
     // Define the sections and their standard fields
+    // Sections follow the vendor registration step order so the checker sees
+    // the data in the same sequence the vendor entered it, with each step's
+    // images/documents shown inline within that step's section:
+    //   0 Company Details → 1 Warehouse → 2 Owner Profile →
+    //   3 Vendor Type & Products → 4 Manufacturing Facilities →
+    //   5 Certifications & Logistics → 6 Contact & Trade → Banking.
     const sections: Array<{
       id: string
       title: string
@@ -282,56 +290,6 @@ export default function VendorDetail({
           { key: "panNumber", label: "PAN Number" },
           { key: "website", label: "Website", type: "url" },
           { key: "companyDescription", label: "Company Description" }
-        ]
-      },
-      {
-        id: "contact",
-        title: "Contact Information",
-        icon: <Phone className="w-5 h-5 text-brand-600" />,
-        fields: [
-          { key: "ownerName", label: "Owner Name" },
-          { key: "designation", label: "Designation" },
-          { key: "businessPhone", label: "Business Phone" },
-          { key: "businessEmail", label: "Business Email" },
-          { key: "phoneNumber2", label: "Alternate Phone" },
-          { key: "businessEmail2", label: "Alternate Email" },
-          { key: "landlineNumber", label: "Landline Number" },
-          { 
-            key: "businessAddress", 
-            label: "Business Address", 
-            valueOverride: formatAddressHelper(
-              fullVendor.businessAddress,
-              fullVendor.businessCity,
-              fullVendor.businessState,
-              fullVendor.businessZipCode,
-              fullVendor.businessCountry
-            )
-          }
-        ]
-      },
-      {
-        id: "owner_profile",
-        title: "Owner Profile Details",
-        icon: <UserCircle className="w-5 h-5 text-brand-600" />,
-        fields: [
-          { key: "ownerEmail", label: "Owner Email" },
-          { key: "ownerEmail2", label: "Owner Email 2" },
-          { key: "ownerPhone", label: "Owner Phone" },
-          { key: "ownerPhone2", label: "Owner Phone 2" },
-          { key: "ownerLandline", label: "Owner Landline" },
-          {
-            key: "ownerAddress",
-            label: "Owner Address",
-            valueOverride: formatAddressHelper(
-              fullVendor.ownerAddress,
-              fullVendor.ownerCity,
-              fullVendor.ownerState,
-              fullVendor.ownerZipCode,
-              fullVendor.ownerCountry
-            )
-          },
-          { key: "businessStartDate", label: "Business Start Date", type: "date" },
-          { key: "employeeCount", label: "Employee Count", transform: (val: string) => getEmployeeCountLabel(val) }
         ]
       },
       {
@@ -357,8 +315,33 @@ export default function VendorDetail({
         ]
       },
       {
+        id: "owner_profile",
+        title: "Owner Profile",
+        icon: <UserCircle className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "ownerEmail", label: "Owner Email" },
+          { key: "ownerEmail2", label: "Owner Email 2" },
+          { key: "ownerPhone", label: "Owner Phone" },
+          { key: "ownerPhone2", label: "Owner Phone 2" },
+          { key: "ownerLandline", label: "Owner Landline" },
+          {
+            key: "ownerAddress",
+            label: "Owner Address",
+            valueOverride: formatAddressHelper(
+              fullVendor.ownerAddress,
+              fullVendor.ownerCity,
+              fullVendor.ownerState,
+              fullVendor.ownerZipCode,
+              fullVendor.ownerCountry
+            )
+          },
+          { key: "businessStartDate", label: "Business Start Date", type: "date" },
+          { key: "employeeCount", label: "Employee Count", transform: (val: string) => getEmployeeCountLabel(val) }
+        ]
+      },
+      {
         id: "capabilities",
-        title: "Capabilities & Catalogue Focus",
+        title: "Vendor Type & Products",
         icon: <Package className="w-5 h-5 text-brand-600" />,
         fields: [
           { key: "vendorType", label: "Vendor Role Type", type: "badge" },
@@ -380,13 +363,38 @@ export default function VendorDetail({
       },
       {
         id: "certifications",
-        title: "Certifications & Compliance",
+        title: "Certifications & Logistics",
         icon: <Award className="w-5 h-5 text-brand-600" />,
         fields: [
           { key: "complianceStandards", label: "Compliance Standards" },
           { key: "packagingCapabilities", label: "Packaging Capabilities" },
           { key: "logisticsPartners", label: "Logistics Partners" },
           { key: "shippingMethods", label: "Shipping Methods", type: "list" }
+        ]
+      },
+      {
+        id: "contact",
+        title: "Contact Information",
+        icon: <Phone className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "ownerName", label: "Owner Name" },
+          { key: "designation", label: "Designation" },
+          { key: "businessPhone", label: "Business Phone" },
+          { key: "businessEmail", label: "Business Email" },
+          { key: "phoneNumber2", label: "Alternate Phone" },
+          { key: "businessEmail2", label: "Alternate Email" },
+          { key: "landlineNumber", label: "Landline Number" },
+          {
+            key: "businessAddress",
+            label: "Business Address",
+            valueOverride: formatAddressHelper(
+              fullVendor.businessAddress,
+              fullVendor.businessCity,
+              fullVendor.businessState,
+              fullVendor.businessZipCode,
+              fullVendor.businessCountry
+            )
+          }
         ]
       },
       {
@@ -406,6 +414,89 @@ export default function VendorDetail({
         fields: [] // Custom rendered
       }
     ]
+
+    // ── Media / documents grouped by the registration step that collected
+    //    them, so each appears inside its own section below. ──────────────
+    const isImageUrl = (url?: string) =>
+      !!url && /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url)
+
+    const allDocs: any[] = Array.isArray(fullVendor.documents) ? fullVendor.documents : []
+    const COMPANY_DOC_TYPES = ["GST_CERTIFICATE", "PAN_CARD", "COMPANY_REGISTRATION", "AADHAAR_CARD"]
+    const companyDocs = allDocs.filter((d) => COMPANY_DOC_TYPES.includes(d.type))
+    // Factory photos are persisted as DocumentType OTHER during registration.
+    const factoryImages = allDocs
+      .filter((d) => d.type === "OTHER")
+      .map((d) => ({ label: d.name || "Factory Image", url: d.documentUrl }))
+
+    const productPhotos: Array<{ label: string; url: string }> = []
+    const collectProducts = (catLabel: string, products: any[]) => {
+      ;(Array.isArray(products) ? products : []).forEach((p: any, i: number) => {
+        ;(Array.isArray(p?.photos) ? p.photos : []).forEach((ph: any) => {
+          const url = ph?.url || ph?.preview
+          if (url) productPhotos.push({ label: `${catLabel} · ${p?.name || `Product ${i + 1}`}`, url })
+        })
+      })
+    }
+    if (fullVendor.categoryProducts && typeof fullVendor.categoryProducts === "object") {
+      Object.entries(fullVendor.categoryProducts).forEach(([catId, products]: [string, any]) =>
+        collectProducts(catId, products),
+      )
+    }
+    if (Array.isArray(fullVendor.additionalCategories)) {
+      fullVendor.additionalCategories.forEach((cat: any) =>
+        collectProducts(cat?.name || "Custom Category", cat?.products),
+      )
+    }
+
+    // Shared renderers for inline media inside a section.
+    const renderImageStrip = (heading: string, icon: React.ReactNode, items: Array<{ label: string; url: string }>) => (
+      <div>
+        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">{icon} {heading}</h4>
+        <div className="flex flex-wrap gap-4">
+          {items.map((m, i) => (
+            <a key={`${m.label}-${i}`} href={m.url} target="_blank" rel="noopener noreferrer" className="group block">
+              <img
+                src={m.url}
+                alt={m.label}
+                className="w-28 h-28 object-cover rounded-xl border border-slate-200 group-hover:border-brand-300 transition-colors"
+              />
+              <p className="text-xs font-semibold text-slate-600 mt-1.5 text-center max-w-28 truncate" title={m.label}>{m.label}</p>
+            </a>
+          ))}
+        </div>
+      </div>
+    )
+
+    const renderDocsGrid = (heading: string, docs: any[]) => (
+      <div>
+        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+          <FileText className="w-4.5 h-4.5 text-slate-400" /> {heading} ({docs.length})
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {docs.map((doc: any, idx: number) => (
+            <div key={doc.id || idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-3 space-y-2">
+              {isImageUrl(doc.documentUrl) ? (
+                <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer">
+                  <img src={doc.documentUrl} alt={doc.name} className="w-full h-32 object-cover rounded-lg border border-slate-200" />
+                </a>
+              ) : (
+                <div className="w-full h-32 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-300">
+                  <FileText className="w-10 h-10" />
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</p>
+                {doc.documentUrl && (
+                  <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-brand-600 hover:text-brand-700" title="View / Download">
+                    <Download className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
 
     return (
       <div className="space-y-8 animate-in fade-in duration-300">
@@ -427,29 +518,79 @@ export default function VendorDetail({
           let hasCustomData = false
           let customContent: React.ReactNode = null
 
-          if (section.id === "owner_profile") {
-            const additional = fullVendor.additionalOwners
-            if (Array.isArray(additional) && additional.length > 0) {
+          if (section.id === "company") {
+            // Company logo + registration documents (GST / PAN / Company Reg / Aadhaar).
+            if (fullVendor.companyLogo || companyDocs.length > 0) {
+              hasCustomData = true
+              customContent = (
+                <div className="col-span-full space-y-6 border-t border-slate-100 pt-6 mt-4">
+                  {fullVendor.companyLogo &&
+                    renderImageStrip("Company Logo", <ImageIcon className="w-4.5 h-4.5 text-slate-400" />, [
+                      { label: "Company Logo", url: fullVendor.companyLogo },
+                    ])}
+                  {companyDocs.length > 0 && renderDocsGrid("Registration Documents", companyDocs)}
+                </div>
+              )
+            }
+          } else if (section.id === "warehouse") {
+            if (factoryImages.length > 0) {
               hasCustomData = true
               customContent = (
                 <div className="col-span-full border-t border-slate-100 pt-6 mt-4">
-                  <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-1.5">
-                    <UserCircle className="w-4.5 h-4.5 text-slate-400" /> Additional Owners ({additional.length})
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {additional.map((owner: any, idx: number) => (
-                      <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
-                        <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
-                        {owner.name && <Field label="Name" value={owner.name} />}
-                        {owner.designation && <Field label="Designation" value={owner.designation} />}
-                        {owner.email && <Field label="Email" value={owner.email} />}
-                        {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
-                        {owner.phone && <Field label="Phone" value={owner.phone} />}
-                        {owner.phone2 && <Field label="Secondary Phone" value={owner.phone2} />}
-                        {owner.landline && <Field label="Landline" value={owner.landline} />}
+                  {renderImageStrip(
+                    `Factory Images (${factoryImages.length})`,
+                    <ImageIcon className="w-4.5 h-4.5 text-slate-400" />,
+                    factoryImages,
+                  )}
+                </div>
+              )
+            }
+          } else if (section.id === "owner_profile") {
+            const additional = fullVendor.additionalOwners
+            const hasOwnerPhoto = !!fullVendor.ownerPhoto
+            const hasAdditional = Array.isArray(additional) && additional.length > 0
+            if (hasOwnerPhoto || hasAdditional) {
+              hasCustomData = true
+              customContent = (
+                <div className="col-span-full space-y-6 border-t border-slate-100 pt-6 mt-4">
+                  {hasOwnerPhoto &&
+                    renderImageStrip("Owner Photo", <ImageIcon className="w-4.5 h-4.5 text-slate-400" />, [
+                      { label: "Owner Photo", url: fullVendor.ownerPhoto },
+                    ])}
+                  {hasAdditional && (
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-1.5">
+                        <UserCircle className="w-4.5 h-4.5 text-slate-400" /> Additional Owners ({additional.length})
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {additional.map((owner: any, idx: number) => (
+                          <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                            <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
+                            {owner.name && <Field label="Name" value={owner.name} />}
+                            {owner.designation && <Field label="Designation" value={owner.designation} />}
+                            {owner.email && <Field label="Email" value={owner.email} />}
+                            {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
+                            {owner.phone && <Field label="Phone" value={owner.phone} />}
+                            {owner.phone2 && <Field label="Secondary Phone" value={owner.phone2} />}
+                            {owner.landline && <Field label="Landline" value={owner.landline} />}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+          } else if (section.id === "capabilities") {
+            if (productPhotos.length > 0) {
+              hasCustomData = true
+              customContent = (
+                <div className="col-span-full border-t border-slate-100 pt-6 mt-4">
+                  {renderImageStrip(
+                    `Product Photos (${productPhotos.length})`,
+                    <Package className="w-4.5 h-4.5 text-slate-400" />,
+                    productPhotos,
+                  )}
                 </div>
               )
             }

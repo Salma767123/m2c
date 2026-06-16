@@ -109,7 +109,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
               type="number"
               value={formData.sampleSize}
               onChange={(e) => setFormData({ ...formData, sampleSize: parseInt(e.target.value) || 200 })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
           <div>
@@ -119,7 +119,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
               step="0.1"
               value={formData.aqlMajor}
               onChange={(e) => setFormData({ ...formData, aqlMajor: parseFloat(e.target.value) || 1.0 })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
           <div>
@@ -129,7 +129,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
               step="0.1"
               value={formData.aqlMinor}
               onChange={(e) => setFormData({ ...formData, aqlMinor: parseFloat(e.target.value) || 2.5 })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
         </div>
@@ -140,7 +140,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
               type="number"
               value={formData.maxAllowedCritical}
               onChange={(e) => setFormData({ ...formData, maxAllowedCritical: parseInt(e.target.value) || 0 })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
           <div>
@@ -149,7 +149,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
               type="number"
               value={formData.maxAllowedMajor}
               onChange={(e) => setFormData({ ...formData, maxAllowedMajor: parseInt(e.target.value) || 5 })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
           <div>
@@ -158,7 +158,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
               type="number"
               value={formData.maxAllowedMinor}
               onChange={(e) => setFormData({ ...formData, maxAllowedMinor: parseInt(e.target.value) || 10 })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
             />
           </div>
         </div>
@@ -265,7 +265,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             value={formData.criticalDefectDetails}
             onChange={(e) => setFormData({ ...formData, criticalDefectDetails: e.target.value })}
             placeholder="Describe critical defects found..."
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 min-h-24"
+            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200 min-h-24"
           />
         </div>
         <div>
@@ -274,7 +274,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             value={formData.majorDefectDetails}
             onChange={(e) => setFormData({ ...formData, majorDefectDetails: e.target.value })}
             placeholder="Describe major defects found..."
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 min-h-24"
+            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200 min-h-24"
           />
         </div>
         <div>
@@ -283,7 +283,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
             value={formData.minorDefectDetails}
             onChange={(e) => setFormData({ ...formData, minorDefectDetails: e.target.value })}
             placeholder="Describe minor defects found..."
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 min-h-24"
+            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200 min-h-24"
           />
         </div>
       </div>
@@ -350,7 +350,7 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
       <div>
         <label className="block text-slate-700 font-semibold mb-3">Photo Evidence:</label>
         <p className="text-slate-600 text-sm mb-4">Major/minor defects, sealed samples with AQF tape</p>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50/50">
+        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
           <input
             ref={defectPhotoInputRef}
             type="file"

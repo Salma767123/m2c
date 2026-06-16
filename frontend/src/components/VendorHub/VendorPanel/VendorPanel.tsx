@@ -250,10 +250,10 @@ export default function VendorPanel() {
   );
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-gray-100 to-slate-100 font-sans">
-      <div className="flex min-h-screen">
+    <div className="min-h-full bg-linear-to-b from-gray-100 to-slate-100 font-sans">
+      <div className="flex min-h-full">
         {/* Left Sidebar — semantic <aside> + <nav> (web-design #129: no <div> with onClick) */}
-        <aside className="hidden md:flex flex-col w-68 bg-white border-r border-gray-100 sticky top-21.25 self-start h-[calc(100vh-85px)] shrink-0 z-(--z-sticky) shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
+        <aside className="hidden md:flex flex-col w-68 bg-white border-r border-gray-100 sticky top-21.25 self-start max-h-[calc(100vh-85px)] shrink-0 z-(--z-sticky) shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
           {/* Header */}
           <div className="px-6 py-6 border-b border-gray-100 shrink-0">
             <h2 className="text-xs font-bold text-gray-900 tracking-widest uppercase">
@@ -265,7 +265,7 @@ export default function VendorPanel() {
           </div>
 
           {/* Navigation Steps */}
-          <nav aria-label="Registration steps" className="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin">
+          <nav aria-label="Registration steps" className="flex-1 min-h-0 overflow-y-auto px-4 py-6 scrollbar-thin">
             <ul className="space-y-1 relative" role="list">
               {steps.map((step, index) => {
                 const skipped = isStepSkipped(index);

@@ -917,9 +917,9 @@ const getProductStats = async (req, res) => {
       where: { vendorId, status: 'ACTIVE' }
     });
 
-    // Get pending products
+    // Get pending products (awaiting approval)
     const pendingProducts = await prisma.product.count({
-      where: { vendorId, status: 'PENDING' }
+      where: { vendorId, approvalStatus: 'PENDING' }
     });
 
     // Get out of stock products

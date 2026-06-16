@@ -399,7 +399,7 @@ export default function Testing({ formData, setFormData }: TestingProps) {
 
       <div>
         <label className="block text-slate-700 font-semibold mb-3">General Testing Photos:</label>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50/50">
+        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
           <input
             ref={generalTestingPhotoInputRef}
             type="file"

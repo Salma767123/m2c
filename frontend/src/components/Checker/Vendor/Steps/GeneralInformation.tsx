@@ -25,7 +25,7 @@ interface GeneralInformationProps {
 const READONLY_CLS =
   "w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-100 text-slate-700 cursor-not-allowed"
 const EDITABLE_CLS =
-  "w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+  "w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200"
 
 export default function GeneralInformation({ formData, setFormData, autofillSnapshot = {} }: GeneralInformationProps) {
   const clientLocked = !!autofillSnapshot.client
@@ -124,7 +124,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             type="date"
             value={formData.serviceStartDate}
             onChange={(e) => setFormData({ ...formData, serviceStartDate: e.target.value })}
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200"
           />
         </div>
         <div>
@@ -132,7 +132,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
           <div ref={serviceTypeDropdownRef} className="relative">
             <button
               onClick={() => setShowServiceTypeDropdown(!showServiceTypeDropdown)}
-              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white text-left flex items-center justify-between hover:border-slate-400"
+              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200 bg-white text-left flex items-center justify-between hover:border-slate-400"
             >
               <span className="text-slate-900">{formData.serviceType}</span>
               <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform duration-200 ${showServiceTypeDropdown ? 'transform rotate-180' : ''}`} />
@@ -149,7 +149,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
                       }}
                       className={`block w-full px-4 py-3 text-sm text-left transition-colors duration-150 ${
                         formData.serviceType === type
-                          ? 'bg-blue-50 text-blue-600 font-medium border-l-2 border-blue-600'
+                          ? 'bg-brand-50 text-brand-600 font-medium border-l-2 border-brand-600'
                           : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >

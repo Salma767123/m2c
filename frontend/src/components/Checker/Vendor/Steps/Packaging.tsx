@@ -155,8 +155,8 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
                     type="button"
                     onClick={() => handleRemarkNumberSelect(item.remarkKey, num)}
                     className={`w-12 h-12 rounded-full border-2 font-semibold text-sm transition-all duration-200 ${isSelected
-                        ? "bg-blue-600 text-white border-blue-600 shadow-lg hover:bg-blue-700 transform scale-105"
-                        : "bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50 hover:scale-105"
+                        ? "bg-brand-500 text-white border-brand-500 shadow-lg hover:bg-brand-600 transform scale-105"
+                        : "bg-white text-slate-700 border-slate-300 hover:border-brand-400 hover:bg-brand-50 hover:scale-105"
                       }`}
                   >
                     {num}
@@ -167,7 +167,7 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
             {formData[item.remarkKey as keyof typeof formData] && (
               <div className="mt-2">
                 <span className="text-sm text-slate-600">Selected: </span>
-                <span className="text-sm font-semibold text-blue-600">
+                <span className="text-sm font-semibold text-brand-600">
                   Code {formData[item.remarkKey as keyof typeof formData]}
                 </span>
                 <button
@@ -186,7 +186,7 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
       <div>
         <label className="block text-slate-700 font-semibold mb-3">Photo Evidence:<span className="text-red-500 ml-0.5" aria-label="required">*</span></label>
         <p className="text-slate-600 text-sm mb-4">Carton quality, labels, internal protection details</p>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50/50">
+        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
           <input
             ref={packagingPhotoInputRef}
             type="file"

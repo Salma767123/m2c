@@ -11,13 +11,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/UI/Table'
-import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Edit, Trash2, History, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react'
+import { Package, PackagePlus, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Edit, Trash2, History, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import inventoryService, { InventoryItem as APIInventoryItem, InventoryStats } from '@/services/inventoryService'
 import StockHistoryModal from '@/components/Shared/StockHistoryModal'
 import { showWarningToast, showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
+import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -63,6 +64,9 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE'>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all')
+  const [restockedFrom, setRestockedFrom] = useState<string>('')
+  const [restockedTo, setRestockedTo] = useState<string>('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
@@ -90,6 +94,22 @@ export default function Inventory() {
 
   // Get categories for filter (vendor categories + 'all')
   const categories = ['all', ...vendorCategories]
+
+  // Apply stock-level filter (driven by clicking the Low/Out of Stock cards)
+  // and the Last Restocked date-range (calendar) filter.
+  const displayedItems = inventoryItems.filter((item) => {
+    if (stockFilter === 'out' && item.currentStock !== 0) return false
+    if (stockFilter === 'low' && !(item.currentStock > 0 && item.currentStock <= item.lowStockAlert)) return false
+
+    if (restockedFrom || restockedTo) {
+      if (!item.lastRestocked) return false
+      const restocked = new Date(item.lastRestocked)
+      const day = new Date(restocked.getFullYear(), restocked.getMonth(), restocked.getDate())
+      if (restockedFrom && day < new Date(restockedFrom + 'T00:00:00')) return false
+      if (restockedTo && day > new Date(restockedTo + 'T00:00:00')) return false
+    }
+    return true
+  })
 
   // Load data
   useEffect(() => {
@@ -227,7 +247,7 @@ export default function Inventory() {
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3">
+      <div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-slate-900">Inventory Management</h1>
@@ -244,42 +264,66 @@ export default function Inventory() {
 
       {/* Inventory Stats */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Items</span>
-            <div className="p-1.5 bg-brand-50 rounded-lg"><Package className="h-4 w-4 text-brand-600" /></div>
+        <button
+          type="button"
+          onClick={() => setStockFilter('all')}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-brand-200 ${stockFilter === 'all' ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Total Items</span>
+            <div className="p-2 bg-brand-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <Package className="h-4 w-4 text-brand-600" />
+            </div>
           </div>
-          <p className="text-xl font-bold text-slate-900">{totalItems}</p>
-          <p className="text-xs text-slate-500 mt-0.5">Unique products</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Low Stock</span>
-            <div className="p-1.5 bg-yellow-50 rounded-lg"><AlertTriangle className="h-4 w-4 text-yellow-600" /></div>
+          <p className="text-xl font-bold text-slate-900 mt-2">{totalItems}</p>
+          <p className="text-xs text-slate-500 mt-1">Unique products</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStockFilter((f) => (f === 'low' ? 'all' : 'low'))}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-yellow-200 ${stockFilter === 'low' ? 'border-yellow-300 ring-1 ring-yellow-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Low Stock</span>
+            <div className="p-2 bg-yellow-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            </div>
           </div>
-          <p className={`text-xl font-bold ${lowStockItems > 0 ? 'text-yellow-600' : 'text-slate-900'}`}>{lowStockItems}</p>
-          <p className="text-xs text-slate-500 mt-0.5">Need restocking</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Out of Stock</span>
-            <div className="p-1.5 bg-red-50 rounded-lg"><TrendingDown className="h-4 w-4 text-red-600" /></div>
+          <p className={`text-xl font-bold mt-2 ${lowStockItems > 0 ? 'text-yellow-600' : 'text-slate-900'}`}>{lowStockItems}</p>
+          <p className="text-xs text-slate-500 mt-1">Need restocking</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStockFilter((f) => (f === 'out' ? 'all' : 'out'))}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-red-200 ${stockFilter === 'out' ? 'border-red-300 ring-1 ring-red-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Out of Stock</span>
+            <div className="p-2 bg-red-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <TrendingDown className="h-4 w-4 text-red-600" />
+            </div>
           </div>
-          <p className={`text-xl font-bold ${outOfStockItems > 0 ? 'text-red-600' : 'text-slate-900'}`}>{outOfStockItems}</p>
-          <p className="text-xs text-slate-500 mt-0.5">Urgent attention</p>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Stock</span>
-            <div className="p-1.5 bg-green-50 rounded-lg"><TrendingUp className="h-4 w-4 text-green-600" /></div>
+          <p className={`text-xl font-bold mt-2 ${outOfStockItems > 0 ? 'text-red-600' : 'text-slate-900'}`}>{outOfStockItems}</p>
+          <p className="text-xs text-slate-500 mt-1">Urgent attention</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStockFilter('all')}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-green-200 ${stockFilter === 'all' ? 'border-green-300 ring-1 ring-green-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Total Stock</span>
+            <div className="p-2 bg-green-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <TrendingUp className="h-4 w-4 text-green-600" />
+            </div>
           </div>
-          <p className="text-xl font-bold text-slate-900">{totalValue.toLocaleString()}</p>
-          <p className="text-xs text-slate-500 mt-0.5">Total units</p>
-        </div>
+          <p className="text-xl font-bold text-slate-900 mt-2">{totalValue.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-1">Total units</p>
+        </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3">
+      <div>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
@@ -311,22 +355,27 @@ export default function Inventory() {
               }))}
               onChange={(value) => setCategoryFilter(value as string)}
             />
+            {/* Last Restocked calendar filter */}
+            <DateRangeCalendar
+              from={restockedFrom}
+              to={restockedTo}
+              placeholder="Last Restocked"
+              onChange={(f, t) => { setRestockedFrom(f); setRestockedTo(t) }}
+            />
           </div>
         </div>
       </div>
 
       {/* Results summary */}
-      {inventoryItems.length > 0 && (
+      {displayedItems.length > 0 && (
         <p className="text-sm text-slate-500">
-          Showing {inventoryItems.length} item{inventoryItems.length === 1 ? '' : 's'}
+          Showing {displayedItems.length} item{displayedItems.length === 1 ? '' : 's'}
+          {stockFilter === 'low' ? ' • Low Stock' : stockFilter === 'out' ? ' • Out of Stock' : ''}
         </p>
       )}
 
       {/* Inventory Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-200/80">
-          <h2 className="text-sm font-semibold text-slate-900">Inventory Items</h2>
-        </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b [&_tr]:border-slate-200/80 [&_th]:!text-slate-500 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
@@ -343,7 +392,7 @@ export default function Inventory() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {inventoryItems.length === 0 ? (
+              {displayedItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-12">
                     <div className="text-slate-500">
@@ -353,7 +402,7 @@ export default function Inventory() {
                   </TableCell>
                 </TableRow>
               ) : (
-                inventoryItems.map((item) => (
+                displayedItems.map((item) => (
                   <TableRow key={item.id} className="hover:bg-slate-50">
                     <TableCell>
                       <div>
@@ -403,13 +452,14 @@ export default function Inventory() {
                               showWarningToast('Stock Update Not Available', `Product approval status: ${item.productApprovalStatus}. Stock can only be updated after admin approval.`)
                             }
                           }}
-                          className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors ${
+                          className={`p-1.5 rounded-lg transition-colors ${
                             item.hasProductCreated && item.productApprovalStatus === 'APPROVED'
-                              ? 'border-brand-200 text-brand-600 hover:bg-brand-50'
-                              : 'border-slate-100 text-slate-400 cursor-not-allowed'
+                              ? 'text-slate-500 hover:text-brand-600 hover:bg-brand-50'
+                              : 'text-slate-300'
                           }`}
+                          title="Update Stock"
                         >
-                          Update Stock
+                          <PackagePlus className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleViewHistory(item)}

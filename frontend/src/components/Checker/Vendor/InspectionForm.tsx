@@ -160,6 +160,15 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
     factoryAddress: "",
     contactPersonName: "",
     contactPhoneNumber: "",
+    // Full vendor contact details (last edited by vendor) — read-only reference.
+    vendorContact: null as null | Record<string, any>,
+    // Vendor-uploaded media (read-only reference). companyLogo + factory images
+    // surface on Step 1; legal/registration documents surface on Step 2.
+    vendorCompanyLogo: "" as string,
+    vendorDocuments: [] as any[],
+    // Vendor's registered products (category, name, photos) — read-only
+    // reference on Step 3 / Production Info.
+    vendorProducts: [] as any[],
 
     // 2. Legal & Registration
     businessRegistrationNumber: "",
@@ -262,6 +271,25 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
             contactPersonName: prev.contactPersonName || (prevForm?.contactPersonName) || v.ownerName || "",
             contactPhoneNumber: prev.contactPhoneNumber || (prevForm?.contactPhoneNumber) || v.businessPhone || "",
             factoryAddress: prev.factoryAddress || (prevForm?.factoryAddress) || factoryAddressFull,
+            vendorContact: {
+              loginEmail: v.email || "",
+              businessPhone: v.businessPhone || "",
+              phoneNumber2: v.phoneNumber2 || "",
+              landlineNumber: v.landlineNumber || "",
+              businessEmail: v.businessEmail || "",
+              businessEmail2: v.businessEmail2 || "",
+              ownerName: v.ownerName || "",
+              ownerPhone: v.ownerPhone || "",
+              ownerPhone2: v.ownerPhone2 || "",
+              ownerLandline: v.ownerLandline || "",
+              ownerEmail: v.ownerEmail || "",
+              ownerEmail2: v.ownerEmail2 || "",
+              mainContact: v.mainContact || null,
+              alternateContacts: Array.isArray(v.alternateContacts) ? v.alternateContacts : [],
+            },
+            vendorCompanyLogo: prev.vendorCompanyLogo || v.companyLogo || "",
+            vendorDocuments: prev.vendorDocuments.length ? prev.vendorDocuments : (Array.isArray(v.documents) ? v.documents : []),
+            vendorProducts: prev.vendorProducts.length ? prev.vendorProducts : (Array.isArray(v.products) ? v.products : []),
             gstTaxId: prev.gstTaxId || (prevForm?.gstTaxId) || v.gstNumber || "",
             businessRegistrationNumber: prev.businessRegistrationNumber || (prevForm?.businessRegistrationNumber) || v.businessRegistrationNumber || "",
             factoryLicenseNumber: prev.factoryLicenseNumber || (prevForm?.factoryLicenseNumber) || v.tradeLicenseNumber || "",

@@ -764,6 +764,19 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                         >
                           Certificate File <span className="text-red-500">*</span>
                         </label>
+                        {/* Hidden with display:none (not sr-only). An sr-only
+                            input is position:absolute + clipped, so focusing it
+                            via the label made the browser scroll it "into view"
+                            at the page top — the scroll jump + blank space. A
+                            display:none input is unfocusable yet the label's
+                            htmlFor click still opens the picker. */}
+                        <input
+                          id={inputId}
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => handleFileChange(cert.id, cert.name, e)}
+                          className="hidden"
+                        />
                         {file ? (
                           <div className={`flex items-center justify-between gap-2 p-2 border rounded-md ${errors[`certFile_${cert.id}`] ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-slate-50/40'}`}>
                             <div className="flex items-center gap-2 min-w-0">
@@ -797,13 +810,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                                 <X className="w-3.5 h-3.5" aria-hidden="true" />
                               </button>
                             </div>
-                            <input
-                              id={inputId}
-                              type="file"
-                              accept=".pdf,.jpg,.jpeg,.png"
-                              onChange={(e) => handleFileChange(cert.id, cert.name, e)}
-                              className="sr-only"
-                            />
                           </div>
                         ) : (
                           <label
@@ -819,13 +825,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                             <Upload className="w-4 h-4 text-slate-400" aria-hidden="true" />
                             <span className="font-medium text-brand-700">Upload</span>
                             <span className="text-slate-500">or drag &amp; drop</span>
-                            <input
-                              id={inputId}
-                              type="file"
-                              accept=".pdf,.jpg,.jpeg,.png"
-                              onChange={(e) => handleFileChange(cert.id, cert.name, e)}
-                              className="sr-only"
-                            />
                           </label>
                         )}
                         {errors[`certFile_${cert.id}`] && (
@@ -983,6 +982,15 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                           >
                             Certificate File <span className="text-red-500">*</span>
                           </label>
+                          {/* Hidden with display:none — see standard cert
+                              block above for why sr-only caused the scroll jump. */}
+                          <input
+                            id={inputId}
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => handleFileChange(other.id, label, e)}
+                            className="hidden"
+                          />
                           {file ? (
                             <div className={`flex items-center justify-between gap-2 p-2 border rounded-md ${errors[`otherCertFile_${other.id}`] ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-slate-50/40'}`}>
                               <div className="flex items-center gap-2 min-w-0">
@@ -1016,13 +1024,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                                   <X className="w-3.5 h-3.5" aria-hidden="true" />
                                 </button>
                               </div>
-                              <input
-                                id={inputId}
-                                type="file"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                onChange={(e) => handleFileChange(other.id, label, e)}
-                                className="sr-only"
-                              />
                             </div>
                           ) : (
                             <label
@@ -1038,13 +1039,6 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                               <Upload className="w-4 h-4 text-slate-400" aria-hidden="true" />
                               <span className="font-medium text-brand-700">Upload</span>
                               <span className="text-slate-500">or drag &amp; drop</span>
-                              <input
-                                id={inputId}
-                                type="file"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                onChange={(e) => handleFileChange(other.id, label, e)}
-                                className="sr-only"
-                              />
                             </label>
                           )}
                           {errors[`otherCertFile_${other.id}`] && (

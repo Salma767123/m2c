@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
-import { Plus, Edit, Eye, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
-import { productService, type Product } from '@/services/productService'
+import { Plus, Edit, Eye, Trash2, ChevronLeft, ChevronRight, Search, Package, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
+import { productService, type Product, type ProductStats } from '@/services/productService'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
+import Dropdown from '@/components/UI/Dropdown'
+import DateRangeCalendar from '@/components/Shared/DateRangeCalendar'
 
 function getPageRange(current: number, total: number): Array<number | '…'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -25,7 +27,14 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
 export default function Products() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [productStats, setProductStats] = useState<ProductStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [cardFilter, setCardFilter] = useState<'all' | 'active' | 'pending' | 'out'>('all');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
   const [deleteModal, setDeleteModal] = useState<{ show: boolean; product: Product | null; loading: boolean }>({
     show: false, product: null, loading: false
   });
@@ -46,10 +55,16 @@ export default function Products() {
   const loadProducts = async (page = 1) => {
     setIsLoading(true);
     try {
-      const response = await productService.getProducts({ page, limit: 10 });
+      const [response, statsResponse] = await Promise.all([
+        productService.getProducts({ page, limit: 10 }),
+        productService.getProductStats(),
+      ]);
       if (response.success) {
         setProducts(response.data.items);
         setPagination(response.data.pagination);
+      }
+      if (statsResponse.success && statsResponse.data) {
+        setProductStats(statsResponse.data);
       }
     } catch (error) {
       console.error('Error loading products:', error);
@@ -58,6 +73,36 @@ export default function Products() {
       setIsLoading(false);
     }
   };
+
+  // Stats
+  const totalProducts = productStats?.totalProducts ?? products.length;
+  const activeProducts = productStats?.activeProducts ?? 0;
+  const pendingProducts = productStats?.pendingProducts ?? 0;
+  const outOfStockProducts = productStats?.outOfStockProducts ?? 0;
+
+  // Categories for filter (derived from loaded products)
+  const categories = ['all', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))];
+
+  // Client-side filters over the loaded page (card click, search, status, category, date added)
+  const displayedProducts = products.filter((p) => {
+    if (cardFilter === 'active' && p.status !== 'ACTIVE') return false;
+    if (cardFilter === 'pending' && p.approvalStatus !== 'PENDING') return false;
+    if (cardFilter === 'out' && p.status !== 'OUT_OF_STOCK') return false;
+    if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+    if (categoryFilter !== 'all' && p.category !== categoryFilter) return false;
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      if (!(p.name?.toLowerCase().includes(q) || p.baseSku?.toLowerCase().includes(q))) return false;
+    }
+    if (dateFrom || dateTo) {
+      if (!p.createdAt) return false;
+      const c = new Date(p.createdAt);
+      const day = new Date(c.getFullYear(), c.getMonth(), c.getDate());
+      if (dateFrom && day < new Date(dateFrom + 'T00:00:00')) return false;
+      if (dateTo && day > new Date(dateTo + 'T00:00:00')) return false;
+    }
+    return true;
+  });
 
   const handleAddProduct = () => {
     router.push('/vendor/dashboard/products/add');
@@ -122,7 +167,7 @@ export default function Products() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold text-slate-900">My Products</h1>
@@ -138,19 +183,121 @@ export default function Products() {
         </div>
       </div>
 
+      {/* Product Stats */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <button
+          type="button"
+          onClick={() => setCardFilter('all')}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-brand-200 ${cardFilter === 'all' ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Total Products</span>
+            <div className="p-2 bg-brand-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <Package className="h-4 w-4 text-brand-600" />
+            </div>
+          </div>
+          <p className="text-xl font-bold text-slate-900 mt-2">{totalProducts}</p>
+          <p className="text-xs text-slate-500 mt-1">All products</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCardFilter((f) => (f === 'active' ? 'all' : 'active'))}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-green-200 ${cardFilter === 'active' ? 'border-green-300 ring-1 ring-green-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Active</span>
+            <div className="p-2 bg-green-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </div>
+          </div>
+          <p className={`text-xl font-bold mt-2 ${activeProducts > 0 ? 'text-green-600' : 'text-slate-900'}`}>{activeProducts}</p>
+          <p className="text-xs text-slate-500 mt-1">Live in catalog</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCardFilter((f) => (f === 'pending' ? 'all' : 'pending'))}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-yellow-200 ${cardFilter === 'pending' ? 'border-yellow-300 ring-1 ring-yellow-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Pending Approval</span>
+            <div className="p-2 bg-yellow-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <Clock className="h-4 w-4 text-yellow-600" />
+            </div>
+          </div>
+          <p className={`text-xl font-bold mt-2 ${pendingProducts > 0 ? 'text-yellow-600' : 'text-slate-900'}`}>{pendingProducts}</p>
+          <p className="text-xs text-slate-500 mt-1">Awaiting review</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCardFilter((f) => (f === 'out' ? 'all' : 'out'))}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-red-200 ${cardFilter === 'out' ? 'border-red-300 ring-1 ring-red-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Out of Stock</span>
+            <div className="p-2 bg-red-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+            </div>
+          </div>
+          <p className={`text-xl font-bold mt-2 ${outOfStockProducts > 0 ? 'text-red-600' : 'text-slate-900'}`}>{outOfStockProducts}</p>
+          <p className="text-xs text-slate-500 mt-1">Need restocking</p>
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Dropdown
+              id="statusFilter"
+              value={statusFilter}
+              options={[
+                { value: 'all', label: 'All Status' },
+                { value: 'ACTIVE', label: 'Active' },
+                { value: 'INACTIVE', label: 'Inactive' },
+                { value: 'OUT_OF_STOCK', label: 'Out of Stock' }
+              ]}
+              onChange={(value) => setStatusFilter(value as 'all' | 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK')}
+            />
+            <Dropdown
+              id="categoryFilter"
+              value={categoryFilter}
+              options={categories.map(cat => ({
+                value: cat,
+                label: cat === 'all' ? 'All Categories' : cat
+              }))}
+              onChange={(value) => setCategoryFilter(value as string)}
+            />
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              placeholder="Date Added"
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t) }}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Results summary */}
-      {products.length > 0 && (
+      {displayedProducts.length > 0 && (
         <p className="text-sm text-slate-500">
-          Showing {((pagination.currentPage - 1) * 10) + 1}–{Math.min(pagination.currentPage * 10, pagination.totalItems)} of {pagination.totalItems} product{pagination.totalItems === 1 ? '' : 's'}
+          Showing {displayedProducts.length} product{displayedProducts.length === 1 ? '' : 's'}
+          {cardFilter === 'active' ? ' • Active' : cardFilter === 'pending' ? ' • Pending Approval' : cardFilter === 'out' ? ' • Out of Stock' : ''}
         </p>
       )}
 
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-200/80">
-          <h2 className="text-sm font-semibold text-slate-900">Product Inventory</h2>
-        </div>
         <div className="overflow-x-auto">
-          {products.length === 0 ? (
+          {displayedProducts.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-slate-600 mb-4">No products found</p>
               <Button onClick={handleAddProduct} className="bg-brand-500 text-white hover:bg-[#313131]">
@@ -173,7 +320,7 @@ export default function Products() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product) => (
+                {displayedProducts.map((product) => (
                   <TableRow key={product.id} className="hover:bg-slate-50">
                     <TableCell>
                       <div className="font-medium text-slate-900">{product.name}</div>

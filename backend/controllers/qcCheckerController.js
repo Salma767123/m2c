@@ -815,6 +815,8 @@ const getVendorDetails = async (req, res) => {
             where: { id: vendorId, assignedQcId: checkerId },
             include: {
                 certifications: true,
+                documents: true,
+                bankDetails: true,
                 assignedQc: {
                     select: { name: true, checkerId: true, email: true, phone: true },
                 },
@@ -971,6 +973,33 @@ const getActiveInspectionForVendor = async (req, res) => {
                     factoryLatitude: true,
                     factoryLongitude: true,
                     mapLink: true,
+                    // Full contact details (last edited by vendor) — read-only
+                    // reference for the checker on Step 1 / Factory Details.
+                    email: true,
+                    phoneNumber2: true,
+                    landlineNumber: true,
+                    businessEmail: true,
+                    businessEmail2: true,
+                    ownerEmail: true,
+                    ownerEmail2: true,
+                    ownerPhone: true,
+                    ownerPhone2: true,
+                    ownerLandline: true,
+                    mainContact: true,
+                    alternateContacts: true,
+                    // Vendor-uploaded media — read-only reference for the checker.
+                    // Logo + factory images surface on Step 1; legal/registration
+                    // documents surface on Step 2.
+                    companyLogo: true,
+                    documents: {
+                        select: { type: true, name: true, documentUrl: true },
+                    },
+                    // Products the vendor registered (category-keyed) — surfaced
+                    // read-only on Step 3 / Production Info. categoryProducts is
+                    // keyed by Category id; names are resolved below.
+                    productCategories: true,
+                    categoryProducts: true,
+                    additionalCategories: true,
                 },
             },
         };
@@ -983,6 +1012,49 @@ const getActiveInspectionForVendor = async (req, res) => {
             orderBy: { scheduledDate: 'asc' },
             select: inspectionSelect,
         });
+
+        // Flatten the vendor's registered products into a clean, read-only list
+        // for Step 3 (Production Info): [{ category, name, photos: [url] }].
+        // categoryProducts is keyed by Category id, so resolve those ids to
+        // human-readable names; additionalCategories already carry their name.
+        if (inspection?.vendor) {
+            const v = inspection.vendor;
+            const products = [];
+            const collect = (categoryName, list) => {
+                (Array.isArray(list) ? list : []).forEach((p, i) => {
+                    const photos = (Array.isArray(p?.photos) ? p.photos : [])
+                        .map((ph) => ph?.url || ph?.preview)
+                        .filter(Boolean);
+                    products.push({
+                        category: categoryName,
+                        name: p?.name || `Product ${i + 1}`,
+                        photos,
+                    });
+                });
+            };
+
+            const catProducts = v.categoryProducts && typeof v.categoryProducts === 'object' ? v.categoryProducts : {};
+            const catIds = Object.keys(catProducts);
+            let nameById = {};
+            if (catIds.length > 0) {
+                const cats = await prisma.category.findMany({
+                    where: { id: { in: catIds } },
+                    select: { id: true, name: true },
+                });
+                nameById = Object.fromEntries(cats.map((c) => [c.id, c.name]));
+            }
+            for (const [catId, list] of Object.entries(catProducts)) {
+                collect(nameById[catId] || catId, list);
+            }
+            (Array.isArray(v.additionalCategories) ? v.additionalCategories : []).forEach((cat) => {
+                collect(cat?.name || 'Custom Category', cat?.products);
+            });
+
+            v.products = products;
+            // Raw category-keyed fields are no longer needed on the client.
+            delete v.categoryProducts;
+            delete v.additionalCategories;
+        }
 
         // For re-inspections, fetch the previous rejection reason from the parent
         let previousRejectionReason = null;

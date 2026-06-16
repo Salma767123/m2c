@@ -121,7 +121,7 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
         <h3 className="text-lg font-semibold text-slate-900">Measurement Samples<span className="text-red-500 ml-0.5" aria-label="required">*</span></h3>
         <button
           onClick={addSample}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add Sample
@@ -230,7 +230,7 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
         <p className="text-slate-600 text-sm mb-4">
           Carton dimensions, product measurements, weight verification
         </p>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50/50">
+        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
           <input
             ref={measurementPhotoInputRef}
             type="file"

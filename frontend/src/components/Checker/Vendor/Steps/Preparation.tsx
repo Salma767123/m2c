@@ -137,7 +137,7 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
                       type="number"
                       value={item.totalQuantity}
                       onChange={(e) => updateItem(item.id, "totalQuantity", Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200"
                     />
                   </div>
 
@@ -147,7 +147,7 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
                       type="number"
                       value={item.inspectionQuantity}
                       onChange={(e) => updateItem(item.id, "inspectionQuantity", Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200"
                     />
                   </div>
 
@@ -162,7 +162,7 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
       <div>
         <label className="block text-slate-700 font-semibold mb-3">Photo Evidence:<span className="text-red-500 ml-0.5" aria-label="required">*</span></label>
         <p className="text-slate-600 text-sm mb-4">Warehouse, cartons, factory overview, name board</p>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50/50">
+        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
           <input
             ref={warehousePhotoInputRef}
             type="file"
