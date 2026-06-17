@@ -43,9 +43,10 @@ interface PackagingProps {
     packagingPhotos: any[]
   }
   setFormData: (data: any) => void
+  errors?: Record<string, string>
 }
 
-export default function Packaging({ formData, setFormData }: PackagingProps) {
+export default function Packaging({ formData, setFormData, errors = {} }: PackagingProps) {
   const packagingPhotoInputRef = useRef<HTMLInputElement | null>(null)
 
   const handlePackagingPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,7 +136,7 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
         { key: "aqlWorkmanship", label: "AQL (Workmanship / Appearance / Function)", detail: "Visual and functional checks", remarkKey: "aqlWorkmanshipRemark" },
         { key: "onSiteTests", label: "On-site Tests", detail: "Drop test, color fastness, seam strength, etc.", remarkKey: "onSiteTestsRemark" },
       ].map((item) => (
-        <div key={item.key} className="bg-slate-50/50 rounded-xl p-6 space-y-4">
+        <div key={item.key} className={`rounded-xl p-6 space-y-4 ${errors[item.remarkKey] ? 'bg-red-50/40 border border-red-300' : 'bg-slate-50/50'}`}>
           <div>
             <label className="block text-slate-900 font-semibold mb-2">
               {item.label}
@@ -179,6 +180,9 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
                 </button>
               </div>
             )}
+            {errors[item.remarkKey] && (
+              <p className="text-xs text-red-600">{errors[item.remarkKey]}</p>
+            )}
           </div>
         </div>
       ))}
@@ -186,7 +190,7 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
       <div>
         <label className="block text-slate-700 font-semibold mb-3">Photo Evidence:<span className="text-red-500 ml-0.5" aria-label="required">*</span></label>
         <p className="text-slate-600 text-sm mb-4">Carton quality, labels, internal protection details</p>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
+        <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${errors.packagingPhotos ? 'border-red-400 bg-red-50/40' : 'border-slate-300 hover:border-brand-400 bg-slate-50/50'}`}>
           <input
             ref={packagingPhotoInputRef}
             type="file"
@@ -204,6 +208,9 @@ export default function Packaging({ formData, setFormData }: PackagingProps) {
             <p className="text-slate-500 text-sm mt-1">Drag & drop or click to browse</p>
           </button>
         </div>
+        {errors.packagingPhotos && (
+          <p className="mt-1.5 text-xs text-red-600">{errors.packagingPhotos}</p>
+        )}
 
         {/* Uploaded Photos List */}
         {formData.packagingPhotos && formData.packagingPhotos.length > 0 && (

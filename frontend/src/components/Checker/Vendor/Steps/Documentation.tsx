@@ -39,9 +39,10 @@ interface DocumentationProps {
   // build the report, so keep this permissive.
   formData: any
   setFormData: (data: any) => void
+  errors?: Record<string, string>
 }
 
-export default function Documentation({ formData, setFormData }: DocumentationProps) {
+export default function Documentation({ formData, setFormData, errors = {} }: DocumentationProps) {
   const companyIdInputRef = useRef<HTMLInputElement | null>(null)
   const signedDocInputRef = useRef<HTMLInputElement | null>(null)
   const clientSigInputRef = useRef<HTMLInputElement | null>(null)
@@ -239,12 +240,14 @@ export default function Documentation({ formData, setFormData }: DocumentationPr
       <div
         className={`rounded-xl px-4 py-3 text-sm border ${hasSignedDoc || hasSignedReport
           ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-          : "bg-amber-50 border-amber-200 text-amber-700"
+          : errors.signedDocuments
+            ? "bg-red-50 border-red-300 text-red-700"
+            : "bg-amber-50 border-amber-200 text-amber-700"
           }`}
       >
         {hasSignedDoc || hasSignedReport
           ? "A signed document is attached. You can submit the inspection."
-          : "At least one signed document is required — upload a signed copy or generate the digitally-signed report."}
+          : errors.signedDocuments || "At least one signed document is required — upload a signed copy or generate the digitally-signed report."}
       </div>
 
       {/* Company ID Card */}
@@ -254,7 +257,7 @@ export default function Documentation({ formData, setFormData }: DocumentationPr
           Company ID Card <span className="text-red-500">*</span>
         </label>
         <p className="text-slate-600 text-xs mb-3">Required: identification card of the person met on-site</p>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50 max-w-md">
+        <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer max-w-md ${errors.companyIdCards ? 'border-red-400 bg-red-50/40' : 'border-slate-300 hover:border-brand-400 bg-slate-50/50'}`}>
           <input
             ref={companyIdInputRef}
             type="file"
@@ -272,6 +275,9 @@ export default function Documentation({ formData, setFormData }: DocumentationPr
             <p className="text-slate-700 font-medium text-sm">Upload ID card</p>
           </button>
         </div>
+        {errors.companyIdCards && (
+          <p className="mt-1.5 text-xs text-red-600">{errors.companyIdCards}</p>
+        )}
         {companyIds.length > 0 && (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-4 max-w-2xl">
             {companyIds.map((image: any, index: number) => (

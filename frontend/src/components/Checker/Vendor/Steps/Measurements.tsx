@@ -49,9 +49,10 @@ interface MeasurementsProps {
     measurementPhotos: any[]
   }
   setFormData: (data: any) => void
+  errors?: Record<string, string>
 }
 
-export default function Measurements({ formData, setFormData }: MeasurementsProps) {
+export default function Measurements({ formData, setFormData, errors = {} }: MeasurementsProps) {
   const measurementPhotoInputRef = useRef<HTMLInputElement | null>(null)
 
   const handleMeasurementPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,8 +130,8 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
       </div>
 
       {formData.measurements.length === 0 ? (
-        <div className="text-center py-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-300">
-          <p className="text-slate-600">No samples added yet. Click "Add Sample" to get started.</p>
+        <div className={`text-center py-8 rounded-xl border-2 border-dashed ${errors.measurements ? 'border-red-400 bg-red-50/40' : 'border-slate-300 bg-slate-50'}`}>
+          <p className={errors.measurements ? 'text-red-600' : 'text-slate-600'}>{errors.measurements || 'No samples added yet. Click "Add Sample" to get started.'}</p>
         </div>
       ) : (
         <div className="overflow-x-auto bg-slate-50/50 rounded-xl p-4">
@@ -230,7 +231,7 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
         <p className="text-slate-600 text-sm mb-4">
           Carton dimensions, product measurements, weight verification
         </p>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
+        <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${errors.measurementPhotos ? 'border-red-400 bg-red-50/40' : 'border-slate-300 hover:border-brand-400 bg-slate-50/50'}`}>
           <input
             ref={measurementPhotoInputRef}
             type="file"
@@ -248,6 +249,9 @@ export default function Measurements({ formData, setFormData }: MeasurementsProp
             <p className="text-slate-500 text-sm mt-1">Drag & drop or click to browse</p>
           </button>
         </div>
+        {errors.measurementPhotos && (
+          <p className="mt-1.5 text-xs text-red-600">{errors.measurementPhotos}</p>
+        )}
 
         {/* Uploaded Photos List */}
         {formData.measurementPhotos && formData.measurementPhotos.length > 0 && (

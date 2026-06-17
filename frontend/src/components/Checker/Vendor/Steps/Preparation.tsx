@@ -44,9 +44,10 @@ interface PreparationProps {
     warehousePhotoEvidences: any[]
   }
   setFormData: (data: any) => void
+  errors?: Record<string, string>
 }
 
-export default function Preparation({ formData, setFormData }: PreparationProps) {
+export default function Preparation({ formData, setFormData, errors = {} }: PreparationProps) {
   const warehousePhotoInputRef = useRef<HTMLInputElement | null>(null)
 
   const handleWarehousePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +90,12 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
           Review the assigned items to inspect
         </p>
       </div>
+
+      {(errors.items || errors.itemName || errors.totalQuantity || errors.inspectionQuantity) && (
+        <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errors.items || errors.itemName || errors.totalQuantity || errors.inspectionQuantity}
+        </div>
+      )}
 
       {/* Items Section */}
       <div>
@@ -137,7 +144,7 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
                       type="number"
                       value={item.totalQuantity}
                       onChange={(e) => updateItem(item.id, "totalQuantity", Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200"
+                      className={`w-full px-3 py-2 border rounded-lg transition-all duration-200 ${!(Number(item.totalQuantity) > 0) && errors.totalQuantity ? 'border-red-500 bg-red-50/40 focus:ring-2 focus:ring-red-500/40 focus:border-red-500' : 'border-slate-300 focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500'}`}
                     />
                   </div>
 
@@ -147,7 +154,7 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
                       type="number"
                       value={item.inspectionQuantity}
                       onChange={(e) => updateItem(item.id, "inspectionQuantity", Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200"
+                      className={`w-full px-3 py-2 border rounded-lg transition-all duration-200 ${errors.inspectionQuantity && (!(Number(item.inspectionQuantity) > 0) || Number(item.inspectionQuantity) > Number(item.totalQuantity)) ? 'border-red-500 bg-red-50/40 focus:ring-2 focus:ring-red-500/40 focus:border-red-500' : 'border-slate-300 focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500'}`}
                     />
                   </div>
 
@@ -162,7 +169,7 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
       <div>
         <label className="block text-slate-700 font-semibold mb-3">Photo Evidence:<span className="text-red-500 ml-0.5" aria-label="required">*</span></label>
         <p className="text-slate-600 text-sm mb-4">Warehouse, cartons, factory overview, name board</p>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
+        <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${errors.warehousePhotoEvidences ? 'border-red-400 bg-red-50/40' : 'border-slate-300 hover:border-brand-400 bg-slate-50/50'}`}>
           <input
             ref={warehousePhotoInputRef}
             type="file"
@@ -180,6 +187,9 @@ export default function Preparation({ formData, setFormData }: PreparationProps)
             <p className="text-slate-500 text-sm mt-1">Drag & drop or click to browse</p>
           </button>
         </div>
+        {errors.warehousePhotoEvidences && (
+          <p className="mt-1.5 text-xs text-red-600">{errors.warehousePhotoEvidences}</p>
+        )}
 
         {/* Uploaded Photos List */}
         {formData.warehousePhotoEvidences && formData.warehousePhotoEvidences.length > 0 && (

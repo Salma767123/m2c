@@ -24,7 +24,9 @@ model Admin {
   role              Role?     @relation(fields: [roleId], references: [id])
   isActive          Boolean   @default(true)
   isVerified        Boolean   @default(false)
-  googleId          String?   @unique
+  // Uniqueness is enforced by a PARTIAL unique index (googleId is a string) created manually in MongoDB.
+  // A plain @unique here would index null/absent values and block all local (non-Google) signups after the first.
+  googleId          String?
   provider          String    @default("local") // "local" or "google"
   lastLogin         DateTime?
   resetToken        String?
@@ -100,7 +102,9 @@ model User {
   image             String?
   isActive          Boolean   @default(true)
   isVerified        Boolean   @default(false)
-  googleId          String?   @unique
+  // Uniqueness is enforced by a PARTIAL unique index (googleId is a string) created manually in MongoDB.
+  // A plain @unique here would index null/absent values and block all local (non-Google) signups after the first.
+  googleId          String?
   provider          String    @default("local") // "local" or "google"
   lastLogin         DateTime?
   resetToken        String?

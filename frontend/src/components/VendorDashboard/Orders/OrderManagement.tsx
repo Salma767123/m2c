@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Eye, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Eye, RefreshCw, ChevronLeft, ChevronRight, ShoppingBag, Clock, PackageCheck, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -41,7 +41,21 @@ export default function VendorOrderManagement() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const statusOptions = ["All", "ORDER_CREATED", "VENDOR_PROCESSING", "PACKED_BY_VENDOR", "IN_TRANSIT_TO_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "REJECTED_BY_ADMIN_HUB", "CANCELLED"];
+  const statusOptions = [
+    { value: "All", label: "All Status" },
+    { value: "ORDER_CREATED", label: "Order Created" },
+    { value: "VENDOR_PROCESSING", label: "Processing" },
+    { value: "PACKED_BY_VENDOR", label: "Packed" },
+    { value: "IN_TRANSIT_TO_ADMIN_HUB", label: "In Transit" },
+    { value: "APPROVED_BY_ADMIN_HUB", label: "Approved" },
+    { value: "REJECTED_BY_ADMIN_HUB", label: "Rejected" },
+    { value: "CANCELLED", label: "Cancelled" },
+  ];
+
+  const setCardFilter = (status: string) => {
+    setStatusFilter((prev) => (prev === status ? "All" : status));
+    setCurrentPage(1);
+  };
 
   const isFetchingRef = useRef(false);
 
@@ -141,73 +155,145 @@ export default function VendorOrderManagement() {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      ORDER_CREATED: "Order Created",
+      VENDOR_PROCESSING: "Processing",
+      PACKED_BY_VENDOR: "Packed",
+      IN_TRANSIT_TO_ADMIN_HUB: "In Transit",
+      RECEIVED_AT_ADMIN_HUB: "Received at Hub",
+      APPROVED_BY_ADMIN_HUB: "Approved",
+      REJECTED_BY_ADMIN_HUB: "Rejected",
+      CANCELLED: "Cancelled",
+    };
+    return labels[status] || status.replace(/_/g, " ");
+  };
+
   const handleViewOrder = (shipmentId: string) => {
     router.push(`/vendor/dashboard/orders/view/${shipmentId}`);
   };
 
   if (isLoading) {
-    return <div className="p-6 text-center text-slate-500">Loading orders...</div>;
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Order Management</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Process and ship your assigned orders</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-8">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
+            <span className="ml-3 text-slate-600">Loading orders...</span>
+          </div>
+        </div>
+      </div>
+    );
   }
+
+  const processingCount = shipments.filter((s) => s.status === "VENDOR_PROCESSING").length;
+  const packedCount = shipments.filter((s) => s.status === "PACKED_BY_VENDOR").length;
+  const inTransitCount = shipments.filter((s) => s.status === "IN_TRANSIT_TO_ADMIN_HUB").length;
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Total Orders</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{shipments.length}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Processing</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">
-            {shipments.filter((s) => s.status === "VENDOR_PROCESSING").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">Packed</p>
-          <p className="text-2xl font-bold text-purple-600 mt-1">
-            {shipments.filter((s) => s.status === "PACKED_BY_VENDOR").length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-          <p className="text-sm text-slate-600">In Transit</p>
-          <p className="text-2xl font-bold text-indigo-600 mt-1">
-            {shipments.filter((s) => s.status === "IN_TRANSIT_TO_ADMIN_HUB").length}
-          </p>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold text-slate-900">Order Management</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Process and ship your assigned orders</p>
+      </div>
+
+      {/* Stats Cards (clickable filters) */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <button
+          type="button"
+          onClick={() => setCardFilter("All")}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-brand-200 ${statusFilter === "All" ? "border-brand-300 ring-1 ring-brand-200" : "border-slate-200/80"}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Total Orders</span>
+            <div className="p-2 bg-brand-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <ShoppingBag className="h-4 w-4 text-brand-600" />
+            </div>
+          </div>
+          <p className="text-xl font-bold text-slate-900 mt-2">{shipments.length}</p>
+          <p className="text-xs text-slate-500 mt-1">All assigned orders</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCardFilter("VENDOR_PROCESSING")}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-blue-200 ${statusFilter === "VENDOR_PROCESSING" ? "border-blue-300 ring-1 ring-blue-200" : "border-slate-200/80"}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Processing</span>
+            <div className="p-2 bg-blue-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <Clock className="h-4 w-4 text-blue-600" />
+            </div>
+          </div>
+          <p className={`text-xl font-bold mt-2 ${processingCount > 0 ? "text-blue-600" : "text-slate-900"}`}>{processingCount}</p>
+          <p className="text-xs text-slate-500 mt-1">Awaiting packing</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCardFilter("PACKED_BY_VENDOR")}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-purple-200 ${statusFilter === "PACKED_BY_VENDOR" ? "border-purple-300 ring-1 ring-purple-200" : "border-slate-200/80"}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Packed</span>
+            <div className="p-2 bg-purple-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <PackageCheck className="h-4 w-4 text-purple-600" />
+            </div>
+          </div>
+          <p className={`text-xl font-bold mt-2 ${packedCount > 0 ? "text-purple-600" : "text-slate-900"}`}>{packedCount}</p>
+          <p className="text-xs text-slate-500 mt-1">Ready to ship</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCardFilter("IN_TRANSIT_TO_ADMIN_HUB")}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-indigo-200 ${statusFilter === "IN_TRANSIT_TO_ADMIN_HUB" ? "border-indigo-300 ring-1 ring-indigo-200" : "border-slate-200/80"}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">In Transit</span>
+            <div className="p-2 bg-indigo-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <Truck className="h-4 w-4 text-indigo-600" />
+            </div>
+          </div>
+          <p className={`text-xl font-bold mt-2 ${inTransitCount > 0 ? "text-indigo-600" : "text-slate-900"}`}>{inTransitCount}</p>
+          <p className="text-xs text-slate-500 mt-1">On the way to hub</p>
+        </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+      <div>
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
             <input
               type="text"
               placeholder="Search by Order ID, Product, or SKU..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
-          <div className="w-full md:w-64">
+          <div className="flex items-center gap-3">
             <Dropdown
+              id="statusFilter"
               value={statusFilter}
               options={statusOptions}
               onChange={(value) => { setStatusFilter(value as string); setCurrentPage(1); }}
               placeholder="Filter by Status"
             />
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shrink-0"
+              title={lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString("en-IN")}` : "Refresh"}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              <span className="text-sm font-medium">Refresh</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleManualRefresh}
-            disabled={isRefreshing}
-            className="flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shrink-0"
-            title={lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString("en-IN")}` : "Refresh"}
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-            <span className="text-sm font-medium">Refresh</span>
-          </button>
         </div>
         {lastUpdated && (
           <p className="text-xs text-slate-500 mt-3">
@@ -268,7 +354,7 @@ export default function VendorOrderManagement() {
                       <span
                         className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${getStatusColor(s.status)}`}
                       >
-                        {s.status.replace(/_/g, " ")}
+                        {getStatusLabel(s.status)}
                       </span>
                     </TableCell>
                     <TableCell>

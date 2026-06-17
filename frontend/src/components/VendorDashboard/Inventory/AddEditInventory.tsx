@@ -70,6 +70,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   const [stockChangeReason, setStockChangeReason] = useState('')
   const [pendingFormData, setPendingFormData] = useState<InventoryFormData | null>(null)
 
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
   const [formData, setFormData] = useState<InventoryFormData>({
     name: '',
     sku: '',
@@ -269,9 +271,34 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
       [name]: type === 'number' ? parseFloat(value) || 0 :
         type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }))
+    clearError(name)
+  }
+
+  const clearError = (name: string) => {
+    setErrors(prev => {
+      if (!prev[name]) return prev
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+  }
+
+  const validate = (data: InventoryFormData): Record<string, string> => {
+    const e: Record<string, string> = {}
+    if (!data.name?.trim()) e.name = 'Product name is required'
+    if (!data.sku?.trim()) e.sku = 'SKU is required'
+    if (!data.category?.trim()) e.category = 'Category is required'
+    if (data.lowStockAlert === undefined || data.lowStockAlert === null || isNaN(data.lowStockAlert) || data.lowStockAlert < 0) {
+      e.lowStockAlert = 'Enter a valid low stock alert (0 or more)'
+    }
+    if (data.sourceType === 'supplier' && !data.supplier?.trim()) {
+      e.supplier = 'Supplier name is required when supplier is selected'
+    }
+    return e
   }
 
   const handleDropdownChange = (name: string, value: string) => {
+    clearError(name)
     setFormData(prev => {
       const newData = {
         ...prev,
@@ -332,10 +359,13 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     e.preventDefault()
 
     // Client-side validation
-    if (formData.sourceType === 'supplier' && !formData.supplier?.trim()) {
-      alert('Supplier name is required when supplier is selected as source type.')
+    const validationErrors = validate(formData)
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
+    setErrors({})
 
     // Stock is no longer set at inventory creation step. It's set when a product is created.
 
@@ -362,14 +392,18 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     } catch (error: any) {
       console.error('❌ Error saving inventory item:', error)
 
+      // The axios interceptor normalizes errors to { message, status, data }
+      const status = error?.status ?? error?.response?.status
+      const message = error?.message || error?.data?.message || error?.response?.data?.message
+
       // Handle specific error cases
-      if (error.response?.status === 400) {
-        alert(error.response.data.message || 'Invalid data provided')
-      } else if (error.response?.status === 401) {
+      if (status === 401) {
         alert('Authentication required. Please login again.')
         router.push('/vendor')
+      } else if (status === 400) {
+        alert(message || 'Invalid data provided')
       } else {
-        alert('Failed to save inventory item. Please try again.')
+        alert(message || 'Failed to save inventory item. Please try again.')
       }
     } finally {
       setIsLoading(false)
@@ -489,10 +523,14 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       name="name"
                       value={formData.name}
                       onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                        errors.name
+                          ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                          : 'border-slate-200 focus:ring-brand-500/40 focus:border-brand-500'
+                      }`}
                       placeholder="Enter product name"
                     />
+                    {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -503,23 +541,30 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       name="sku"
                       value={formData.sku}
                       onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                        errors.sku
+                          ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                          : 'border-slate-200 focus:ring-brand-500/40 focus:border-brand-500'
+                      }`}
                       placeholder="Enter SKU"
                     />
+                    {errors.sku && <p className="mt-1 text-xs text-red-600">{errors.sku}</p>}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Dropdown
-                      id="category"
-                      label="Category *"
-                      value={formData.category}
-                      options={vendorCategories.map(cat => cat.name)}
-                      placeholder={isLoadingCategories ? "Loading categories..." : "Select Category"}
-                      onChange={(value) => handleDropdownChange('category', value as string)}
-                    />
+                    <div className={errors.category ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
+                      <Dropdown
+                        id="category"
+                        label="Category *"
+                        value={formData.category}
+                        options={vendorCategories.map(cat => cat.name)}
+                        placeholder={isLoadingCategories ? "Loading categories..." : "Select Category"}
+                        onChange={(value) => handleDropdownChange('category', value as string)}
+                      />
+                    </div>
+                    {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category}</p>}
                     {isLoadingCategories && (
                       <p className="text-xs text-slate-500 mt-1">Loading your selected categories...</p>
                     )}
@@ -581,11 +626,16 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     name="lowStockAlert"
                     value={formData.lowStockAlert}
                     onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      errors.lowStockAlert
+                        ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                        : 'border-slate-200 focus:ring-brand-500/40 focus:border-brand-500'
+                    }`}
                     placeholder="e.g. 5"
                   />
-                  <p className="text-xs text-slate-500 mt-1">You will be notified when stock falls below this number.</p>
+                  {errors.lowStockAlert
+                    ? <p className="text-xs text-red-600 mt-1">{errors.lowStockAlert}</p>
+                    : <p className="text-xs text-slate-500 mt-1">You will be notified when stock falls below this number.</p>}
                 </div>
               </CardContent>
             </Card>
@@ -679,14 +729,14 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="supplier"
                           value={formData.supplier}
                           onChange={handleInputChange}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-slate-500 transition-colors ${formData.sourceType === 'supplier' && !formData.supplier?.trim()
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-slate-200'
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.supplier
+                            ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                            : 'border-slate-200 focus:ring-brand-500/40 focus:border-slate-500'
                             }`}
                           placeholder="Enter supplier name"
                         />
-                        {formData.sourceType === 'supplier' && !formData.supplier?.trim() && (
-                          <p className="text-xs text-red-600 mt-1">Supplier name is required when supplier is selected</p>
+                        {errors.supplier && (
+                          <p className="text-xs text-red-600 mt-1">{errors.supplier}</p>
                         )}
                       </div>
                       <div>

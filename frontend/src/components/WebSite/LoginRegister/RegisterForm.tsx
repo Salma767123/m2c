@@ -222,7 +222,7 @@ export default function RegisterForm({ onGoogleAuth }: RegisterFormProps) {
       }
     } catch (error: any) {
       console.error('Registration error:', error)
-      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Something went wrong. Please try again.'
+      const errorMessage = error?.data?.error || error?.data?.message || error?.message || error.response?.data?.error || error.response?.data?.message || 'Something went wrong. Please try again.'
       showErrorToast('Registration Failed', errorMessage)
     } finally {
       setIsLoading(false)

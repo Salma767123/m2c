@@ -504,7 +504,9 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     setNewStock(e.target.value)
                     setErrors({ ...errors, newStock: undefined })
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent ${errors.newStock ? 'border-red-500' : 'border-slate-200'
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${errors.newStock
+                    ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                    : 'border-slate-200 focus:ring-brand-500/40 focus:border-transparent'
                     }`}
                   placeholder="Enter stock quantity"
                   min="0"
@@ -545,7 +547,9 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                     setReason(e.target.value)
                     setErrors({ ...errors, reason: undefined })
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent resize-none ${errors.reason ? 'border-red-500' : 'border-slate-200'
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 resize-none ${errors.reason
+                    ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                    : 'border-slate-200 focus:ring-brand-500/40 focus:border-transparent'
                     }`}
                   placeholder="e.g., New shipment received, Damaged items removed, Inventory correction"
                   rows={3}

@@ -19,10 +19,13 @@ import VendorService, {
   VendorOwnerInfo,
 } from "@/services/vendorService";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import ResultModal from "@/components/UI/ResultModal";
 
 interface VendorInfo extends VendorBasicInfo, VendorOwnerInfo {
   companyLogo?: string;
 }
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function VendorSettings() {
   const [vendorInfo, setVendorInfo] = useState<VendorInfo>({
@@ -52,6 +55,29 @@ export default function VendorSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [uploadResult, setUploadResult] = useState<{ show: boolean; type: "success" | "error"; text: string }>({ show: false, type: "success", text: "" });
+
+  const clearError = (field: string) => {
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const validate = (): Record<string, string> => {
+    const e: Record<string, string> = {};
+    if (!vendorInfo.companyName.trim()) e.companyName = "Company name is required";
+    if (!vendorInfo.businessPhone.trim()) e.businessPhone = "Business phone is required";
+    if (!vendorInfo.businessEmail.trim()) e.businessEmail = "Business email is required";
+    else if (!EMAIL_REGEX.test(vendorInfo.businessEmail.trim())) e.businessEmail = "Enter a valid email address";
+    if (!vendorInfo.ownerName.trim()) e.ownerName = "Owner name is required";
+    if (!vendorInfo.ownerEmail.trim()) e.ownerEmail = "Owner email is required";
+    else if (!EMAIL_REGEX.test(vendorInfo.ownerEmail.trim())) e.ownerEmail = "Enter a valid email address";
+    return e;
+  };
 
   // Load vendor profile on component mount
   useEffect(() => {
@@ -96,23 +122,40 @@ export default function VendorSettings() {
 
   const handleInputChange = (field: keyof VendorInfo, value: string) => {
     setVendorInfo((prev) => ({ ...prev, [field]: value }));
+    clearError(field as string);
   };
 
   const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setLogoFile(file);
+    if (!file) return;
 
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setLogoPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadResult({ show: true, type: "error", text: `${file.name} exceeds the 10MB limit.` });
+      event.target.value = "";
+      return;
     }
+
+    setLogoFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setLogoPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    setUploadResult({ show: true, type: "success", text: "Logo selected successfully. Save changes to apply." });
+    event.target.value = "";
   };
 
   const handleSave = async () => {
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      showErrorToast("Validation Error", "Please correct the highlighted fields.");
+      return;
+    }
+    setErrors({});
+
     try {
       setIsSaving(true);
 
@@ -171,6 +214,13 @@ export default function VendorSettings() {
       setIsSaving(false);
     }
   };
+
+  const inputCls = (field: string) =>
+    `w-full px-3 py-2 border rounded-lg focus:ring-2 disabled:bg-slate-50 ${
+      errors[field]
+        ? "border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500"
+        : "border-slate-200 focus:ring-brand-500/40 focus:border-slate-700"
+    }`;
 
   if (isLoading) {
     return (
@@ -234,8 +284,9 @@ export default function VendorSettings() {
                     handleInputChange("companyName", e.target.value)
                   }
                   disabled={!isEditing}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
+                  className={inputCls("companyName")}
                 />
+                {errors.companyName && <p className="text-xs text-red-600 mt-1">{errors.companyName}</p>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -250,8 +301,9 @@ export default function VendorSettings() {
                       handleInputChange("businessPhone", e.target.value)
                     }
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
+                    className={inputCls("businessPhone")}
                   />
+                  {errors.businessPhone && <p className="text-xs text-red-600 mt-1">{errors.businessPhone}</p>}
                 </div>
 
                 <div>
@@ -265,8 +317,9 @@ export default function VendorSettings() {
                       handleInputChange("businessEmail", e.target.value)
                     }
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
+                    className={inputCls("businessEmail")}
                   />
+                  {errors.businessEmail && <p className="text-xs text-red-600 mt-1">{errors.businessEmail}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -450,8 +503,9 @@ export default function VendorSettings() {
                     handleInputChange("ownerName", e.target.value)
                   }
                   disabled={!isEditing}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
+                  className={inputCls("ownerName")}
                 />
+                {errors.ownerName && <p className="text-xs text-red-600 mt-1">{errors.ownerName}</p>}
               </div>
 
               <div>
@@ -465,8 +519,9 @@ export default function VendorSettings() {
                     handleInputChange("ownerEmail", e.target.value)
                   }
                   disabled={!isEditing}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-slate-700 disabled:bg-slate-50"
+                  className={inputCls("ownerEmail")}
                 />
+                {errors.ownerEmail && <p className="text-xs text-red-600 mt-1">{errors.ownerEmail}</p>}
               </div>
 
               <div>
@@ -487,6 +542,13 @@ export default function VendorSettings() {
           </Card>
         </div>
       </div>
+
+      <ResultModal
+        show={uploadResult.show}
+        type={uploadResult.type}
+        text={uploadResult.text}
+        onClose={() => setUploadResult((prev) => ({ ...prev, show: false }))}
+      />
     </div>
   );
 }

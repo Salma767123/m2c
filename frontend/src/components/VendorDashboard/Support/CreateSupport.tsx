@@ -7,6 +7,7 @@ import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import Dropdown from '@/components/UI/Dropdown'
 import supportService from '@/services/supportService'
 import { useRouter } from 'next/navigation'
+import ResultModal from '@/components/UI/ResultModal'
 
 export default function CreateSupport() {
   const router = useRouter()
@@ -19,6 +20,25 @@ export default function CreateSupport() {
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [uploadResult, setUploadResult] = useState<{ show: boolean; type: 'success' | 'error'; text: string }>({ show: false, type: 'success', text: '' })
+
+  const clearError = (name: string) => {
+    setErrors(prev => {
+      if (!prev[name]) return prev
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
+  }
+
+  const validate = () => {
+    const e: Record<string, string> = {}
+    if (!formData.subject.trim()) e.subject = 'Subject is required'
+    if (!formData.description.trim()) e.description = 'Description is required'
+    else if (formData.description.trim().length < 20) e.description = 'Description must be at least 20 characters'
+    return e
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -26,6 +46,7 @@ export default function CreateSupport() {
       ...prev,
       [name]: value
     }))
+    clearError(name)
   }
 
   const handleCategoryChange = (value: string | string[]) => {
@@ -44,10 +65,26 @@ export default function CreateSupport() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
+
+    const oversized = files.filter(f => f.size > 10 * 1024 * 1024)
+    if (oversized.length > 0) {
+      setUploadResult({ show: true, type: 'error', text: `The following file(s) exceed the 10MB limit: ${oversized.map(f => f.name).join(', ')}` })
+      e.target.value = ''
+      return
+    }
+
+    if (formData.attachments.length + files.length > 5) {
+      setUploadResult({ show: true, type: 'error', text: 'You can attach a maximum of 5 files.' })
+      e.target.value = ''
+      return
+    }
+
     setFormData(prev => ({
       ...prev,
       attachments: [...prev.attachments, ...files].slice(0, 5) // Max 5 files
     }))
+    setUploadResult({ show: true, type: 'success', text: `${files.length > 1 ? `${files.length} files` : 'File'} attached successfully.` })
+    e.target.value = ''
   }
 
   const removeAttachment = (index: number) => {
@@ -59,6 +96,14 @@ export default function CreateSupport() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+
+    const validationErrors = validate()
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors)
+      showErrorToast('Validation Error', 'Please correct the highlighted fields.')
+      return
+    }
+    setErrors({})
     setIsSubmitting(true)
 
     try {
@@ -108,9 +153,13 @@ export default function CreateSupport() {
             value={formData.subject}
             onChange={handleInputChange}
             placeholder="Brief description of your issue"
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+              errors.subject
+                ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                : 'border-slate-300 focus:ring-blue-500'
+            }`}
           />
+          {errors.subject && <p className="text-xs text-red-600 mt-1">{errors.subject}</p>}
         </div>
 
         {/* Category & Priority */}
@@ -161,10 +210,17 @@ export default function CreateSupport() {
             onChange={handleInputChange}
             placeholder="Provide detailed information about your issue..."
             rows={6}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+              errors.description
+                ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                : 'border-slate-300 focus:ring-blue-500'
+            }`}
           />
-          <p className="text-xs text-slate-500 mt-1">Minimum 20 characters</p>
+          {errors.description ? (
+            <p className="text-xs text-red-600 mt-1">{errors.description}</p>
+          ) : (
+            <p className="text-xs text-slate-500 mt-1">Minimum 20 characters</p>
+          )}
         </div>
 
         {/* Attachments */}
@@ -235,6 +291,13 @@ export default function CreateSupport() {
           <span className="font-semibold">Response Time:</span> We typically respond to tickets within 24-48 hours. For urgent issues, please mark as "Urgent" priority.
         </p>
       </div>
+
+      <ResultModal
+        show={uploadResult.show}
+        type={uploadResult.type}
+        text={uploadResult.text}
+        onClose={() => setUploadResult(prev => ({ ...prev, show: false }))}
+      />
     </div>
   )
 }

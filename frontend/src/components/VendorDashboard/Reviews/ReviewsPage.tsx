@@ -87,7 +87,7 @@ export default function VendorReviewsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div>
         <h1 className="text-xl font-bold text-slate-900">Reviews & Ratings</h1>
         <p className="text-sm text-slate-500 mt-0.5">
           Feedback from the admin hub on every delivery you&apos;ve made.

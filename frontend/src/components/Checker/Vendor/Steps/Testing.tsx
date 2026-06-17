@@ -70,9 +70,10 @@ interface TestingProps {
     }>
   }
   setFormData: (data: any) => void
+  errors?: Record<string, string>
 }
 
-export default function Testing({ formData, setFormData }: TestingProps) {
+export default function Testing({ formData, setFormData, errors = {} }: TestingProps) {
   const rightPhotoRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
   const wrongPhotoRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
   const generalTestingPhotoInputRef = useRef<HTMLInputElement | null>(null)
@@ -246,6 +247,18 @@ export default function Testing({ formData, setFormData }: TestingProps) {
     }
   }
 
+  // A test is incomplete when no Pass/Fail decision is made, or the chosen
+  // outcome is missing its required photo. Only highlighted once the parent
+  // surfaces a testing error so the form stays calm during normal entry.
+  const testHasError = (t: any): boolean => {
+    if (!errors.tests) return false
+    const decided = t?.pass === true || t?.fail === true
+    if (!decided) return true
+    if (t.pass && (!Array.isArray(t.rightPhotos) || t.rightPhotos.length === 0)) return true
+    if (t.fail && (!Array.isArray(t.wrongPhotos) || t.wrongPhotos.length === 0)) return true
+    return false
+  }
+
   return (
     <div className="space-y-8">
       <div className="border-b border-slate-200 pb-6">
@@ -257,8 +270,14 @@ export default function Testing({ formData, setFormData }: TestingProps) {
         </p>
       </div>
 
+      {errors.tests && (
+        <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {errors.tests}
+        </div>
+      )}
+
       {tests.map((test) => (
-        <div key={test.id} className="bg-slate-50/50 rounded-xl p-6 border border-slate-200">
+        <div key={test.id} className={`rounded-xl p-6 border ${testHasError(test) ? 'bg-red-50/40 border-red-300' : 'bg-slate-50/50 border-slate-200'}`}>
           <div className="mb-4">
             <label className="block text-slate-900 font-semibold mb-2">{test.label}<span className="text-red-500 ml-0.5" aria-label="required">*</span></label>
             <p className="text-slate-600 text-sm mb-4">{test.detail}</p>

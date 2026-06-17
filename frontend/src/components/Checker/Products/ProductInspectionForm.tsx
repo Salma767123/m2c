@@ -295,6 +295,14 @@ export default function ProductInspectionForm({
     const currentStepIndex = steps.findIndex((s) => s.id === currentStep)
     const isLastStep = currentStepIndex === steps.length - 1
 
+    // The form lives inside the dashboard's scrollable <main>, not the window,
+    // so window.scrollTo is a no-op. Scroll the nearest scrollable ancestor by
+    // bringing the form root into view, with a window fallback for safety.
+    const scrollToTop = () => {
+        rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+        window.scrollTo({ top: 0, behavior: "smooth" })
+    }
+
     // How far forward the checker is allowed to jump. Steps are sequential:
     // you can always revisit anything up to (and one past) the furthest
     // *valid* prefix. Concretely, starting from step 0 we walk forward while
@@ -325,17 +333,19 @@ export default function ProductInspectionForm({
                 "Please complete this step",
                 firstErrorMessage(stepErrors) || "Some required fields are missing."
             )
-            window.scrollTo({ top: 0, behavior: "smooth" })
+            scrollToTop()
             return
         }
         if (!isLastStep) {
             setCurrentStep(steps[currentStepIndex + 1].id)
+            scrollToTop()
         }
     }
 
     const prevStep = () => {
         if (currentStepIndex > 0) {
             setCurrentStep(steps[currentStepIndex - 1].id)
+            scrollToTop()
         }
     }
 
@@ -353,6 +363,7 @@ export default function ProductInspectionForm({
             const stepErrors = validateStep(currentStep, formData)
             setErrors((prev) => ({ ...prev, [currentStep]: stepErrors }))
             setCurrentStep(target)
+            scrollToTop()
             return
         }
 
@@ -378,11 +389,12 @@ export default function ProductInspectionForm({
                     "Finish the current step before moving ahead."
             )
             setCurrentStep(firstBlocking)
-            window.scrollTo({ top: 0, behavior: "smooth" })
+            scrollToTop()
             return
         }
 
         setCurrentStep(target)
+        scrollToTop()
     }
 
     // Helper to clean photo data before submission
@@ -407,7 +419,7 @@ export default function ProductInspectionForm({
                 "Cannot submit yet",
                 "Some required fields are missing. Review the highlighted steps."
             )
-            window.scrollTo({ top: 0, behavior: "smooth" })
+            scrollToTop()
             return
         }
 
@@ -566,25 +578,25 @@ export default function ProductInspectionForm({
                 {/* Step Content */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 mb-8">
                     {currentStep === "generalInformation" && (
-                        <GeneralInformation formData={formData} setFormData={setFormData} autofillSnapshot={autofillSnapshot} />
+                        <GeneralInformation formData={formData} setFormData={setFormData} autofillSnapshot={autofillSnapshot} errors={errors.generalInformation || {}} />
                     )}
                     {currentStep === "preparation" && (
-                        <Preparation formData={formData} setFormData={setFormData} />
+                        <Preparation formData={formData} setFormData={setFormData} errors={errors.preparation || {}} />
                     )}
                     {currentStep === "measurements" && (
-                        <Measurements formData={formData} setFormData={setFormData} />
+                        <Measurements formData={formData} setFormData={setFormData} errors={errors.measurements || {}} />
                     )}
                     {currentStep === "packaging" && (
-                        <Packaging formData={formData} setFormData={setFormData} />
+                        <Packaging formData={formData} setFormData={setFormData} errors={errors.packaging || {}} />
                     )}
                     {currentStep === "defects" && (
                         <Defects formData={formData} setFormData={setFormData} />
                     )}
                     {currentStep === "testing" && (
-                        <Testing formData={formData} setFormData={setFormData} />
+                        <Testing formData={formData} setFormData={setFormData} errors={errors.testing || {}} />
                     )}
                     {currentStep === "documentation" && (
-                        <Documentation formData={formData} setFormData={setFormData} />
+                        <Documentation formData={formData} setFormData={setFormData} errors={errors.documentation || {}} />
                     )}
                     {currentStep === "review" && (
                         <Review formData={formData as any} />

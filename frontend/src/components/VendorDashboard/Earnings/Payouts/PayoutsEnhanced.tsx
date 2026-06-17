@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Download, Search, Calendar, DollarSign, CheckCircle, Clock, AlertCircle, XCircle, Eye, X, Edit, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
+import { Card, CardContent } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
 import Dropdown from '@/components/UI/Dropdown';
@@ -30,9 +30,11 @@ export default function PayoutsEnhanced() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('All Status');
+  const [metricFilter, setMetricFilter] = useState<'all' | 'paid' | 'month' | 'pending' | 'failed'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showBankModal, setShowBankModal] = useState(false);
   const [bankDetails, setBankDetails] = useState<VendorBankDetails | null>(null);
   const [bankLoading, setBankLoading] = useState(true);
 
@@ -201,7 +203,25 @@ export default function PayoutsEnhanced() {
       (settlement.settlementNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (settlement.billingNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'All Status' || settlement.status === filterStatus;
-    return matchesSearch && matchesStatus;
+
+    let matchesMetric = true;
+    if (metricFilter === 'paid') {
+      matchesMetric = settlement.status === 'Paid';
+    } else if (metricFilter === 'pending') {
+      matchesMetric = settlement.status === 'Pending' || settlement.status === 'Processing';
+    } else if (metricFilter === 'failed') {
+      matchesMetric = settlement.status === 'Failed';
+    } else if (metricFilter === 'month') {
+      if (!settlement.createdAt) {
+        matchesMetric = false;
+      } else {
+        const date = new Date(settlement.createdAt);
+        const now = new Date();
+        matchesMetric = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesMetric;
   });
 
   const totalPages = Math.ceil(filteredSettlements.length / PAGE_SIZE);
@@ -213,15 +233,15 @@ export default function PayoutsEnhanced() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'Paid':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
+        return <CheckCircle className="w-3.5 h-3.5" />;
       case 'Processing':
-        return <Clock className="w-5 h-5 text-blue-600" />;
+        return <Clock className="w-3.5 h-3.5" />;
       case 'Pending':
-        return <Clock className="w-5 h-5 text-yellow-600" />;
+        return <Clock className="w-3.5 h-3.5" />;
       case 'Failed':
-        return <AlertCircle className="w-5 h-5 text-red-600" />;
+        return <AlertCircle className="w-3.5 h-3.5" />;
       case 'Cancelled':
-        return <XCircle className="w-5 h-5 text-slate-500" />;
+        return <XCircle className="w-3.5 h-3.5" />;
       default:
         return null;
     }
@@ -230,17 +250,17 @@ export default function PayoutsEnhanced() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Paid':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-50 text-green-700 border border-green-200';
       case 'Processing':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-50 text-blue-700 border border-blue-200';
       case 'Pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
       case 'Failed':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-50 text-red-700 border border-red-200';
       case 'Cancelled':
-        return 'bg-slate-100 text-slate-800';
+        return 'bg-slate-50 text-slate-700 border border-slate-200';
       default:
-        return 'bg-slate-100 text-slate-800';
+        return 'bg-slate-50 text-slate-700 border border-slate-200';
     }
   };
 
@@ -270,6 +290,12 @@ export default function PayoutsEnhanced() {
     setShowDetailsModal(true);
   };
 
+  const handleMetricClick = (metric: 'paid' | 'month' | 'pending' | 'failed') => {
+    setMetricFilter((prev) => (prev === metric ? 'all' : metric));
+    setFilterStatus('All Status');
+    setCurrentPage(1);
+  };
+
   // Mask the account number for display security
   const maskAccountNumber = (acc: string) => {
     if (!acc || acc.length < 4) return acc;
@@ -279,170 +305,101 @@ export default function PayoutsEnhanced() {
   return (
     <div className="space-y-6 font-sans">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Settlements & Payouts</h1>
-          <p className="text-sm text-slate-600 mt-1">View and manage your payout history</p>
+          <h1 className="text-xl font-bold text-slate-900">Settlements & Payouts</h1>
+          <p className="text-sm text-slate-500 mt-0.5">View and manage your payout history</p>
         </div>
-        <button
-          onClick={handleDownloadReport}
-          disabled={filteredSettlements.length === 0}
-          className="flex items-center gap-2 bg-brand-500 hover:bg-slate-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Download className="w-4 h-4" />
-          Download Report
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => setShowBankModal(true)}
+            className="flex items-center gap-2 border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-2.5 px-4 rounded-lg transition-colors"
+          >
+            <DollarSign className="w-4 h-4 text-slate-500" />
+            Bank Account
+            {!bankLoading && bankDetails?.isVerified && (
+              <ShieldCheck className="w-4 h-4 text-green-600" />
+            )}
+          </button>
+          <button
+            onClick={handleDownloadReport}
+            disabled={filteredSettlements.length === 0}
+            className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" />
+            Download Report
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-green-50 border-green-200 hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Total Paid</p>
-                <p className="text-2xl font-bold text-slate-900">₹{totalCompleted.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-slate-600 mt-1">
-                  {settlements.filter((p) => p.status === 'Paid').length} payouts
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-green-100">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <button
+          type="button"
+          onClick={() => handleMetricClick('paid')}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-green-200 ${metricFilter === 'paid' ? 'border-green-300 ring-1 ring-green-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Total Paid</span>
+            <div className="p-2 bg-green-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-xl font-bold text-slate-900 mt-2">₹{totalCompleted.toLocaleString('en-IN')}</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {settlements.filter((p) => p.status === 'Paid').length} payouts
+          </p>
+        </button>
 
-        <Card className="bg-blue-50 border-blue-200 hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">This Month</p>
-                <p className="text-2xl font-bold text-slate-900">₹{thisMonthPayouts.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-slate-600 mt-1">Current month payouts</p>
-              </div>
-              <div className="p-3 rounded-lg bg-blue-100">
-                <Calendar className="w-6 h-6 text-blue-600" />
-              </div>
+        <button
+          type="button"
+          onClick={() => handleMetricClick('month')}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-blue-200 ${metricFilter === 'month' ? 'border-blue-300 ring-1 ring-blue-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">This Month</span>
+            <div className="p-2 bg-blue-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <Calendar className="h-4 w-4 text-blue-600" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-xl font-bold text-slate-900 mt-2">₹{thisMonthPayouts.toLocaleString('en-IN')}</p>
+          <p className="text-xs text-slate-500 mt-1">Current month payouts</p>
+        </button>
 
-        <Card className="bg-yellow-50 border-yellow-200 hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Pending/Processing</p>
-                <p className="text-2xl font-bold text-slate-900">₹{totalPending.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-slate-600 mt-1">
-                  {settlements.filter((p) => p.status === 'Pending' || p.status === 'Processing').length} payouts
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-yellow-100">
-                <Clock className="w-6 h-6 text-yellow-600" />
-              </div>
+        <button
+          type="button"
+          onClick={() => handleMetricClick('pending')}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-yellow-200 ${metricFilter === 'pending' ? 'border-yellow-300 ring-1 ring-yellow-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Pending/Processing</span>
+            <div className="p-2 bg-yellow-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <Clock className="h-4 w-4 text-yellow-600" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-xl font-bold text-slate-900 mt-2">₹{totalPending.toLocaleString('en-IN')}</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {settlements.filter((p) => p.status === 'Pending' || p.status === 'Processing').length} payouts
+          </p>
+        </button>
 
-        <Card className="bg-red-50 border-red-200 hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Failed</p>
-                <p className="text-2xl font-bold text-slate-900">₹{totalFailed.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-slate-600 mt-1">
-                  {settlements.filter((p) => p.status === 'Failed').length} payouts
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-red-100">
-                <AlertCircle className="w-6 h-6 text-red-600" />
-              </div>
+        <button
+          type="button"
+          onClick={() => handleMetricClick('failed')}
+          className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-red-200 ${metricFilter === 'failed' ? 'border-red-300 ring-1 ring-red-200' : 'border-slate-200/80'}`}
+        >
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-slate-600">Failed</span>
+            <div className="p-2 bg-red-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
+              <AlertCircle className="h-4 w-4 text-red-600" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-xl font-bold text-slate-900 mt-2">₹{totalFailed.toLocaleString('en-IN')}</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {settlements.filter((p) => p.status === 'Failed').length} payouts
+          </p>
+        </button>
       </div>
-
-      {/* Bank Account */}
-      <div>
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-slate-600" />
-                Bank Account
-              </CardTitle>
-              <Link href="/vendor/dashboard/settings/bank">
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Edit className="w-4 h-4" />
-                  {bankDetails ? 'Manage' : 'Add Bank Details'}
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {bankLoading ? (
-              <div className="flex items-center justify-center py-6">
-                <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
-                <span className="ml-2 text-sm text-slate-500">Loading bank details...</span>
-              </div>
-            ) : bankDetails ? (
-              <div className="space-y-4">
-                {/* Verification Badge */}
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium w-fit ${bankDetails.isVerified ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}>
-                  {bankDetails.isVerified
-                    ? <><ShieldCheck className="w-4 h-4" /> Verified by Admin</>
-                    : <><ShieldAlert className="w-4 h-4" /> Pending Verification</>
-                  }
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Bank Name</p>
-                    <p className="font-semibold text-slate-900">{bankDetails.bankName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Account Holder</p>
-                    <p className="font-semibold text-slate-900">{bankDetails.accountHolderName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">Account Number</p>
-                    <p className="font-semibold font-mono text-slate-900">{maskAccountNumber(bankDetails.accountNumber)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">IFSC Code</p>
-                    <p className="font-semibold text-slate-900">{bankDetails.ifscCode}</p>
-                  </div>
-                  {bankDetails.accountType && (
-                    <div>
-                      <p className="text-sm text-slate-600 mb-1">Account Type</p>
-                      <p className="font-semibold text-slate-900 capitalize">{bankDetails.accountType}</p>
-                    </div>
-                  )}
-                  {bankDetails.branchName && (
-                    <div>
-                      <p className="text-sm text-slate-600 mb-1">Branch</p>
-                      <p className="font-semibold text-slate-900">{bankDetails.branchName}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
-                <AlertCircle className="w-10 h-10 text-yellow-500" />
-                <p className="text-sm font-semibold text-slate-700">No bank details added yet</p>
-                <p className="text-xs text-slate-500">Add your bank account to receive payouts from settlements.</p>
-                <Link href="/vendor/dashboard/settings/bank">
-                  <Button size="sm" className="gap-2 bg-brand-500 hover:bg-slate-700 text-white mt-1">
-                    <ExternalLink className="w-4 h-4" />
-                    Add Bank Details
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
 
       {/* Filters */}
       <Card>
@@ -463,7 +420,7 @@ export default function PayoutsEnhanced() {
               <Dropdown
                 value={filterStatus}
                 options={["All Status", "Paid", "Processing", "Pending", "Failed", "Cancelled"]}
-                onChange={(val) => { setFilterStatus(val as string); setCurrentPage(1); }}
+                onChange={(val) => { setFilterStatus(val as string); setMetricFilter('all'); setCurrentPage(1); }}
                 placeholder="Filter by status"
               />
             </div>
@@ -490,16 +447,17 @@ export default function PayoutsEnhanced() {
       )}
 
       {/* Payouts Table */}
-      <Card>
+      <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <RefreshCw className="w-8 h-8 text-slate-400 animate-spin" />
             <span className="ml-3 text-slate-500 font-medium">Loading Settlements...</span>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <Table>
-            <TableHeader>
-              <TableRow>
+            <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b [&_tr]:border-slate-200/80 [&_th]:!text-slate-500 [&_th]:font-bold [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:h-11">
+              <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
                 <TableHead>Settlement No.</TableHead>
                 <TableHead>Billing/Order No.</TableHead>
                 <TableHead>Amount</TableHead>
@@ -512,9 +470,9 @@ export default function PayoutsEnhanced() {
             <TableBody>
               {paginatedSettlements.length > 0 ? (
                 paginatedSettlements.map((settlement) => (
-                  <TableRow key={settlement.id} className="hover:bg-slate-50">
+                  <TableRow key={settlement.id}>
                     <TableCell>
-                      <div className="font-semibold text-indigo-600">{settlement.settlementNumber}</div>
+                      <div className="font-semibold text-brand-600">{settlement.settlementNumber}</div>
                       {settlement.transactionId && (
                         <div className="text-xs text-slate-500 mt-1 font-mono">
                           TXN: {settlement.transactionId}
@@ -533,14 +491,12 @@ export default function PayoutsEnhanced() {
                       <div className="text-sm text-slate-900">{settlement.period}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold capitalize whitespace-nowrap ${getStatusBadge(settlement.status)}`}
+                      >
                         {getStatusIcon(settlement.status)}
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(settlement.status)}`}
-                        >
-                          {settlement.status}
-                        </span>
-                      </div>
+                        {settlement.status}
+                      </span>
                     </TableCell>
                     <TableCell>
                       {settlement.paymentDate ? (
@@ -558,15 +514,13 @@ export default function PayoutsEnhanced() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <button
                         onClick={() => viewPayoutDetails(settlement)}
-                        className="gap-2"
+                        className="p-1.5 text-slate-500 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition-colors"
+                        title="View details"
                       >
-                        <Eye className="w-4 h-4" />
-                        Details
-                      </Button>
+                        <Eye className="h-4 w-4" />
+                      </button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -579,6 +533,7 @@ export default function PayoutsEnhanced() {
               )}
             </TableBody>
           </Table>
+          </div>
         )}
         {!loading && totalPages > 1 && (
           <div className="flex items-center justify-end gap-3 text-sm px-5 py-3 border-t border-slate-200">
@@ -589,14 +544,101 @@ export default function PayoutsEnhanced() {
             </div>
           </div>
         )}
-      </Card>
+      </div>
+
+      {/* Bank Account Modal */}
+      {showBankModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-slate-600" />
+                Bank Account
+              </h2>
+              <button
+                onClick={() => setShowBankModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6 text-slate-600" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {bankLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
+                  <span className="ml-2 text-sm text-slate-500">Loading bank details...</span>
+                </div>
+              ) : bankDetails ? (
+                <div className="space-y-4">
+                  {/* Verification Badge */}
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium w-fit ${bankDetails.isVerified ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}>
+                    {bankDetails.isVerified
+                      ? <><ShieldCheck className="w-4 h-4" /> Verified by Admin</>
+                      : <><ShieldAlert className="w-4 h-4" /> Pending Verification</>
+                    }
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-slate-600 mb-1">Bank Name</p>
+                      <p className="font-semibold text-slate-900">{bankDetails.bankName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600 mb-1">Account Holder</p>
+                      <p className="font-semibold text-slate-900">{bankDetails.accountHolderName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600 mb-1">Account Number</p>
+                      <p className="font-semibold font-mono text-slate-900">{maskAccountNumber(bankDetails.accountNumber)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600 mb-1">IFSC Code</p>
+                      <p className="font-semibold text-slate-900">{bankDetails.ifscCode}</p>
+                    </div>
+                    {bankDetails.accountType && (
+                      <div>
+                        <p className="text-sm text-slate-600 mb-1">Account Type</p>
+                        <p className="font-semibold text-slate-900 capitalize">{bankDetails.accountType}</p>
+                      </div>
+                    )}
+                    {bankDetails.branchName && (
+                      <div>
+                        <p className="text-sm text-slate-600 mb-1">Branch</p>
+                        <p className="font-semibold text-slate-900">{bankDetails.branchName}</p>
+                      </div>
+                    )}
+                  </div>
+                  <Link href="/vendor/dashboard/settings/bank" className="block">
+                    <Button variant="outline" size="sm" className="gap-2 w-full">
+                      <Edit className="w-4 h-4" />
+                      Manage Bank Details
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
+                  <AlertCircle className="w-10 h-10 text-yellow-500" />
+                  <p className="text-sm font-semibold text-slate-700">No bank details added yet</p>
+                  <p className="text-xs text-slate-500">Add your bank account to receive payouts from settlements.</p>
+                  <Link href="/vendor/dashboard/settings/bank">
+                    <Button size="sm" className="gap-2 bg-brand-500 hover:bg-brand-600 text-white mt-1">
+                      <ExternalLink className="w-4 h-4" />
+                      Add Bank Details
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payout Details Modal */}
       {showDetailsModal && selectedSettlement && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-slate-900">Settlement Details</h2>
+              <h2 className="text-xl font-bold text-slate-900">Settlement Details</h2>
               <button
                 onClick={() => setShowDetailsModal(false)}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -677,7 +719,7 @@ export default function PayoutsEnhanced() {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); handleDownloadReceipt(selectedSettlement); }}
-                  className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-slate-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200"
+                  className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
                 >
                   <Download className="w-4 h-4" />
                   Download Receipt

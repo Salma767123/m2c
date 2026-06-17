@@ -20,14 +20,22 @@ interface GeneralInformationProps {
   // Captured by parent at autofill time so lock state is stable across
   // typing and step remounts. Missing snapshot → every field editable.
   autofillSnapshot?: Record<string, boolean>
+  // Per-field validation errors keyed by field name. Optional so the
+  // Vendor inspection flow (which doesn't validate) keeps working unchanged.
+  errors?: Record<string, string>
 }
 
 const READONLY_CLS =
   "w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-100 text-slate-700 cursor-not-allowed"
 const EDITABLE_CLS =
   "w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200"
+const ERROR_CLS =
+  "w-full px-4 py-3 border border-red-500 rounded-xl bg-red-50/40 focus:ring-2 focus:ring-red-500/40 focus:border-red-500 transition-all duration-200"
 
-export default function GeneralInformation({ formData, setFormData, autofillSnapshot = {} }: GeneralInformationProps) {
+const FieldError = ({ message }: { message?: string }) =>
+  message ? <p className="mt-1.5 text-xs text-red-600">{message}</p> : null
+
+export default function GeneralInformation({ formData, setFormData, autofillSnapshot = {}, errors = {} }: GeneralInformationProps) {
   const clientLocked = !!autofillSnapshot.client
   const vendorLocked = !!autofillSnapshot.vendor
   const factoryLocked = !!autofillSnapshot.factory
@@ -80,8 +88,9 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             aria-readonly={clientLocked || undefined}
             onChange={(e) => !clientLocked && setFormData({ ...formData, client: e.target.value })}
             placeholder="Enter client name"
-            className={clientLocked ? READONLY_CLS : EDITABLE_CLS}
+            className={clientLocked ? READONLY_CLS : errors.client ? ERROR_CLS : EDITABLE_CLS}
           />
+          <FieldError message={errors.client} />
         </div>
         <div>
           <label className="block text-slate-700 font-semibold mb-3 text-sm">Vendor:<Req /></label>
@@ -91,8 +100,9 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             readOnly={vendorLocked}
             aria-readonly={vendorLocked || undefined}
             onChange={(e) => !vendorLocked && setFormData({ ...formData, vendor: e.target.value })}
-            className={vendorLocked ? READONLY_CLS : EDITABLE_CLS}
+            className={vendorLocked ? READONLY_CLS : errors.vendor ? ERROR_CLS : EDITABLE_CLS}
           />
+          <FieldError message={errors.vendor} />
         </div>
         <div>
           <label className="block text-slate-700 font-semibold mb-3 text-sm">Factory:<Req /></label>
@@ -103,8 +113,9 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             aria-readonly={factoryLocked || undefined}
             onChange={(e) => !factoryLocked && setFormData({ ...formData, factory: e.target.value })}
             placeholder="Enter factory name"
-            className={factoryLocked ? READONLY_CLS : EDITABLE_CLS}
+            className={factoryLocked ? READONLY_CLS : errors.factory ? ERROR_CLS : EDITABLE_CLS}
           />
+          <FieldError message={errors.factory} />
         </div>
         <div>
           <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Location:<Req /></label>
@@ -115,8 +126,9 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             aria-readonly={serviceLocationLocked || undefined}
             onChange={(e) => !serviceLocationLocked && setFormData({ ...formData, serviceLocation: e.target.value })}
             placeholder="Enter service location"
-            className={serviceLocationLocked ? READONLY_CLS : EDITABLE_CLS}
+            className={serviceLocationLocked ? READONLY_CLS : errors.serviceLocation ? ERROR_CLS : EDITABLE_CLS}
           />
+          <FieldError message={errors.serviceLocation} />
         </div>
         <div>
           <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Start Date:<Req /></label>
@@ -124,15 +136,16 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             type="date"
             value={formData.serviceStartDate}
             onChange={(e) => setFormData({ ...formData, serviceStartDate: e.target.value })}
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200"
+            className={errors.serviceStartDate ? ERROR_CLS : EDITABLE_CLS}
           />
+          <FieldError message={errors.serviceStartDate} />
         </div>
         <div>
           <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Type:<Req /></label>
           <div ref={serviceTypeDropdownRef} className="relative">
             <button
               onClick={() => setShowServiceTypeDropdown(!showServiceTypeDropdown)}
-              className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-200 bg-white text-left flex items-center justify-between hover:border-slate-400"
+              className={`w-full px-4 py-3 border rounded-xl transition-all duration-200 bg-white text-left flex items-center justify-between ${errors.serviceType ? 'border-red-500 bg-red-50/40 focus:ring-2 focus:ring-red-500/40 focus:border-red-500' : 'border-slate-300 focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 hover:border-slate-400'}`}
             >
               <span className="text-slate-900">{formData.serviceType}</span>
               <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform duration-200 ${showServiceTypeDropdown ? 'transform rotate-180' : ''}`} />
@@ -160,6 +173,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
               </div>
             )}
           </div>
+          <FieldError message={errors.serviceType} />
         </div>
       </div>
 
