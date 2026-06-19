@@ -1,9 +1,18 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { showErrorToast } from './toast-utils';
 
+// Every backend route is mounted under `/api`, while services call paths like
+// `/vendor-dashboard/chart`. Normalise the configured base so it always ends in
+// exactly one `/api` — whether or not NEXT_PUBLIC_API_URL already includes it —
+// otherwise requests miss the prefix and the backend returns "Route not found".
+const API_BASE_URL = (() => {
+  const raw = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
+  return /\/api$/.test(raw) ? raw : `${raw}/api`;
+})();
+
 // Create axios instance with base configuration
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+  baseURL: API_BASE_URL,
   timeout: 30000, // 30 seconds — increased to handle larger payloads (e.g. base64 images)
   withCredentials: true, // Always send httpOnly cookies (enables 7-day admin sessions)
   headers: {
@@ -145,7 +154,7 @@ export const createVendorAxiosInstance = () => {
   const vendorToken = typeof window !== 'undefined' ? localStorage.getItem('vendorToken') : null;
 
   return axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+    baseURL: API_BASE_URL,
     timeout: 10000,
     headers: {
       'Content-Type': 'application/json',
@@ -159,7 +168,7 @@ export const createAdminAxiosInstance = () => {
   const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
 
   return axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+    baseURL: API_BASE_URL,
     timeout: 10000,
     headers: {
       'Content-Type': 'application/json',
