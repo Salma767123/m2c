@@ -36,7 +36,7 @@ import {
   Legend,
 } from 'recharts';
 import vendorReportsService, { ReportPeriod } from '@/services/vendorReportsService';
-import DateRangeCalendar from '@/components/UI/DateRangeCalendar';
+import DateRangeCalendar from '@/components/Shared/DateRangeCalendar';
 import { toast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -300,7 +300,6 @@ export default function VendorReports() {
             to={dateRange.to}
             onChange={(from, to) => setDateRange({ from, to })}
             placeholder="Custom date range"
-            triggerClassName="h-10 px-4 border-slate-300 text-sm font-medium"
           />
           <button type="button" className={exportBtn} onClick={exportToPDF} disabled={loading || !data}>
             <FileText className="w-4 h-4" /> PDF
