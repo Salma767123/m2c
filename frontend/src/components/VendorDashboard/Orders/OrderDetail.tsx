@@ -23,6 +23,29 @@ const carriers = [
   "XpressBees",
 ];
 
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "ORDER_CREATED":
+      return "bg-slate-50 text-slate-700 border border-slate-200";
+    case "VENDOR_PROCESSING":
+      return "bg-blue-50 text-blue-700 border border-blue-200";
+    case "PACKED_BY_VENDOR":
+      return "bg-purple-50 text-purple-700 border border-purple-200";
+    case "IN_TRANSIT_TO_ADMIN_HUB":
+      return "bg-indigo-50 text-indigo-700 border border-indigo-200";
+    case "RECEIVED_AT_ADMIN_HUB":
+      return "bg-teal-50 text-teal-700 border border-teal-200";
+    case "APPROVED_BY_ADMIN_HUB":
+      return "bg-green-50 text-green-700 border border-green-200";
+    case "REJECTED_BY_ADMIN_HUB":
+      return "bg-orange-50 text-orange-700 border border-orange-200";
+    case "CANCELLED":
+      return "bg-red-50 text-red-700 border border-red-200";
+    default:
+      return "bg-slate-50 text-slate-700 border border-slate-200";
+  }
+};
+
 export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
   const router = useRouter();
   const [shipment, setShipment] = useState<VendorShipment | null>(null);
@@ -137,13 +160,13 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            className="p-2 border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
           >
             <ArrowLeft className="h-5 w-5 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Order Details</h1>
-            <p className="text-sm text-slate-600 mt-1">Order ID: {shipment.order?.orderId || shipment.shipmentId}</p>
+            <h1 className="text-xl font-bold text-slate-900">Order Details</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Order ID: {shipment.order?.orderId || shipment.shipmentId}</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -151,7 +174,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
             <button
               onClick={handleMarkAsPacked}
               disabled={!shipment.assignedHubId}
-              className={`px-6 py-2 rounded-lg transition-colors font-medium ${shipment.assignedHubId
+              className={`px-4 py-2.5 rounded-lg transition-colors font-semibold ${shipment.assignedHubId
                   ? "bg-purple-600 text-white hover:bg-purple-700"
                   : "bg-slate-200 text-slate-400 cursor-not-allowed"
                 }`}
@@ -164,8 +187,8 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
             <button
               onClick={handleOpenShippingModal}
               disabled={!shipment.assignedHubId}
-              className={`px-6 py-2 rounded-lg transition-colors font-medium ${shipment.assignedHubId
-                  ? "bg-brand-500 text-white hover:bg-brand-700"
+              className={`px-4 py-2.5 rounded-lg transition-colors font-semibold ${shipment.assignedHubId
+                  ? "bg-brand-500 text-white hover:bg-brand-600"
                   : "bg-slate-200 text-slate-400 cursor-not-allowed"
                 }`}
               title={!shipment.assignedHubId ? "Wait for admin to assign a hub" : ""}
@@ -174,19 +197,19 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
             </button>
           )}
           {status === "IN_TRANSIT_TO_ADMIN_HUB" && (
-            <div className="px-6 py-2 bg-blue-100 text-blue-800 rounded-lg font-medium border border-blue-300">
+            <div className="px-4 py-2.5 bg-indigo-50 text-indigo-700 rounded-lg font-semibold border border-indigo-200">
               In Transit to Hub
             </div>
           )}
           {["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(status) && (
-            <div className="px-6 py-2 bg-green-100 text-green-800 rounded-lg font-medium border border-green-300">
+            <div className="px-4 py-2.5 bg-green-50 text-green-700 rounded-lg font-semibold border border-green-200">
               Handled by Admin Hub ({status.replace(/_/g, " ")})
             </div>
           )}
           {status === "REJECTED_BY_ADMIN_HUB" && (
             <button
               onClick={() => setShowReshipModal(true)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+              className="px-4 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-semibold flex items-center gap-2"
             >
               <RefreshCw className="h-4 w-4" />
               Reship
@@ -196,7 +219,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       </div>
 
       {/* Order Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+      <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/80">
         <div className="flex items-center gap-2 mb-4">
           <Package className="h-5 w-5 text-slate-600" />
           <h2 className="text-lg font-semibold text-slate-900">Order Information</h2>
@@ -210,15 +233,9 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           </div>
           <div>
             <p className="text-sm text-slate-600">Status</p>
-            <p className={`text-base font-medium mt-1 ${status === "VENDOR_PROCESSING" ? "text-blue-600" :
-              status === "PACKED_BY_VENDOR" ? "text-purple-600" :
-                status === "IN_TRANSIT_TO_ADMIN_HUB" ? "text-indigo-600" :
-                  status === "REJECTED_BY_ADMIN_HUB" ? "text-red-600" :
-                    status === "CANCELLED" ? "text-red-600" :
-                      "text-green-600"
-              }`}>
+            <span className={`inline-flex mt-1.5 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${getStatusColor(status)}`}>
               {status.replace(/_/g, " ")}
-            </p>
+            </span>
           </div>
           <div>
             <p className="text-sm text-slate-600">Total Amount</p>
@@ -230,7 +247,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       </div>
 
       {/* Product Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+      <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/80">
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Product Details</h2>
         <div className="space-y-4">
           {shipment.items.map((item: any) => (
@@ -265,7 +282,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
       </div>
 
       {/* Hub Details */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+      <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/80">
         <div className="flex items-center gap-2 mb-4">
           <MapPin className="h-5 w-5 text-slate-600" />
           <h2 className="text-lg font-semibold text-slate-900">Delivery Hub</h2>
@@ -301,7 +318,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
               </div>
             </>
           ) : (
-            <div className="md:col-span-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="md:col-span-2 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
               <p className="text-sm text-yellow-800 font-medium">Awaiting Admin Hub Assignment</p>
               <p className="text-xs text-yellow-700 mt-1">
                 You will be able to pack and ship this order once an admin assigns a hub to it.
@@ -313,7 +330,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
       {/* Shipping Details — shown once vendor has shipped */}
       {shipment.vendorCarrier && shipment.vendorTrackingId && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+        <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/80">
           <div className="flex items-center gap-2 mb-4">
             <Truck className="h-5 w-5 text-slate-600" />
             <h2 className="text-lg font-semibold text-slate-900">Shipping Details</h2>
@@ -343,7 +360,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
       {/* Admin Review & Feedback */}
       {shipment.adminReview && (
-        <div className={`rounded-lg shadow-sm border p-6 ${shipment.adminReview.approved ? "bg-white border-slate-200" : "bg-red-50 border-red-200"}`}>
+        <div className={`rounded-2xl shadow-xs border p-6 ${shipment.adminReview.approved ? "bg-white border-slate-200/80" : "bg-red-50 border-red-200"}`}>
           <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
             <div className="flex items-center gap-2">
               <svg className="h-5 w-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,7 +428,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
       {/* Processing Instructions */}
       {!["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(status) && (
-        <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg">
+        <div className="bg-blue-50 border border-blue-200 p-6 rounded-xl">
           <h3 className="text-sm font-semibold text-blue-900 mb-2">Processing Instructions</h3>
           <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
             <li>Ensure product quality before packing</li>
@@ -425,7 +442,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
       {/* Order Completed Message */}
       {["RECEIVED_AT_ADMIN_HUB", "APPROVED_BY_ADMIN_HUB", "SHIPPED_TO_CUSTOMER", "DELIVERED"].includes(status) && (
-        <div className="bg-green-50 border border-green-200 p-6 rounded-lg">
+        <div className="bg-green-50 border border-green-200 p-6 rounded-xl">
           <h3 className="text-sm font-semibold text-green-900 mb-2">Order Handled by Hub</h3>
           <p className="text-sm text-green-800">
             This order has been received at the hub. Your role in this order is now complete. Thank you for your service!
@@ -435,8 +452,8 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
       {/* Shipping Modal */}
       {showShippingModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Ship to Hub</h2>
@@ -486,7 +503,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
               </button>
               <button
                 onClick={handleConfirmShipping}
-                className="px-6 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium"
+                className="px-4 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-semibold"
               >
                 Confirm Shipping
               </button>
@@ -497,8 +514,8 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
 
       {/* Reship Confirmation Modal */}
       {showReshipModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div className="p-6 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -545,7 +562,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
               <button
                 onClick={handleReship}
                 disabled={reshipLoading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-semibold flex items-center gap-2 disabled:opacity-50"
               >
                 {reshipLoading ? (
                   <>

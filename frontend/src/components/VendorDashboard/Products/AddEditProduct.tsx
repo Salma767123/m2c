@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
@@ -86,6 +86,19 @@ const getColorName = (hex: string): string => {
   }
 
   return colorMap[hex.toLowerCase()] || `Custom (${hex})`
+}
+
+// Helper: map a typed color name to a hex so the swatch follows the text input.
+const getColorHex = (name: string): string | null => {
+  const nameMap: { [key: string]: string } = {
+    black: '#000000', white: '#ffffff', gray: '#808080', grey: '#808080',
+    silver: '#c0c0c0', red: '#ff0000', green: '#008000', lime: '#00ff00',
+    blue: '#0000ff', navy: '#000080', yellow: '#ffff00', magenta: '#ff00ff',
+    cyan: '#00ffff', maroon: '#800000', olive: '#808000', purple: '#800080',
+    teal: '#008080', orange: '#ffa500', pink: '#ffc0cb', brown: '#a52a2a',
+    beige: '#f5f5dc',
+  }
+  return nameMap[name.trim().toLowerCase()] || null
 }
 
 interface ProductVariant {
@@ -194,6 +207,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [isLoadingData, setIsLoadingData] = useState(isEdit)
   const [availableInventoryItems, setAvailableInventoryItems] = useState<any[]>([])
   const [isLoadingInventory, setIsLoadingInventory] = useState(false)
+  const [inventoryLoadError, setInventoryLoadError] = useState(false)
 
   const [formData, setFormData] = useState<ProductFormData>({
     // Inventory Connection (NEW)
@@ -395,24 +409,27 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   }
 
   // Load available inventory items
-  useEffect(() => {
-    const loadAvailableInventory = async () => {
-      if (!isEdit) {
-        setIsLoadingInventory(true)
-        try {
-          const response = await productService.getAvailableInventoryItems()
-          if (response.success && response.data) {
-            setAvailableInventoryItems(response.data)
-          }
-        } catch (error) {
-          console.error('Error loading inventory items:', error)
-          showErrorToast('Load Failed', 'Unable to load inventory items')
-        } finally {
-          setIsLoadingInventory(false)
-        }
+  const loadAvailableInventory = useCallback(async () => {
+    if (isEdit) return
+    setIsLoadingInventory(true)
+    setInventoryLoadError(false)
+    try {
+      const response = await productService.getAvailableInventoryItems()
+      if (response.success && Array.isArray(response.data)) {
+        setAvailableInventoryItems(response.data)
+      } else {
+        setInventoryLoadError(true)
       }
+    } catch (error) {
+      console.error('Error loading inventory items:', error)
+      setInventoryLoadError(true)
+      showErrorToast('Load Failed', 'Unable to load inventory items')
+    } finally {
+      setIsLoadingInventory(false)
     }
+  }, [isEdit])
 
+  useEffect(() => {
     loadAvailableInventory()
 
     // Load GST Rates
@@ -430,7 +447,18 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       }
     }
     loadGstRates()
-  }, [isEdit])
+  }, [isEdit, loadAvailableInventory])
+
+  // For variant products, suggest the lowest variant price as the base "from"
+  // price so it is never left at 0 — but only when it hasn't been set yet, so a
+  // manually entered base price is never overwritten.
+  useEffect(() => {
+    if (!formData.hasVariants || formData.variants.length === 0) return
+    const prices = formData.variants.map(v => v.price).filter(p => p > 0)
+    if (prices.length === 0) return
+    const minPrice = Math.min(...prices)
+    setFormData(prev => (prev.basePrice > 0 ? prev : { ...prev, basePrice: minPrice }))
+  }, [formData.hasVariants, formData.variants])
 
   // Load product data for editing
   useEffect(() => {
@@ -671,6 +699,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               color: getColorName(value)
             }
           }
+          // If typing a known color name, auto-update the swatch hex
+          if (field === 'color') {
+            const hex = getColorHex(value)
+            return { ...v, color: value, ...(hex ? { colorHex: hex } : {}) }
+          }
           return { ...v, [field]: value }
         }
         return v
@@ -889,8 +922,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (formData.hasVariants && formData.variants.length === 0) {
       newErrors.variants = 'Please add at least one variant or disable variants.'
     }
-    if (!formData.hasVariants && formData.basePrice <= 0) {
-      newErrors.basePrice = 'Please enter a valid base price.'
+    if (formData.basePrice <= 0) {
+      newErrors.basePrice = formData.hasVariants
+        ? 'Add at least one variant with a price greater than 0.'
+        : 'Please enter a valid base price.'
     }
     const hasCoverImage = formData.images?.some(img => img.imageType === 'cover')
     if (!hasCoverImage) newErrors.coverImage = 'Please upload a cover image for the product.'
@@ -1082,9 +1117,26 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           }}
                           disabled={isLoadingInventory}
                         />
-                        <p className="text-xs text-slate-500">
-                          Only inventory items without existing products are shown
-                        </p>
+                        {inventoryLoadError ? (
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-red-600">Couldn&apos;t load inventory items.</span>
+                            <button
+                              type="button"
+                              onClick={loadAvailableInventory}
+                              className="font-semibold text-brand-600 hover:text-brand-700 underline"
+                            >
+                              Retry
+                            </button>
+                          </div>
+                        ) : !isLoadingInventory && availableInventoryItems.length === 0 ? (
+                          <p className="text-xs text-slate-500">
+                            No available inventory items. Every item already has a product, or none are active.
+                          </p>
+                        ) : (
+                          <p className="text-xs text-slate-500">
+                            Only inventory items without existing products are shown
+                          </p>
+                        )}
                         {errors.inventoryItemId && (
                           <p className="text-xs text-red-600">{errors.inventoryItemId}</p>
                         )}
@@ -1106,16 +1158,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             <X className="h-4 w-4 mr-1" />
                             Change
                           </Button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-slate-600">Current Stock:</span>
-                            <span className="font-medium ml-2">{selectedInventoryItem.currentStock}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-600">Base Price:</span>
-                            <span className="font-medium ml-2">${selectedInventoryItem.sellingPrice}</span>
-                          </div>
                         </div>
                         <Link href={`/vendor/dashboard/inventory/edit/${selectedInventoryItem.id}`}>
                           <Button variant="outline" size="sm" className="mt-3">
@@ -1240,7 +1282,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                     <div className="flex flex-col">
                       <label className="block text-sm font-semibold text-slate-700 mb-2 leading-snug min-h-[2.5rem]">
                         Unit of Measurement (UOM)
@@ -1274,19 +1316,6 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         onChange={handleInputChange}
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
                         placeholder="e.g., 230x250 cm"
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <label className="block text-sm font-semibold text-slate-700 mb-2 leading-snug min-h-[2.5rem]">
-                        Weight
-                      </label>
-                      <input
-                        type="text"
-                        name="weight"
-                        value={formData.weight}
-                        onChange={handleInputChange}
-                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                        placeholder="e.g., 1.2 kg"
                       />
                     </div>
                     <div className="flex flex-col">
@@ -1346,7 +1375,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           <input
                             type="text"
                             value={formData.singleUnitColor || ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, singleUnitColor: e.target.value }))}
+                            onChange={(e) => {
+                              const name = e.target.value
+                              const hex = getColorHex(name)
+                              setFormData(prev => ({ ...prev, singleUnitColor: name, ...(hex ? { singleUnitColorHex: hex } : {}) }))
+                            }}
                             placeholder="Color name"
                             className="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
                           />
@@ -1584,13 +1617,14 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 value={newVariant.size || ''}
                                 options={standardSizes}
                                 placeholder="Select Size"
+                                buttonClassName="h-11 rounded-lg"
                                 onChange={(value) => setNewVariant(prev => ({ ...prev, size: value as string }))}
                               />
                             </div>
 
                             <div className="space-y-2">
                               <label className="block text-sm font-semibold text-slate-700">Color *</label>
-                              <div className="flex items-center gap-3 p-3 border border-slate-300 rounded-lg bg-white">
+                              <div className="flex items-center gap-2 h-11 px-3 border border-slate-300 rounded-lg bg-white">
                                 <input
                                   type="color"
                                   value={newVariant.colorHex || '#000000'}
@@ -1602,13 +1636,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                       color: getColorName(hex)
                                     }))
                                   }}
-                                  className="w-10 h-10 border border-slate-300 rounded-md cursor-pointer"
+                                  className="w-7 h-7 shrink-0 border border-slate-300 rounded-md cursor-pointer"
                                   title="Pick a color"
                                 />
                                 <input
                                   type="text"
                                   value={newVariant.color || ''}
-                                  onChange={(e) => setNewVariant(prev => ({ ...prev, color: e.target.value }))}
+                                  onChange={(e) => {
+                                    const name = e.target.value
+                                    const hex = getColorHex(name)
+                                    setNewVariant(prev => ({ ...prev, color: name, ...(hex ? { colorHex: hex } : {}) }))
+                                  }}
                                   placeholder="Color name"
                                   className="flex-1 px-0 py-0 border-0 focus:outline-none focus:ring-0 text-sm bg-transparent"
                                 />
@@ -1622,7 +1660,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 value={newVariant.sku}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, sku: e.target.value }))}
                                 placeholder="e.g., CS-Q-BLK"
-                                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
+                                className="w-full h-11 px-3.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
                               />
                             </div>
                           </div>
@@ -1639,7 +1677,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                   onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                                   placeholder="0.00"
                                   step="0.01"
-                                  className="w-full pl-8 pr-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
+                                  className="w-full h-11 pl-8 pr-3.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
                                 />
                               </div>
                             </div>
@@ -1652,7 +1690,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                                 placeholder="0"
                                 min="0"
-                                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
+                                className="w-full h-11 px-3.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
                               />
                             </div>
                           </div>
@@ -1684,7 +1722,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
                           {/* Variants Table */}
                           <div className="overflow-x-auto border border-slate-300 rounded-lg">
-                            <Table>
+                            <Table className="[&_th]:px-3 [&_th]:h-11 [&_td]:px-3 [&_td]:py-2">
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>Size</TableHead>
@@ -1703,7 +1741,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                       <select
                                         value={variant.size}
                                         onChange={(e) => updateVariant(variant.id, 'size', e.target.value)}
-                                        className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
+                                        className="w-full min-w-[72px] px-2 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
                                       >
                                         {standardSizes.map(s => (
                                           <option key={s} value={s}>{s}</option>
@@ -1724,7 +1762,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                             type="text"
                                             value={variant.color}
                                             onChange={(e) => updateVariant(variant.id, 'color', e.target.value)}
-                                            className="text-slate-900 text-sm font-medium bg-transparent border-none p-0 focus:outline-none focus:ring-1 focus:ring-slate-300 rounded px-1"
+                                            className="w-full min-w-[90px] text-slate-900 text-sm font-medium bg-transparent border-none p-0 focus:outline-none focus:ring-1 focus:ring-slate-300 rounded px-1"
                                             placeholder="Color name"
                                           />
                                           <span className="text-slate-500 text-xs">{variant.colorHex || '#CCCCCC'}</span>
@@ -1736,12 +1774,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         type="text"
                                         value={variant.sku}
                                         onChange={(e) => updateVariant(variant.id, 'sku', e.target.value)}
-                                        className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
+                                        className="w-full min-w-[110px] px-2 py-1.5 border border-slate-300 rounded-md text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
                                         placeholder="SKU"
                                       />
                                     </TableCell>
                                     <TableCell>
-                                      <div className="relative">
+                                      <div className="relative min-w-[96px]">
                                         <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-slate-500 text-xs">₹</span>
                                         <input
                                           type="number"
@@ -1769,17 +1807,26 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                       <button
                                         type="button"
                                         onClick={() => setEditingVariantId(variant.id || null)}
-                                        className={`p-1 inline-flex items-center gap-1 transition-colors ${variant.images && variant.images.length > 0
-                                          ? 'text-brand-500 hover:text-brand-700'
-                                          : 'text-slate-400 hover:text-slate-600'
-                                          }`}
+                                        className="inline-flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         title={variant.images && variant.images.length > 0 ? "Change image" : "Add image"}
                                         disabled={!variant.id}
                                       >
-                                        <ImageIcon className="h-4 w-4" />
-                                        <span className="text-xs font-medium">
-                                          {variant.images && variant.images.length > 0 ? 'Edit' : 'Add'}
-                                        </span>
+                                        {variant.images && variant.images.length > 0 ? (
+                                          <>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                              src={variant.images[0]}
+                                              alt={`${variant.color || 'variant'} preview`}
+                                              className="w-9 h-9 rounded-md object-cover border border-slate-200"
+                                            />
+                                            <span className="text-xs font-medium text-brand-500 hover:text-brand-700">Edit</span>
+                                          </>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-600">
+                                            <ImageIcon className="h-4 w-4" />
+                                            <span className="text-xs font-medium">Add</span>
+                                          </span>
+                                        )}
                                       </button>
                                     </TableCell>
                                     <TableCell className="text-center">
@@ -1856,6 +1903,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             placeholder="0"
                           />
                         </div>
+                        {formData.hasVariants && (
+                          <p className="text-[10px] text-slate-500 mt-1">Pre-filled from the lowest variant price — you can edit it</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -2108,6 +2158,23 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm bg-slate-100 text-slate-600"
                       />
                       <p className="text-xs text-slate-500 mt-1">Auto-calculated</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Shipping Weight (kg)
+                      </label>
+                      <input
+                        type="text"
+                        name="weight"
+                        value={formData.weight}
+                        onChange={handleInputChange}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                        placeholder="e.g., 1.2"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Used to calculate shipping</p>
                     </div>
                   </div>
 
@@ -2482,8 +2549,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <span className="text-slate-600">Price Range:</span>
                   <span className="font-medium">
                     {formData.hasVariants && formData.variants.length > 0
-                      ? `$${Math.min(...formData.variants.map(v => v.price))} - $${Math.max(...formData.variants.map(v => v.price))}`
-                      : `$${formData.basePrice}`
+                      ? `₹${Math.min(...formData.variants.map(v => v.price))} - ₹${Math.max(...formData.variants.map(v => v.price))}`
+                      : `₹${formData.basePrice}`
                     }
                   </span>
                 </div>

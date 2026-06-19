@@ -95,6 +95,13 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     productId: ''
   })
 
+  // Today (local) as YYYY-MM-DD — used to block future dates in date pickers.
+  const todayStr = (() => {
+    const d = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  })()
+
   // Load vendor's selected categories
   useEffect(() => {
     const loadVendorCategories = async () => {
@@ -266,12 +273,21 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
 
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 :
-        type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }))
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [name]: type === 'number' ? parseFloat(value) || 0 :
+          type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      }
+      // Changing the manufacturing date can invalidate an already-picked
+      // "Last Restocked" that now falls before it — clear it so the user re-picks.
+      if (name === 'manufacturingDate' && next.lastRestocked && value && next.lastRestocked < value) {
+        next.lastRestocked = ''
+      }
+      return next
+    })
     clearError(name)
+    if (name === 'manufacturingDate') clearError('lastRestocked')
   }
 
   const clearError = (name: string) => {
@@ -293,6 +309,20 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     }
     if (data.sourceType === 'supplier' && !data.supplier?.trim()) {
       e.supplier = 'Supplier name is required when supplier is selected'
+    }
+    if (
+      data.sourceType === 'manufacture' &&
+      data.manufacturingDate &&
+      data.lastRestocked &&
+      data.lastRestocked < data.manufacturingDate
+    ) {
+      e.lastRestocked = 'Last Restocked cannot be earlier than the Manufacturing Date'
+    }
+    if (data.manufacturingDate && data.manufacturingDate > todayStr) {
+      e.manufacturingDate = 'Manufacturing Date cannot be in the future'
+    }
+    if (data.lastRestocked && data.lastRestocked > todayStr) {
+      e.lastRestocked = 'Last Restocked cannot be in the future'
     }
     return e
   }
@@ -748,6 +778,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="lastRestocked"
                           value={formData.lastRestocked}
                           onChange={handleInputChange}
+                          max={todayStr}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-slate-500 transition-colors"
                         />
                       </div>
@@ -782,8 +813,15 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="manufacturingDate"
                           value={formData.manufacturingDate}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-slate-500 transition-colors"
+                          max={todayStr}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.manufacturingDate
+                            ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                            : 'border-slate-200 focus:ring-brand-500/40 focus:border-slate-500'
+                            }`}
                         />
+                        {errors.manufacturingDate && (
+                          <p className="text-xs text-red-600 mt-1">{errors.manufacturingDate}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -794,8 +832,21 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           name="lastRestocked"
                           value={formData.lastRestocked}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-slate-500 transition-colors"
+                          min={formData.manufacturingDate || undefined}
+                          max={todayStr}
+                          disabled={!formData.manufacturingDate}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors disabled:bg-slate-100 disabled:cursor-not-allowed ${errors.lastRestocked
+                            ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                            : 'border-slate-200 focus:ring-brand-500/40 focus:border-slate-500'
+                            }`}
                         />
+                        {errors.lastRestocked ? (
+                          <p className="text-xs text-red-600 mt-1">{errors.lastRestocked}</p>
+                        ) : (
+                          <p className="text-xs text-slate-500 mt-1">
+                            Select the Manufacturing Date first; it can&apos;t be earlier than that.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

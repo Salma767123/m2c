@@ -299,15 +299,19 @@ const getVendorReviews = async (req, res) => {
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
         const skip = (page - 1) * limit;
 
-        const reviewWhere = { vendorId };
+        // Optional star-rating filter (1-5). Applies only to the paginated list, not the
+        // distribution/summary — so the metric cards always show the full breakdown.
+        const ratingParam = parseInt(req.query.rating, 10);
+        const ratingFilter = ratingParam >= 1 && ratingParam <= 5 ? ratingParam : null;
+        const listWhere = ratingFilter ? { vendorId, rating: ratingFilter } : { vendorId };
 
-        const [vendor, reviews, totalReviews, ratingRows] = await Promise.all([
+        const [vendor, reviews, listTotal, globalTotal, ratingRows] = await Promise.all([
             prisma.vendor.findUnique({
                 where: { id: vendorId },
                 select: { rating: true, ratingCount: true, companyName: true },
             }),
             prisma.adminReview.findMany({
-                where: reviewWhere,
+                where: listWhere,
                 orderBy: { reviewedAt: 'desc' },
                 skip,
                 take: limit,
@@ -346,7 +350,8 @@ const getVendorReviews = async (req, res) => {
                     },
                 },
             }),
-            prisma.adminReview.count({ where: reviewWhere }),
+            prisma.adminReview.count({ where: listWhere }),
+            prisma.adminReview.count({ where: { vendorId } }),
             prisma.adminReview.findMany({
                 where: { vendorId, rating: { not: null } },
                 select: { rating: true },
@@ -368,7 +373,7 @@ const getVendorReviews = async (req, res) => {
                 overall: {
                     rating: vendor.rating,
                     ratingCount: vendor.ratingCount,
-                    totalReviews,
+                    totalReviews: globalTotal,
                     distribution,
                 },
                 reviews,
@@ -376,8 +381,8 @@ const getVendorReviews = async (req, res) => {
             pagination: {
                 page,
                 limit,
-                total: totalReviews,
-                totalPages: Math.ceil(totalReviews / limit),
+                total: listTotal,
+                totalPages: Math.ceil(listTotal / limit),
             },
         });
     } catch (error) {

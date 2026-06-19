@@ -41,12 +41,29 @@ const getPrevDateRange = (period) => {
     return { start: new Date(start - length), end: start };
 };
 
+// Helper: resolve the active date range from query params.
+// A custom startDate/endDate (YYYY-MM-DD) takes precedence over the period preset.
+const resolveRange = (query) => {
+    const { startDate, endDate, period = '30days' } = query;
+    if (startDate && endDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            const length = end - start;
+            return { start, end, prevStart: new Date(start - length), prevEnd: start };
+        }
+    }
+    const { start, end } = getDateRange(period);
+    const { start: prevStart, end: prevEnd } = getPrevDateRange(period);
+    return { start, end, prevStart, prevEnd };
+};
+
 const getVendorOverviewReport = async (req, res) => {
     try {
         const vendorId = req.vendorId || req.userId;
-        const { period = '30days' } = req.query;
-        const { start, end } = getDateRange(period);
-        const { start: prevStart, end: prevEnd } = getPrevDateRange(period);
+        const { start, end, prevStart, prevEnd } = resolveRange(req.query);
 
         const dateFilter = { gte: start, lte: end };
         const prevDateFilter = { gte: prevStart, lte: prevEnd };
@@ -57,6 +74,7 @@ const getVendorOverviewReport = async (req, res) => {
             currentOrders,
             prevOrders,
             currentProducts,
+            stockAggregate,
             topSellingProducts,
             statusDistribution,
             revenueOverTime
@@ -77,6 +95,8 @@ const getVendorOverviewReport = async (req, res) => {
             prisma.order.count({ where: { items: { some: { vendorId } }, createdAt: prevDateFilter } }),
             // Total products listed by vendor
             prisma.product.count({ where: { vendorId } }),
+            // Total stock on hand across all vendor products
+            prisma.product.aggregate({ where: { vendorId }, _sum: { totalStock: true } }),
             // Top selling products
             prisma.orderItem.groupBy({
                 by: ['productId', 'productName'],
@@ -102,8 +122,7 @@ const getVendorOverviewReport = async (req, res) => {
         const currentRevenue = currentItems.reduce((sum, item) => sum + item.totalPrice, 0);
         const prevRevenue = prevItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
-        const avgOrderValue = currentOrders > 0 ? (currentRevenue / currentOrders) : 0;
-        const prevAvgOrderValue = prevOrders > 0 ? (prevRevenue / prevOrders) : 0;
+        const totalStock = stockAggregate?._sum?.totalStock || 0;
 
         // Build monthly revenue chart data
         const monthMap = {};
@@ -151,13 +170,68 @@ const getVendorOverviewReport = async (req, res) => {
             };
         }));
 
+        // Drill-down tables backing each metric card. Built from the same range
+        // filter so the table below the cards always matches the selected metric.
+        const [revenueItemRows, orderRows, productRows] = await Promise.all([
+            prisma.orderItem.findMany({
+                where: { vendorId, order: { createdAt: dateFilter, paymentStatus: 'PAID' } },
+                include: { order: { select: { orderId: true, createdAt: true } } },
+                orderBy: { order: { createdAt: 'desc' } },
+                take: 200,
+            }),
+            prisma.order.findMany({
+                where: { items: { some: { vendorId } }, createdAt: dateFilter },
+                select: { orderId: true, status: true, createdAt: true, items: { where: { vendorId }, select: { totalPrice: true } } },
+                orderBy: { createdAt: 'desc' },
+                take: 200,
+            }),
+            prisma.product.findMany({
+                where: { vendorId },
+                select: { name: true, baseSku: true, category: true, basePrice: true, totalStock: true, status: true, createdAt: true },
+                orderBy: { createdAt: 'desc' },
+            }),
+        ]);
+
+        const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN');
+
+        const revenueTable = revenueItemRows.map(item => ({
+            'Order ID': item.order?.orderId || '—',
+            Product: item.productName,
+            Quantity: item.quantity,
+            Amount: item.totalPrice,
+            Date: fmtDate(item.order?.createdAt),
+        }));
+
+        const ordersTable = orderRows.map(o => ({
+            'Order ID': o.orderId,
+            Status: o.status.replace(/_/g, ' '),
+            Amount: o.items.reduce((s, i) => s + i.totalPrice, 0),
+            Date: fmtDate(o.createdAt),
+        }));
+
+        const stockTable = productRows.map(p => ({
+            Product: p.name,
+            SKU: p.baseSku,
+            Stock: p.totalStock,
+            Status: p.status,
+        }));
+
+        const productsTable = productRows.map(p => ({
+            Product: p.name,
+            Category: p.category,
+            'Base Price': p.basePrice,
+            Stock: p.totalStock,
+            Status: p.status,
+            'Listed On': fmtDate(p.createdAt),
+        }));
+
         res.json({
             success: true,
             data: {
                 metrics: {
                     revenue: { current: currentRevenue, previous: prevRevenue },
                     orders: { current: currentOrders, previous: prevOrders },
-                    avgOrderValue: { current: avgOrderValue, previous: prevAvgOrderValue },
+                    totalStock: { current: totalStock, previous: totalStock },
                     productsListed: { current: currentProducts, previous: currentProducts }
                 },
                 charts: {
@@ -165,7 +239,11 @@ const getVendorOverviewReport = async (req, res) => {
                     orderStatusData
                 },
                 tables: {
-                    topProducts: topProductsData
+                    topProducts: topProductsData,
+                    revenue: revenueTable,
+                    orders: ordersTable,
+                    stock: stockTable,
+                    products: productsTable
                 }
             }
         });
@@ -179,8 +257,7 @@ const getVendorOverviewReport = async (req, res) => {
 const getVendorOrdersReport = async (req, res) => {
     try {
         const vendorId = req.vendorId || req.userId;
-        const { period = '30days' } = req.query;
-        const { start, end } = getDateRange(period);
+        const { start, end } = resolveRange(req.query);
 
         const filter = { vendorId, order: { createdAt: { gte: start, lte: end } } };
 

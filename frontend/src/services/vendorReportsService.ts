@@ -2,12 +2,22 @@ import axiosInstance from '@/lib/axios';
 
 export type ReportPeriod = 'today' | '7days' | '30days' | '3months' | '6months' | '1year';
 
-const vendorReportsService = {
-    getOverview: (period: ReportPeriod = '30days') =>
-        axiosInstance.get(`/vendor-reports/overview?period=${period}`).then(r => r.data),
+export interface DateRange {
+    from: string;
+    to: string;
+}
 
-    getOrders: (period: ReportPeriod = '30days') =>
-        axiosInstance.get(`/vendor-reports/orders?period=${period}`).then(r => r.data),
+const buildQuery = (period: ReportPeriod, range?: DateRange) =>
+    range && range.from && range.to
+        ? `startDate=${range.from}&endDate=${range.to}`
+        : `period=${period}`;
+
+const vendorReportsService = {
+    getOverview: (period: ReportPeriod = '30days', range?: DateRange) =>
+        axiosInstance.get(`/vendor-reports/overview?${buildQuery(period, range)}`).then(r => r.data),
+
+    getOrders: (period: ReportPeriod = '30days', range?: DateRange) =>
+        axiosInstance.get(`/vendor-reports/orders?${buildQuery(period, range)}`).then(r => r.data),
 };
 
 export default vendorReportsService;

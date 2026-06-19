@@ -173,7 +173,7 @@ const buildBuckets = (granularity, startDate, endDate, multiYear) => {
                 start: new Date(cursor),
                 end: new Date(next),
                 label: multiYear
-                    ? `${MONTH_LABELS[cursor.getMonth()]} ${String(cursor.getFullYear()).slice(2)}`
+                    ? `${MONTH_LABELS[cursor.getMonth()]} '${String(cursor.getFullYear()).slice(2)}`
                     : MONTH_LABELS[cursor.getMonth()],
             });
             cursor = next;

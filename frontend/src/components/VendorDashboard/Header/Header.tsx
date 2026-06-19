@@ -16,7 +16,6 @@ import {
   X,
   ChevronDown,
   Search,
-  Phone,
   HelpCircle,
   LayoutDashboard,
   Package,
@@ -161,16 +160,6 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
 
         {/* Right Section */}
         <div className="flex items-center space-x-4">
-          {/* Support call button */}
-          <a
-            href="tel:+919876543210"
-            className="hidden md:inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-full px-3.5 py-2 transition-colors duration-150 shadow-xs shadow-brand-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
-            title="Call Support"
-          >
-            <Phone className="w-3.5 h-3.5" />
-            +91 98765 43210
-          </a>
-
           {/* Notifications */}
           <NotificationDropdown />
 
@@ -182,8 +171,12 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center space-x-2 text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5"
             >
-              <div className="h-7 w-7 rounded-full bg-brand-50 flex items-center justify-center border border-brand-100">
-                <User className="h-4 w-4 text-brand-500" />
+              <div className="h-7 w-7 rounded-full bg-brand-50 flex items-center justify-center border border-brand-100 overflow-hidden">
+                {vendor.companyLogo ? (
+                  <img src={vendor.companyLogo} alt={vendor.companyName} className="h-full w-full object-cover" />
+                ) : (
+                  <User className="h-4 w-4 text-brand-500" />
+                )}
               </div>
               <span className="text-sm font-semibold text-slate-700 hidden sm:inline">{vendor.ownerName}</span>
               <ChevronDown className="h-4 w-4 text-slate-400" />
@@ -194,8 +187,12 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-md border border-slate-200 z-50 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                   <div className="flex items-center space-x-3">
-                    <div className="h-10 w-10 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
-                      <User className="h-5 w-5 text-brand-500" />
+                    <div className="h-10 w-10 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0 overflow-hidden">
+                      {vendor.companyLogo ? (
+                        <img src={vendor.companyLogo} alt={vendor.companyName} className="h-full w-full object-cover" />
+                      ) : (
+                        <User className="h-5 w-5 text-brand-500" />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-900 text-sm truncate">{vendor.ownerName}</p>
@@ -220,14 +217,6 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
                 </div>
                 <div className="p-1.5 bg-white">
                   <Link
-                    href="/vendor/dashboard/profile"
-                    onClick={() => setShowUserMenu(false)}
-                    className="flex items-center w-full px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors font-semibold text-sm"
-                  >
-                    <User className="mr-2.5 h-4 w-4 text-slate-400" />
-                    <span>Profile</span>
-                  </Link>
-                  <Link
                     href="/vendor/dashboard/settings"
                     onClick={() => setShowUserMenu(false)}
                     className="flex items-center w-full px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors font-semibold text-sm"
@@ -241,7 +230,7 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
                     className="flex items-center w-full px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors font-semibold text-sm"
                   >
                     <HelpCircle className="mr-2.5 h-4 w-4 text-slate-400" />
-                    <span>Help & Support</span>
+                    <span>Support</span>
                   </Link>
                 </div>
                 <div className="p-1.5 bg-white border-t border-slate-100">

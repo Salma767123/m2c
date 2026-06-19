@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Eye, RefreshCw, ChevronLeft, ChevronRight, ShoppingBag, Clock, PackageCheck, Truck } from "lucide-react";
+import { Search, Eye, ChevronLeft, ChevronRight, ShoppingBag, Clock, PackageCheck, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/UI/Table";
 import Dropdown from "@/components/UI/Dropdown";
+import DateRangeCalendar from "@/components/Shared/DateRangeCalendar";
 import { orderService, VendorShipment } from "@/services/orderService";
 import { showErrorToast } from "@/lib/toast-utils";
 
@@ -37,8 +38,8 @@ export default function VendorOrderManagement() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [shipments, setShipments] = useState<VendorShipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const statusOptions = [
@@ -63,19 +64,16 @@ export default function VendorOrderManagement() {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
     try {
-      if (silent) setIsRefreshing(true);
-      else setIsLoading(true);
+      if (!silent) setIsLoading(true);
       const res = await orderService.getVendorOrders();
       if (res.success) {
         setShipments(res.data);
-        setLastUpdated(new Date());
       }
     } catch (error: any) {
       if (!silent) showErrorToast(error.message || "Failed to fetch orders");
       else console.warn("Silent order refresh failed:", error.message || error);
     } finally {
       isFetchingRef.current = false;
-      setIsRefreshing(false);
       setIsLoading(false);
     }
   }, []);
@@ -110,8 +108,6 @@ export default function VendorOrderManagement() {
     };
   }, [fetchOrders]);
 
-  const handleManualRefresh = () => fetchOrders(true);
-
   const filteredShipments = shipments.filter((s) => {
     const mainItem = s.items?.[0] || ({} as any);
     const productName = mainItem.productName || "Unknown";
@@ -123,7 +119,19 @@ export default function VendorOrderManagement() {
       productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sku.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "All" || s.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    // Date filter: a full range filters between both endpoints; a single
+    // selected date (only one endpoint) filters to that exact day.
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const start = dateFrom || dateTo;
+      const end = dateTo || dateFrom;
+      const orderDate = new Date(s.order?.createdAt || s.createdAt);
+      if (orderDate < new Date(`${start}T00:00:00`)) matchesDate = false;
+      if (orderDate > new Date(`${end}T23:59:59.999`)) matchesDate = false;
+    }
+
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   const totalPages = Math.ceil(filteredShipments.length / PAGE_SIZE);
@@ -275,7 +283,7 @@ export default function VendorOrderManagement() {
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
             />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Dropdown
               id="statusFilter"
               value={statusFilter}
@@ -283,23 +291,14 @@ export default function VendorOrderManagement() {
               onChange={(value) => { setStatusFilter(value as string); setCurrentPage(1); }}
               placeholder="Filter by Status"
             />
-            <button
-              type="button"
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className="flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shrink-0"
-              title={lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString("en-IN")}` : "Refresh"}
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              <span className="text-sm font-medium">Refresh</span>
-            </button>
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              placeholder="Order Date"
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t); setCurrentPage(1); }}
+            />
           </div>
         </div>
-        {lastUpdated && (
-          <p className="text-xs text-slate-500 mt-3">
-            Auto-updates every 30s &middot; Last updated {lastUpdated.toLocaleTimeString("en-IN")}
-          </p>
-        )}
       </div>
 
       {/* Results summary */}

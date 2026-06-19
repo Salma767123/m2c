@@ -52,6 +52,16 @@ const PRESETS: { value: ChartRange; label: string }[] = [
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
+// Compact INR for axis ticks. Scales to k / L (lakh) / Cr (crore) and keeps
+// small values readable (e.g. ₹250 instead of collapsing to ₹0k).
+const formatRevenueTick = (value: number) => {
+  const v = Number(value) || 0;
+  if (v >= 1_00_00_000) return `₹${(v / 1_00_00_000).toFixed(v % 1_00_00_000 === 0 ? 0 : 1)}Cr`;
+  if (v >= 1_00_000) return `₹${(v / 1_00_000).toFixed(v % 1_00_000 === 0 ? 0 : 1)}L`;
+  if (v >= 1_000) return `₹${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}k`;
+  return `₹${Math.round(v)}`;
+};
+
 const toISODate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -429,7 +439,8 @@ function TrendChart({
                 <YAxis
                   stroke="#6b7280"
                   style={{ fontSize: '12px' }}
-                  tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
+                  allowDecimals={false}
+                  tickFormatter={(value) => formatRevenueTick(value)}
                 />
                 <Tooltip
                   contentStyle={{

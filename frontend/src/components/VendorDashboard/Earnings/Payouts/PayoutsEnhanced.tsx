@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/UI/Card';
 import { Button } from '@/components/UI/Button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table';
 import Dropdown from '@/components/UI/Dropdown';
+import DateRangeCalendar from '@/components/Shared/DateRangeCalendar';
 import { settlementService, Settlement } from '@/services/settlementService';
 import VendorService, { VendorBankDetails } from '@/services/vendorService';
 import { showErrorToast } from '@/lib/toast-utils';
@@ -30,6 +31,8 @@ export default function PayoutsEnhanced() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('All Status');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [metricFilter, setMetricFilter] = useState<'all' | 'paid' | 'month' | 'pending' | 'failed'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
@@ -115,8 +118,8 @@ export default function PayoutsEnhanced() {
       return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     };
 
-    // ── Header bar ──
-    doc.setFillColor(31, 41, 55);
+    // ── Header bar ── (brand-500 #e01a1b)
+    doc.setFillColor(224, 26, 27);
     doc.rect(0, 0, pageW, 28, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
@@ -208,7 +211,8 @@ export default function PayoutsEnhanced() {
     if (metricFilter === 'paid') {
       matchesMetric = settlement.status === 'Paid';
     } else if (metricFilter === 'pending') {
-      matchesMetric = settlement.status === 'Pending' || settlement.status === 'Processing';
+      // A failed payout is still unpaid, so it counts as outstanding/pending.
+      matchesMetric = settlement.status === 'Pending' || settlement.status === 'Processing' || settlement.status === 'Failed';
     } else if (metricFilter === 'failed') {
       matchesMetric = settlement.status === 'Failed';
     } else if (metricFilter === 'month') {
@@ -221,7 +225,23 @@ export default function PayoutsEnhanced() {
       }
     }
 
-    return matchesSearch && matchesStatus && matchesMetric;
+    // Date filter: a full range filters between both endpoints; a single
+    // selected date (only one endpoint) filters to that exact day.
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      if (!settlement.createdAt) {
+        matchesDate = false;
+      } else {
+        const start = dateFrom || dateTo;
+        const end = dateTo || dateFrom;
+        const c = new Date(settlement.createdAt);
+        const day = new Date(c.getFullYear(), c.getMonth(), c.getDate());
+        if (day < new Date(start + 'T00:00:00')) matchesDate = false;
+        if (day > new Date(end + 'T23:59:59')) matchesDate = false;
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesMetric && matchesDate;
   });
 
   const totalPages = Math.ceil(filteredSettlements.length / PAGE_SIZE);
@@ -269,7 +289,7 @@ export default function PayoutsEnhanced() {
     .reduce((sum, s) => sum + s.amount, 0);
 
   const totalPending = settlements
-    .filter((s) => s.status === 'Pending' || s.status === 'Processing')
+    .filter((s) => s.status === 'Pending' || s.status === 'Processing' || s.status === 'Failed')
     .reduce((sum, s) => sum + s.amount, 0);
 
   const totalFailed = settlements
@@ -372,14 +392,14 @@ export default function PayoutsEnhanced() {
           className={`group text-left bg-white rounded-xl border shadow-xs p-3.5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-yellow-200 ${metricFilter === 'pending' ? 'border-yellow-300 ring-1 ring-yellow-200' : 'border-slate-200/80'}`}
         >
           <div className="flex items-start justify-between">
-            <span className="text-xs font-medium text-slate-600">Pending/Processing</span>
+            <span className="text-xs font-medium text-slate-600">Pending Payment</span>
             <div className="p-2 bg-yellow-50 rounded-xl transition-transform duration-200 group-hover:scale-110">
               <Clock className="h-4 w-4 text-yellow-600" />
             </div>
           </div>
           <p className="text-xl font-bold text-slate-900 mt-2">₹{totalPending.toLocaleString('en-IN')}</p>
           <p className="text-xs text-slate-500 mt-1">
-            {settlements.filter((p) => p.status === 'Pending' || p.status === 'Processing').length} payouts
+            {settlements.filter((p) => p.status === 'Pending' || p.status === 'Processing' || p.status === 'Failed').length} payouts · incl. failed
           </p>
         </button>
 
@@ -424,6 +444,13 @@ export default function PayoutsEnhanced() {
                 placeholder="Filter by status"
               />
             </div>
+
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              placeholder="Created Date"
+              onChange={(f, t) => { setDateFrom(f); setDateTo(t); setCurrentPage(1); }}
+            />
 
             <button
               onClick={fetchSettlements}

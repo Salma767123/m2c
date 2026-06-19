@@ -101,12 +101,16 @@ export default function Inventory() {
     if (stockFilter === 'out' && item.currentStock !== 0) return false
     if (stockFilter === 'low' && !(item.currentStock > 0 && item.currentStock <= item.lowStockAlert)) return false
 
+    // Date filter: a full range filters between both endpoints; a single
+    // selected date (only one endpoint) filters to that exact day.
     if (restockedFrom || restockedTo) {
       if (!item.lastRestocked) return false
+      const start = restockedFrom || restockedTo
+      const end = restockedTo || restockedFrom
       const restocked = new Date(item.lastRestocked)
       const day = new Date(restocked.getFullYear(), restocked.getMonth(), restocked.getDate())
-      if (restockedFrom && day < new Date(restockedFrom + 'T00:00:00')) return false
-      if (restockedTo && day > new Date(restockedTo + 'T00:00:00')) return false
+      if (day < new Date(start + 'T00:00:00')) return false
+      if (day > new Date(end + 'T23:59:59')) return false
     }
     return true
   })

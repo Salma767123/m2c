@@ -9,12 +9,17 @@ import supportService from '@/services/supportService'
 import { useRouter } from 'next/navigation'
 import ResultModal from '@/components/UI/ResultModal'
 
+const DESCRIPTION_MIN = 20
+const DESCRIPTION_MAX = 600
+const MAX_FILES = 2
+const MAX_FILE_SIZE_MB = 1
+
 export default function CreateSupport() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     subject: '',
     category: 'technical',
-    priority: 'medium',
+    otherCategory: '',
     description: '',
     attachments: [] as File[]
   })
@@ -35,8 +40,10 @@ export default function CreateSupport() {
   const validate = () => {
     const e: Record<string, string> = {}
     if (!formData.subject.trim()) e.subject = 'Subject is required'
+    if (formData.category === 'other' && !formData.otherCategory.trim()) e.otherCategory = 'Please specify the category'
     if (!formData.description.trim()) e.description = 'Description is required'
-    else if (formData.description.trim().length < 20) e.description = 'Description must be at least 20 characters'
+    else if (formData.description.trim().length < DESCRIPTION_MIN) e.description = `Description must be at least ${DESCRIPTION_MIN} characters`
+    else if (formData.description.trim().length > DESCRIPTION_MAX) e.description = `Description must be at most ${DESCRIPTION_MAX} characters`
     return e
   }
 
@@ -50,38 +57,34 @@ export default function CreateSupport() {
   }
 
   const handleCategoryChange = (value: string | string[]) => {
+    const next = value as string
     setFormData(prev => ({
       ...prev,
-      category: value as string
+      category: next,
+      otherCategory: next === 'other' ? prev.otherCategory : ''
     }))
-  }
-
-  const handlePriorityChange = (value: string | string[]) => {
-    setFormData(prev => ({
-      ...prev,
-      priority: value as string
-    }))
+    if (next !== 'other') clearError('otherCategory')
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
 
-    const oversized = files.filter(f => f.size > 10 * 1024 * 1024)
+    const oversized = files.filter(f => f.size > MAX_FILE_SIZE_MB * 1024 * 1024)
     if (oversized.length > 0) {
-      setUploadResult({ show: true, type: 'error', text: `The following file(s) exceed the 10MB limit: ${oversized.map(f => f.name).join(', ')}` })
+      setUploadResult({ show: true, type: 'error', text: `The following file(s) exceed the ${MAX_FILE_SIZE_MB}MB limit: ${oversized.map(f => f.name).join(', ')}` })
       e.target.value = ''
       return
     }
 
-    if (formData.attachments.length + files.length > 5) {
-      setUploadResult({ show: true, type: 'error', text: 'You can attach a maximum of 5 files.' })
+    if (formData.attachments.length + files.length > MAX_FILES) {
+      setUploadResult({ show: true, type: 'error', text: `You can attach a maximum of ${MAX_FILES} files.` })
       e.target.value = ''
       return
     }
 
     setFormData(prev => ({
       ...prev,
-      attachments: [...prev.attachments, ...files].slice(0, 5) // Max 5 files
+      attachments: [...prev.attachments, ...files].slice(0, MAX_FILES)
     }))
     setUploadResult({ show: true, type: 'success', text: `${files.length > 1 ? `${files.length} files` : 'File'} attached successfully.` })
     e.target.value = ''
@@ -109,8 +112,7 @@ export default function CreateSupport() {
     try {
       const payload = {
         subject: formData.subject,
-        category: formData.category,
-        priority: formData.priority,
+        category: formData.category === 'other' ? formData.otherCategory.trim() : formData.category,
         description: formData.description,
       }
 
@@ -135,35 +137,35 @@ export default function CreateSupport() {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Create Support Ticket</h1>
-          <p className="text-slate-600 mt-1">Report an issue and get help from our support team</p>
+          <h1 className="text-xl font-bold text-slate-900">Create Support Ticket</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Report an issue and get help from our support team</p>
         </div>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
-        {/* Subject */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Subject <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            name="subject"
-            value={formData.subject}
-            onChange={handleInputChange}
-            placeholder="Brief description of your issue"
-            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-              errors.subject
-                ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
-                : 'border-slate-300 focus:ring-blue-500'
-            }`}
-          />
-          {errors.subject && <p className="text-xs text-red-600 mt-1">{errors.subject}</p>}
-        </div>
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-6 space-y-4">
+        {/* Subject, Category & (optional) Specify Category */}
+        <div className={`grid grid-cols-1 gap-4 ${formData.category === 'other' ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          {/* Subject */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Subject <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="subject"
+              value={formData.subject}
+              onChange={handleInputChange}
+              placeholder="Brief summary of your issue"
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                errors.subject
+                  ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                  : 'border-slate-300 focus:ring-brand-500/40 focus:border-transparent'
+              }`}
+            />
+            {errors.subject && <p className="text-xs text-red-600 mt-1">{errors.subject}</p>}
+          </div>
 
-        {/* Category & Priority */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Category */}
           <div>
             <Dropdown
@@ -182,75 +184,85 @@ export default function CreateSupport() {
             />
           </div>
 
-          {/* Priority */}
-          <div>
-            <Dropdown
-              label="Priority"
-              value={formData.priority}
-              options={[
-                { value: 'low', label: 'Low' },
-                { value: 'medium', label: 'Medium' },
-                { value: 'high', label: 'High' },
-                { value: 'urgent', label: 'Urgent' }
-              ]}
-              onChange={handlePriorityChange}
-              placeholder="Select priority"
-            />
-          </div>
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Description <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleInputChange}
-            placeholder="Provide detailed information about your issue..."
-            rows={6}
-            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-              errors.description
-                ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
-                : 'border-slate-300 focus:ring-blue-500'
-            }`}
-          />
-          {errors.description ? (
-            <p className="text-xs text-red-600 mt-1">{errors.description}</p>
-          ) : (
-            <p className="text-xs text-slate-500 mt-1">Minimum 20 characters</p>
+          {/* Specify Other Category */}
+          {formData.category === 'other' && (
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Specify Category <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="otherCategory"
+                value={formData.otherCategory}
+                onChange={handleInputChange}
+                placeholder="Enter the category"
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  errors.otherCategory
+                    ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                    : 'border-slate-300 focus:ring-brand-500/40 focus:border-transparent'
+                }`}
+              />
+              {errors.otherCategory && <p className="text-xs text-red-600 mt-1">{errors.otherCategory}</p>}
+            </div>
           )}
         </div>
 
-        {/* Attachments */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Attachments (Optional)
-          </label>
-          <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
-            <Paperclip className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm text-slate-600 mb-2">Drag and drop files here, or</p>
-            <label className="text-blue-600 hover:text-blue-700 cursor-pointer">
-              click to browse
-              <input
-                type="file"
-                multiple
-                onChange={handleFileChange}
-                className="hidden"
-                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-              />
+        {/* Description & Attachments */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Description <span className="text-red-500">*</span>
             </label>
-            <p className="text-xs text-slate-500 mt-2">Max 5 files, 10MB each</p>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              placeholder="Provide detailed information about your issue..."
+              rows={5}
+              maxLength={DESCRIPTION_MAX}
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                errors.description
+                  ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                  : 'border-slate-300 focus:ring-brand-500/40 focus:border-transparent'
+              }`}
+            />
+            <div className="flex items-center justify-between mt-1">
+              {errors.description ? (
+                <p className="text-xs text-red-600">{errors.description}</p>
+              ) : (
+                <p className="text-xs text-slate-500">Min {DESCRIPTION_MIN}, max {DESCRIPTION_MAX} chars</p>
+              )}
+              <p className="text-xs text-slate-400 shrink-0 ml-2">{formData.description.length}/{DESCRIPTION_MAX}</p>
+            </div>
           </div>
 
-          {/* Attached Files */}
-          {formData.attachments.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <h4 className="text-sm font-medium text-slate-700">Attached Files:</h4>
-              <ul className="space-y-1">
+          {/* Attachments */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Attachments (Optional)
+            </label>
+            <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
+              <Paperclip className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
+              <p className="text-xs text-slate-600 mb-1">Drag and drop files here, or</p>
+              <label className="text-sm text-brand-500 hover:text-brand-600 cursor-pointer">
+                click to browse
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                />
+              </label>
+              <p className="text-xs text-slate-500 mt-1.5">Max {MAX_FILES} files, {MAX_FILE_SIZE_MB}MB each</p>
+            </div>
+
+            {/* Attached Files */}
+            {formData.attachments.length > 0 && (
+              <div className="mt-2 space-y-1">
                 {formData.attachments.map((file, index) => (
-                  <li key={index} className="flex items-center justify-between text-sm text-slate-600 bg-slate-50 p-2 rounded">
+                  <div key={index} className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 px-2 py-1.5 rounded">
                     <span className="truncate">{file.name}</span>
                     <button
                       type="button"
@@ -259,11 +271,11 @@ export default function CreateSupport() {
                     >
                       ✕
                     </button>
-                  </li>
+                  </div>
                 ))}
-              </ul>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Buttons */}
@@ -271,7 +283,7 @@ export default function CreateSupport() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex items-center justify-center gap-2 bg-brand-500 hover:bg-slate-700 disabled:bg-slate-400 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:bg-slate-400 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors"
           >
             <Send className="w-4 h-4" />
             {isSubmitting ? 'Submitting...' : 'Submit Ticket'}

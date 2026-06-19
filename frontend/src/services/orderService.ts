@@ -216,7 +216,7 @@ class OrderService {
         }
     }
 
-    async getVendorReviews(params?: { page?: number; limit?: number }): Promise<{
+    async getVendorReviews(params?: { page?: number; limit?: number; rating?: number }): Promise<{
         success: boolean;
         data: {
             overall: {
@@ -256,6 +256,7 @@ class OrderService {
             const query = new URLSearchParams();
             if (params?.page) query.set('page', String(params.page));
             if (params?.limit) query.set('limit', String(params.limit));
+            if (params?.rating) query.set('rating', String(params.rating));
             const qs = query.toString();
             const response = await axios.get(`/orders/vendor/reviews${qs ? `?${qs}` : ''}`);
             return response.data;

@@ -94,12 +94,16 @@ export default function Products() {
       const q = searchTerm.toLowerCase();
       if (!(p.name?.toLowerCase().includes(q) || p.baseSku?.toLowerCase().includes(q))) return false;
     }
+    // Date filter: a full range filters between both endpoints; a single
+    // selected date (only one endpoint) filters to that exact day.
     if (dateFrom || dateTo) {
       if (!p.createdAt) return false;
+      const start = dateFrom || dateTo;
+      const end = dateTo || dateFrom;
       const c = new Date(p.createdAt);
       const day = new Date(c.getFullYear(), c.getMonth(), c.getDate());
-      if (dateFrom && day < new Date(dateFrom + 'T00:00:00')) return false;
-      if (dateTo && day > new Date(dateTo + 'T00:00:00')) return false;
+      if (day < new Date(start + 'T00:00:00')) return false;
+      if (day > new Date(end + 'T23:59:59')) return false;
     }
     return true;
   });

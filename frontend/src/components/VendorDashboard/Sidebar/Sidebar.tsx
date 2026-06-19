@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useVendorAuth } from "@/hooks/useVendorAuth";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Package,
-  DollarSign,
+  IndianRupee,
   Warehouse,
   User,
   ChevronDown,
@@ -55,7 +56,7 @@ const navigation: NavigationItem[] = [
   },
   {
     title: "Earnings",
-    icon: DollarSign,
+    icon: IndianRupee,
     href: "/vendor/dashboard/earnings/payouts",
   },
   {
@@ -90,6 +91,7 @@ interface VendorSidebarProps {
 
 export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }: VendorSidebarProps) {
   const pathname = usePathname();
+  const { vendor } = useVendorAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   // Simple active check functions
@@ -291,8 +293,8 @@ export default function VendorSidebar({ isCollapsed = false, onToggleCollapse }:
             <User className="h-5 w-5 text-white" />
           </div>
           <div className="ml-3 flex-1">
-            <p className="text-sm font-semibold text-slate-900">Vendor Store</p>
-            <p className="text-xs text-slate-500">Premium Plan</p>
+            <p className="text-sm font-semibold text-slate-900 truncate">{vendor?.companyName || 'Vendor Store'}</p>
+            <p className="text-xs text-slate-500">Vendor Store</p>
           </div>
         </div>
       </div>
