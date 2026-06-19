@@ -8,6 +8,7 @@ import { ArrowLeft, Save, Package, AlertTriangle, Plus } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import inventoryService, { CreateInventoryData, VendorCategories } from '@/services/inventoryService'
+import { showErrorToast } from '@/lib/toast-utils'
 
 interface InventoryFormData {
   // Basic Product Info (Primary Data)
@@ -392,7 +393,13 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     const validationErrors = validate(formData)
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      const firstField = Object.keys(validationErrors)[0]
+      showErrorToast('Validation Error', validationErrors[firstField])
+      setTimeout(() => {
+        const el = document.getElementById(`vf-${firstField}`)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        else window.scrollTo({ top: 0, behavior: 'smooth' })
+      }, 60)
       return
     }
     setErrors({})
@@ -549,6 +556,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       Product Name *
                     </label>
                     <input
+                      id="vf-name"
                       type="text"
                       name="name"
                       value={formData.name}
@@ -567,6 +575,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                       SKU *
                     </label>
                     <input
+                      id="vf-sku"
                       type="text"
                       name="sku"
                       value={formData.sku}
@@ -584,7 +593,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <div className={errors.category ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
+                    <div id="vf-category" className={errors.category ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
                       <Dropdown
                         id="category"
                         label="Category *"
@@ -652,9 +661,11 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     Low Stock Alert *
                   </label>
                   <input
+                    id="vf-lowStockAlert"
                     type="number"
                     name="lowStockAlert"
                     value={formData.lowStockAlert}
+                    onFocus={(e) => e.currentTarget.select()}
                     onChange={handleInputChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                       errors.lowStockAlert
@@ -755,6 +766,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           Supplier Name *
                         </label>
                         <input
+                          id="vf-supplier"
                           type="text"
                           name="supplier"
                           value={formData.supplier}
@@ -809,6 +821,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           Manufacturing Date
                         </label>
                         <input
+                          id="vf-manufacturingDate"
                           type="date"
                           name="manufacturingDate"
                           value={formData.manufacturingDate}
@@ -828,6 +841,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           Last Restocked
                         </label>
                         <input
+                          id="vf-lastRestocked"
                           type="date"
                           name="lastRestocked"
                           value={formData.lastRestocked}

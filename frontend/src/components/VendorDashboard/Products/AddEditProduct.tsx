@@ -299,6 +299,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     fabricType: 'fabric',
     variants: 'variants',
     basePrice: 'pricing',
+    processingDays: 'shipping',
+    shippingDays: 'shipping',
   }
 
   const clearError = (name: string) => {
@@ -322,7 +324,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const goToPrevTab = () => {
     if (activeTabIndex > 0) setActiveTab(productTabs[activeTabIndex - 1].id)
   }
-  const goToNextTab = () => {
+  const goToNextTab = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    // Tab navigation only — never submit/save or run form validation. Neutralise
+    // the event so a click can't bubble into the form's submit handler.
+    e?.preventDefault()
+    e?.stopPropagation()
     if (activeTabIndex < productTabs.length - 1) setActiveTab(productTabs[activeTabIndex + 1].id)
   }
 
@@ -397,6 +403,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   })
 
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null)
+  // SKU duplicate highlighting: error on the "Add Variant" SKU box, and ids of
+  // already-added variants whose SKU clashes (highlighted red in the table).
+  const [newVariantSkuError, setNewVariantSkuError] = useState('')
+  const [skuConflictIds, setSkuConflictIds] = useState<string[]>([])
 
   const handleVariantImageUpdate = (variantId: string, newImages: string[]) => {
     // Custom logic to update variant images using the existing updateVariant helper if needed,
@@ -655,6 +665,15 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   }
   const addVariant = () => {
     if (newVariant.size && newVariant.color && newVariant.sku) {
+      const candidate = newVariant.sku!.trim().toLowerCase()
+      const clashes = formData.variants.some(v => (v.sku || '').trim().toLowerCase() === candidate)
+        || (formData.baseSku || '').trim().toLowerCase() === candidate
+      if (clashes) {
+        setNewVariantSkuError(`SKU "${newVariant.sku}" is already used. Each SKU must be unique.`)
+        showErrorToast('Duplicate SKU', `SKU "${newVariant.sku}" is already used. Each SKU must be unique.`)
+        return
+      }
+      setNewVariantSkuError('')
       const variant: ProductVariant = {
         id: Date.now().toString(),
         size: newVariant.size!,
@@ -922,6 +941,31 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (formData.hasVariants && formData.variants.length === 0) {
       newErrors.variants = 'Please add at least one variant or disable variants.'
     }
+    // Block duplicate SKUs before hitting the backend so the vendor gets immediate,
+    // field-level feedback instead of a server round-trip error.
+    if (formData.hasVariants && formData.variants.length > 0) {
+      const norm = (s: string) => (s || '').trim().toLowerCase()
+      const baseSkuNorm = norm(formData.baseSku)
+      const byNorm = new Map<string, string[]>()
+      formData.variants.forEach(v => {
+        const k = norm(v.sku)
+        if (!k) return
+        byNorm.set(k, [...(byNorm.get(k) || []), v.id || ''])
+      })
+      const dupEntry = [...byNorm.entries()].find(([, ids]) => ids.length > 1)
+      const baseClashIds = baseSkuNorm
+        ? formData.variants.filter(v => norm(v.sku) === baseSkuNorm).map(v => v.id || '')
+        : []
+      if (dupEntry) {
+        newErrors.variants = `Duplicate variant SKU "${dupEntry[0]}". Each variant must have a unique SKU.`
+        setSkuConflictIds(dupEntry[1])
+      } else if (baseClashIds.length) {
+        newErrors.variants = 'A variant SKU matches the base SKU. Each SKU must be unique.'
+        setSkuConflictIds(baseClashIds)
+      } else {
+        setSkuConflictIds([])
+      }
+    }
     if (formData.basePrice <= 0) {
       newErrors.basePrice = formData.hasVariants
         ? 'Add at least one variant with a price greater than 0.'
@@ -929,15 +973,23 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     }
     const hasCoverImage = formData.images?.some(img => img.imageType === 'cover')
     if (!hasCoverImage) newErrors.coverImage = 'Please upload a cover image for the product.'
+    if (formData.dispatchTimeline.processingDays <= 0) newErrors.processingDays = 'Enter the processing days (at least 1).'
+    if (formData.dispatchTimeline.shippingDays <= 0) newErrors.shippingDays = 'Enter the shipping days (at least 1).'
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
-      // Jump to the tab holding the first error so the highlight is visible
+      // Jump to the tab holding the first error, then scroll the offending field
+      // into view and surface its specific message in the toast. Cover image lives
+      // in the always-visible sidebar, so scrolling — not the tab switch — reveals it.
       const firstField = Object.keys(newErrors)[0]
       const targetTab = fieldTabMap[firstField]
       if (targetTab) setActiveTab(targetTab)
-      showErrorToast('Validation Error', 'Please correct the highlighted fields.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      showErrorToast('Validation Error', newErrors[firstField])
+      setTimeout(() => {
+        const el = document.getElementById(`vf-${firstField}`)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        else window.scrollTo({ top: 0, behavior: 'smooth' })
+      }, 60)
       return
     }
     setErrors({})
@@ -1079,7 +1131,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       </div>
 
       {/* Form */}
-      <form id="product-form" onSubmit={handleSubmit}>
+      <form
+        id="product-form"
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => {
+          // Prevent Enter inside a single-line input from submitting (creating) the
+          // product. Submission must be an explicit click on Create/Update.
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+            e.preventDefault()
+          }
+        }}
+      >
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-start">
           {/* Main Content — left/center stays in place; kept free of an overflow
               container so its dropdown menus (category, UOM, size, tags) can open
@@ -1095,7 +1157,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 <CardContent className="space-y-4">
 
                   {/* Inventory Selection */}
-                  <div className="border border-brand-200 rounded-xl p-4 bg-brand-50">
+                  <div id="vf-inventoryItemId" className="border border-brand-200 rounded-xl p-4 bg-brand-50">
                     <h4 className="font-semibold text-slate-900 mb-1.5">Select Inventory Item</h4>
                     <p className="text-sm text-slate-600 mb-4">
                       Choose an inventory item to create a detailed product with variants
@@ -1191,6 +1253,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       Product Name *
                     </label>
                     <input
+                      id="vf-name"
                       type="text"
                       name="name"
                       value={formData.name}
@@ -1218,6 +1281,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       Description *
                     </label>
                     <textarea
+                      id="vf-description"
                       name="description"
                       value={formData.description}
                       onChange={handleInputChange}
@@ -1237,7 +1301,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <div className={errors.category ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
+                      <div id="vf-category" className={errors.category ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
                         <Dropdown
                           label="Category *"
                           value={formData.category}
@@ -1257,7 +1321,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       )}
                     </div>
                     <div>
-                      <div className={errors.subCategory ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
+                      <div id="vf-subCategory" className={errors.subCategory ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
                         <Dropdown
                           label="Sub-Category *"
                           value={formData.subCategory}
@@ -1441,7 +1505,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <CardTitle>Fabric Type & Specifications</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
+                  <div id="vf-fabricType">
                     <div className={errors.fabricType ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
                       <Dropdown
                         label="Fabric Type *"
@@ -1574,7 +1638,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 <CardHeader>
                   <CardTitle>Size & Color Variants</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent id="vf-variants" className="space-y-6">
                   {errors.variants && (
                     <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
                       {errors.variants}
@@ -1658,10 +1722,15 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               <input
                                 type="text"
                                 value={newVariant.sku}
-                                onChange={(e) => setNewVariant(prev => ({ ...prev, sku: e.target.value }))}
+                                onChange={(e) => { setNewVariant(prev => ({ ...prev, sku: e.target.value })); if (newVariantSkuError) setNewVariantSkuError('') }}
                                 placeholder="e.g., CS-Q-BLK"
-                                className="w-full h-11 px-3.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
+                                className={`w-full h-11 px-3.5 border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-colors bg-white ${
+                                  newVariantSkuError
+                                    ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                                    : 'border-slate-300 focus:ring-brand-500/40 focus:border-brand-500'
+                                }`}
                               />
+                              {newVariantSkuError && <p className="text-xs text-red-600">{newVariantSkuError}</p>}
                             </div>
                           </div>
 
@@ -1674,6 +1743,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 <input
                                   type="number"
                                   value={newVariant.price}
+                                  onFocus={(e) => e.currentTarget.select()}
                                   onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                                   placeholder="0.00"
                                   step="0.01"
@@ -1687,6 +1757,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               <input
                                 type="number"
                                 value={newVariant.stock}
+                                onFocus={(e) => e.currentTarget.select()}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                                 placeholder="0"
                                 min="0"
@@ -1773,8 +1844,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                       <input
                                         type="text"
                                         value={variant.sku}
-                                        onChange={(e) => updateVariant(variant.id, 'sku', e.target.value)}
-                                        className="w-full min-w-[110px] px-2 py-1.5 border border-slate-300 rounded-md text-xs font-mono focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
+                                        onChange={(e) => { updateVariant(variant.id, 'sku', e.target.value); if (skuConflictIds.includes(variant.id || '')) setSkuConflictIds(prev => prev.filter(id => id !== variant.id)) }}
+                                        className={`w-full min-w-[110px] px-2 py-1.5 border rounded-md text-xs font-mono focus:outline-none focus:ring-1 bg-white ${
+                                          skuConflictIds.includes(variant.id || '')
+                                            ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40'
+                                            : 'border-slate-300 focus:ring-brand-500/40'
+                                        }`}
                                         placeholder="SKU"
                                       />
                                     </TableCell>
@@ -1784,6 +1859,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         <input
                                           type="number"
                                           value={variant.price}
+                                          onFocus={(e) => e.currentTarget.select()}
                                           onChange={(e) => updateVariant(variant.id, 'price', parseFloat(e.target.value) || 0)}
                                           className="w-full pl-5 pr-2 py-1.5 border border-slate-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
                                           step="0.01"
@@ -1795,6 +1871,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                       <input
                                         type="number"
                                         value={variant.stock}
+                                        onFocus={(e) => e.currentTarget.select()}
                                         onChange={(e) => updateVariant(variant.id, 'stock', parseInt(e.target.value) || 0)}
                                         className={`w-20 px-2 py-1.5 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white ${variant.stock > 20 ? 'border-green-300 text-green-800' :
                                           variant.stock > 5 ? 'border-yellow-300 text-yellow-800' :
@@ -1894,9 +1971,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         <div className="relative">
                           <span className="absolute left-3 top-2 text-slate-500">₹</span>
                           <input
+                            id="vf-basePrice"
                             type="number"
                             name="basePrice"
                             value={formData.basePrice}
+                            onFocus={(e) => e.currentTarget.select()}
                             onChange={handleInputChange}
                             required
                             className="w-full pl-7 pr-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
@@ -1915,6 +1994,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           type="number"
                           name="totalStock"
                           value={formData.totalStock}
+                          onFocus={(e) => e.currentTarget.select()}
                           onChange={handleInputChange}
                           required
                           readOnly={isEdit}
@@ -2011,9 +2091,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         <div className="relative">
                           <span className="absolute left-3 top-2 text-slate-500">₹</span>
                           <input
+                            id="vf-basePrice"
                             type="number"
                             name="basePrice"
                             value={formData.basePrice}
+                            onFocus={(e) => e.currentTarget.select()}
                             onChange={handleInputChange}
                             className={`w-full pl-7 pr-3.5 py-2.5 border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-colors ${
                               errors.basePrice
@@ -2069,6 +2151,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               ? formData.totalStock + formData.variants.reduce((sum, v) => sum + v.stock, 0)
                               : formData.totalStock
                             }
+                            onFocus={(e) => e.currentTarget.select()}
                             onChange={handleInputChange}
                             required={!isEdit}
                             readOnly={isEdit || formData.hasVariants}
@@ -2099,6 +2182,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             type="number"
                             name="lowStockThreshold"
                             value={formData.lowStockThreshold}
+                            onFocus={(e) => e.currentTarget.select()}
                             onChange={handleInputChange}
                             className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
                           />
@@ -2125,8 +2209,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       </label>
                       <input
                         type="number"
+                        id="vf-processingDays"
                         name="dispatchTimeline.processingDays"
                         value={formData.dispatchTimeline.processingDays}
+                        onFocus={(e) => e.currentTarget.select()}
                         onChange={handleInputChange}
                         required
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
@@ -2139,8 +2225,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       </label>
                       <input
                         type="number"
+                        id="vf-shippingDays"
                         name="dispatchTimeline.shippingDays"
                         value={formData.dispatchTimeline.shippingDays}
+                        onFocus={(e) => e.currentTarget.select()}
                         onChange={handleInputChange}
                         required
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
@@ -2322,7 +2410,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               </CardContent>
             </Card>
 
-            <Card>
+            <Card id="vf-coverImage" className={errors.coverImage ? 'ring-2 ring-red-500/50 border-red-300' : ''}>
               <CardHeader>
                 <CardTitle>Product Images</CardTitle>
                 <p className="text-sm text-slate-600">Upload cover image and gallery images for your product</p>

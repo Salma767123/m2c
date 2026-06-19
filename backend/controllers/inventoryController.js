@@ -686,7 +686,9 @@ const getInventoryStats = async (req, res) => {
       }
     });
 
-    const lowStockCount = lowStockItems.filter(item => item.currentStock <= item.lowStockAlert).length;
+    // Low stock excludes out-of-stock (currentStock === 0) so it stays mutually
+    // exclusive from the Out of Stock metric — matching the UI badges/filter.
+    const lowStockCount = lowStockItems.filter(item => item.currentStock > 0 && item.currentStock <= item.lowStockAlert).length;
 
     // Get out of stock items
     const outOfStockItems = await prisma.inventory.count({
@@ -989,7 +991,9 @@ const getAllInventoryStats = async (req, res) => {
       }
     });
 
-    const lowStockCount = lowStockItems.filter(item => item.currentStock <= item.lowStockAlert).length;
+    // Low stock excludes out-of-stock (currentStock === 0) so it stays mutually
+    // exclusive from the Out of Stock metric — matching the UI badges/filter.
+    const lowStockCount = lowStockItems.filter(item => item.currentStock > 0 && item.currentStock <= item.lowStockAlert).length;
 
     // Get out of stock items
     const outOfStockItems = await prisma.inventory.count({

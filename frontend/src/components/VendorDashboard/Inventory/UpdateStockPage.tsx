@@ -445,6 +445,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                           <input
                             type="number"
                             value={variantStocks[variant.id] || 0}
+                            onFocus={(e) => e.currentTarget.select()}
                             onChange={(e) => handleVariantStockChange(variant.id, e.target.value)}
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"
                             min="0"
@@ -500,6 +501,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                 <input
                   type="number"
                   value={newStock}
+                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => {
                     setNewStock(e.target.value)
                     setErrors({ ...errors, newStock: undefined })
