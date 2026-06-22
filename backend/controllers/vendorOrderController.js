@@ -1,6 +1,7 @@
 const { prisma } = require('../config/database');
 const { recomputeAndPersistOrderStatus } = require('../utils/computeOrderStatus');
 const { notifications } = require('../utils/notificationService');
+const { attachVendorPrices } = require('../utils/vendorPricing');
 
 // Maps vendor status → customer notification
 const VENDOR_STATUS_NOTIFY = {
@@ -72,6 +73,10 @@ const getVendorOrders = async (req, res) => {
             orderBy: { createdAt: 'desc' },
         });
 
+        // Attach the vendor's own price to every line item; the stored unitPrice/
+        // totalPrice are the admin/customer price and must not surface to the vendor.
+        await attachVendorPrices(shipments.flatMap(s => s.items || []));
+
         res.json({
             success: true,
             data: shipments.map(normalizeShipment),
@@ -132,6 +137,8 @@ const getVendorOrderById = async (req, res) => {
                 error: 'Order not found or unauthorized',
             });
         }
+
+        await attachVendorPrices(shipment.items || []);
 
         res.json({
             success: true,

@@ -8,6 +8,10 @@ export interface OrderItem {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    // Vendor-derived price (what the vendor is actually paid). Backend attaches
+    // these for all vendor-panel responses; admin/customer price is never shown.
+    vendorUnitPrice?: number;
+    vendorTotalPrice?: number;
     vendorId: string;
     vendorName: string;
     sku: string;

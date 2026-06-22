@@ -1,4 +1,8 @@
 const { prisma } = require('../config/database');
+const { attachVendorPrices } = require('../utils/vendorPricing');
+
+// Fields needed to derive the vendor price for a line item.
+const VENDOR_PRICE_SELECT = { productId: true, variantId: true, quantity: true, unitPrice: true };
 
 // Helper: get date range based on period string
 const getDateRange = (period) => {
@@ -75,19 +79,19 @@ const getVendorOverviewReport = async (req, res) => {
             prevOrders,
             currentProducts,
             stockAggregate,
-            topSellingProducts,
+            topItems,
             statusDistribution,
             revenueOverTime
         ] = await Promise.all([
             // current revenue items
             prisma.orderItem.findMany({
                 where: { vendorId, order: { createdAt: dateFilter, paymentStatus: 'PAID' } },
-                select: { totalPrice: true }
+                select: VENDOR_PRICE_SELECT
             }),
             // prev revenue items
             prisma.orderItem.findMany({
                 where: { vendorId, order: { createdAt: prevDateFilter, paymentStatus: 'PAID' } },
-                select: { totalPrice: true }
+                select: VENDOR_PRICE_SELECT
             }),
             // current orders
             prisma.order.count({ where: { items: { some: { vendorId } }, createdAt: dateFilter } }),
@@ -97,14 +101,10 @@ const getVendorOverviewReport = async (req, res) => {
             prisma.product.count({ where: { vendorId } }),
             // Total stock on hand across all vendor products
             prisma.product.aggregate({ where: { vendorId }, _sum: { totalStock: true } }),
-            // Top selling products
-            prisma.orderItem.groupBy({
-                by: ['productId', 'productName'],
+            // Top selling products — aggregated in JS on the vendor price below
+            prisma.orderItem.findMany({
                 where: { vendorId, order: { createdAt: dateFilter } },
-                _sum: { totalPrice: true, quantity: true },
-                _count: { id: true },
-                orderBy: { _sum: { totalPrice: 'desc' } },
-                take: 5,
+                select: { ...VENDOR_PRICE_SELECT, productName: true }
             }),
             // order status distribution
             prisma.order.groupBy({
@@ -115,14 +115,34 @@ const getVendorOverviewReport = async (req, res) => {
             // Revenue over time (monthly for last 6 months)
             prisma.orderItem.findMany({
                 where: { vendorId, order: { createdAt: { gte: new Date(new Date().setMonth(new Date().getMonth() - 6)) }, paymentStatus: 'PAID' } },
-                select: { totalPrice: true, order: { select: { createdAt: true } } }
+                select: { ...VENDOR_PRICE_SELECT, order: { select: { createdAt: true } } }
             })
         ]);
 
-        const currentRevenue = currentItems.reduce((sum, item) => sum + item.totalPrice, 0);
-        const prevRevenue = prevItems.reduce((sum, item) => sum + item.totalPrice, 0);
+        // Derive vendor price on every item set before any revenue math.
+        await Promise.all([
+            attachVendorPrices(currentItems),
+            attachVendorPrices(prevItems),
+            attachVendorPrices(topItems),
+            attachVendorPrices(revenueOverTime),
+        ]);
+
+        const currentRevenue = currentItems.reduce((sum, item) => sum + (item.vendorTotalPrice || 0), 0);
+        const prevRevenue = prevItems.reduce((sum, item) => sum + (item.vendorTotalPrice || 0), 0);
 
         const totalStock = stockAggregate?._sum?.totalStock || 0;
+
+        // Top selling products by vendor revenue
+        const topMap = new Map();
+        topItems.forEach(item => {
+            const cur = topMap.get(item.productId) || { productId: item.productId, productName: item.productName, quantity: 0, revenue: 0 };
+            cur.quantity += item.quantity || 0;
+            cur.revenue += item.vendorTotalPrice || 0;
+            topMap.set(item.productId, cur);
+        });
+        const topSellingProducts = Array.from(topMap.values())
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
 
         // Build monthly revenue chart data
         const monthMap = {};
@@ -131,7 +151,7 @@ const getVendorOverviewReport = async (req, res) => {
             const d = new Date(item.order.createdAt);
             const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
             if (!monthMap[key]) monthMap[key] = { period: key, revenue: 0 };
-            monthMap[key].revenue += item.totalPrice;
+            monthMap[key].revenue += item.vendorTotalPrice || 0;
         });
         const revenueChartData = Object.values(monthMap).slice(-12);
 
@@ -162,8 +182,8 @@ const getVendorOverviewReport = async (req, res) => {
             });
             return {
                 name: p.productName,
-                sales: p._sum.quantity || 0,
-                revenue: p._sum.totalPrice || 0,
+                sales: p.quantity || 0,
+                revenue: p.revenue || 0,
                 stock: product?.totalStock ?? 0,
                 trend: 0, // Mock trend for now
                 rating: product?.rating || 0
@@ -181,7 +201,7 @@ const getVendorOverviewReport = async (req, res) => {
             }),
             prisma.order.findMany({
                 where: { items: { some: { vendorId } }, createdAt: dateFilter },
-                select: { orderId: true, status: true, createdAt: true, items: { where: { vendorId }, select: { totalPrice: true } } },
+                select: { orderId: true, status: true, createdAt: true, items: { where: { vendorId }, select: VENDOR_PRICE_SELECT } },
                 orderBy: { createdAt: 'desc' },
                 take: 200,
             }),
@@ -194,18 +214,22 @@ const getVendorOverviewReport = async (req, res) => {
 
         const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN');
 
+        // Derive vendor price for the drill-down rows too.
+        await attachVendorPrices(revenueItemRows);
+        await Promise.all(orderRows.map(o => attachVendorPrices(o.items)));
+
         const revenueTable = revenueItemRows.map(item => ({
             'Order ID': item.order?.orderId || '—',
             Product: item.productName,
             Quantity: item.quantity,
-            Amount: item.totalPrice,
+            Amount: item.vendorTotalPrice || 0,
             Date: fmtDate(item.order?.createdAt),
         }));
 
         const ordersTable = orderRows.map(o => ({
             'Order ID': o.orderId,
             Status: o.status.replace(/_/g, ' '),
-            Amount: o.items.reduce((s, i) => s + i.totalPrice, 0),
+            Amount: o.items.reduce((s, i) => s + (i.vendorTotalPrice || 0), 0),
             Date: fmtDate(o.createdAt),
         }));
 
@@ -275,14 +299,16 @@ const getVendorOrdersReport = async (req, res) => {
             })
         ]);
 
+        await attachVendorPrices(orders);
+
         const totalItems = orders.length;
-        const totalRevenue = orders.reduce((sum, item) => sum + item.totalPrice, 0);
+        const totalRevenue = orders.reduce((sum, item) => sum + (item.vendorTotalPrice || 0), 0);
 
         const mappedOrders = orders.map(item => ({
             orderId: item.order.orderId,
             product: item.productName,
             quantity: item.quantity,
-            amount: item.totalPrice,
+            amount: item.vendorTotalPrice || 0,
             date: item.order.createdAt,
             status: item.order.status.replace(/_/g, ' ')
         }));

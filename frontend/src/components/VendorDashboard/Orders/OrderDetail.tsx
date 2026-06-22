@@ -240,7 +240,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           <div>
             <p className="text-sm text-slate-600">Total Amount</p>
             <p className="text-base font-medium text-slate-900 mt-1">
-              ₹{shipment.items.reduce((acc: number, item: any) => acc + item.totalPrice, 0).toLocaleString("en-IN")}
+              ₹{shipment.items.reduce((acc: number, item: any) => acc + (item.vendorTotalPrice ?? item.totalPrice), 0).toLocaleString("en-IN")}
             </p>
           </div>
         </div>
@@ -271,7 +271,7 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
                   <div>
                     <p className="text-sm text-slate-600">Price per Unit</p>
                     <p className="text-base font-medium text-slate-900">
-                      ₹{item.unitPrice.toLocaleString("en-IN")}
+                      ₹{(item.vendorUnitPrice ?? item.unitPrice).toLocaleString("en-IN")}
                     </p>
                   </div>
                 </div>
