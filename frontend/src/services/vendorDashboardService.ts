@@ -18,6 +18,7 @@ export interface VendorDashboardStats {
         id: string;
         name: string;
         category: string;
+        sku: string;
         price: number;
         stock: number;
         status: string;
@@ -26,6 +27,7 @@ export interface VendorDashboardStats {
     }[];
     recentOrders: {
         id: string;
+        shipmentId: string | null;
         orderId: string;
         customerName: string;
         amount: number;

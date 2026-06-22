@@ -1,20 +1,13 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
-import { Package, Clock, Eye } from 'lucide-react';
+import { Package, Eye } from 'lucide-react';
 import Link from 'next/link';
 
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  price: number;
-  stock: number;
-  addedDate: string;
-  status: 'pending' | 'approved' | 'rejected';
-}
-// mock removed
+// Dashboard is a quick overview only — show a few latest items, never the
+// full dataset. The rest live in the Products module / View All page.
+const MAX_PREVIEW = 4;
+
 const getStatusBadge = (status: string) => {
   switch (status?.toLowerCase()) {
     case 'approved':
@@ -31,8 +24,10 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function RecentProducts({ products }: { products: any[] }) {
+  const items = (products || []).slice(0, MAX_PREVIEW);
+
   return (
-    <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
+    <Card className="border border-slate-200/80 rounded-2xl shadow-xs flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-lg text-slate-900">
           <span className="p-2 bg-brand-50 rounded-lg">
@@ -47,43 +42,62 @@ export default function RecentProducts({ products }: { products: any[] }) {
           View All
         </Link>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {products && products.map((product) => (
-            <div
-              key={product.id}
-              className="flex items-start justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"
-            >
-              <div className="flex-1">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h4 className="font-semibold text-slate-900 mb-1">{product.name}</h4>
-                    <p className="text-sm text-slate-600">{product.category}</p>
-                  </div>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(product.status)}`}
-                  >
-                    {product.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-slate-600">
-                  <span className="font-semibold text-slate-900">₹{product.price.toLocaleString()}</span>
-                  <span>Stock: {product.stock}</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {new Date(product.createdAt).toLocaleDateString('en-IN')}
-                  </span>
-                </div>
-              </div>
+      <CardContent className="flex-1">
+        {items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-44 text-slate-400">
+            <Package className="w-8 h-8 mb-2 opacity-50" />
+            <p className="text-sm">No products added yet</p>
+          </div>
+        ) : (
+          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 pr-1">
+            {items.map((product) => (
               <Link
+                key={product.id}
                 href={`/vendor/dashboard/products/${product.id}`}
-                className="ml-4 p-2 hover:bg-slate-200 rounded-lg transition-colors"
+                className="group flex items-center gap-3 py-3 px-2 -mx-2 rounded-xl hover:bg-slate-50 transition-colors"
               >
-                <Eye className="w-4 h-4 text-slate-600" />
+                {/* Thumbnail */}
+                {product.image ? (
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-11 h-11 rounded-lg object-cover border border-slate-200 shrink-0"
+                  />
+                ) : (
+                  <div className="w-11 h-11 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                    <Package className="w-5 h-5 text-slate-400" />
+                  </div>
+                )}
+
+                {/* Name + meta */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-slate-900 text-sm truncate">{product.name}</h4>
+                    <span
+                      className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${getStatusBadge(product.status)}`}
+                    >
+                      {product.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 truncate">
+                    {product.category}
+                    {product.sku ? <span className="text-slate-400"> · {product.sku}</span> : null}
+                  </p>
+                </div>
+
+                {/* Price + stock */}
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-slate-900">₹{Number(product.price || 0).toLocaleString('en-IN')}</p>
+                  <p className="text-[11px] text-slate-500">
+                    Stock: <span className="font-semibold text-slate-700">{product.stock}</span>
+                  </p>
+                </div>
+
+                <Eye className="w-4 h-4 text-slate-300 group-hover:text-brand-500 transition-colors shrink-0" />
               </Link>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

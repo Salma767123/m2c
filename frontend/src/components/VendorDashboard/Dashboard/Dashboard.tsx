@@ -1,6 +1,6 @@
 'use client';
 
-import { Package, DollarSign, Star, ShoppingCart } from 'lucide-react';
+import { Package, IndianRupee, Star, ShoppingCart } from 'lucide-react';
 import StatsGrid from './components/StatsGrid';
 import AnalyticsOverview from './components/AnalyticsOverview';
 import RecentProducts from './components/RecentProducts';
@@ -65,7 +65,7 @@ export default function Dashboard() {
       title: 'Revenue',
       value: `₹${data.stats.totalRevenue.toLocaleString()}`,
       change: '0%',
-      icon: DollarSign,
+      icon: IndianRupee,
       color: 'text-emerald-600',
       bgColor: 'bg-white border-slate-200/80',
       iconBg: 'bg-emerald-50',

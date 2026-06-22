@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const { attachVendorPrices } = require('../utils/vendorPricing');
 
 const getVendorDashboardStats = async (req, res) => {
     try {
@@ -19,11 +20,18 @@ const getVendorDashboardStats = async (req, res) => {
                     }
                 }
             }),
-            // 3. Recent products
+            // 3. Recent products (with primary thumbnail for the dashboard preview)
             prisma.product.findMany({
                 where: { vendorId },
                 take: 5,
-                orderBy: { createdAt: 'desc' }
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    images: {
+                        take: 1,
+                        orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+                        select: { url: true }
+                    }
+                }
             }),
             // 4. Recent orders
             prisma.orderItem.findMany({
@@ -45,10 +53,15 @@ const getVendorDashboardStats = async (req, res) => {
             })
         ]);
 
+        // Revenue/earnings shown to the vendor must use the VENDOR price (what they
+        // get paid), not the admin/customer selling price stored on the order item.
+        await attachVendorPrices(orderItems);
+        await attachVendorPrices(recentOrdersGrouped);
+
         const orderIds = new Set(orderItems.map(item => item.orderId));
         const totalOrdersCount = orderIds.size;
 
-        const totalRevenue = orderItems.reduce((sum, item) => sum + (item.totalPrice ? Number(item.totalPrice) : 0), 0);
+        const totalRevenue = orderItems.reduce((sum, item) => sum + (item.vendorTotalPrice || 0), 0);
 
         // Earnings chart (monthly data for the current year)
         const currentYear = new Date().getFullYear();
@@ -56,7 +69,7 @@ const getVendorDashboardStats = async (req, res) => {
         orderItems.forEach(item => {
             const date = item.order && item.order.createdAt ? new Date(item.order.createdAt) : new Date(item.createdAt);
             if (date.getFullYear() === currentYear) {
-                monthlyEarnings[date.getMonth()] += (item.totalPrice ? Number(item.totalPrice) : 0);
+                monthlyEarnings[date.getMonth()] += (item.vendorTotalPrice || 0);
             }
         });
 
@@ -77,9 +90,12 @@ const getVendorDashboardStats = async (req, res) => {
             if (item.order && !recentOrderMap.has(item.orderId)) {
                 recentOrderMap.set(item.orderId, {
                     id: item.order.id, // we might need the internal id vs public orderId
+                    // The vendor order detail page is keyed by VendorShipment id
+                    // (not Order id) — link the dashboard preview to that.
+                    shipmentId: item.shipmentId || null,
                     orderId: item.order.orderId,
                     customerName: item.order.customerName,
-                    amount: item.totalPrice, // Note: For a vendor view, the "amount" might be only their part, so item.totalPrice instead of order.totalAmount
+                    amount: item.vendorTotalPrice || 0, // vendor's own price, not the customer/admin price
                     status: item.order.status,
                     date: item.order.createdAt,
                     items: 1
@@ -87,7 +103,7 @@ const getVendorDashboardStats = async (req, res) => {
             } else if (item.order) {
                 const existing = recentOrderMap.get(item.orderId);
                 existing.items += 1;
-                existing.amount += item.totalPrice;
+                existing.amount += item.vendorTotalPrice || 0;
                 recentOrderMap.set(item.orderId, existing);
             }
         });
@@ -105,14 +121,16 @@ const getVendorDashboardStats = async (req, res) => {
                 id: p.id,
                 name: p.name,
                 category: p.category,
+                sku: p.baseSku || '',
                 price: p.basePrice || 0,
                 stock: p.totalStock || 0,
                 status: p.status,
                 createdAt: p.createdAt,
-                image: '' // Add image fetch if necessary
+                image: p.images?.[0]?.url || ''
             })),
             recentOrders: recentOrdersList.map(o => ({
                 id: o.id,
+                shipmentId: o.shipmentId,
                 orderId: o.orderId,
                 customerName: o.customerName,
                 amount: o.amount,

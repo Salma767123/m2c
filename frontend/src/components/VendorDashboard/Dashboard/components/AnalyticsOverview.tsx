@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import {
-  DollarSign,
+  IndianRupee,
   ShoppingCart,
   Calendar,
   ChevronDown,
@@ -380,7 +380,7 @@ function TrendChart({
         <CardTitle className="flex items-center gap-2 text-lg text-slate-900">
           <span className={`p-2 rounded-lg ${isRevenue ? 'bg-emerald-50' : 'bg-blue-50'}`}>
             {isRevenue ? (
-              <DollarSign className="w-5 h-5 text-emerald-600" />
+              <IndianRupee className="w-5 h-5 text-emerald-600" />
             ) : (
               <ShoppingCart className="w-5 h-5 text-blue-500" />
             )}

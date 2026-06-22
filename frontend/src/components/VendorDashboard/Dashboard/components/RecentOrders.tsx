@@ -4,17 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import { ShoppingCart, Clock, CheckCircle, Package as PackageIcon, Truck } from 'lucide-react';
 import Link from 'next/link';
 
-interface Order {
-  id: string;
-  orderNumber: string;
-  product: string;
-  quantity: number;
-  amount: number;
-  hub: string;
-  status: 'pending' | 'packed' | 'shipped' | 'delivered';
-  orderDate: string;
-}
-// mock data removed
+// Quick overview only — a few latest orders; the rest live in the Orders module.
+const MAX_PREVIEW = 4;
 
 const getStatusIcon = (status: string) => {
   switch (status) {
@@ -27,7 +18,7 @@ const getStatusIcon = (status: string) => {
     case 'pending':
       return <Clock className="w-4 h-4 text-amber-500" />;
     default:
-      return null;
+      return <ShoppingCart className="w-4 h-4 text-slate-400" />;
   }
 };
 
@@ -47,8 +38,10 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function RecentOrders({ orders }: { orders: any[] }) {
+  const items = (orders || []).slice(0, MAX_PREVIEW);
+
   return (
-    <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
+    <Card className="border border-slate-200/80 rounded-2xl shadow-xs flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-lg text-slate-900">
           <span className="p-2 bg-brand-50 rounded-lg">
@@ -63,38 +56,60 @@ export default function RecentOrders({ orders }: { orders: any[] }) {
           View All
         </Link>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {orders && orders.map((order) => (
-            <div
-              key={order.id}
-              className="flex items-start justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"
-            >
-              <div className="flex-1">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h4 className="font-semibold text-slate-900 mb-1">{order.orderId}</h4>
-                    <p className="text-sm text-slate-600">{order.customerName}</p>
+      <CardContent className="flex-1">
+        {items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-44 text-slate-400">
+            <ShoppingCart className="w-8 h-8 mb-2 opacity-50" />
+            <p className="text-sm">No orders yet</p>
+          </div>
+        ) : (
+          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 pr-1">
+            {items.map((order) => {
+              const status = (order.status || '').toLowerCase();
+              // Vendor order detail is keyed by VendorShipment id, not Order id.
+              // Fall back to the orders list if a shipment id isn't available.
+              const href = order.shipmentId
+                ? `/vendor/dashboard/orders/view/${order.shipmentId}`
+                : '/vendor/dashboard/orders';
+              return (
+                <Link
+                  key={order.id}
+                  href={href}
+                  className="group flex items-center gap-3 py-3 px-2 -mx-2 rounded-xl hover:bg-slate-50 transition-colors"
+                >
+                  {/* Status avatar */}
+                  <div className="w-11 h-11 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                    {getStatusIcon(status)}
                   </div>
-                  <span
-                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(order.status?.toLowerCase())}`}
-                  >
-                    {getStatusIcon(order.status?.toLowerCase())}
-                    {order.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-slate-600">
-                  <span className="font-semibold text-slate-900">₹{order.amount.toLocaleString()}</span>
-                  <span>Items: {order.items}</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {new Date(order.date).toLocaleDateString('en-IN')}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+
+                  {/* Order id + customer */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-slate-900 text-sm truncate">{order.orderId}</h4>
+                      <span
+                        className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${getStatusBadge(status)}`}
+                      >
+                        {order.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 truncate">
+                      {order.customerName}
+                      <span className="text-slate-400"> · {new Date(order.date).toLocaleDateString('en-IN')}</span>
+                    </p>
+                  </div>
+
+                  {/* Amount + items */}
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-bold text-slate-900">₹{Number(order.amount || 0).toLocaleString('en-IN')}</p>
+                    <p className="text-[11px] text-slate-500">
+                      Items: <span className="font-semibold text-slate-700">{order.items}</span>
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
