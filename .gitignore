@@ -5,3 +5,7 @@
 serviceAccountKey.json
 
 mobile/.env
+
+# Claude Code local config
+.claude/
+**/.claude/

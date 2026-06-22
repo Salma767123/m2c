@@ -3,6 +3,22 @@ const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudina
 const { prisma } = require('../config/database');
 const { normalizeCategoryValues } = require('../utils/categoryResolver');
 
+// A certificate may only be edited/replaced by the vendor when it is expired
+// or within this many days of expiring. Valid certificates (and certs with no
+// expiry date) are locked. Adjust this single value to change the threshold.
+const CERT_EXPIRY_THRESHOLD_DAYS = 30;
+
+// Returns true when an existing certificate is still valid and therefore must
+// not be modified — i.e. it has an expiry date that is more than the threshold
+// number of days in the future, or it has no expiry date at all.
+const isCertificateLocked = (expiryDate) => {
+  if (!expiryDate) return true;
+  const expiry = new Date(expiryDate);
+  if (isNaN(expiry.getTime())) return true;
+  const daysUntilExpiry = Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  return daysUntilExpiry > CERT_EXPIRY_THRESHOLD_DAYS;
+};
+
 // ============================================
 // VENDOR PROFILE SETTINGS
 // ============================================
@@ -640,6 +656,14 @@ const updateVendorCertification = async (req, res) => {
 
     if (!existingCertification) {
       return res.status(404).json({ error: 'Certification not found' });
+    }
+
+    // Valid certificates cannot be modified. Editing/replacement is only
+    // permitted once a certificate is expired or nearing its expiry date.
+    if (isCertificateLocked(existingCertification.expiryDate)) {
+      return res.status(403).json({
+        error: 'This certificate is still valid and cannot be edited. Editing is only allowed when a certificate is expired or nearing expiry.'
+      });
     }
 
     let documentUrl = existingCertification.documentUrl;
