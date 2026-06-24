@@ -341,6 +341,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function OverviewTab({ product, primaryImage }: { product: ProductDetailData; primaryImage: string | null }) {
     const v = product.vendor || {}
+    const lc = product.logisticsConfig
+    const dt = product.dispatchTimeline
+    const fs = product.fabricSpecifications as Record<string, unknown> | null | undefined
+
+    const careInstructions: string[] = Array.isArray(fs?.careInstructions)
+        ? (fs.careInstructions as string[])
+        : []
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-1">
@@ -358,6 +366,22 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                     <Row icon={<Layers className="w-4 h-4" />} label="Sub-category" value={product.subCategory} />
                     <Row icon={<IndianRupee className="w-4 h-4" />} label="Base Price" value={formatCurrency(product.basePrice)} />
                     <Row icon={<Package className="w-4 h-4" />} label="Total Stock" value={String(product.totalStock ?? 0)} />
+                    {product.uom && <Row icon={<Package className="w-4 h-4" />} label="Selling Unit (UOM)" value={product.uom} />}
+                    {product.dimensions && <Row icon={<Layers className="w-4 h-4" />} label="Display Dimensions" value={product.dimensionUnit ? `${product.dimensions} ${product.dimensionUnit}` : product.dimensions} />}
+                    {product.weight && <Row icon={<Package className="w-4 h-4" />} label="Display Weight" value={product.weight} />}
+                    {product.tags && product.tags.length > 0 && (
+                        <Row
+                            icon={<FileText className="w-4 h-4" />}
+                            label="Tags"
+                            value={
+                                <span className="flex flex-wrap gap-1 mt-0.5">
+                                    {product.tags.map((tag) => (
+                                        <span key={tag} className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full">{tag}</span>
+                                    ))}
+                                </span>
+                            }
+                        />
+                    )}
                 </Section>
                 <Section title="Vendor">
                     <Row icon={<Factory className="w-4 h-4" />} label="Company" value={v.companyName} />
@@ -370,6 +394,70 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                         value={[v.factoryCity, v.factoryState].filter(Boolean).join(", ")}
                     />
                 </Section>
+
+                {/* Fabric & Specifications */}
+                {(product.fabricType || product.material || fs) && (
+                    <div className="sm:col-span-2">
+                        <Section title="Fabric & Specifications">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                                {product.fabricType && <Row icon={<Layers className="w-4 h-4" />} label="Fabric Type" value={product.fabricType} />}
+                                {product.material && <Row icon={<Layers className="w-4 h-4" />} label="Material Description" value={product.material} />}
+                                {fs?.composition != null && <Row icon={<Layers className="w-4 h-4" />} label="Composition" value={String(fs.composition)} />}
+                                {fs?.weight != null && <Row icon={<Layers className="w-4 h-4" />} label="Weight (GSM)" value={String(fs.weight)} />}
+                                {fs?.weave != null && <Row icon={<Layers className="w-4 h-4" />} label="Weave" value={String(fs.weave)} />}
+                                {fs?.finish != null && <Row icon={<Layers className="w-4 h-4" />} label="Finish" value={String(fs.finish)} />}
+                                {careInstructions.length > 0 && (
+                                    <Row
+                                        icon={<FileText className="w-4 h-4" />}
+                                        label="Care Instructions"
+                                        value={
+                                            <ul className="list-disc list-inside space-y-0.5 mt-0.5">
+                                                {careInstructions.map((inst, i) => (
+                                                    <li key={i} className="text-sm text-slate-700">{inst}</li>
+                                                ))}
+                                            </ul>
+                                        }
+                                    />
+                                )}
+                            </div>
+                        </Section>
+                    </div>
+                )}
+
+                {/* Dispatch & Shipping */}
+                {dt && (
+                    <div className="sm:col-span-2">
+                        <Section title="Dispatch & Shipping">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6">
+                                <Row icon={<Clock className="w-4 h-4" />} label="Processing Days" value={`${dt.processingDays} day${dt.processingDays !== 1 ? 's' : ''}`} />
+                                <Row icon={<Clock className="w-4 h-4" />} label="Shipping Days" value={`${dt.shippingDays} day${dt.shippingDays !== 1 ? 's' : ''}`} />
+                                <Row icon={<Clock className="w-4 h-4" />} label="Total Days" value={`${dt.totalDays} day${dt.totalDays !== 1 ? 's' : ''}`} />
+                            </div>
+                        </Section>
+                    </div>
+                )}
+
+                {/* Logistics Configuration */}
+                {lc && (
+                    <div className="sm:col-span-2">
+                        <Section title="Logistics Configuration">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                                <Row icon={<Package className="w-4 h-4" />} label="Shipping Weight per Unit" value={`${lc.unitWeight} ${lc.weightUom}`} />
+                                {lc.maxWeight > 0 && <Row icon={<Package className="w-4 h-4" />} label="Max Shippable Weight" value={`${lc.maxWeight} ${lc.weightUom}`} />}
+                                {lc.dimensions && (
+                                    <Row icon={<Layers className="w-4 h-4" />} label="Shipping Dimensions" value={`${lc.dimensions.length} × ${lc.dimensions.width} × ${lc.dimensions.height} ${lc.dimensions.unit}`} />
+                                )}
+                                {lc.transportTypes.length > 0 && <Row icon={<Package className="w-4 h-4" />} label="Transport Types" value={lc.transportTypes.join(', ')} />}
+                                {lc.transportTypes.includes('AIR') && lc.airDeliveryDays > 0 && <Row icon={<Clock className="w-4 h-4" />} label="Air Delivery Days" value={`${lc.airDeliveryDays} days`} />}
+                                {lc.transportTypes.includes('SHIP') && lc.shipDeliveryDays > 0 && <Row icon={<Clock className="w-4 h-4" />} label="Ship Delivery Days" value={`${lc.shipDeliveryDays} days`} />}
+                                {lc.airCostPerKg > 0 && <Row icon={<IndianRupee className="w-4 h-4" />} label="Air Cost per KG" value={formatCurrency(lc.airCostPerKg)} />}
+                                {lc.shipCostPerKg > 0 && <Row icon={<IndianRupee className="w-4 h-4" />} label="Ship Cost per KG" value={formatCurrency(lc.shipCostPerKg)} />}
+                                {lc.notes && <Row icon={<FileText className="w-4 h-4" />} label="Logistics Notes" value={lc.notes} />}
+                            </div>
+                        </Section>
+                    </div>
+                )}
+
                 {product.description && (
                     <div className="sm:col-span-2">
                         <Section title="Description">
@@ -461,7 +549,8 @@ function ImagesTab({
                                     <th className="px-3 py-2">Size</th>
                                     <th className="px-3 py-2">Color</th>
                                     <th className="px-3 py-2">Price</th>
-                                    <th className="px-3 py-2 rounded-r-lg">Stock</th>
+                                    <th className="px-3 py-2">Stock</th>
+                                    <th className="px-3 py-2 rounded-r-lg">Low Stock Alert</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -509,6 +598,9 @@ function ImagesTab({
                                             </td>
                                             <td className="px-3 py-2">{formatCurrency(v.price)}</td>
                                             <td className="px-3 py-2">{v.stock}</td>
+                                            <td className="px-3 py-2">
+                                                {v.lowStockThreshold != null ? v.lowStockThreshold : '—'}
+                                            </td>
                                         </tr>
                                     )
                                 })}

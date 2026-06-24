@@ -602,6 +602,12 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                           <p className="text-xs text-gray-500 mb-1">Stock</p>
                           <p className="text-sm font-semibold text-gray-900">{variant.stock} units</p>
                         </div>
+                        {variant.lowStockThreshold != null && (
+                          <div className="bg-white p-3 rounded border border-amber-200">
+                            <p className="text-xs text-gray-500 mb-1">Low Stock Alert</p>
+                            <p className="text-sm font-semibold text-amber-700">{variant.lowStockThreshold} units</p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Variant Multi-Currency Display */}
@@ -707,15 +713,21 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {product.uom && (
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">Selling Unit (UOM)</span>
+                    <span className="text-gray-900">{product.uom}</span>
+                  </div>
+                )}
                 {product.dimensions && (
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Dimensions</span>
+                    <span className="text-sm font-medium text-gray-500">Display Dimensions</span>
                     <span className="text-gray-900">{product.dimensions}</span>
                   </div>
                 )}
                 {product.weight && (
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Weight</span>
+                    <span className="text-sm font-medium text-gray-500">Display Weight</span>
                     <span className="text-gray-900">{product.weight}</span>
                   </div>
                 )}
@@ -976,6 +988,88 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               </div>
             </CardContent>
           </Card>
+
+          {/* Logistics Configuration */}
+          {product.logisticsConfig && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Logistics</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(() => {
+                  const lc = product.logisticsConfig!
+                  return (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Shipping Weight per Unit</p>
+                        <p className="text-sm text-gray-600">{lc.unitWeight} {lc.weightUom}</p>
+                      </div>
+                      {lc.maxWeight > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Max Shippable Weight</p>
+                          <p className="text-sm text-gray-600">{lc.maxWeight} {lc.weightUom}</p>
+                        </div>
+                      )}
+                      {lc.dimensions && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Shipping Dimensions</p>
+                          <p className="text-sm text-gray-600">{lc.dimensions.length} × {lc.dimensions.width} × {lc.dimensions.height} {lc.dimensions.unit}</p>
+                        </div>
+                      )}
+                      {lc.transportTypes.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Transport Types</p>
+                          <p className="text-sm text-gray-600">{lc.transportTypes.join(', ')}</p>
+                        </div>
+                      )}
+                      {lc.transportTypes.includes('AIR') && lc.airDeliveryDays > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Air Delivery Days</p>
+                          <p className="text-sm text-gray-600">{lc.airDeliveryDays} days</p>
+                        </div>
+                      )}
+                      {lc.transportTypes.includes('SHIP') && lc.shipDeliveryDays > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Ship Delivery Days</p>
+                          <p className="text-sm text-gray-600">{lc.shipDeliveryDays} days</p>
+                        </div>
+                      )}
+                      {lc.airCostPerKg > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Air Cost per KG</p>
+                          <p className="text-sm text-gray-600">₹{lc.airCostPerKg}</p>
+                        </div>
+                      )}
+                      {lc.shipCostPerKg > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Ship Cost per KG</p>
+                          <p className="text-sm text-gray-600">₹{lc.shipCostPerKg}</p>
+                        </div>
+                      )}
+                      {lc.weightRanges.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Weight Range Rules</p>
+                          <ul className="mt-1 space-y-0.5">
+                            {lc.weightRanges.map((wr, i) => (
+                              <li key={i} className="text-sm text-gray-600">
+                                {wr.minWeight}–{wr.maxWeight} {lc.weightUom} → {wr.recommendedTransport}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {lc.notes && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Logistics Notes</p>
+                          <p className="text-sm text-gray-600">{lc.notes}</p>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
