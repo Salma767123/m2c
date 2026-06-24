@@ -104,23 +104,11 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
           <FieldError message={errors.vendor} />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Factory Location:<Req /></label>
-          <input
-            type="text"
-            value={formData.serviceLocation}
-            readOnly={serviceLocationLocked}
-            aria-readonly={serviceLocationLocked || undefined}
-            onChange={(e) => !serviceLocationLocked && setFormData({ ...formData, serviceLocation: e.target.value })}
-            placeholder="Enter factory location"
-            className={serviceLocationLocked ? READONLY_CLS : errors.serviceLocation ? ERROR_CLS : EDITABLE_CLS}
-          />
-          <FieldError message={errors.serviceLocation} />
-        </div>
-        <div>
           <label className="block text-slate-700 font-semibold mb-3 text-sm">Inspection Date:<Req /></label>
           <input
             type="date"
             value={formData.serviceStartDate}
+            min={new Date().toISOString().slice(0, 10)}
             onChange={(e) => setFormData({ ...formData, serviceStartDate: e.target.value })}
             className={errors.serviceStartDate ? ERROR_CLS : EDITABLE_CLS}
           />

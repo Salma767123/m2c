@@ -1,7 +1,9 @@
 "use client"
 
-import { Upload, X, FileText, Download, PenLine, CheckCircle2, Loader2, IdCard } from "lucide-react"
-import { useRef, useState, useEffect } from "react"
+import { Upload, X, FileText, Download, PenLine, CheckCircle2, Loader2, IdCard, RotateCcw } from "lucide-react"
+import { useRef, useState, useEffect, useCallback } from "react"
+import SignatureCanvas from "react-signature-canvas"
+import type SignatureCanvasType from "react-signature-canvas"
 import { qcCheckerService } from "@/services/qcCheckerService"
 import {
   generateProductInspectionPdf,
@@ -54,12 +56,14 @@ interface DocumentationProps {
 export default function Documentation({ formData, setFormData, errors = {} }: DocumentationProps) {
   const companyIdInputRef = useRef<HTMLInputElement | null>(null)
   const signedDocInputRef = useRef<HTMLInputElement | null>(null)
-  const clientSigInputRef = useRef<HTMLInputElement | null>(null)
+  const sigPadRef = useRef<SignatureCanvasType | null>(null)
+  const sigCanvasContainerRef = useRef<HTMLDivElement | null>(null)
 
   const [showDocModal, setShowDocModal] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [sigCanvasSize, setSigCanvasSize] = useState({ width: 460, height: 200 })
 
   // Best-effort GPS capture for the report's location field. Silent on failure.
   useEffect(() => {
@@ -70,6 +74,21 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     )
   }, [])
+
+  // Measure the canvas container width when the signature modal opens
+  useEffect(() => {
+    if (!showSignModal) return
+    const measure = () => {
+      if (sigCanvasContainerRef.current) {
+        const w = sigCanvasContainerRef.current.clientWidth
+        if (w > 0) setSigCanvasSize({ width: w, height: Math.round(w * 0.42) })
+      }
+    }
+    // Small delay lets the modal finish painting before measuring
+    const t = setTimeout(measure, 50)
+    window.addEventListener("resize", measure)
+    return () => { clearTimeout(t); window.removeEventListener("resize", measure) }
+  }, [showSignModal])
 
   const buildMeta = (): ReportMeta => {
     const checker = qcCheckerService.getCheckerData?.() || null
@@ -121,13 +140,12 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
     })
   }
 
-  // ── Digital signed report: upload client signature → merge → generate ────────
-  const handleClientSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  // ── Digital signed report: capture pad → merge → generate ───────────────────
+  const handleConfirmSignature = useCallback(async () => {
+    if (!sigPadRef.current || sigPadRef.current.isEmpty()) return
     setGenerating(true)
     try {
-      const sigDataUrl = await compressImage(file, 600, 0.85)
+      const sigDataUrl = sigPadRef.current.toDataURL("image/png")
       const meta = buildMeta()
       const doc = generateProductInspectionPdf(formData, meta, {
         clientSignatureDataUrl: sigDataUrl,
@@ -139,11 +157,11 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
         clientSignature: sigDataUrl,
         signedReport: [{ name, url: pdfDataUrl, data: pdfDataUrl, id: Date.now() }],
       })
+      setShowSignModal(false)
     } finally {
       setGenerating(false)
-      if (e.target) e.target.value = ""
     }
-  }
+  }, [formData, setFormData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const downloadSignedReport = () => {
     const report = (formData.signedReport || [])[0]
@@ -228,7 +246,7 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
             </div>
             <div>
               <h3 className="font-bold text-slate-900">Digital Signed Report</h3>
-              <p className="text-sm text-slate-600">Upload the client&apos;s signature to auto-generate a digitally-signed report.</p>
+              <p className="text-sm text-slate-600">Draw the client&apos;s signature on-screen to auto-generate a digitally-signed report.</p>
             </div>
           </div>
           {hasSignedReport && (
@@ -419,64 +437,68 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900">Digital Signed Report</h3>
+              <div>
+                <h3 className="font-bold text-slate-900">Client Signature</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Draw signature using finger, stylus, or mouse</p>
+              </div>
               <button onClick={() => setShowSignModal(false)} className="p-1.5 hover:bg-slate-100 rounded-lg" aria-label="Close">
                 <X className="w-4 h-4 text-slate-500" />
               </button>
             </div>
-            <div className="p-6 space-y-5 overflow-y-auto">
-              <p className="text-sm text-slate-600">
-                Upload an image of the client&apos;s signature. It will be merged into the full report and a digitally-signed PDF is generated automatically.
-              </p>
 
-              {/* Step 1: signature upload */}
+            <div className="p-6 space-y-4 overflow-y-auto">
+              {/* Signature pad */}
               <div>
-                <label className="block text-slate-700 font-semibold mb-2 text-sm">Client&apos;s digital signature</label>
-                <div className="border-2 border-dashed border-brand-300 rounded-xl p-6 text-center hover:border-brand-400 transition-colors cursor-pointer bg-brand-50/40">
-                  <input
-                    ref={clientSigInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleClientSignatureUpload}
-                    className="hidden"
-                  />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-slate-700 font-semibold text-sm">Sign below</label>
                   <button
                     type="button"
-                    onClick={() => clientSigInputRef.current?.click()}
-                    disabled={generating}
-                    className="flex flex-col items-center justify-center w-full disabled:opacity-60"
+                    onClick={() => sigPadRef.current?.clear()}
+                    className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors"
                   >
-                    {generating ? (
-                      <Loader2 className="w-7 h-7 text-brand-500 mb-2 animate-spin" />
-                    ) : (
-                      <PenLine className="w-7 h-7 text-brand-500 mb-2" />
-                    )}
-                    <p className="text-slate-700 font-medium text-sm">
-                      {generating ? "Generating signed report…" : "Upload signature image"}
-                    </p>
+                    <RotateCcw className="w-3.5 h-3.5" /> Clear
                   </button>
                 </div>
+                <div
+                  ref={sigCanvasContainerRef}
+                  className="w-full rounded-xl border-2 border-brand-300 bg-slate-50 overflow-hidden touch-none"
+                  style={{ height: sigCanvasSize.height }}
+                >
+                  <SignatureCanvas
+                    ref={sigPadRef}
+                    penColor="#1e293b"
+                    canvasProps={{
+                      width: sigCanvasSize.width,
+                      height: sigCanvasSize.height,
+                      style: { width: "100%", height: "100%", display: "block" },
+                    }}
+                    backgroundColor="rgb(248,250,252)"
+                  />
+                </div>
+                <p className="text-xs text-slate-400 mt-2 text-center">
+                  Use your finger, stylus, or mouse to draw your signature
+                </p>
               </div>
 
-              {/* Signature preview */}
-              {formData.clientSignature && (
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-slate-500">Signature:</span>
+              {/* Already-captured signature preview (when re-opening) */}
+              {formData.clientSignature && !hasSignedReport && (
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <span className="text-xs font-medium text-slate-500 shrink-0">Saved:</span>
                   <img
                     src={formData.clientSignature}
-                    alt="Client signature"
-                    className="h-14 object-contain border border-slate-200 rounded-lg bg-white px-2"
+                    alt="Saved signature"
+                    className="h-10 object-contain"
                   />
                 </div>
               )}
 
-              {/* Step 2: generated report */}
+              {/* Generated report actions */}
               {hasSignedReport && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                   <div className="flex items-center gap-2 text-emerald-700 font-semibold text-sm mb-3">
                     <CheckCircle2 className="w-4 h-4" /> Digitally-signed report generated
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 flex-wrap">
                     <button
                       type="button"
                       onClick={downloadSignedReport}
@@ -489,18 +511,32 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
                       onClick={clearSignedReport}
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-sm transition-colors"
                     >
-                      <X className="w-4 h-4" /> Remove
+                      <X className="w-4 h-4" /> Re-sign
                     </button>
                   </div>
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50">
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
               <button
+                type="button"
                 onClick={() => setShowSignModal(false)}
-                className="w-full px-4 py-2.5 rounded-xl font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors"
               >
-                Done
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSignature}
+                disabled={generating}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors disabled:opacity-60"
+              >
+                {generating ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
+                ) : (
+                  <><CheckCircle2 className="w-4 h-4" /> Confirm &amp; Generate Report</>
+                )}
               </button>
             </div>
           </div>

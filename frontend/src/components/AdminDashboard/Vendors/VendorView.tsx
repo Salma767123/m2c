@@ -563,7 +563,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                 <div className="flex items-center space-x-3">
                   <Mail className="h-4 w-4 text-gray-400" />
                   <div>
-                    <p className="text-sm text-gray-600">Email 1</p>
+                    <p className="text-sm text-gray-600">Business Email</p>
                     <p className="font-medium">{vendor.businessEmail || vendor.email}</p>
                   </div>
                 </div>
@@ -572,7 +572,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="flex items-center space-x-3">
                     <Mail className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Email 2</p>
+                      <p className="text-sm text-gray-600">Secondary Email</p>
                       <p className="font-medium">{(vendor as any).businessEmail2}</p>
                     </div>
                   </div>
@@ -581,7 +581,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                 <div className="flex items-center space-x-3">
                   <Phone className="h-4 w-4 text-gray-400" />
                   <div>
-                    <p className="text-sm text-gray-600">Phone Number 1</p>
+                    <p className="text-sm text-gray-600">Primary Phone</p>
                     <p className="font-medium">{vendor.businessPhone}</p>
                   </div>
                 </div>
@@ -590,7 +590,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="flex items-center space-x-3">
                     <Phone className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Local Landline Number</p>
+                      <p className="text-sm text-gray-600">Local Landline</p>
                       <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: (vendor as any).localLandlineStd, number: vendor.landlineNumber })}</p>
                     </div>
                   </div>
@@ -599,7 +599,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="flex items-center space-x-3">
                     <Phone className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">International Landline Number</p>
+                      <p className="text-sm text-gray-600">International Landline</p>
                       <p className="font-medium">{formatIntlLandline((vendor as any).intlLandline)}</p>
                     </div>
                   </div>
@@ -609,7 +609,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="flex items-center space-x-3">
                     <Phone className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Phone Number 2</p>
+                      <p className="text-sm text-gray-600">Secondary Phone</p>
                       <p className="font-medium">{vendor.phoneNumber2}</p>
                     </div>
                   </div>
@@ -753,7 +753,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                 )}
                 {(vendor as any).employeeCount && (
                   <div>
-                    <p className="text-sm text-gray-600">Employee Count</p>
+                    <p className="text-sm text-gray-600">Number of Employees</p>
                     <p className="font-medium">{(vendor as any).employeeCount}</p>
                   </div>
                 )}
@@ -1792,13 +1792,13 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                     )}
                     {(contact.localLandline || contact.landline) && (
                       <div>
-                        <p className="text-sm text-gray-600">Local Landline Number</p>
+                        <p className="text-sm text-gray-600">Local Landline</p>
                         <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: contact.localLandlineStd, number: contact.localLandline || contact.landline })}</p>
                       </div>
                     )}
                     {contact.intlLandline && (
                       <div>
-                        <p className="text-sm text-gray-600">International Landline Number</p>
+                        <p className="text-sm text-gray-600">International Landline</p>
                         <p className="font-medium">{formatIntlLandline(contact.intlLandline)}</p>
                       </div>
                     )}
