@@ -23,11 +23,11 @@ const isBlank = (v: unknown): boolean =>
 // Everything here goes on the final report header — all required.
 function validateGeneralInformation(d: any): StepErrors {
     const e: StepErrors = {}
-    if (isBlank(d.client)) e.client = "Client is required"
-    if (isBlank(d.vendor)) e.vendor = "Vendor is required"
-    if (isBlank(d.factory)) e.factory = "Factory is required"
-    if (isBlank(d.serviceLocation)) e.serviceLocation = "Service location is required"
-    if (isBlank(d.serviceStartDate)) e.serviceStartDate = "Service start date is required"
+    if (isBlank(d.client)) e.client = "Company name is required"
+    if (isBlank(d.vendor)) e.vendor = "Vendor name is required"
+    if (isBlank(d.factory)) e.factory = "Factory name is required"
+    if (isBlank(d.serviceLocation)) e.serviceLocation = "Factory location is required"
+    if (isBlank(d.serviceStartDate)) e.serviceStartDate = "Inspection date is required"
     if (isBlank(d.serviceType)) e.serviceType = "Service type is required"
     return e
 }

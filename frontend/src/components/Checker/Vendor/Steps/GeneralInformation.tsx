@@ -74,26 +74,26 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
       <div className="border-b border-slate-200 pb-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-2">General Information</h2>
         <p className="text-slate-600">
-          Basic information about the vendor, client, and service details
+          Basic information about the company, vendor, factory, and inspection details
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Client:<Req /></label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Company Name:<Req /></label>
           <input
             type="text"
             value={formData.client}
             readOnly={clientLocked}
             aria-readonly={clientLocked || undefined}
             onChange={(e) => !clientLocked && setFormData({ ...formData, client: e.target.value })}
-            placeholder="Enter client name"
+            placeholder="Enter company name"
             className={clientLocked ? READONLY_CLS : errors.client ? ERROR_CLS : EDITABLE_CLS}
           />
           <FieldError message={errors.client} />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Vendor:<Req /></label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Vendor Name:<Req /></label>
           <input
             type="text"
             value={formData.vendor}
@@ -105,7 +105,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
           <FieldError message={errors.vendor} />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Factory:<Req /></label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Factory Name:<Req /></label>
           <input
             type="text"
             value={formData.factory}
@@ -118,20 +118,20 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
           <FieldError message={errors.factory} />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Location:<Req /></label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Factory Location:<Req /></label>
           <input
             type="text"
             value={formData.serviceLocation}
             readOnly={serviceLocationLocked}
             aria-readonly={serviceLocationLocked || undefined}
             onChange={(e) => !serviceLocationLocked && setFormData({ ...formData, serviceLocation: e.target.value })}
-            placeholder="Enter service location"
+            placeholder="Enter factory location"
             className={serviceLocationLocked ? READONLY_CLS : errors.serviceLocation ? ERROR_CLS : EDITABLE_CLS}
           />
           <FieldError message={errors.serviceLocation} />
         </div>
         <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Service Start Date:<Req /></label>
+          <label className="block text-slate-700 font-semibold mb-3 text-sm">Inspection Date:<Req /></label>
           <input
             type="date"
             value={formData.serviceStartDate}
