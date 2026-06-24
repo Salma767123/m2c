@@ -171,9 +171,9 @@ export default function SuspensionModal({
   if (!isOpen || !vendor) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-hidden bg-white">
-        <CardHeader className="border-b border-gray-200 bg-orange-50">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white overflow-hidden">
+        <CardHeader className="border-b border-gray-200 bg-orange-50 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -198,9 +198,9 @@ export default function SuspensionModal({
           </div>
         </CardHeader>
 
-        <CardContent className="p-0">
+        <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
           {/* Vendor Information Header */}
-          <div className="p-6 bg-gray-50 border-b border-gray-200">
+          <div className="p-6 bg-gray-50 border-b border-gray-200 shrink-0">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
                 <Building2 className="w-6 h-6 text-gray-600" />
@@ -232,7 +232,7 @@ export default function SuspensionModal({
             </div>
           </div>
 
-          <div className="p-6 max-h-[60vh] overflow-y-auto">
+          <div className="p-6 flex-1 overflow-y-auto">
             {/* Step 1: Category Selection */}
             {step === 'category' && (
               <div className="space-y-4">
@@ -437,7 +437,7 @@ export default function SuspensionModal({
         </CardContent>
 
         {/* Footer Actions */}
-        <div className="border-t border-gray-200 p-6 bg-gray-50">
+        <div className="border-t border-gray-200 p-6 bg-gray-50 shrink-0">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600">
               {step === 'category' && 'Select a suspension category to continue'}
