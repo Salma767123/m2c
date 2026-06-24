@@ -92,6 +92,7 @@ export interface ProductVariant {
   colorHex?: string | null
   price: number
   stock: number
+  lowStockThreshold?: number | null
   images?: string[]
 }
 
@@ -135,6 +136,37 @@ export interface ProductDetailData {
   }>
   createdAt: string
   updatedAt?: string | null
+  // Product fields
+  uom?: string | null
+  dimensions?: string | null
+  dimensionUnit?: string | null
+  weight?: string | null
+  tags?: string[]
+  lowStockThreshold?: number | null
+  // Fabric & Specifications
+  fabricType?: string | null
+  material?: string | null
+  fabricSpecifications?: Record<string, unknown> | null
+  // Dispatch & Shipping
+  dispatchTimeline?: {
+    processingDays: number
+    shippingDays: number
+    totalDays: number
+  } | null
+  // Logistics
+  logisticsConfig?: {
+    unitWeight: number
+    weightUom: string
+    maxWeight: number
+    dimensions: { length: number; width: number; height: number; unit: string } | null
+    transportTypes: string[]
+    weightRanges: Array<{ minWeight: number; maxWeight: number; recommendedTransport: string }>
+    airDeliveryDays: number
+    shipDeliveryDays: number
+    airCostPerKg: number
+    shipCostPerKg: number
+    notes: string
+  } | null
   images?: ProductImage[]
   variants?: ProductVariant[]
   vendor?: ProductDetailVendor

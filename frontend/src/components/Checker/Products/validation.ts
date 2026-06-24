@@ -25,8 +25,7 @@ function validateGeneralInformation(d: any): StepErrors {
     const e: StepErrors = {}
     if (isBlank(d.client)) e.client = "Company name is required"
     if (isBlank(d.vendor)) e.vendor = "Vendor name is required"
-    if (isBlank(d.factory)) e.factory = "Factory name is required"
-    if (isBlank(d.serviceLocation)) e.serviceLocation = "Factory location is required"
+if (isBlank(d.serviceLocation)) e.serviceLocation = "Factory location is required"
     if (isBlank(d.serviceStartDate)) e.serviceStartDate = "Inspection date is required"
     if (isBlank(d.serviceType)) e.serviceType = "Service type is required"
     return e

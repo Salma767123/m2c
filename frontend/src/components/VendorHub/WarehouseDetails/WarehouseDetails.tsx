@@ -447,60 +447,67 @@ export default function WarehouseDetails({
           title="Facility Ownership & Capacity"
           subtitle="How you hold the warehouse and its total floor area"
         >
-          {/* Ownership Type Chips */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              Ownership Type{' '}
-              {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
-            </label>
-            <p className="text-xs text-slate-500 mb-3">
-              Select the type of ownership for your warehouse facility.
-            </p>
-            <div
-              className="flex flex-wrap gap-2.5"
-              role="radiogroup"
-              aria-label="Facility ownership"
-              aria-disabled={isLinked}
-              data-field="ownershipType"
-            >
-              {ownershipTypes.map((type) => (
-                <ToggleButton
-                  key={type.id}
-                  selected={formData.ownershipType === type.id}
-                  invalid={!isLinked && !!(errors.ownershipType && touched.ownershipType)}
-                  disabled={isLinked}
-                  onClick={() => handleInputChange('ownershipType', formData.ownershipType === type.id ? '' : type.id)}
-                >
-                  <span className="font-semibold">{type.label}</span>
-                </ToggleButton>
-              ))}
-            </div>
-            {errors.ownershipType && touched.ownershipType && !isLinked && (
-              <p className="text-red-600 text-xs mt-2 font-medium" role="alert">
-                {errors.ownershipType}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 sm:gap-y-0">
+            {/* Left column — Ownership Type, left-aligned */}
+            <div className="sm:border-r sm:border-slate-200 sm:pr-6">
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                Ownership Type{' '}
+                {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
+              </label>
+              <p className="text-xs text-slate-500 mb-3">
+                Select the type of ownership for your warehouse facility.
               </p>
-            )}
-          </div>
+              <div
+                className="flex flex-nowrap gap-2.5"
+                role="radiogroup"
+                aria-label="Facility ownership"
+                aria-disabled={isLinked}
+                data-field="ownershipType"
+              >
+                {ownershipTypes.map((type) => (
+                  <ToggleButton
+                    key={type.id}
+                    selected={formData.ownershipType === type.id}
+                    invalid={!isLinked && !!(errors.ownershipType && touched.ownershipType)}
+                    disabled={isLinked}
+                    onClick={() => handleInputChange('ownershipType', formData.ownershipType === type.id ? '' : type.id)}
+                  >
+                    <span className="font-semibold">{type.label}</span>
+                  </ToggleButton>
+                ))}
+              </div>
+              {errors.ownershipType && touched.ownershipType && !isLinked && (
+                <p className="text-red-600 text-xs mt-2 font-medium" role="alert">
+                  {errors.ownershipType}
+                </p>
+              )}
+            </div>
 
-          {/* Warehousing Capacity */}
-          <div className="max-w-xs">
-            <label htmlFor="warehousingCapacity" className="block text-sm font-semibold text-slate-700 mb-1">
-              Warehousing Capacity{' '}
-              <span className="text-slate-400 text-xs font-normal">(sq ft, optional)</span>
-            </label>
-            <div className="relative">
-              <input
-                id="warehousingCapacity"
-                type="number"
-                name="warehousingCapacity"
-                value={formData.warehousingCapacity}
-                onChange={(e) => handleInputChange('warehousingCapacity', e.target.value)}
-                onBlur={() => handleBlur('warehousingCapacity')}
-                className="w-full text-sm font-medium pl-4 pr-14 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                placeholder="e.g. 50000"
-                min="0"
-              />
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">sq ft</span>
+            {/* Right column — Warehousing Capacity, fills right half */}
+            <div className="sm:pl-6">
+              <div className="w-full max-w-[260px]">
+                <label htmlFor="warehousingCapacity" className="block text-sm font-semibold text-slate-700 mb-1">
+                  Warehousing Capacity{' '}
+                  <span className="text-slate-400 text-xs font-normal">(sq ft, optional)</span>
+                </label>
+                <p className="text-xs text-slate-500 mb-3">Total floor area of your warehouse.</p>
+                <div className="flex items-stretch border border-slate-300 hover:border-slate-400 rounded-lg overflow-hidden transition-colors focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
+                  <input
+                    id="warehousingCapacity"
+                    type="number"
+                    name="warehousingCapacity"
+                    value={formData.warehousingCapacity}
+                    onChange={(e) => handleInputChange('warehousingCapacity', e.target.value)}
+                    onBlur={() => handleBlur('warehousingCapacity')}
+                    className="flex-1 min-w-0 text-sm font-medium pl-4 pr-2 py-2.5 border-0 outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    placeholder="e.g. 50000"
+                    min="0"
+                  />
+                  <span className="flex items-center px-3 text-sm font-semibold text-slate-500 bg-slate-50 border-l border-slate-200 select-none whitespace-nowrap">
+                    sq ft
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </AccordionSection>

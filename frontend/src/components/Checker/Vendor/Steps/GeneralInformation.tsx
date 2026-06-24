@@ -11,7 +11,7 @@ interface GeneralInformationProps {
   formData: {
     client: string
     vendor: string
-    factory: string
+    factory?: string
     serviceLocation: string
     serviceStartDate: string
     serviceType: string
@@ -38,7 +38,6 @@ const FieldError = ({ message }: { message?: string }) =>
 export default function GeneralInformation({ formData, setFormData, autofillSnapshot = {}, errors = {} }: GeneralInformationProps) {
   const clientLocked = !!autofillSnapshot.client
   const vendorLocked = !!autofillSnapshot.vendor
-  const factoryLocked = !!autofillSnapshot.factory
   const serviceLocationLocked = !!autofillSnapshot.serviceLocation
 
   const [showServiceTypeDropdown, setShowServiceTypeDropdown] = useState(false)
@@ -74,7 +73,7 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
       <div className="border-b border-slate-200 pb-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-2">General Information</h2>
         <p className="text-slate-600">
-          Basic information about the company, vendor, factory, and inspection details
+          Basic information about the company, vendor, and inspection details
         </p>
       </div>
 
@@ -103,19 +102,6 @@ export default function GeneralInformation({ formData, setFormData, autofillSnap
             className={vendorLocked ? READONLY_CLS : errors.vendor ? ERROR_CLS : EDITABLE_CLS}
           />
           <FieldError message={errors.vendor} />
-        </div>
-        <div>
-          <label className="block text-slate-700 font-semibold mb-3 text-sm">Factory Name:<Req /></label>
-          <input
-            type="text"
-            value={formData.factory}
-            readOnly={factoryLocked}
-            aria-readonly={factoryLocked || undefined}
-            onChange={(e) => !factoryLocked && setFormData({ ...formData, factory: e.target.value })}
-            placeholder="Enter factory name"
-            className={factoryLocked ? READONLY_CLS : errors.factory ? ERROR_CLS : EDITABLE_CLS}
-          />
-          <FieldError message={errors.factory} />
         </div>
         <div>
           <label className="block text-slate-700 font-semibold mb-3 text-sm">Factory Location:<Req /></label>
