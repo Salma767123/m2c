@@ -19,6 +19,7 @@ import {
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { useVendorAuth } from '@/hooks/useVendorAuth'
 import { dispatchAuthChange } from '@/lib/authEvents'
+import { isVendorLoggedIn } from '@/lib/vendorAuth'
 
 interface LoginFormData {
   email: string
@@ -27,6 +28,7 @@ interface LoginFormData {
 }
 
 export default function VendorLogin() {
+  const [authChecked, setAuthChecked] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [emailError, setEmailError] = useState("")
@@ -40,6 +42,15 @@ export default function VendorLogin() {
     password: '',
     rememberMe: false
   })
+
+  // Redirect if already logged in as vendor
+  useEffect(() => {
+    if (isVendorLoggedIn()) {
+      router.replace('/vendor/dashboard')
+    } else {
+      setAuthChecked(true)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Autofocus email field on mount
   useEffect(() => {
@@ -96,15 +107,10 @@ export default function VendorLogin() {
       
       console.log('Vendor login successful:', result)
 
-      // Store authentication data
-      if (loginData.rememberMe) {
-        localStorage.setItem('vendorToken', result.token)
-        localStorage.setItem('vendorUser', JSON.stringify(result.vendor))
-        console.log('Stored in localStorage')
-      } else {
+      // VendorService.loginVendor already stores vendorToken + vendorData in localStorage.
+      // For sessionStorage (non-remember-me) we mirror the token only — data stays in localStorage.
+      if (!loginData.rememberMe) {
         sessionStorage.setItem('vendorToken', result.token)
-        sessionStorage.setItem('vendorUser', JSON.stringify(result.vendor))
-        console.log('Stored in sessionStorage')
       }
       dispatchAuthChange()
 
@@ -137,7 +143,7 @@ export default function VendorLogin() {
   }
 
   return (
-    <div className="min-h-screen flex bg-white font-sans">
+    <div className={`min-h-screen flex bg-white font-sans${authChecked ? "" : " invisible"}`}>
       {/* Left Side - Professional Branding */}
       <div className="hidden lg:flex lg:flex-1 relative bg-[#000000]">
         <div className="flex items-center justify-center w-full p-12">

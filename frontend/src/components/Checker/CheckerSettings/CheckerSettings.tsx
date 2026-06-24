@@ -132,8 +132,8 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field label="Email Address" value={profile?.email} />
                 <Field label="Phone Number" value={profile?.phone} />
-                <Field label="Alternate Email" value={profile?.alternateEmail} />
-                <Field label="Alternate Phone" value={profile?.alternatePhone} />
+                <Field label="Secondary Email" value={profile?.alternateEmail} />
+                <Field label="Secondary Phone" value={profile?.alternatePhone} />
               </div>
             </SectionCard>
 
@@ -148,10 +148,10 @@ export default function SettingsPage() {
             {/* Address */}
             <SectionCard icon={MapPin} title="Address Information">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Field label="Street Address" value={profile?.address} />
+                <Field label="Address Line 1" value={profile?.address} />
                 <Field label="City" value={profile?.city} />
                 <Field label="State / Province" value={profile?.state} />
-                <Field label="ZIP / Postal Code" value={profile?.zipCode} />
+                <Field label="PIN / ZIP Code" value={profile?.zipCode} />
                 <Field label="Country" value={profile?.country} />
               </div>
             </SectionCard>

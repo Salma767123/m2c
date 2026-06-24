@@ -245,7 +245,8 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
   const [contactPhoto, setContactPhoto] = useState<string | null>(data?.mainContact?.photo || null);
   const [contactPhotoFile, setContactPhotoFile] = useState<File | null>(null);
   // Selected image awaiting crop (1:1). Saved only after the user crops & confirms.
-  const [cropState, setCropState] = useState<{ src: string; name: string } | null>(null);
+  // target: 'main' for the primary contact, or an alt contact id string.
+  const [cropState, setCropState] = useState<{ src: string; name: string; target: 'main' | string } | null>(null);
 
   const closeCropper = () => {
     setCropState((prev) => {
@@ -286,7 +287,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       applyContactPhoto(file);
       return;
     }
-    setCropState({ src: URL.createObjectURL(file), name: file.name });
+    setCropState({ src: URL.createObjectURL(file), name: file.name, target: 'main' });
   };
 
   const removeContactPhoto = () => {
@@ -325,7 +326,11 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    applyAltContactPhoto(id, file);
+    if (!file.type.startsWith('image/')) {
+      applyAltContactPhoto(id, file);
+      return;
+    }
+    setCropState({ src: URL.createObjectURL(file), name: file.name, target: id });
   };
 
   const removeAltContactPhoto = (id: string) => {
@@ -723,7 +728,11 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         title="Crop Profile Photo"
         onCancel={closeCropper}
         onCropped={(file) => {
-          applyContactPhoto(file);
+          if (cropState?.target === 'main') {
+            applyContactPhoto(file);
+          } else if (cropState?.target) {
+            applyAltContactPhoto(cropState.target, file);
+          }
           closeCropper();
         }}
       />

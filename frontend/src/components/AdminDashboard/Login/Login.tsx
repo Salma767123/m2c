@@ -7,6 +7,7 @@ import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
 import axiosInstance from '@/lib/axios'
 import { dispatchAuthChange } from '@/lib/authEvents'
+import { getStoredAuth } from '@/lib/auth'
 import {
   Eye,
   EyeOff,
@@ -52,6 +53,7 @@ interface LoginResponse {
 }
 
 export default function AdminLogin() {
+  const [authChecked, setAuthChecked] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [emailError, setEmailError] = useState("")
@@ -70,11 +72,13 @@ export default function AdminLogin() {
 
   // Redirect if already logged in as admin
   useEffect(() => {
-    const adminToken = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken')
-    if (adminToken) {
+    const auth = getStoredAuth()
+    if (auth) {
       router.replace('/admin/dashboard')
+    } else {
+      setAuthChecked(true)
     }
-  }, [router])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check for error from Google OAuth redirect
   useEffect(() => {
@@ -211,7 +215,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen flex bg-white font-sans">
+    <div className={`min-h-screen flex bg-white font-sans${authChecked ? "" : " invisible"}`}>
       {/* Left Side - Professional Branding */}
       <div className="hidden lg:flex lg:flex-1 relative bg-[#000000]">
         <div className="flex items-center justify-center w-full p-12">

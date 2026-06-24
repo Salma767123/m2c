@@ -146,8 +146,8 @@ export default function QCCheckerDetail() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Field label="Email Address" value={checker.email} />
               <Field label="Phone Number" value={checker.phone} />
-              <Field label="Alternate Email" value={checker.alternateEmail} />
-              <Field label="Alternate Phone" value={checker.alternatePhone} />
+              <Field label="Secondary Email" value={checker.alternateEmail} />
+              <Field label="Secondary Phone" value={checker.alternatePhone} />
             </div>
           </SectionCard>
 
@@ -162,10 +162,10 @@ export default function QCCheckerDetail() {
           {/* Address */}
           <SectionCard icon={MapPin} title="Address Information">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Field label="Street Address" value={checker.address} />
+              <Field label="Address Line 1" value={checker.address} />
               <Field label="City" value={checker.city} />
               <Field label="State / Province" value={checker.state} />
-              <Field label="ZIP / Postal Code" value={checker.zipCode} />
+              <Field label="PIN / ZIP Code" value={checker.zipCode} />
               <Field label="Country" value={checker.country} />
             </div>
           </SectionCard>

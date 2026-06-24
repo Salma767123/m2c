@@ -9,6 +9,7 @@ import Dropdown from "../../UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService } from "@/services/qcCheckerService";
+import ImageCropModal from "@/components/UI/ImageCropModal";
 
 const INPUT_CLASS =
   "w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white";
@@ -46,6 +47,7 @@ export default function EditQCChecker() {
     alternatePhone: "",
     alternateEmail: "",
     address: "",
+    addressLine2: "",
     city: "",
     state: "",
     zipCode: "",
@@ -62,6 +64,7 @@ export default function EditQCChecker() {
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const idProofInputRef = useRef<HTMLInputElement>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -78,6 +81,7 @@ export default function EditQCChecker() {
           alternatePhone: c.alternatePhone || "",
           alternateEmail: c.alternateEmail || "",
           address: c.address || "",
+          addressLine2: c.addressLine2 || "",
           city: c.city || "",
           state: c.state || "",
           zipCode: c.zipCode || "",
@@ -110,8 +114,9 @@ export default function EditQCChecker() {
     setFormData((prev) => ({ ...prev, [name]: value as string }));
   };
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       showErrorToast("Invalid file", "Profile photo must be an image.");
@@ -121,6 +126,10 @@ export default function EditQCChecker() {
       showErrorToast("File too large", "Profile photo must be under 5MB.");
       return;
     }
+    setCropSrc(URL.createObjectURL(file));
+  };
+
+  const applyProfilePhoto = async (file: File) => {
     const dataUrl = await readFileAsDataUrl(file);
     setFormData((prev) => ({ ...prev, profilePhoto: dataUrl }));
   };
@@ -152,7 +161,7 @@ export default function EditQCChecker() {
         phone: formData.phone,
         alternatePhone: formData.alternatePhone || undefined,
         alternateEmail: formData.alternateEmail || undefined,
-        address: formData.address || undefined,
+        address: [formData.address, formData.addressLine2].filter(Boolean).join(", ") || undefined,
         city: formData.city || undefined,
         state: formData.state || undefined,
         zipCode: formData.zipCode || undefined,
@@ -188,6 +197,19 @@ export default function EditQCChecker() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
+      <ImageCropModal
+        src={cropSrc}
+        title="Crop Profile Photo"
+        onCancel={() => {
+          if (cropSrc?.startsWith("blob:")) URL.revokeObjectURL(cropSrc);
+          setCropSrc(null);
+        }}
+        onCropped={async (file) => {
+          await applyProfilePhoto(file);
+          if (cropSrc?.startsWith("blob:")) URL.revokeObjectURL(cropSrc);
+          setCropSrc(null);
+        }}
+      />
       <Breadcrumb />
 
       {/* Header */}
@@ -361,7 +383,7 @@ export default function EditQCChecker() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Alternate Email</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Secondary Email</label>
                 <input
                   type="email"
                   name="alternateEmail"
@@ -373,7 +395,7 @@ export default function EditQCChecker() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Alternate Phone Number</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Secondary Phone Number</label>
                 <input
                   type="tel"
                   name="alternatePhone"
@@ -397,13 +419,27 @@ export default function EditQCChecker() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Street Address</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Address Line 1</label>
                 <input
                   type="text"
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
-                  placeholder="Enter street address"
+                  placeholder="House / building / street"
+                  className={INPUT_CLASS}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Address Line 2 <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  name="addressLine2"
+                  value={formData.addressLine2}
+                  onChange={handleInputChange}
+                  placeholder="Apartment, suite, floor"
                   className={INPUT_CLASS}
                 />
               </div>
@@ -418,8 +454,8 @@ export default function EditQCChecker() {
                   <input type="text" name="state" value={formData.state} onChange={handleInputChange} placeholder="Enter state" className={INPUT_CLASS} />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">ZIP/Postal Code</label>
-                  <input type="text" name="zipCode" value={formData.zipCode} onChange={handleInputChange} placeholder="Enter ZIP code" className={INPUT_CLASS} />
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">PIN / ZIP Code</label>
+                  <input type="text" name="zipCode" value={formData.zipCode} onChange={handleInputChange} placeholder="Enter PIN / ZIP code" className={INPUT_CLASS} />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Country</label>

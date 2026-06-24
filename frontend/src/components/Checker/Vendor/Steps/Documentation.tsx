@@ -34,6 +34,15 @@ const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<stri
   })
 }
 
+// Read any file as a data URL (used for PDFs which cannot go through canvas)
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => resolve(e.target?.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+
 interface DocumentationProps {
   // The whole inspection formData is passed in; we read across many steps to
   // build the report, so keep this permissive.
@@ -93,8 +102,9 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
     const files = Array.from(e.target.files || [])
     const newDocs = await Promise.all(
       files.map(async (file) => {
-        const data = await compressImage(file)
-        return { file, name: file.name, url: data, data, id: Date.now() + Math.random() }
+        const isPdf = file.type === "application/pdf"
+        const data = isPdf ? await readFileAsDataUrl(file) : await compressImage(file)
+        return { file, name: file.name, url: data, data, isPdf, id: Date.now() + Math.random() }
       })
     )
     setFormData({
@@ -332,13 +342,13 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
 
               <div className="border-t border-slate-100 pt-5">
                 <label className="block text-slate-700 font-semibold mb-1 text-sm">Upload signed document</label>
-                <p className="text-slate-500 text-xs mb-3">After the client signs the printed report, upload the scanned copy here.</p>
+                <p className="text-slate-500 text-xs mb-3">After the client signs the printed report, upload the scanned copy here. Accepted: PDF, PNG, JPG.</p>
                 <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
                   <input
                     ref={signedDocInputRef}
                     type="file"
                     multiple
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/jpg,application/pdf,.pdf"
                     onChange={handleSignedDocUpload}
                     className="hidden"
                   />
@@ -349,18 +359,31 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
                   >
                     <Upload className="w-7 h-7 text-slate-400 mb-2" />
                     <p className="text-slate-700 font-medium text-sm">Upload signed copy</p>
+                    <p className="text-slate-400 text-xs mt-1">PDF, PNG, JPG</p>
                   </button>
                 </div>
                 {signedDocs.length > 0 && (
                   <div className="grid grid-cols-3 gap-3 mt-4">
-                    {signedDocs.map((image: any, index: number) => (
-                      <div key={image.id || index} className="relative group">
-                        <div className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
-                          <img src={image.url || image.data} alt={`Signed ${index + 1}`} className="w-full h-full object-cover" />
-                        </div>
+                    {signedDocs.map((doc: any, index: number) => (
+                      <div key={doc.id || index} className="relative group">
+                        {doc.isPdf ? (
+                          <a
+                            href={doc.url || doc.data}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="aspect-square flex flex-col items-center justify-center gap-1.5 bg-slate-50 rounded-lg border border-slate-200 hover:border-brand-400 transition-colors p-2"
+                          >
+                            <FileText className="w-7 h-7 text-red-500 shrink-0" />
+                            <span className="text-xs text-slate-600 text-center leading-tight line-clamp-2 break-all">{doc.name}</span>
+                          </a>
+                        ) : (
+                          <div className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+                            <img src={doc.url || doc.data} alt={`Signed ${index + 1}`} className="w-full h-full object-cover" />
+                          </div>
+                        )}
                         <button
                           type="button"
-                          onClick={() => removeSignedDoc(image.id)}
+                          onClick={() => removeSignedDoc(doc.id)}
                           className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X className="w-3 h-3" />

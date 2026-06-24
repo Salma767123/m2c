@@ -42,7 +42,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     if (typeof window !== 'undefined') {
       checkAuth()
     }
-  }, [router])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show loading for a bit longer to ensure proper auth check
   if (isLoading) {

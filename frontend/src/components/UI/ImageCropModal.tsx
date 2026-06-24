@@ -135,7 +135,7 @@ export default function ImageCropModal({
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]" onClick={saving ? undefined : onCancel} />
+      <div className="absolute inset-0 bg-white/20 backdrop-blur-xl" onClick={saving ? undefined : onCancel} />
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">

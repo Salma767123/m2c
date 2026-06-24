@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Home, ArrowLeft, Send, AlertTriangle, X, XCircle, ChevronRight } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, Send, AlertTriangle, X, XCircle, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/UI/Button';
 import VendorService, { VendorRegistrationData, VendorFiles } from '@/services/vendorService';
 import { categoryService } from '@/services/categoryService';
@@ -385,13 +385,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
             </li>
           </ul>
         </div>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link href="/">
-            <Button className="bg-slate-900 hover:bg-slate-800 text-white transition-colors h-11 px-8 text-base font-semibold flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40">
-              <Home className="w-5 h-5" />
-              Return to Homepage
-            </Button>
-          </Link>
+        <div className="flex justify-center">
           <Link href="/vendor">
             <Button variant="outline" className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors h-11 px-8 text-base font-semibold rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30">
               Vendor Login

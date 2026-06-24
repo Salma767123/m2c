@@ -109,7 +109,7 @@ export default function VendorProtectedRoute({ children }: VendorProtectedRouteP
     if (typeof window !== 'undefined') {
       checkAuth()
     }
-  }, [router])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show loading state
   if (isLoading) {
