@@ -297,6 +297,15 @@ export default function QCCheckerList() {
                           </Link>
                         )}
                         {hasPermission('edit_qc_checkers') && (
+                          <Link
+                            href={`/admin/dashboard/qc-checker/${checker.id}/edit`}
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                            title="Edit Checker"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Link>
+                        )}
+                        {hasPermission('edit_qc_checkers') && (
                           <button
                             onClick={() => handleResendClick(checker.id, checker.email)}
                             disabled={resendingId === checker.id}

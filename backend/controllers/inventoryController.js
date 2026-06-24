@@ -1,4 +1,27 @@
 const { prisma } = require('../config/database');
+const { generateBaseSku } = require('../utils/skuGenerator');
+const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
+
+// Decide an inventory item's stock state, variant-aware. For products with
+// variants, low-stock is evaluated PER VARIANT (the variant is the sellable
+// unit) — a product is "low" if ANY variant is at/below its alert level, even
+// when the aggregate total looks healthy. Falls back to the aggregate for
+// products without variants.
+const computeStockFlags = (item) => {
+  const variants = item.variants || [];
+  if (variants.length > 0) {
+    const allZero = variants.every(v => (v.stock || 0) === 0) && (item.baseStock || 0) === 0;
+    const anyLow = variants.some(v => {
+      const t = v.lowStockThreshold ?? item.lowStockAlert;
+      return (v.stock || 0) > 0 && (v.stock || 0) <= t;
+    });
+    return { out: allZero, low: !allZero && anyLow };
+  }
+  return {
+    out: (item.currentStock || 0) === 0,
+    low: (item.currentStock || 0) > 0 && (item.currentStock || 0) <= item.lowStockAlert,
+  };
+};
 
 // Create new inventory item
 const createInventoryItem = async (req, res) => {
@@ -15,7 +38,6 @@ const createInventoryItem = async (req, res) => {
 
     const {
       name,
-      sku,
       category,
       subcategory,
       description,
@@ -29,23 +51,12 @@ const createInventoryItem = async (req, res) => {
       notes
     } = req.body;
 
-    // Validate required fields
-    if (!name || !sku || !category || lowStockAlert === undefined) {
+    // Validate required fields. SKU is NOT required from the client — it is
+    // auto-generated server-side (immutable, globally unique) below.
+    if (!name || !category || lowStockAlert === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Name, SKU, category, and low stock alert are required'
-      });
-    }
-
-    // Check if SKU already exists
-    const existingSku = await prisma.inventory.findUnique({
-      where: { sku }
-    });
-
-    if (existingSku) {
-      return res.status(400).json({
-        success: false,
-        message: 'SKU already exists. Please use a unique SKU.'
+        message: 'Name, category, and low stock alert are required'
       });
     }
 
@@ -57,8 +68,17 @@ const createInventoryItem = async (req, res) => {
       });
     }
 
-    // Create inventory item
-    const inventoryItem = await prisma.inventory.create({
+    // Fetch the vendor's company name for the SKU company-code prefix.
+    const vendorRecord = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { companyName: true },
+    });
+
+    // Create inventory item with an auto-generated master SKU. The atomic
+    // counter increment commits with the create inside one transaction.
+    const inventoryItem = await prisma.$transaction(async (tx) => {
+      const sku = await generateBaseSku(tx, vendorRecord?.companyName);
+      return tx.inventory.create({
       data: {
         vendorId,
         name,
@@ -77,6 +97,7 @@ const createInventoryItem = async (req, res) => {
         lastRestocked: lastRestocked ? new Date(lastRestocked) : null,
         notes
       }
+      });
     });
 
     res.status(201).json({
@@ -124,7 +145,14 @@ const getVendorInventory = async (req, res) => {
       where,
       include: {
         products: {
-          select: { id: true, approvalStatus: true },
+          select: {
+            id: true,
+            approvalStatus: true,
+            hasVariants: true,
+            variants: {
+              select: { id: true, variantName: true, size: true, color: true, sku: true, stock: true, lowStockThreshold: true },
+            },
+          },
           take: 1
         }
       },
@@ -133,12 +161,20 @@ const getVendorInventory = async (req, res) => {
       take: parseInt(limit)
     });
 
-    // Enrich items with product approval status
+    // Enrich items with product approval status + variant stock breakdown so the
+    // UI can show per-variant stock and per-variant low-stock alerts.
     const enrichedItems = inventoryItems.map(item => {
       const { products, ...rest } = item;
+      const product = products?.[0] || null;
       return {
         ...rest,
-        productApprovalStatus: products?.[0]?.approvalStatus || null
+        productApprovalStatus: product?.approvalStatus || null,
+        hasVariants: product?.hasVariants || false,
+        variants: (product?.variants || []).map(v => ({
+          ...v,
+          // Effective alert level for this variant: its own override, else the item's.
+          effectiveThreshold: v.lowStockThreshold ?? item.lowStockAlert,
+        })),
       };
     });
 
@@ -257,19 +293,8 @@ const updateInventoryItem = async (req, res) => {
       });
     }
 
-    // Check if SKU is being changed and if new SKU already exists
-    if (sku && sku !== existingItem.sku) {
-      const existingSku = await prisma.inventory.findUnique({
-        where: { sku }
-      });
-
-      if (existingSku) {
-        return res.status(400).json({
-          success: false,
-          message: 'SKU already exists. Please use a unique SKU.'
-        });
-      }
-    }
+    // SKU is immutable — it is an auto-generated permanent identifier and can
+    // never be changed once the item exists.
 
     // Block vendor from editing inventory item when linked product is approved
     if (!isAdmin && existingItem.hasProductCreated && existingItem.productId) {
@@ -296,7 +321,7 @@ const updateInventoryItem = async (req, res) => {
     // Build update data
     const updateData = {
       ...(name && { name }),
-      ...(sku && { sku }),
+      // sku intentionally omitted — immutable.
       ...(category && { category }),
       ...(subcategory !== undefined && { subcategory }),
       ...(description !== undefined && { description }),
@@ -566,6 +591,9 @@ const updateStock = async (req, res) => {
     const { updatedItem, historyRecord } = result;
     console.log('✅ Stock updated successfully');
 
+    // Fire-and-forget: email the vendor if this update left the item low on stock.
+    checkAndAlertLowStock(id).catch(() => {});
+
     res.json({
       success: true,
       message: 'Stock updated successfully',
@@ -682,13 +710,22 @@ const getInventoryStats = async (req, res) => {
       select: {
         id: true,
         currentStock: true,
-        lowStockAlert: true
+        baseStock: true,
+        lowStockAlert: true,
+        products: {
+          select: { variants: { select: { stock: true, lowStockThreshold: true } } },
+          take: 1,
+        },
       }
     });
 
-    // Low stock excludes out-of-stock (currentStock === 0) so it stays mutually
-    // exclusive from the Out of Stock metric — matching the UI badges/filter.
-    const lowStockCount = lowStockItems.filter(item => item.currentStock > 0 && item.currentStock <= item.lowStockAlert).length;
+    // Variant-aware: an item counts as low if any variant is at/below its alert
+    // level (or, for non-variant items, the aggregate is low). Excludes fully
+    // out-of-stock items so it stays mutually exclusive from Out of Stock.
+    const lowStockCount = lowStockItems.filter(item => {
+      const variants = item.products?.[0]?.variants || [];
+      return computeStockFlags({ ...item, variants }).low;
+    }).length;
 
     // Get out of stock items
     const outOfStockItems = await prisma.inventory.count({
@@ -874,6 +911,25 @@ const getVendorCategories = async (req, res) => {
   }
 };
 
+// Preview the next auto-generated SKU for this vendor (read-only, does not
+// consume a sequence number). Used to show the SKU on the create form.
+const getNextSku = async (req, res) => {
+  try {
+    const isAdmin = req.user.role?.toUpperCase() === 'ADMIN';
+    const vendorId = isAdmin ? req.query.vendorId : (req.user.vendorId || req.user.id);
+    if (!vendorId) {
+      return res.status(400).json({ success: false, message: 'Vendor ID is required' });
+    }
+    const { peekNextBaseSku } = require('../utils/skuGenerator');
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { companyName: true } });
+    const sku = await peekNextBaseSku(prisma, vendor?.companyName);
+    res.json({ success: true, sku });
+  } catch (error) {
+    console.error('Error previewing next SKU:', error);
+    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+  }
+};
+
 module.exports = {
   createInventoryItem,
   getVendorInventory,
@@ -882,7 +938,8 @@ module.exports = {
   deleteInventoryItem,
   updateStock,
   getInventoryStats,
-  getVendorCategories
+  getVendorCategories,
+  getNextSku
 };
 
 
@@ -1301,6 +1358,7 @@ module.exports = {
   getStockHistory,
   getInventoryStats,
   getVendorCategories,
+  getNextSku,
   getAllInventory,
   getAllInventoryStats,
   getInventoryByVendor,

@@ -92,6 +92,7 @@ export interface AdminProduct {
   }>;
   variants: Array<{
     id: string;
+    variantName?: string;
     size: string;
     color: string;
     colorHex?: string;
@@ -106,6 +107,7 @@ export interface AdminProduct {
     originalPriceUSD?: number;
     priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH';
     stock: number;
+    lowStockThreshold?: number | null;
     images?: string[];
   }>;
 }

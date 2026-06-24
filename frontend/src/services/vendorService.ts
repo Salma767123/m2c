@@ -21,6 +21,12 @@ export interface VendorRegistrationData {
   email2?: string;
   phone: string;
   landlineNumber?: string;
+  localLandlineStd?: string;
+  localLandlineNumber?: string;
+  intlLandline?: string;
+  intlLandlineCountryCode?: string;
+  intlLandlineStd?: string;
+  intlLandlineNumber?: string;
   phoneNumber2?: string;
   website?: string;
   address: string;
@@ -45,6 +51,12 @@ export interface VendorRegistrationData {
   ownerPhone: string;
   ownerPhone2?: string;
   ownerLandline?: string;
+  ownerLocalLandlineStd?: string;
+  ownerLocalLandlineNumber?: string;
+  ownerIntlLandline?: string;
+  ownerIntlLandlineCountryCode?: string;
+  ownerIntlLandlineStd?: string;
+  ownerIntlLandlineNumber?: string;
   /** Additional owners / directors / partners. Required core fields are
    *  name + email + phone; the rest are optional and mirror the primary
    *  owner shape (designation / email2 / phone2 / landline). Backend
@@ -74,7 +86,6 @@ export interface VendorRegistrationData {
   warehouseState: string;
   warehouseZip: string;
   warehouseCountry: string;
-  mapLink?: string;
 
   // Vendor Type & Products
   vendorType: string | string[];
@@ -123,7 +134,15 @@ export interface VendorRegistrationData {
     email2?: string;
     phone1: string;
     phone2?: string;
+    /** Legacy single landline string — kept for backward compatibility. New
+     *  registrations use the split local / international fields below. */
     landline?: string;
+    /** Local landline: country dial code + STD/area code + subscriber number. */
+    localLandlineCountryCode?: string;
+    localLandlineStd?: string;
+    localLandline?: string;
+    /** International landline in E.164 form (dial code + national number). */
+    intlLandline?: string;
     department: string;
     customDepartment?: string;
     /** Base64 data URI of the contact photo. Backend deep-walks the
@@ -174,6 +193,8 @@ export interface VendorFiles {
   typeCertFile?: File;
   /** Aadhaar card upload — required only for "Unregistered Vendor". */
   aadhaarFile?: File;
+  /** IEC Certificate — optional for all business types. */
+  iecCertFile?: File;
   ownerPhoto?: File;
   /** Factory images keyed by slot ID (nameBoard / frontView / backView /
    *  leftView / rightView / roadView / insideFactory / others). Each slot
@@ -505,6 +526,9 @@ class VendorService {
     }
     if (files.aadhaarFile) {
       form.append('aadhaarFile', files.aadhaarFile);
+    }
+    if (files.iecCertFile) {
+      form.append('iecCertFile', files.iecCertFile);
     }
     if (files.ownerPhoto) {
       form.append('ownerPhoto', files.ownerPhoto);

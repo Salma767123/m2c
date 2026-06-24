@@ -199,6 +199,8 @@ const registerVendor = async (req, res) => {
       email2,
       phone,
       landlineNumber,
+      localLandlineStd,
+      intlLandline,
       phoneNumber2,
       website,
       address,
@@ -219,6 +221,8 @@ const registerVendor = async (req, res) => {
       ownerPhone,
       ownerPhone2,
       ownerLandline,
+      ownerLocalLandlineStd,
+      ownerIntlLandline,
       additionalOwners,
       businessStartDate,       // Full date — preferred over legacy yearEstablished
       yearEstablished,         // Legacy year-only fallback
@@ -274,51 +278,79 @@ const registerVendor = async (req, res) => {
       password
     } = req.body;
 
-    // Validate required fields
-    if (!companyName || !email || !phone || !ownerName || !ownerEmail || !ownerPhone) {
+    // Validate required fields — return a structured errors array so the
+    // frontend can display each field as a separate row in the error modal.
+    const requiredFields = [
+      { field: 'companyName',  label: 'Company Name',   step: 0, value: companyName },
+      { field: 'email',        label: 'Company Email',   step: 0, value: email },
+      { field: 'phone',        label: 'Company Phone',   step: 0, value: phone },
+      { field: 'ownerName',    label: 'Owner Name',      step: 2, value: ownerName },
+      { field: 'ownerEmail',   label: 'Owner Email',     step: 2, value: ownerEmail },
+      { field: 'ownerPhone',   label: 'Owner Phone',     step: 2, value: ownerPhone },
+    ];
+    const missingFields = requiredFields
+      .filter(f => !f.value)
+      .map(f => ({ field: f.field, label: f.label, step: f.step, message: `${f.label} is required` }));
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
-        error: 'Missing required fields: companyName, email, phone, ownerName, ownerEmail, ownerPhone'
+        code: 'VALIDATION_ERROR',
+        error: 'Missing required fields',
+        errors: missingFields,
       });
     }
 
-    // Normalize emails before duplicate check + insert so "JOHN@x.com" and
-    // "john@x.com" don't register twice. The schema's @unique index is
-    // case-sensitive on MongoDB; normalizing at the application layer is
-    // the simplest fix. Same normalization applies in vendorLogin.
+    // Normalise email and GST before any duplicate check.
+    // Email: lowercase+trim (login identifier, @unique in schema).
+    // GST: uppercase+trim (unique business identity for registered vendors;
+    //   enforced via a partial unique index created by scripts/createGstIndex.js).
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedOwnerEmail = ownerEmail ? ownerEmail.trim().toLowerCase() : ownerEmail;
-
-    // Check if vendor already exists — GST number is the unique business
-    // identity used to detect duplicate registrations. GST is normalized
-    // (trimmed + uppercased) so casing/whitespace differences don't slip
-    // through. Only enforced when a GST number is actually provided.
     const normalizedGst = gstNumber ? gstNumber.trim().toUpperCase() : '';
+
+    // ── Registered vendor (GST provided) ────────────────────────────────────
+    // GST Number is the PRIMARY unique identifier. Check it first and surface
+    // the most actionable error. Email is a secondary (login) identifier and
+    // is still checked to keep the @unique constraint intact.
     if (normalizedGst) {
       const existingByGst = await prisma.vendor.findFirst({
-        where: { gstNumber: normalizedGst }
+        where: { gstNumber: normalizedGst },
+        select: { id: true }
       });
       if (existingByGst) {
         return res.status(409).json({
           code: 'DUPLICATE_GST',
           field: 'gstNumber',
-          error: 'A vendor is already registered with this GST number.'
+          error: 'A vendor with this GST Number is already registered. GST Number must be unique for each registered vendor.'
         });
       }
-    }
-
-    // Email remains a unique login identifier at the database level, so also
-    // guard against a duplicate email to surface a clean message instead of a
-    // raw Prisma unique-constraint (E11000) error.
-    const existingVendor = await prisma.vendor.findUnique({
-      where: { email: normalizedEmail }
-    });
-
-    if (existingVendor) {
-      return res.status(409).json({
-        code: 'DUPLICATE_EMAIL',
-        field: 'email',
-        error: 'A vendor is already registered with this email.'
+      // Secondary check: email must also be unique for login purposes.
+      const existingByEmail = await prisma.vendor.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true }
       });
+      if (existingByEmail) {
+        return res.status(409).json({
+          code: 'DUPLICATE_EMAIL',
+          field: 'email',
+          error: 'This email address is already registered. Please use a different email.'
+        });
+      }
+    } else {
+      // ── Unregistered vendor (no GST) ──────────────────────────────────────
+      // Email is the PRIMARY unique identifier. Block duplicate registrations
+      // based on email alone.
+      const existingByEmail = await prisma.vendor.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true }
+      });
+      if (existingByEmail) {
+        return res.status(409).json({
+          code: 'DUPLICATE_EMAIL',
+          field: 'email',
+          error: 'A vendor is already registered with this email address. Email must be unique for unregistered vendors.'
+        });
+      }
     }
 
     // Hash password if provided
@@ -333,6 +365,7 @@ const registerVendor = async (req, res) => {
     let panCardUrl = null;
     let typeCertUrl = null;
     let aadhaarUrl = null;
+    let iecCertUrl = null;
     let ownerPhotoUrl = null;
     // Factory images carry slot identity (nameBoard / frontView / etc.) so the
     // resulting VendorDocument rows have human-readable names instead of a
@@ -378,6 +411,13 @@ const registerVendor = async (req, res) => {
         const aadhaarResult = await uploadFiles([req.files.aadhaarFile[0]], 'vendor-documents/aadhaar');
         aadhaarUrl = aadhaarResult[0].cloudinaryUrl;
         if (aadhaarResult[0].publicId) uploadedPublicIds.push(aadhaarResult[0].publicId);
+      }
+
+      // Upload IEC certificate (optional for all business types)
+      if (req.files?.iecCertFile?.[0]) {
+        const iecCertResult = await uploadFiles([req.files.iecCertFile[0]], 'vendor-documents/iec');
+        iecCertUrl = iecCertResult[0].cloudinaryUrl;
+        if (iecCertResult[0].publicId) uploadedPublicIds.push(iecCertResult[0].publicId);
       }
 
       // Upload owner photo
@@ -539,6 +579,8 @@ const registerVendor = async (req, res) => {
       ownerPhone,
       ownerPhone2: ownerPhone2 || null,
       ownerLandline: ownerLandline || null,
+      ownerLocalLandlineStd: ownerLocalLandlineStd || null,
+      ownerIntlLandline: ownerIntlLandline || null,
       // Owner address columns dropped from the schema — they always copied
       // the business address. Re-add only when a real owner-address input
       // ships on Step 3.
@@ -569,6 +611,8 @@ const registerVendor = async (req, res) => {
       // Contact & Trade Information
       businessPhone: phone,
       landlineNumber: landlineNumber || null,
+      localLandlineStd: localLandlineStd || null,
+      intlLandline: intlLandline || null,
       phoneNumber2: phoneNumber2 || null,
       businessEmail: normalizedEmail,
       businessEmail2: email2 ? email2.trim().toLowerCase() : null,
@@ -818,6 +862,15 @@ const registerVendor = async (req, res) => {
       });
     }
 
+    if (iecCertUrl) {
+      documents.push({
+        vendorId: vendor.id,
+        type: 'EXPORT_LICENSE',
+        name: 'IEC Certificate',
+        documentUrl: iecCertUrl
+      });
+    }
+
     if (factoryImageUploads.length > 0) {
       factoryImageUploads.forEach(({ url, slotId }, index) => {
         documents.push({
@@ -1007,7 +1060,10 @@ const getAllVendors = async (req, res) => {
         { companyName: { contains: search, mode: 'insensitive' } },
         { ownerName: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
-        { vendorCode: { contains: search, mode: 'insensitive' } }
+        { vendorCode: { contains: search, mode: 'insensitive' } },
+        // GST Number is the primary unique key for registered vendors — include
+        // it in the search so admins can look up vendors directly by GST.
+        { gstNumber: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -1285,6 +1341,40 @@ const updateVendorById = async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
+    // ── Uniqueness checks when the admin changes GST or email ───────────
+    // GST is the primary unique key for registered vendors. If the admin is
+    // setting/changing the GST, verify it isn't already taken by a DIFFERENT
+    // vendor. Same guard for email (login identifier, @unique in schema).
+    const incomingGst = updateData.gstNumber ? updateData.gstNumber.trim().toUpperCase() : '';
+    if (incomingGst && incomingGst !== (existingVendor.gstNumber || '').trim().toUpperCase()) {
+      const takenByGst = await prisma.vendor.findFirst({
+        where: { gstNumber: incomingGst, NOT: { id: vendorId } },
+        select: { id: true, companyName: true }
+      });
+      if (takenByGst) {
+        return res.status(409).json({
+          code: 'DUPLICATE_GST',
+          field: 'gstNumber',
+          error: `GST Number ${incomingGst} is already assigned to vendor "${takenByGst.companyName}".`
+        });
+      }
+    }
+
+    const incomingEmail = updateData.email ? updateData.email.trim().toLowerCase() : '';
+    if (incomingEmail && incomingEmail !== (existingVendor.email || '').trim().toLowerCase()) {
+      const takenByEmail = await prisma.vendor.findFirst({
+        where: { email: incomingEmail, NOT: { id: vendorId } },
+        select: { id: true, companyName: true }
+      });
+      if (takenByEmail) {
+        return res.status(409).json({
+          code: 'DUPLICATE_EMAIL',
+          field: 'email',
+          error: `Email ${incomingEmail} is already registered to vendor "${takenByEmail.companyName}".`
+        });
+      }
+    }
+
     // ── Optional password reset by admin ─────────────────────────────
     // The edit form lets the admin replace the vendor's password from
     // Step 1 (Account Security). Empty value = keep the current bcrypt
@@ -1345,6 +1435,7 @@ const updateVendorById = async (req, res) => {
       await replaceVendorDoc('panCardFile', 'PAN_CARD', 'vendor-documents/pan', 'PAN Card');
       await replaceVendorDoc('typeCertFile', 'COMPANY_REGISTRATION', 'vendor-documents/business-cert', typeCertDisplayName);
       await replaceVendorDoc('aadhaarFile', 'AADHAAR_CARD', 'vendor-documents/aadhaar', 'Aadhaar Card');
+      await replaceVendorDoc('iecCertFile', 'EXPORT_LICENSE', 'vendor-documents/iec', 'IEC Certificate');
     } catch (uploadError) {
       console.error('Admin document upload error:', uploadError);
       return res.status(500).json({
@@ -1489,6 +1580,8 @@ const updateVendorById = async (req, res) => {
       businessEmail2: updateData.email2 || null,
       businessPhone: updateData.phone,
       landlineNumber: updateData.landlineNumber || null,
+      localLandlineStd: updateData.localLandlineStd || null,
+      intlLandline: updateData.intlLandline || null,
       phoneNumber2: updateData.phoneNumber2 || null,
       website: updateData.website,
       businessAddress: updateData.address,
@@ -1509,6 +1602,8 @@ const updateVendorById = async (req, res) => {
       ownerPhone: updateData.ownerPhone,
       ownerPhone2: updateData.ownerPhone2 || null,
       ownerLandline: updateData.ownerLandline || null,
+      ownerLocalLandlineStd: updateData.ownerLocalLandlineStd || null,
+      ownerIntlLandline: updateData.ownerIntlLandline || null,
       ...(updateData.additionalOwners !== undefined && {
         additionalOwners: safeJsonParse(updateData.additionalOwners)
       }),
@@ -1572,7 +1667,7 @@ const updateVendorById = async (req, res) => {
 
       // Logistics
       shippingMethods: parsedShippingMethods || [],
-      qualityControl: updateData.qualityControlProcess,
+      qualityControl: updateData.qualityControlProcess || null,
       packagingCapabilities: updateData.packagingCapabilities || null,
       logisticsPartners: updateData.logisticsPartners || null,
       complianceStandards: updateData.complianceStandards || null,

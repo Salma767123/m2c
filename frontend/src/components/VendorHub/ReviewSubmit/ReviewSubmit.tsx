@@ -2,11 +2,50 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Home, ArrowLeft, Send, AlertTriangle, X } from 'lucide-react';
+import { CheckCircle2, Home, ArrowLeft, Send, AlertTriangle, X, XCircle, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/UI/Button';
 import VendorService, { VendorRegistrationData, VendorFiles } from '@/services/vendorService';
 import { categoryService } from '@/services/categoryService';
 import VendorDataSummary from './VendorDataSummary';
+
+interface ValidationError {
+  field: string;
+  label: string;
+  reason: string;
+  step?: number;
+  stepLabel?: string;
+}
+
+const STEP_LABELS: Record<number, string> = {
+  0: 'Company Details',
+  1: 'Warehouse',
+  2: 'Owner Profile',
+  3: 'Vendor Type & Products',
+  4: 'Manufacturing Facilities',
+  5: 'Certifications & Logistics',
+  6: 'Contact & Trade Info',
+};
+
+// Maps a backend field name to a human-readable label and the step it lives on.
+const FIELD_MAP: Record<string, { label: string; step: number }> = {
+  companyName:   { label: 'Company Name',         step: 0 },
+  email:         { label: 'Company Email',         step: 0 },
+  phone:         { label: 'Company Phone',         step: 0 },
+  businessType:  { label: 'Business Type',         step: 0 },
+  gstNumber:     { label: 'GST Number',            step: 0 },
+  address:       { label: 'Company Address',       step: 0 },
+  city:          { label: 'City',                  step: 0 },
+  state:         { label: 'State',                 step: 0 },
+  zipCode:       { label: 'PIN Code',              step: 0 },
+  password:      { label: 'Password',              step: 0 },
+  ownerName:     { label: 'Owner Name',            step: 2 },
+  ownerEmail:    { label: 'Owner Email',           step: 2 },
+  ownerPhone:    { label: 'Owner Phone',           step: 2 },
+  designation:   { label: 'Owner Designation',     step: 2 },
+  warehouseAddress: { label: 'Warehouse Address',  step: 1 },
+  vendorType:    { label: 'Vendor Type',           step: 3 },
+  selectedCategories: { label: 'Product Categories', step: 3 },
+};
 
 interface ReviewSubmitProps {
   onPrev: () => void;
@@ -27,7 +66,12 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
     governingLaw: false,
   });
   const [privacyChecked, setPrivacyChecked] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  // All validation errors (agreement or server-side) shown in the modal popup.
+  const [errorModal, setErrorModal] = useState<{
+    title: string;
+    subtitle?: string;
+    errors: ValidationError[];
+  } | null>(null);
   // Duplicate-registration warning surfaced as a modal popup (not an inline
   // alert). `field` lets the "Edit details" button jump back to the relevant
   // step so the user can correct the GST number / email.
@@ -58,15 +102,37 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
   
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    
-    // Require confirmation, terms and privacy agreement
+
+    // Build a list of missing agreement items for the modal
     if (!confirmChecked || !allTermsAccepted || !privacyChecked) {
-      setSubmitError('Please accept all terms and conditions');
+      const agreementErrors: ValidationError[] = [];
+      if (!confirmChecked) {
+        agreementErrors.push({ field: 'confirmAccuracy', label: 'Accuracy Confirmation', reason: 'You must confirm the accuracy of your information' });
+      }
+      const termLabels: Record<string, string> = {
+        acceptanceOfTerms: 'Acceptance of Terms',
+        paymentTerms: 'Payment Terms',
+        shippingDelivery: 'Shipping and Delivery',
+        returnsRefunds: 'Returns and Refunds',
+        limitationOfLiability: 'Limitation of Liability',
+        governingLaw: 'Governing Law',
+      };
+      Object.entries(termsConditions).forEach(([key, checked]) => {
+        if (!checked) agreementErrors.push({ field: key, label: termLabels[key] || key, reason: 'This term must be accepted before submitting' });
+      });
+      if (!privacyChecked) {
+        agreementErrors.push({ field: 'agreePrivacy', label: 'Privacy Policy', reason: 'You must agree to the Privacy Policy' });
+      }
+      setErrorModal({
+        title: 'Please Complete Required Agreements',
+        subtitle: 'All terms and conditions must be accepted before submitting your application.',
+        errors: agreementErrors,
+      });
       return;
     }
-    
+
     setIsSubmitting(true);
-    setSubmitError(null);
+    setErrorModal(null);
     setDuplicateWarning(null);
 
     try {
@@ -84,6 +150,12 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         email2: data.email2 || '',
         phone: data.phone || '',
         landlineNumber: data.landlineNumber || '',
+        localLandlineStd: data.localLandlineStd || '',
+        localLandlineNumber: data.localLandlineNumber || '',
+        intlLandline: data.intlLandline || '',
+        intlLandlineCountryCode: data.intlLandlineCountryCode || '',
+        intlLandlineStd: data.intlLandlineStd || '',
+        intlLandlineNumber: data.intlLandlineNumber || '',
         phoneNumber2: data.phoneNumber2 || '',
         website: data.website || '',
         address: data.address || '',
@@ -104,6 +176,12 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         ownerPhone: data.ownerPhone || '',
         ownerPhone2: data.ownerPhone2 || '',
         ownerLandline: data.ownerLandline || '',
+        ownerLocalLandlineStd: data.ownerLocalLandlineStd || '',
+        ownerLocalLandlineNumber: data.ownerLocalLandlineNumber || '',
+        ownerIntlLandline: data.ownerIntlLandline || '',
+        ownerIntlLandlineCountryCode: data.ownerIntlLandlineCountryCode || '',
+        ownerIntlLandlineStd: data.ownerIntlLandlineStd || '',
+        ownerIntlLandlineNumber: data.ownerIntlLandlineNumber || '',
         additionalOwners: data.additionalOwners || undefined,
         businessStartDate: data.businessStartDate || '',
         yearEstablished: data.yearEstablished || '',
@@ -119,7 +197,6 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         warehouseState: data.warehouseState || data.state || '',
         warehouseZip: data.warehouseZip || data.zipCode || '',
         warehouseCountry: data.warehouseCountry || data.country || 'India',
-        mapLink: data.mapLink || '',
         
         // Vendor Type & Products
         vendorType: data.vendorType || ['manufacturer'],
@@ -174,6 +251,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         panCardFile: data.panCardFile,
         typeCertFile: data.typeCertFile,
         aadhaarFile: data.aadhaarFile,
+        iecCertFile: data.iecCertFile,
         // Owner profile photo — captured in OwnerProfile (Owner Identity
         // section) as a File and uploaded to Cloudinary via the backend's
         // `ownerPhoto` multer field.
@@ -229,26 +307,51 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
 
     } catch (error: any) {
       console.error('Registration failed:', error);
-      // Prefer the most specific server-side message available. The axios
-      // interceptor returns `{ message, status, data }`; older callers see
-      // raw axios errors with `response.data`. Cover both shapes.
+
+      // Normalise the response payload — axios interceptor returns `{ data }`;
+      // raw axios errors carry `response.data`. Cover both shapes.
+      const payload = error?.data || error?.response?.data || {};
+      const code = payload.code;
+
+      // Duplicate vendor (GST / email already registered) — dedicated popup.
+      if (code === 'DUPLICATE_GST' || code === 'DUPLICATE_EMAIL') {
+        const message = payload.error || payload.message || 'A vendor is already registered with these details.';
+        const field = payload.field;
+        setDuplicateWarning({ message, field });
+        return;
+      }
+
+      // Structured validation errors returned by the backend.
+      if (code === 'VALIDATION_ERROR' && Array.isArray(payload.errors) && payload.errors.length > 0) {
+        const validationErrors: ValidationError[] = payload.errors.map((e: any) => {
+          const mapped = FIELD_MAP[e.field];
+          return {
+            field: e.field,
+            label: e.label || mapped?.label || e.field,
+            reason: e.message || 'This field is required',
+            step: e.step ?? mapped?.step,
+            stepLabel: e.step != null ? STEP_LABELS[e.step] : mapped ? STEP_LABELS[mapped.step] : undefined,
+          };
+        });
+        setErrorModal({
+          title: 'Please Complete Required Fields',
+          subtitle: 'The following fields must be filled in before your application can be submitted.',
+          errors: validationErrors,
+        });
+        return;
+      }
+
+      // Any other server error — show a single-entry modal.
       const message =
-        error?.response?.data?.error ||
-        error?.response?.data?.message ||
-        error?.data?.error ||
-        error?.data?.message ||
+        payload.error ||
+        payload.message ||
         error?.message ||
         'Registration failed. Please try again.';
-
-      // Duplicate vendor (GST / email already registered) is shown as a
-      // dedicated popup warning rather than the inline alert.
-      const code = error?.data?.code || error?.response?.data?.code;
-      const field = error?.data?.field || error?.response?.data?.field;
-      if (code === 'DUPLICATE_GST' || code === 'DUPLICATE_EMAIL') {
-        setDuplicateWarning({ message, field });
-      } else {
-        setSubmitError(message);
-      }
+      setErrorModal({
+        title: 'Submission Failed',
+        subtitle: 'An error occurred while submitting your application.',
+        errors: [{ field: 'server', label: 'Server Error', reason: message }],
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -328,12 +431,6 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         />
 
         <div className='max-w-full space-y-4 pt-4'>
-          {submitError && (
-            <div className="bg-error-50 border border-error-200/50 rounded-lg p-4 animate-in fade-in duration-300">
-              <div className="text-error-700 text-sm font-semibold">{submitError}</div>
-            </div>
-          )}
-
           {/* Accuracy Confirmation */}
           <div className="flex items-start gap-3 border border-slate-200 bg-slate-50/30 hover:bg-slate-50/60 transition-all duration-150 p-4 rounded-lg">
             <input
@@ -466,19 +563,108 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
         </div>
       </form>
 
-      {/* Duplicate-registration warning popup. Shown when the backend reports
-          a vendor already exists with the submitted GST number (or email). */}
+      {/* ── Validation / Agreement error modal ─────────────────────────── */}
+      {errorModal && (
+        <div
+          className="fixed inset-0 flex items-start justify-center bg-slate-900/60 backdrop-blur-sm p-4 pt-16 animate-in fade-in duration-200 overflow-y-auto"
+          style={{ zIndex: 'var(--z-modal-backdrop, 1000)' }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="error-modal-title"
+          onClick={() => setErrorModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full animate-in zoom-in-95 fade-in duration-200 mb-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start gap-4 p-6 border-b border-slate-100">
+              <div className="w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                <XCircle className="w-6 h-6 text-red-500" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 id="error-modal-title" className="text-lg font-bold text-slate-900">
+                  {errorModal.title}
+                </h3>
+                {errorModal.subtitle && (
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">{errorModal.subtitle}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setErrorModal(null)}
+                className="text-slate-400 hover:text-slate-600 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Error list */}
+            <div className="divide-y divide-slate-50 max-h-80 overflow-y-auto">
+              {errorModal.errors.map((err, i) => (
+                <div key={i} className="flex items-start gap-3 px-6 py-3.5 hover:bg-slate-50/60 transition-colors">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-2 shrink-0" aria-hidden="true" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">{err.label}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{err.reason}</p>
+                  </div>
+                  {err.step != null && (
+                    <button
+                      type="button"
+                      onClick={() => { setErrorModal(null); onGoToStep(err.step!); }}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded px-1"
+                      title={`Go to ${err.stepLabel || STEP_LABELS[err.step] || 'step'}`}
+                    >
+                      {err.stepLabel || STEP_LABELS[err.step] || 'Go to step'}
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-3 p-5 border-t border-slate-100">
+              <p className="text-xs text-slate-400">{errorModal.errors.length} issue{errorModal.errors.length !== 1 ? 's' : ''} to resolve</p>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setErrorModal(null)}
+                  className="inline-flex items-center justify-center h-9 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
+                >
+                  Close
+                </Button>
+                {errorModal.errors.some(e => e.step != null) && (
+                  <Button
+                    onClick={() => {
+                      const firstStep = errorModal.errors.find(e => e.step != null)?.step;
+                      setErrorModal(null);
+                      if (firstStep != null) onGoToStep(firstStep);
+                    }}
+                    className="inline-flex items-center gap-1.5 justify-center h-9 px-5 text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                  >
+                    Go to First Issue
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Duplicate-registration warning popup ───────────────────────── */}
       {duplicateWarning && (
         <div
-          className="fixed inset-0 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-          style={{ zIndex: 'var(--z-modal-backdrop)' }}
+          className="fixed inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          style={{ zIndex: 'var(--z-modal-backdrop, 1000)' }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="duplicate-warning-title"
           onClick={() => setDuplicateWarning(null)}
         >
           <div
-            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200"
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-4">
@@ -496,7 +682,7 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
               <button
                 type="button"
                 onClick={() => setDuplicateWarning(null)}
-                className="text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+                className="text-slate-400 hover:text-slate-600 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />

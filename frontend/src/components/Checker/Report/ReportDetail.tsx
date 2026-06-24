@@ -304,11 +304,46 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
 
       {/* SECTION 2: Legal */}
       <Section title="Section 2 — Legal & Registration" icon={ShieldCheck} accent="bg-brand-50 text-brand-700">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <InfoRow label="Business Reg. No." value={fd.businessRegistrationNumber} />
-          <InfoRow label="GST / Tax ID" value={fd.gstTaxId} />
-          <InfoRow label="Factory License No." value={fd.factoryLicenseNumber} />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+          <InfoRow label="GST Number" value={fd.gstTaxId} />
+          {fd.panNumber && <InfoRow label="PAN Number" value={fd.panNumber} />}
+          {fd.iecCode && <InfoRow label="IEC Code" value={fd.iecCode} />}
+          {fd.companyIdNumber && <InfoRow label="Company ID / CIN" value={fd.companyIdNumber} />}
         </div>
+        {/* Document verification results */}
+        {fd.docVerifications && Object.keys(fd.docVerifications).length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Document Verification</p>
+            {Object.entries(fd.docVerifications as Record<string, { verified: string; remarks: string }>).map(([idx, v]) => {
+              const docList = Array.isArray(fd.vendorDocuments)
+                ? fd.vendorDocuments.filter((d: any) => d?.type && d.type !== "OTHER" && d?.documentUrl)
+                : []
+              const doc = docList[Number(idx)]
+              if (!doc) return null
+              const label = (doc.type === "GST_CERTIFICATE" ? "GST Certificate" :
+                             doc.type === "PAN_CARD" ? "PAN Card" :
+                             doc.type === "COMPANY_REGISTRATION" ? "Company Registration" :
+                             doc.name || doc.type) as string
+              return (
+                <div key={idx} className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">{label}</p>
+                    {v.remarks && <p className="text-xs text-slate-500 mt-0.5">{v.remarks}</p>}
+                  </div>
+                  {v.verified === "yes" && (
+                    <span className="shrink-0 px-2 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full">Verified ✓</span>
+                  )}
+                  {v.verified === "no" && (
+                    <span className="shrink-0 px-2 py-0.5 text-xs font-bold bg-red-100 text-red-700 border border-red-200 rounded-full">Not Verified ✗</span>
+                  )}
+                  {(!v.verified || v.verified === "") && (
+                    <span className="shrink-0 px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-500 rounded-full">Not Checked</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </Section>
 
       {/* SECTION 3: Production */}

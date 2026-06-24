@@ -370,18 +370,18 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
             {items.map((item, i) => (
               <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="flex-1">
-                  <p className="font-semibold text-slate-900 text-sm">{item.itemName || `Item ${i + 1}`}</p>
+                  <p className="font-semibold text-slate-900 text-sm">{item.itemName || `Product ${i + 1}`}</p>
                   {item.itemDescription && <p className="text-xs text-slate-500 mt-0.5">{item.itemDescription}</p>}
                 </div>
                 <div className="flex gap-4 text-xs text-center flex-shrink-0">
-                  <div><p className="font-bold text-slate-800">{item.totalQuantity ?? "—"}</p><p className="text-slate-500">Total Qty</p></div>
+                  <div><p className="font-bold text-slate-800">{item.totalQuantity ?? "—"}</p><p className="text-slate-500">Lot Quantity</p></div>
                   <div><p className="font-bold text-brand-600">{item.inspectionQuantity ?? "—"}</p><p className="text-slate-500">Inspection Qty</p></div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-slate-400 text-sm">No items recorded.</p>
+          <p className="text-slate-400 text-sm">No products recorded.</p>
         )}
         <PhotoGrid photos={fd.warehousePhotoEvidences} label="Warehouse Photos" onImageClick={(src, alt) => setSelectedImage({src, alt})} />
       </Section>

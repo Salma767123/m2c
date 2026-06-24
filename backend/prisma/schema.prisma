@@ -258,7 +258,9 @@ model Vendor {
   ownerEmail2      String? // Optional secondary owner email
   ownerPhone       String
   ownerPhone2      String? // Optional secondary owner phone (E.164)
-  ownerLandline    String? // Optional owner landline (E.164)
+  ownerLandline         String? // Local landline assembled (STD+number, India +91)
+  ownerLocalLandlineStd String? // STD / area code part of local landline
+  ownerIntlLandline     String? // International landline assembled (dial+std+number)
   // Owner address — nullable because the registration form does NOT
   // collect a separate owner address (it shares the business address).
   // The Vendor Settings page lets vendors edit these post-approval; until
@@ -301,7 +303,10 @@ model Vendor {
   establishedYear    Int?
   companyDescription String?
   companyLogo        String? // Cloudinary URL
-  gstNumber          String? // GST/Tax identification number
+  // gstNumber is enforced unique via a MongoDB SPARSE unique index created by
+  // scripts/createGstIndex.js — Prisma's MongoDB connector cannot express
+  // sparse indexes in the schema, so the constraint lives at the DB layer.
+  gstNumber          String? // GST/Tax identification number — unique key for registered vendors
   // Type-specific regulatory ID — IEC (proprietorship) / CIN (Pvt Ltd) /
   // Partnership Deed details / LLPIN. Optional because "Other" businessType
   // values skip this in the frontend validation.
@@ -321,7 +326,9 @@ model Vendor {
 
   // Contact & Trade Information
   businessPhone   String
-  landlineNumber  String?
+  landlineNumber  String? // Local landline assembled (STD+number, India +91)
+  localLandlineStd String? // STD / area code part of local landline
+  intlLandline    String? // International landline assembled (dial+std+number)
   phoneNumber2    String?
   businessEmail   String
   businessEmail2  String? // Optional secondary contact email
@@ -690,6 +697,9 @@ model Inventory {
   sourceType    SourceType?
   supplier      String?
   lastRestocked DateTime?
+  // Timestamp of the last low-stock alert email sent; cleared when restocked
+  // above the alert level, so the vendor gets one email per low-stock episode.
+  lowStockAlertedAt DateTime?
   notes         String?
 
   // Product Creation Status
@@ -783,7 +793,11 @@ model Product {
   hasVariants Boolean          @default(false)
 
   // Base Product Info
-  baseSku String
+  // Auto-generated, immutable, globally unique: [COMPANY_CODE]-[YY]-[SERIAL].
+  baseSku String @unique
+  // Last variant suffix issued for this product (1 → A, 2 → B …). Only ever
+  // increments so deleted-variant suffixes are never reused.
+  variantSeq Int @default(0)
 
   // Images
   images      ProductImage[]
@@ -849,7 +863,8 @@ model ProductVariant {
   productId String  @db.ObjectId
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  size             String
+  variantName      String?         // Optional human label for the variant
+  size             String?         // Optional
   color            String
   colorHex         String?
   sku              String          @unique
@@ -863,6 +878,7 @@ model ProductVariant {
   originalPriceUSD Float? // Original price in USD for this variant
   priceVisibility  PriceVisibility @default(BOTH) // Controls which domain shows this variant
   stock            Int             @default(0)
+  lowStockThreshold Int?           // Per-variant low-stock alert level; falls back to the product/inventory min stock when null
   images           String[]        @default([]) // Array of image URLs
 
   createdAt DateTime @default(now())

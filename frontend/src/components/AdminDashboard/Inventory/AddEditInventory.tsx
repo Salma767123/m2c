@@ -438,10 +438,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
       return
     }
 
-    if (!formData.sku.trim()) {
-      console.error('SKU is required')
-      return
-    }
+    // SKU is auto-generated server-side — not entered by the admin.
 
     // Stock is no longer editable during inventory creation (set during product creation)
 
@@ -654,19 +651,18 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    SKU *
+                    SKU
                   </label>
                   <input
                     type="text"
                     name="sku"
                     value={formData.sku}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
-                    placeholder="Enter unique SKU code"
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-slate-600 cursor-not-allowed"
+                    placeholder={isEdit ? '' : 'Auto-generated on save'}
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    Enter a unique SKU code for this inventory item
+                    Auto-generated &amp; permanent — not editable.
                   </p>
                 </div>
 

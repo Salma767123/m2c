@@ -9,6 +9,7 @@ import ManufacturingFacilities from "../ManufacturingFacilities/ManufacturingFac
 import CertificationsLogistics from "../CertificationsLogistics/CertificationsLogistics";
 import ContactTradeInfo from "../ContactTradeInfo/ContactTradeInfo";
 import ReviewSubmit from "../ReviewSubmit/ReviewSubmit";
+import { CenterNoticeHost } from "@/components/UI/CenterNotice";
 // import ReviewSubmit from '../ReviewSubmit/ReviewSubmit'; // Temporarily commented out
 
 const steps = [
@@ -119,31 +120,13 @@ export default function VendorPanel() {
   };
 
   const goToStep = (step: number, fromReviewEdit: boolean = false) => {
+    // Steps that don't apply to this vendor (e.g. based on business type) stay
+    // unreachable, but every other step is freely navigable so users can
+    // preview/review and enter data in any order.
     if (isStepSkipped(step)) return;
 
-    if (fromReviewEdit) {
-      setIsEditingFromReview(true);
-      setCurrentStep(step);
-      return;
-    }
-
-    // Allow going to completed steps, the current step, or the next
-    // immediately-available step. When the previous step is skipped, fall
-    // back to the one before it so the flow doesn't get stuck.
-    const previousLive = findAdjacent(step, -1);
-    const canEnter =
-      step <= currentStep ||
-      completedSteps.includes(step - 1) ||
-      (previousLive >= 0 && completedSteps.includes(previousLive));
-
-    if (canEnter) {
-      setIsEditingFromReview(false);
-      setCurrentStep(step);
-    } else {
-      alert(
-        "Please complete the previous steps before proceeding to this step.",
-      );
-    }
+    setIsEditingFromReview(fromReviewEdit);
+    setCurrentStep(step);
   };
 
   const renderStep = () => {
@@ -251,6 +234,8 @@ export default function VendorPanel() {
 
   return (
     <div className="min-h-full bg-linear-to-b from-gray-100 to-slate-100 font-sans">
+      {/* Center-screen success/error/warning/info notices for the registration flow */}
+      <CenterNoticeHost />
       <div className="flex min-h-full">
         {/* Left Sidebar — semantic <aside> + <nav> (web-design #129: no <div> with onClick) */}
         <aside className="hidden md:flex flex-col w-68 bg-white border-r border-gray-100 sticky top-21.25 self-start max-h-[calc(100vh-85px)] shrink-0 z-(--z-sticky) shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
@@ -271,11 +256,9 @@ export default function VendorPanel() {
                 const skipped = isStepSkipped(index);
                 const isCompleted = completedSteps.includes(index) && !skipped;
                 const isCurrent = index === currentStep && !skipped;
-                const isAccessible =
-                  !skipped &&
-                  (index <= currentStep ||
-                    isCompleted ||
-                    (index > 0 && completedSteps.includes(index - 1)));
+                // Every non-skipped step is freely navigable — no locking of
+                // upcoming steps.
+                const isAccessible = !skipped;
 
                 return (
                   <li key={index} className="relative flex items-start gap-4 pb-6 last:pb-0">

@@ -40,11 +40,11 @@ function validatePreparation(d: any): StepErrors {
     const e: StepErrors = {}
     const items = Array.isArray(d.items) ? d.items : []
     if (items.length === 0) {
-        e.items = "Add at least one inspection item"
+        e.items = "Add at least one inspection product"
     } else {
         for (const i of items) {
             if (isBlank(i?.itemName)) {
-                e.itemName = "Item name is required"
+                e.itemName = "Product name is required"
                 break
             }
             const total = Number(i?.totalQuantity)

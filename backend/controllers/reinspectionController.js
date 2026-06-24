@@ -278,6 +278,14 @@ const adminReviewFactoryInspection = async (req, res) => {
 
         const { decision, reason, remarks, notes, newCheckerId, scheduledDate, scheduledTime } = req.body;
 
+        // Reject past dates when scheduling a re-inspection
+        if (decision === 'RAISE_REINSPECTION' && scheduledDate) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            if (new Date(scheduledDate) < today) {
+                return res.status(400).json({ error: 'Scheduled date cannot be in the past' });
+            }
+        }
+
         const inspection = await prisma.inspection.findUnique({
             where: { id: inspectionId },
             include: {

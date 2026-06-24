@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
+const { withWriteRetry } = require('../utils/dbRetry');
 
 // Recompute and persist the average rating + rating count for a vendor,
 // based on every APPROVED admin review that carries a numeric rating.
@@ -66,7 +67,7 @@ const createOrUpdateShipmentReview = async (req, res) => {
             where: { shipmentId: shipment.id },
         });
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await withWriteRetry(() => prisma.$transaction(async (tx) => {
             const basePayload = {
                 reviewComments: reviewComments || null,
                 qualityCheckNotes: qualityCheckNotes || null,
@@ -105,7 +106,7 @@ const createOrUpdateShipmentReview = async (req, res) => {
             }
 
             return review;
-        });
+        }));
 
         // Notify vendor about the review
         if (vendorId) {
@@ -212,7 +213,7 @@ const createOrUpdateAdminReview = async (req, res) => {
             where: { orderId: order.id },
         });
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await withWriteRetry(() => prisma.$transaction(async (tx) => {
             const basePayload = {
                 reviewComments: reviewComments || null,
                 qualityCheckNotes: qualityCheckNotes || null,
@@ -246,7 +247,7 @@ const createOrUpdateAdminReview = async (req, res) => {
             }
 
             return review;
-        });
+        }));
 
         res.status(existingReview ? 200 : 201).json({
             success: true,

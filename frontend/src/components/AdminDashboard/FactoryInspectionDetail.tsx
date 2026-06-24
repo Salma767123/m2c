@@ -287,11 +287,51 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
 
                     {/* Section 2: Legal & Registration */}
                     <Section title="Section 2 — Legal & Registration" icon={ShieldCheck} accent="bg-indigo-50 text-indigo-800">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            <InfoCard label="Business Reg. No." value={formData.businessRegistrationNumber} />
-                            <InfoCard label="GST / Tax ID" value={formData.gstTaxId} />
-                            <InfoCard label="Factory License No." value={formData.factoryLicenseNumber} />
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                            <InfoCard label="GST Number" value={formData.gstTaxId} />
+                            {formData.panNumber && <InfoCard label="PAN Number" value={formData.panNumber} />}
+                            {formData.iecCode && <InfoCard label="IEC Code" value={formData.iecCode} />}
+                            {formData.companyIdNumber && <InfoCard label="Company ID / CIN" value={formData.companyIdNumber} />}
                         </div>
+                        {/* Document verification results */}
+                        {formData.docVerifications && Object.keys(formData.docVerifications).length > 0 && (
+                            <div className="mt-2 space-y-2">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Document Verification</p>
+                                {Object.entries(formData.docVerifications as Record<string, { verified: string; remarks: string }>).map(([idx, v]) => {
+                                    const docList = Array.isArray(formData.vendorDocuments)
+                                        ? formData.vendorDocuments.filter((d: any) => d?.type && d.type !== 'OTHER' && d?.documentUrl)
+                                        : []
+                                    const doc = docList[Number(idx)]
+                                    const label = doc
+                                        ? (doc.type === 'GST_CERTIFICATE' ? 'GST Certificate' :
+                                           doc.type === 'PAN_CARD' ? 'PAN Card' :
+                                           doc.type === 'COMPANY_REGISTRATION' ? 'Company Registration' :
+                                           doc.name || doc.type)
+                                        : `Document ${Number(idx) + 1}`
+                                    return (
+                                        <div key={idx} className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-slate-800">{label}</p>
+                                                {v.remarks && <p className="text-xs text-slate-500 mt-0.5">{v.remarks}</p>}
+                                            </div>
+                                            {v.verified === 'yes' && (
+                                                <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+                                                    <CheckCircle className="w-3 h-3" /> Verified
+                                                </span>
+                                            )}
+                                            {v.verified === 'no' && (
+                                                <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-red-50 text-red-700 border border-red-200 rounded-full">
+                                                    <XCircle className="w-3 h-3" /> Not Verified
+                                                </span>
+                                            )}
+                                            {(!v.verified || v.verified === '') && (
+                                                <span className="shrink-0 px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-500 rounded-full">Not Checked</span>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </Section>
 
                     {/* Section 3: Production Info */}

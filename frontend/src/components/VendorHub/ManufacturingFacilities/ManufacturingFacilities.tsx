@@ -5,7 +5,7 @@ import { Button } from '@/components/UI/Button';
 import { Factory, Settings, Palette, Printer, Scissors, Shirt, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Grid3, Field, Input, Textarea, AccordionSection } from '../FormUI';
 import { scrollToFirstError } from '@/lib/formErrorScroll';
-import { showErrorToast } from '@/lib/toast-utils';
+import { centerNotice } from '@/components/UI/CenterNotice';
 
 interface ManufacturingFacilitiesProps {
   onNext: () => void;
@@ -99,7 +99,7 @@ const facilityTypes: FacilityType[] = [
     description: 'Cutting and stitching of garments',
     fields: [
       { id: 'stitchingMachines', label: 'Number of Machines', type: 'number', kind: 'integer' },
-      { id: 'stitchingCapacity', label: 'Daily Capacity (kg)', type: 'number', kind: 'decimal' },
+      { id: 'stitchingCapacity', label: 'Daily Capacity (Pieces)', type: 'number', kind: 'decimal' },
       remarksField,
     ],
   },
@@ -109,7 +109,7 @@ const facilityTypes: FacilityType[] = [
     icon: Factory,
     description: 'Final processing and quality control',
     fields: [
-      { id: 'finishingCapacity', label: 'Daily Capacity (kg)', type: 'number', kind: 'decimal' },
+      { id: 'finishingCapacity', label: 'Daily Capacity (Pieces)', type: 'number', kind: 'decimal' },
       remarksField,
     ],
   },
@@ -156,7 +156,7 @@ function validateFacilityField(field: FacilityField, raw: string, enabled: boole
     const n = parseFloat(value);
     if (n <= 0) return `${field.label} must be greater than 0.`;
     if (n > MAX_CAPACITY_KG)
-      return `${field.label} can't exceed ${MAX_CAPACITY_KG.toLocaleString()} kg.`;
+      return `${field.label} can't exceed ${MAX_CAPACITY_KG.toLocaleString()}.`;
     return '';
   }
 
@@ -340,7 +340,7 @@ export default function ManufacturingFacilities({ onNext, onPrev, onUpdateData, 
       setTouched((prev) => ({ ...prev, ...allTouched }));
 
       const count = Object.keys(newErrors).length;
-      showErrorToast(
+      centerNotice.warning(
         count === 1
           ? '1 field needs your attention'
           : `${count} fields need your attention`,

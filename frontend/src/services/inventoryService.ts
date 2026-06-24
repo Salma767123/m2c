@@ -21,8 +21,22 @@ export interface InventoryItem {
   hasProductCreated: boolean;
   productId?: string;
   productApprovalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION' | null;
+  hasVariants?: boolean;
+  variants?: InventoryVariantStock[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Per-variant stock breakdown returned with each inventory item.
+export interface InventoryVariantStock {
+  id: string;
+  variantName?: string | null;
+  size?: string | null;
+  color?: string | null;
+  sku: string;
+  stock: number;
+  lowStockThreshold?: number | null;
+  effectiveThreshold: number;
 }
 
 export interface InventoryStats {
@@ -130,6 +144,12 @@ class InventoryService {
   async getVendorCategories(): Promise<VendorCategories> {
     const response = await axios.get(`${this.baseURL}/categories`);
     return response.data.data;
+  }
+
+  // Preview the next auto-generated SKU (read-only; not consumed).
+  async getNextSku(): Promise<string> {
+    const response = await axios.get(`${this.baseURL}/next-sku`);
+    return response.data.sku as string;
   }
 
   // Create new inventory item

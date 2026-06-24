@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { SquarePen, Calendar, Building2, Warehouse, UserCircle, Tags, Factory, ShieldCheck, Briefcase } from 'lucide-react';
-import { AccordionSection } from '../FormUI';
+import { AccordionSection, getLandlineDisplay } from '../FormUI';
 
 /**
  * Read-only summary of a vendor's collected registration data. Shared by
@@ -285,7 +285,7 @@ export default function VendorDataSummary({
             />
           )}
           {data.iecCode && <InfoRow label="IEC Code" value={data.iecCode} />}
-          {data.panNumber && <InfoRow label="PAN Number" value={data.panNumber} />}
+          {data.panNumber && <InfoRow label="Company PAN Number" value={data.panNumber} />}
           {data.aadhaarNumber && <InfoRow label="Aadhaar Number" value={data.aadhaarNumber} />}
           <InfoRow label="Primary Email" value={data.email} />
           {data.email2 && <InfoRow label="Secondary Email" value={data.email2} />}
@@ -322,7 +322,7 @@ export default function VendorDataSummary({
           <InfoRow label="Same as Warehouse" value={data.sameAsWarehouse ? 'Yes' : 'No'} />
           <InfoRow label="Company Logo" value={<DocValue src={data.logo || data.logoFile} alt="Company logo" />} />
           <InfoRow label="GST Certificate" value={<DocValue src={data.gstDocument || data.gstFile} alt="GST certificate" />} />
-          <InfoRow label="PAN Card" value={<DocValue src={data.panCardDocument || data.panCardFile} alt="PAN card" />} />
+          <InfoRow label="Company PAN Card" value={<DocValue src={data.panCardDocument || data.panCardFile} alt="Company PAN card" />} />
           {(data.typeCertFile || data.typeCertDocument) && (
             <InfoRow label="Business Reg. Certificate" value={<DocValue src={data.typeCertDocument || data.typeCertFile} alt="Business registration certificate" />} />
           )}
@@ -677,9 +677,16 @@ export default function VendorDataSummary({
           {data.mainContact?.phone2 && (
             <InfoRow label="Main Contact Secondary Phone" value={data.mainContact.phone2} />
           )}
-          {data.mainContact?.landline && (
-            <InfoRow label="Main Contact Landline" value={data.mainContact.landline} />
-          )}
+          {(() => {
+            const ll = getLandlineDisplay(data.mainContact);
+            return (
+              <>
+                {ll.local && <InfoRow label="Main Contact Local Landline" value={ll.local} />}
+                {ll.intl && <InfoRow label="Main Contact International Landline" value={ll.intl} />}
+                {!ll.hasNew && ll.legacy && <InfoRow label="Main Contact Landline" value={ll.legacy} />}
+              </>
+            );
+          })()}
           <InfoRow
             label="Main Contact Department"
             value={data.mainContact?.customDepartment || data.mainContact?.department || 'Not provided'}

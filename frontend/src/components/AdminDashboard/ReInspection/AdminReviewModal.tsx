@@ -232,6 +232,7 @@ export default function AdminReviewModal({
                       <input
                         type="date"
                         value={scheduledDate}
+                        min={new Date().toISOString().slice(0, 10)}
                         onChange={e => setScheduledDate(e.target.value)}
                         className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
                       />

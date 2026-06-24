@@ -171,9 +171,14 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
     vendorProducts: [] as any[],
 
     // 2. Legal & Registration
-    businessRegistrationNumber: "",
     gstTaxId: "",
-    factoryLicenseNumber: "",
+    panNumber: "",
+    iecCode: "",
+    companyIdNumber: "",
+    businessType: "",
+    // docVerifications: keyed by doc index in the filtered legal-docs list.
+    // { [idx]: { verified: 'yes'|'no'|'', remarks: '' } }
+    docVerifications: {} as Record<string, { verified: string; remarks: string }>,
 
     // 3. Production Info
     productsManufactured: "",
@@ -272,18 +277,37 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
             contactPhoneNumber: prev.contactPhoneNumber || (prevForm?.contactPhoneNumber) || v.businessPhone || "",
             factoryAddress: prev.factoryAddress || (prevForm?.factoryAddress) || factoryAddressFull,
             vendorContact: {
+              // Business contact
               loginEmail: v.email || "",
               businessPhone: v.businessPhone || "",
               phoneNumber2: v.phoneNumber2 || "",
               landlineNumber: v.landlineNumber || "",
+              localLandlineStd: v.localLandlineStd || "",
+              intlLandline: v.intlLandline || "",
               businessEmail: v.businessEmail || "",
               businessEmail2: v.businessEmail2 || "",
+              // Factory location
+              factoryCity: v.factoryCity || "",
+              factoryState: v.factoryState || "",
+              factoryZipCode: v.factoryZipCode || "",
+              factoryCountry: v.factoryCountry || "",
+              mapLink: v.mapLink || "",
+              factoryOwnershipType: v.factoryOwnershipType || "",
+              // Owner / Proprietor
               ownerName: v.ownerName || "",
               ownerPhone: v.ownerPhone || "",
               ownerPhone2: v.ownerPhone2 || "",
               ownerLandline: v.ownerLandline || "",
+              ownerLocalLandlineStd: v.ownerLocalLandlineStd || "",
+              ownerIntlLandline: v.ownerIntlLandline || "",
               ownerEmail: v.ownerEmail || "",
               ownerEmail2: v.ownerEmail2 || "",
+              ownerPhoto: v.ownerPhoto || "",
+              ownerDesignation: v.designation || "",
+              additionalOwners: Array.isArray(v.additionalOwners) ? v.additionalOwners : [],
+              // Unregistered vendor Aadhaar
+              aadhaarNumber: v.aadhaarNumber || "",
+              // Contact persons
               mainContact: v.mainContact || null,
               alternateContacts: Array.isArray(v.alternateContacts) ? v.alternateContacts : [],
             },
@@ -291,8 +315,13 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
             vendorDocuments: prev.vendorDocuments.length ? prev.vendorDocuments : (Array.isArray(v.documents) ? v.documents : []),
             vendorProducts: prev.vendorProducts.length ? prev.vendorProducts : (Array.isArray(v.products) ? v.products : []),
             gstTaxId: prev.gstTaxId || (prevForm?.gstTaxId) || v.gstNumber || "",
-            businessRegistrationNumber: prev.businessRegistrationNumber || (prevForm?.businessRegistrationNumber) || v.businessRegistrationNumber || "",
-            factoryLicenseNumber: prev.factoryLicenseNumber || (prevForm?.factoryLicenseNumber) || v.tradeLicenseNumber || "",
+            panNumber: prev.panNumber || v.panNumber || "",
+            iecCode: prev.iecCode || v.iecCode || "",
+            companyIdNumber: prev.companyIdNumber || v.companyIdNumber || "",
+            businessType: prev.businessType || v.businessType || "",
+            docVerifications: prev.docVerifications && Object.keys(prev.docVerifications).length > 0
+              ? prev.docVerifications
+              : (prevForm?.docVerifications || {}),
             // Production Info (only from previous form data)
             productsManufactured: prev.productsManufactured || (prevForm?.productsManufactured) || "",
             monthlyProductionCapacity: prev.monthlyProductionCapacity || (prevForm?.monthlyProductionCapacity) || "",
@@ -319,8 +348,6 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
             contactPhoneNumber: isNonEmpty(prevForm?.contactPhoneNumber || v.businessPhone),
             factoryAddress: isNonEmpty(prevForm?.factoryAddress || factoryAddressFull),
             gstTaxId: isNonEmpty(prevForm?.gstTaxId || v.gstNumber),
-            businessRegistrationNumber: isNonEmpty(prevForm?.businessRegistrationNumber || v.businessRegistrationNumber),
-            factoryLicenseNumber: isNonEmpty(prevForm?.factoryLicenseNumber || v.tradeLicenseNumber),
             categoryToInspect: isNonEmpty(prevForm?.categoryToInspect || assignedCategories),
           })
 

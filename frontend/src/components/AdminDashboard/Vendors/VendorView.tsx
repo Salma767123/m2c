@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card'
@@ -43,7 +44,7 @@ import { toast } from '@/hooks/use-toast'
 import RejectionModal from './RejectionModal'
 import SuspensionModal from './SuspensionModal'
 import { hasPermission } from '@/lib/auth'
-import { isEmbeddableMapUrl, sanitizeEmbedSrc } from '@/lib/mapLink'
+import { getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
 
 interface VendorViewProps {
   vendorId: string
@@ -562,7 +563,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                 <div className="flex items-center space-x-3">
                   <Mail className="h-4 w-4 text-gray-400" />
                   <div>
-                    <p className="text-sm text-gray-600">Business Email</p>
+                    <p className="text-sm text-gray-600">Email 1</p>
                     <p className="font-medium">{vendor.businessEmail || vendor.email}</p>
                   </div>
                 </div>
@@ -571,7 +572,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="flex items-center space-x-3">
                     <Mail className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Business Email 2</p>
+                      <p className="text-sm text-gray-600">Email 2</p>
                       <p className="font-medium">{(vendor as any).businessEmail2}</p>
                     </div>
                   </div>
@@ -580,7 +581,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                 <div className="flex items-center space-x-3">
                   <Phone className="h-4 w-4 text-gray-400" />
                   <div>
-                    <p className="text-sm text-gray-600">Business Phone</p>
+                    <p className="text-sm text-gray-600">Phone Number 1</p>
                     <p className="font-medium">{vendor.businessPhone}</p>
                   </div>
                 </div>
@@ -589,8 +590,17 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="flex items-center space-x-3">
                     <Phone className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Landline Number</p>
-                      <p className="font-medium">{vendor.landlineNumber}</p>
+                      <p className="text-sm text-gray-600">Local Landline Number</p>
+                      <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: (vendor as any).localLandlineStd, number: vendor.landlineNumber })}</p>
+                    </div>
+                  </div>
+                )}
+                {(vendor as any).intlLandline && (
+                  <div className="flex items-center space-x-3">
+                    <Phone className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600">International Landline Number</p>
+                      <p className="font-medium">{formatIntlLandline((vendor as any).intlLandline)}</p>
                     </div>
                   </div>
                 )}
@@ -605,12 +615,26 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   </div>
                 )}
 
-                {vendor.gstNumber && (
+                {vendor.gstNumber ? (
                   <div className="flex items-center space-x-3">
                     <FileText className="h-4 w-4 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-600">GST Number</p>
-                      <p className="font-medium">{vendor.gstNumber}</p>
+                      <p className="text-sm text-gray-600 flex items-center gap-1.5">
+                        GST Number
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-green-50 text-green-700 border border-green-200">Unique ID</span>
+                      </p>
+                      <p className="font-medium font-mono tracking-wide">{vendor.gstNumber}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-3">
+                    <FileText className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600 flex items-center gap-1.5">
+                        Vendor Type
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Unregistered</span>
+                      </p>
+                      <p className="text-sm text-gray-500">No GST — identified by email</p>
                     </div>
                   </div>
                 )}
@@ -663,7 +687,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <User className="h-5 w-5" />
-              <span>Owner Information</span>
+              <span>Owner Identity</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -680,7 +704,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
                 <div>
-                  <p className="text-sm text-gray-600">Name</p>
+                  <p className="text-sm text-gray-600">Owner Full Name</p>
                   <p className="font-medium">{vendor.ownerName}</p>
                 </div>
                 {(vendor as any).designation && (
@@ -690,29 +714,35 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   </div>
                 )}
                 <div>
-                  <p className="text-sm text-gray-600">Email</p>
+                  <p className="text-sm text-gray-600">Primary Email</p>
                   <p className="font-medium">{vendor.ownerEmail}</p>
                 </div>
                 {(vendor as any).ownerEmail2 && (
                   <div>
-                    <p className="text-sm text-gray-600">Email 2</p>
+                    <p className="text-sm text-gray-600">Secondary Email</p>
                     <p className="font-medium">{(vendor as any).ownerEmail2}</p>
                   </div>
                 )}
                 <div>
-                  <p className="text-sm text-gray-600">Phone</p>
+                  <p className="text-sm text-gray-600">Primary Phone</p>
                   <p className="font-medium">{vendor.ownerPhone}</p>
                 </div>
                 {(vendor as any).ownerPhone2 && (
                   <div>
-                    <p className="text-sm text-gray-600">Phone 2</p>
+                    <p className="text-sm text-gray-600">Secondary Phone</p>
                     <p className="font-medium">{(vendor as any).ownerPhone2}</p>
                   </div>
                 )}
                 {(vendor as any).ownerLandline && (
                   <div>
-                    <p className="text-sm text-gray-600">Landline</p>
-                    <p className="font-medium">{(vendor as any).ownerLandline}</p>
+                    <p className="text-sm text-gray-600">Local Landline</p>
+                    <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: (vendor as any).ownerLocalLandlineStd, number: (vendor as any).ownerLandline })}</p>
+                  </div>
+                )}
+                {(vendor as any).ownerIntlLandline && (
+                  <div>
+                    <p className="text-sm text-gray-600">International Landline</p>
+                    <p className="font-medium">{formatIntlLandline((vendor as any).ownerIntlLandline)}</p>
                   </div>
                 )}
                 {(vendor as any).businessStartDate && (
@@ -753,7 +783,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 flex-1 text-sm">
                           <div>
-                            <p className="text-gray-500">Name</p>
+                            <p className="text-gray-500">Full Name</p>
                             <p className="font-medium">{owner.name}</p>
                           </div>
                           {owner.designation && (
@@ -784,7 +814,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                           )}
                           {owner.landline && (
                             <div>
-                              <p className="text-gray-500">Landline</p>
+                              <p className="text-gray-500">Local Landline</p>
                               <p className="font-medium">{owner.landline}</p>
                             </div>
                           )}
@@ -909,7 +939,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
       {/* Identification & Compliance — legal IDs collected on Step 1
           (CompanyDetails). Surfaced here so admins can verify against
           uploaded certificates during approval review. */}
-      {(v.companyIdNumber || v.panNumber || v.factoryOwnershipType) && (
+      {(v.companyIdNumber || v.panNumber || v.factoryOwnershipType || v.iecCode || v.aadhaarNumber) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -925,15 +955,27 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                   <p className="font-medium">{v.companyIdNumber}</p>
                 </div>
               )}
+              {v.iecCode && (
+                <div>
+                  <p className="text-sm text-gray-600">IEC Code (Import Export Code)</p>
+                  <p className="font-medium">{v.iecCode}</p>
+                </div>
+              )}
               {v.panNumber && (
                 <div>
                   <p className="text-sm text-gray-600">PAN Number</p>
                   <p className="font-medium">{v.panNumber}</p>
                 </div>
               )}
+              {v.aadhaarNumber && (
+                <div>
+                  <p className="text-sm text-gray-600">Aadhaar Number</p>
+                  <p className="font-medium">{v.aadhaarNumber}</p>
+                </div>
+              )}
               {v.factoryOwnershipType && (
                 <div>
-                  <p className="text-sm text-gray-600">Factory Ownership</p>
+                  <p className="text-sm text-gray-600">Factory Ownership Type</p>
                   <p className="font-medium capitalize">{v.factoryOwnershipType}</p>
                 </div>
               )}
@@ -963,7 +1005,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
       </Card>
 
       {/* Warehouse & Map Details */}
-      {(vendor.warehouseAddress || vendor.mapLink) && (
+      {vendor.warehouseAddress && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -1020,79 +1062,6 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                 )}
               </div>
 
-              {/* Google Map Display */}
-              {vendor.mapLink && (
-                <div className="mt-6">
-                  <p className="text-sm text-gray-600 mb-3 font-semibold">Location Map</p>
-                  {isEmbeddableMapUrl(vendor.mapLink) ? (
-                    <div className="relative border border-gray-200 rounded-lg overflow-hidden">
-                      <iframe
-                        src={sanitizeEmbedSrc(vendor.mapLink)}
-                        width="100%"
-                        height="400"
-                        style={{ border: 0 }}
-                        allowFullScreen
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                        title="Warehouse Location"
-                        className="w-full"
-                      />
-                      {/* Pin overlay — required when the URL uses our `ll=`/`q=`
-                          coords format (no native Google marker). The `pb=`
-                          embed-share URLs already render their own pin, so we
-                          skip the overlay for those to avoid a double marker. */}
-                      {/maps\.google\.com\/maps\?(?:ll|q)=/.test(vendor.mapLink) && (
-                        <div
-                          className="absolute pointer-events-none"
-                          style={{
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -100%)',
-                          }}
-                        >
-                          <svg
-                            width="32"
-                            height="42"
-                            viewBox="0 0 32 42"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              d="M16 0C7.164 0 0 7.164 0 16c0 12 16 26 16 26s16-14 16-26C32 7.164 24.836 0 16 0z"
-                              fill="#EA4335"
-                            />
-                            <circle cx="16" cy="16" r="6" fill="white" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-8 border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center bg-gray-50">
-                      <Globe className="h-12 w-12 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-600 text-center mb-4">
-                        A location link is provided but it's not a direct map embed.
-                      </p>
-                      <Button asChild variant="outline">
-                        <a href={vendor.mapLink} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          View on Google Maps
-                        </a>
-                      </Button>
-                    </div>
-                  )}
-                  <div className="mt-2 text-right">
-                    <a
-                      href={vendor.mapLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
-                    >
-                      <Globe className="h-3 w-3" />
-                      Open Full Map in New Tab
-                    </a>
-                  </div>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -1705,7 +1674,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
               <div>
-                <p className="text-sm text-gray-600">Name</p>
+                <p className="text-sm text-gray-600">Full Name</p>
                 <p className="font-medium">{vendor.mainContact.name || 'N/A'}</p>
               </div>
               <div>
@@ -1715,31 +1684,50 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Email 1</p>
+                <p className="text-sm text-gray-600">Primary Email</p>
                 <p className="font-medium">{vendor.mainContact.email1 || vendor.mainContact.email || 'N/A'}</p>
               </div>
               {vendor.mainContact.email2 && (
                 <div>
-                  <p className="text-sm text-gray-600">Email 2</p>
+                  <p className="text-sm text-gray-600">Secondary Email</p>
                   <p className="font-medium">{vendor.mainContact.email2}</p>
                 </div>
               )}
               <div>
-                <p className="text-sm text-gray-600">Phone 1</p>
+                <p className="text-sm text-gray-600">Primary Phone</p>
                 <p className="font-medium">{vendor.mainContact.phone1 || vendor.mainContact.phone || 'N/A'}</p>
               </div>
               {vendor.mainContact.phone2 && (
                 <div>
-                  <p className="text-sm text-gray-600">Phone 2</p>
+                  <p className="text-sm text-gray-600">Secondary Phone</p>
                   <p className="font-medium">{vendor.mainContact.phone2}</p>
                 </div>
               )}
-              {(vendor.mainContact as any).landline && (
-                <div>
-                  <p className="text-sm text-gray-600">Landline</p>
-                  <p className="font-medium">{(vendor.mainContact as any).landline}</p>
-                </div>
-              )}
+              {(() => {
+                const ll = getLandlineDisplay(vendor.mainContact as any);
+                return (
+                  <>
+                    {ll.local && (
+                      <div>
+                        <p className="text-sm text-gray-600">Local Landline Number</p>
+                        <p className="font-medium">{ll.local}</p>
+                      </div>
+                    )}
+                    {ll.intl && (
+                      <div>
+                        <p className="text-sm text-gray-600">International Landline Number</p>
+                        <p className="font-medium">{ll.intl}</p>
+                      </div>
+                    )}
+                    {!ll.hasNew && ll.legacy && (
+                      <div>
+                        <p className="text-sm text-gray-600">Local Landline Number</p>
+                        <p className="font-medium">{ll.legacy}</p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <div>
                 <p className="text-sm text-gray-600">Department</p>
                 <p className="font-medium capitalize">
@@ -1758,17 +1746,22 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Mail className="h-5 w-5" />
-              <span>Alternate Contacts</span>
+              <span>Additional Contact Persons</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
               {vendor.alternateContacts.map((contact: any, index: number) => (
                 <div key={index} className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-4">Contact {index + 1}</h4>
+                  <div className="flex items-center gap-3 mb-4">
+                    {contact.photo && (
+                      <Image src={contact.photo} alt={contact.name || 'Contact'} width={40} height={40} className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" />
+                    )}
+                    <h4 className="font-medium text-gray-900">Contact Person {index + 2}</h4>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600">Name</p>
+                      <p className="text-sm text-gray-600">Full Name</p>
                       <p className="font-medium">{contact.name || 'N/A'}</p>
                     </div>
                     <div>
@@ -1778,29 +1771,35 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="text-sm text-gray-600">Primary Email</p>
                       <p className="font-medium">{contact.email1 || contact.email || 'N/A'}</p>
                     </div>
                     {contact.email2 && (
                       <div>
-                        <p className="text-sm text-gray-600">Email 2</p>
+                        <p className="text-sm text-gray-600">Secondary Email</p>
                         <p className="font-medium">{contact.email2}</p>
                       </div>
                     )}
                     <div>
-                      <p className="text-sm text-gray-600">Phone</p>
+                      <p className="text-sm text-gray-600">Primary Phone</p>
                       <p className="font-medium">{contact.phone1 || contact.phone || 'N/A'}</p>
                     </div>
                     {contact.phone2 && (
                       <div>
-                        <p className="text-sm text-gray-600">Phone 2</p>
+                        <p className="text-sm text-gray-600">Secondary Phone</p>
                         <p className="font-medium">{contact.phone2}</p>
                       </div>
                     )}
-                    {contact.landline && (
+                    {(contact.localLandline || contact.landline) && (
                       <div>
-                        <p className="text-sm text-gray-600">Landline</p>
-                        <p className="font-medium">{contact.landline}</p>
+                        <p className="text-sm text-gray-600">Local Landline Number</p>
+                        <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: contact.localLandlineStd, number: contact.localLandline || contact.landline })}</p>
+                      </div>
+                    )}
+                    {contact.intlLandline && (
+                      <div>
+                        <p className="text-sm text-gray-600">International Landline Number</p>
+                        <p className="font-medium">{formatIntlLandline(contact.intlLandline)}</p>
                       </div>
                     )}
                     <div>

@@ -24,6 +24,12 @@ const createInspection = async (req, res) => {
             return res.status(400).json({ error: 'Missing required configuration for QC Assignment' });
         }
 
+        // Reject past dates
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        if (new Date(scheduledDate) < today) {
+            return res.status(400).json({ error: 'Scheduled date cannot be in the past' });
+        }
+
         // Optional validation: Ensure QC Checker exists
         const checker = await prisma.qCChecker.findUnique({ where: { id: checkerId } });
         if (!checker) {
@@ -331,6 +337,14 @@ const updateInspection = async (req, res) => {
             estimatedDuration,
             itemsToInspect
         } = req.body;
+
+        // Reject past dates
+        if (scheduledDate) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            if (new Date(scheduledDate) < today) {
+                return res.status(400).json({ error: 'Scheduled date cannot be in the past' });
+            }
+        }
 
         const updatedInspection = await prisma.inspection.update({
             where: { id },

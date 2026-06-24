@@ -19,9 +19,10 @@ interface InspectionData {
   factoryAddress?: string;
   contactPersonName?: string;
   contactPhoneNumber?: string;
-  businessRegistrationNumber?: string;
   gstTaxId?: string;
-  factoryLicenseNumber?: string;
+  panNumber?: string;
+  iecCode?: string;
+  companyIdNumber?: string;
   productsManufactured?: string;
   monthlyProductionCapacity?: string;
   numberOfProductionWorkers?: string;
@@ -288,9 +289,10 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
               <Shield className="h-5 w-5 text-blue-600" /> Legal & Registration
             </h3>
             <div className="space-y-3">
-              <div className="flex justify-between"><span className="text-gray-600">Business Reg. No.</span><span className="font-medium">{formData.businessRegistrationNumber || "N/A"}</span></div>
               <div className="flex justify-between"><span className="text-gray-600">GST / Tax ID</span><span className="font-medium">{formData.gstTaxId || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Factory License No.</span><span className="font-medium">{formData.factoryLicenseNumber || "N/A"}</span></div>
+              {formData.panNumber && <div className="flex justify-between"><span className="text-gray-600">PAN Number</span><span className="font-medium font-mono">{formData.panNumber}</span></div>}
+              {formData.iecCode && <div className="flex justify-between"><span className="text-gray-600">IEC Code</span><span className="font-medium font-mono">{formData.iecCode}</span></div>}
+              {formData.companyIdNumber && <div className="flex justify-between"><span className="text-gray-600">Company ID / CIN</span><span className="font-medium font-mono">{formData.companyIdNumber}</span></div>}
             </div>
           </CardContent>
         </Card>

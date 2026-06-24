@@ -34,6 +34,7 @@ interface InventoryItem {
 
 interface ProductVariant {
   id: string
+  variantName?: string
   size: string
   color: string
   colorHex?: string
@@ -420,8 +421,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                         {/* Variant Info */}
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900">{variant.size}</span>
-                            <span className="text-gray-400">•</span>
+                            <span className="font-medium text-gray-900">{variant.variantName?.trim() || variant.size || 'Variant'}</span>
+                            {variant.color && <span className="text-gray-400">•</span>}
                             <div className="flex items-center gap-2">
                               {variant.colorHex && (
                                 <div

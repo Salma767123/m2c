@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import VendorService, { VendorProfile } from "@/services/vendorService";
 import ResultModal from "@/components/UI/ResultModal";
+import { PhoneInput, LocalLandlineInput, getLandlineDisplay } from "@/components/VendorHub/FormUI";
 
 // A certificate may only be edited/replaced when it is expired or within this
 // many days of expiring. Valid certs (and certs with no expiry) stay locked.
@@ -453,7 +454,12 @@ function MainContactSection({
       department: mc.customDepartment || mc.department || "",
       email2: mc.email2 || "",
       phone2: mc.phone2 || "",
-      landline: mc.landline || "",
+      // New split landline fields. For legacy records that only have the old
+      // single `landline`, carry it into the local number so it isn't lost.
+      localLandlineCountryCode: mc.localLandlineCountryCode || "+91",
+      localLandlineStd: mc.localLandlineStd || "",
+      localLandline: mc.localLandline || (mc.localLandlineStd ? "" : mc.landline) || "",
+      intlLandline: mc.intlLandline || "",
     });
     setEditing(true);
   };
@@ -472,7 +478,12 @@ function MainContactSection({
         department: form.department,
         email2: form.email2,
         phone2: form.phone2,
-        landline: form.landline,
+        localLandlineCountryCode: form.localLandlineCountryCode || "+91",
+        localLandlineStd: form.localLandlineStd || "",
+        localLandline: form.localLandline || "",
+        intlLandline: form.intlLandline || "",
+        // Legacy single landline is superseded once a local landline is set.
+        landline: form.localLandline ? "" : (mc.landline || ""),
         email1: mc.email1,
         email: mc.email,
         phone1: mc.phone1,
@@ -540,7 +551,16 @@ function MainContactSection({
             {mc.email2 && <Field label="Secondary Email" value={mc.email2} />}
             {primaryPhone && <Field label="Phone" value={primaryPhone} />}
             {mc.phone2 && <Field label="Secondary Phone" value={mc.phone2} />}
-            {mc.landline && <Field label="Landline" value={mc.landline} />}
+            {(() => {
+              const ll = getLandlineDisplay(mc);
+              return (
+                <>
+                  {ll.local && <Field label="Local Landline" value={ll.local} />}
+                  {ll.intl && <Field label="International Landline" value={ll.intl} />}
+                  {!ll.hasNew && ll.legacy && <Field label="Landline" value={ll.legacy} />}
+                </>
+              );
+            })()}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
@@ -551,7 +571,38 @@ function MainContactSection({
             <EditInput label="Secondary Email" type="email" value={form.email2} onChange={set("email2")} />
             <LockedField label="Primary Phone" value={primaryPhone} />
             <EditInput label="Secondary Phone" value={form.phone2} onChange={set("phone2")} />
-            <EditInput label="Landline" value={form.landline} onChange={set("landline")} />
+            <div className="md:col-span-2 lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 block">
+                  Local Landline
+                </label>
+                <LocalLandlineInput
+                  value={{
+                    countryCode: form.localLandlineCountryCode || "+91",
+                    std: form.localLandlineStd || "",
+                    number: form.localLandline || "",
+                  }}
+                  onChange={(v) =>
+                    setForm((f: any) => ({
+                      ...f,
+                      localLandlineCountryCode: v.countryCode,
+                      localLandlineStd: v.std,
+                      localLandline: v.number,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 block">
+                  International Landline
+                </label>
+                <PhoneInput
+                  value={form.intlLandline || ""}
+                  onChange={(v) => setForm((f: any) => ({ ...f, intlLandline: v }))}
+                  placeholder="44 2817 5000"
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>

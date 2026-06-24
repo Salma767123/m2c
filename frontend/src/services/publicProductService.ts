@@ -32,6 +32,7 @@ export interface PublicProduct {
   hasVariants: boolean;
   variants?: Array<{
     id: string;
+    variantName?: string;
     size: string;
     color: string;
     colorHex?: string;

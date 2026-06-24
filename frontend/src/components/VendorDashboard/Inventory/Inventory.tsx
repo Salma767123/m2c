@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { Card, CardContent } from '@/components/UI/Card'
 import { Button } from '@/components/UI/Button'
 import {
@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/UI/Table'
-import { Package, PackagePlus, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Edit, Trash2, History, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react'
+import { Package, PackagePlus, AlertTriangle, TrendingDown, TrendingUp, Plus, Search, Edit, Trash2, History, ChevronLeft, ChevronRight, ChevronDown, Eye, X } from 'lucide-react'
 import Link from 'next/link'
 import Dropdown from '@/components/UI/Dropdown'
 import inventoryService, { InventoryItem as APIInventoryItem, InventoryStats } from '@/services/inventoryService'
@@ -56,6 +56,34 @@ const getApprovalBadge = (item: APIInventoryItem) => {
   }
 }
 
+// Variant-aware stock state: for products with variants, low-stock is judged
+// PER VARIANT (a product is low if ANY variant is at/below its alert level,
+// even when the total looks healthy). Mirrors the backend logic.
+const computeStockFlags = (item: APIInventoryItem) => {
+  const variants = item.variants || []
+  if (variants.length > 0) {
+    const allZero = variants.every(v => (v.stock || 0) === 0) && (item.baseStock || 0) === 0
+    const anyLow = variants.some(v => (v.stock || 0) > 0 && (v.stock || 0) <= (v.effectiveThreshold ?? item.lowStockAlert))
+    return { out: allZero, low: !allZero && anyLow }
+  }
+  return {
+    out: (item.currentStock || 0) === 0,
+    low: (item.currentStock || 0) > 0 && (item.currentStock || 0) <= item.lowStockAlert,
+  }
+}
+
+const stockStatusBadge = (item: APIInventoryItem) => {
+  const { out, low } = computeStockFlags(item)
+  if (out) return <span className={`${pill} bg-red-50 text-red-700 border-red-200`}>Out of Stock</span>
+  if (low) return <span className={`${pill} bg-yellow-50 text-yellow-700 border-yellow-200`}>Low Stock</span>
+  return <span className={`${pill} bg-green-50 text-green-700 border-green-200`}>In Stock</span>
+}
+
+// Show the variant NAME only (no size/color). Unnamed variants get a numbered
+// fallback so they stay distinguishable.
+const variantLabel = (v: { variantName?: string | null }, index: number) =>
+  v.variantName?.trim() || `Variant ${index + 1}`
+
 export default function Inventory() {
   const [inventoryItems, setInventoryItems] = useState<APIInventoryItem[]>([])
   const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null)
@@ -64,6 +92,7 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE'>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [productStatusFilter, setProductStatusFilter] = useState<string>('all')
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all')
   const [restockedFrom, setRestockedFrom] = useState<string>('')
   const [restockedTo, setRestockedTo] = useState<string>('')
@@ -85,6 +114,13 @@ export default function Inventory() {
 
   // View details modal state
   const [viewItem, setViewItem] = useState<APIInventoryItem | null>(null)
+  // Inventory rows expanded to reveal their per-variant stock breakdown.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const toggleExpanded = (id: string) => setExpandedIds(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
 
   // Calculate stats
   const totalItems = inventoryStats?.totalItems || 0
@@ -98,8 +134,20 @@ export default function Inventory() {
   // Apply stock-level filter (driven by clicking the Low/Out of Stock cards)
   // and the Last Restocked date-range (calendar) filter.
   const displayedItems = inventoryItems.filter((item) => {
-    if (stockFilter === 'out' && item.currentStock !== 0) return false
-    if (stockFilter === 'low' && !(item.currentStock > 0 && item.currentStock <= item.lowStockAlert)) return false
+    if (stockFilter === 'out' || stockFilter === 'low') {
+      const flags = computeStockFlags(item)
+      if (stockFilter === 'out' && !flags.out) return false
+      if (stockFilter === 'low' && !flags.low) return false
+    }
+
+    // Product status filter (matches the badge shown in the table).
+    if (productStatusFilter !== 'all') {
+      if (productStatusFilter === 'none') {
+        if (item.hasProductCreated) return false
+      } else if (!item.hasProductCreated || item.productApprovalStatus !== productStatusFilter) {
+        return false
+      }
+    }
 
     // Date filter: a full range filters between both endpoints; a single
     // selected date (only one endpoint) filters to that exact day.
@@ -359,6 +407,20 @@ export default function Inventory() {
               }))}
               onChange={(value) => setCategoryFilter(value as string)}
             />
+            <Dropdown
+              id="productStatusFilter"
+              value={productStatusFilter}
+              options={[
+                { value: 'all', label: 'All Product Status' },
+                { value: 'none', label: 'No Product' },
+                { value: 'PENDING', label: 'Pending Approval' },
+                { value: 'QC_APPROVED', label: 'QC Approved' },
+                { value: 'APPROVED', label: 'Approved' },
+                { value: 'REJECTED', label: 'Rejected' },
+                { value: 'REINSPECTION', label: 'Reinspection' },
+              ]}
+              onChange={(value) => setProductStatusFilter(value as string)}
+            />
             {/* Last Restocked calendar filter */}
             <DateRangeCalendar
               from={restockedFrom}
@@ -369,14 +431,6 @@ export default function Inventory() {
           </div>
         </div>
       </div>
-
-      {/* Results summary */}
-      {displayedItems.length > 0 && (
-        <p className="text-sm text-slate-500">
-          Showing {displayedItems.length} item{displayedItems.length === 1 ? '' : 's'}
-          {stockFilter === 'low' ? ' • Low Stock' : stockFilter === 'out' ? ' • Out of Stock' : ''}
-        </p>
-      )}
 
       {/* Inventory Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
@@ -406,13 +460,34 @@ export default function Inventory() {
                   </TableCell>
                 </TableRow>
               ) : (
-                displayedItems.map((item) => (
-                  <TableRow key={item.id} className="hover:bg-slate-50">
+                displayedItems.map((item) => {
+                  const variants = item.variants || []
+                  const hasVariants = variants.length > 0
+                  const isExpanded = expandedIds.has(item.id)
+                  const { low: itemLow } = computeStockFlags(item)
+                  return (
+                  <Fragment key={item.id}>
+                  <TableRow className={`transition-colors ${isExpanded && hasVariants ? 'bg-brand-50/40 hover:bg-brand-50/50 [&>td:first-child]:shadow-[inset_3px_0_0_0_var(--color-brand-500,#e01a1b)]' : 'hover:bg-slate-50'}`}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium text-slate-900">{item.name}</div>
-                        <div className="text-sm text-slate-500">
-                          {item.category}{item.subcategory ? ` > ${item.subcategory}` : ''}
+                      <div className="flex items-center gap-2.5">
+                        {hasVariants ? (
+                          <button
+                            onClick={() => toggleExpanded(item.id)}
+                            className={`flex items-center justify-center h-6 w-6 rounded-lg border transition-all ${isExpanded ? 'bg-brand-500 border-brand-500 text-white' : 'border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
+                            title={isExpanded ? 'Hide variants' : 'Show variants'}
+                            aria-expanded={isExpanded}
+                          >
+                            <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-300 ${isExpanded ? '' : '-rotate-90'}`} />
+                          </button>
+                        ) : (
+                          <span className="inline-block w-6" />
+                        )}
+                        <div>
+                          <div className="font-semibold text-slate-900">{item.name}</div>
+                          <div className="text-sm text-slate-500">
+                            {item.category}{item.subcategory ? ` > ${item.subcategory}` : ''}
+                            {hasVariants && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-md bg-brand-50 text-brand-600 text-[11px] font-semibold">{variants.length} variant{variants.length === 1 ? '' : 's'}</span>}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
@@ -421,7 +496,7 @@ export default function Inventory() {
                       {getApprovalBadge(item)}
                     </TableCell>
                     <TableCell>
-                      <span className={item.currentStock <= item.lowStockAlert ? 'text-red-600 font-bold' : 'text-slate-900 font-semibold'}>
+                      <span className={itemLow ? 'text-red-600 font-bold' : 'text-slate-900 font-semibold'}>
                         {item.currentStock}
                       </span>
                     </TableCell>
@@ -433,7 +508,7 @@ export default function Inventory() {
                     <TableCell className="text-sm text-slate-600">
                       {item.lowStockAlert}
                     </TableCell>
-                    <TableCell>{getStatusBadge(item.status, item.currentStock, item.lowStockAlert)}</TableCell>
+                    <TableCell>{stockStatusBadge(item)}</TableCell>
                     <TableCell className="text-sm text-slate-600">
                       {item.lastRestocked ? new Date(item.lastRestocked).toLocaleDateString() : 'Never'}
                     </TableCell>
@@ -502,7 +577,44 @@ export default function Inventory() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+
+                  {/* Per-variant stock breakdown — grouped child rows under the parent */}
+                  {hasVariants && isExpanded && variants.map((v, vi) => {
+                    const threshold = v.effectiveThreshold ?? item.lowStockAlert
+                    const isLast = vi === variants.length - 1
+                    return (
+                      <TableRow
+                        key={v.id}
+                        className="bg-brand-50/40 hover:bg-brand-50/70 transition-colors animate-in fade-in slide-in-from-top-1 duration-200 [&>td]:py-2 [&>td]:border-0"
+                      >
+                        <TableCell className="!pl-6">
+                          {/* Tree connector: vertical spine + branch into the row */}
+                          <div className="flex items-stretch gap-2.5">
+                            <div className="relative w-4 shrink-0">
+                              <span className={`absolute left-1/2 top-0 w-px bg-brand-200 ${isLast ? 'h-1/2' : 'h-full'}`} />
+                              <span className="absolute left-1/2 top-1/2 h-px w-2 bg-brand-200" />
+                            </div>
+                            <span className="text-[13px] font-medium text-slate-700">{variantLabel(v, vi)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-slate-500">{v.sku}</TableCell>
+                        <TableCell></TableCell>
+                        <TableCell>
+                          <span className={(v.stock || 0) <= threshold ? 'text-red-600 font-bold text-[13px]' : 'text-slate-700 font-semibold text-[13px]'}>
+                            {v.stock || 0}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-slate-300">—</TableCell>
+                        <TableCell className="text-[13px] text-slate-500">{threshold}</TableCell>
+                        <TableCell>{getStatusBadge('', v.stock || 0, threshold)}</TableCell>
+                        <TableCell></TableCell>
+                        <TableCell></TableCell>
+                      </TableRow>
+                    )
+                  })}
+                  </Fragment>
+                  )
+                })
               )}
             </TableBody>
           </Table>

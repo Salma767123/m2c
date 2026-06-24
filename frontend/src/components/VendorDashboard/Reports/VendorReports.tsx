@@ -45,6 +45,27 @@ import autoTable from 'jspdf-autotable';
 type ReportTab = 'overview' | 'orders';
 type MetricKey = 'revenue' | 'orders' | 'stock' | 'products';
 
+// Distinct colour per order status so every slice of the Order Status
+// Distribution pie is visually unique (keyed by the space-separated label the
+// API sends, e.g. "PACKED BY VENDOR"). Unmapped statuses fall back to a
+// well-spaced palette by index so two slices never share a colour.
+const ORDER_STATUS_COLORS: Record<string, string> = {
+  'ORDER CREATED': '#3b82f6',           // blue
+  'VENDOR PROCESSING': '#f59e0b',       // amber
+  'PACKED BY VENDOR': '#8b5cf6',        // violet
+  'IN TRANSIT TO ADMIN HUB': '#06b6d4', // cyan
+  'RECEIVED AT ADMIN HUB': '#ec4899',   // pink
+  'APPROVED BY ADMIN HUB': '#14b8a6',   // teal
+  'REJECTED BY ADMIN HUB': '#ef4444',   // red
+  'SHIPPED TO CUSTOMER': '#0ea5e9',     // sky
+  'DELIVERED': '#22c55e',               // green
+  'CANCELLED': '#64748b',               // slate
+};
+const STATUS_FALLBACK_PALETTE = ['#8b5cf6', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899', '#14b8a6', '#0ea5e9', '#a855f7', '#64748b'];
+
+const statusColor = (status: string, index: number): string =>
+  ORDER_STATUS_COLORS[String(status).toUpperCase()] || STATUS_FALLBACK_PALETTE[index % STATUS_FALLBACK_PALETTE.length];
+
 const METRIC_LABELS: Record<MetricKey, string> = {
   revenue: 'Revenue Breakdown',
   orders: 'Orders',
@@ -418,7 +439,7 @@ export default function VendorReports() {
                 <ResponsiveContainer width="100%" height={300}>
                   <RechartsPieChart>
                     <Pie
-                      data={data.charts?.orderStatusData || []}
+                      data={(data.charts?.orderStatusData || []).map((e: any, i: number) => ({ ...e, color: statusColor(e.status, i) }))}
                       cx="50%" cy="50%"
                       labelLine={false}
                       label={({ percent }: any) => percent ? `${(percent * 100).toFixed(0)}%` : ''}
@@ -426,7 +447,7 @@ export default function VendorReports() {
                       dataKey="count"
                     >
                       {(data.charts?.orderStatusData || []).map((entry: any, i: number) => (
-                        <Cell key={i} fill={entry.color} />
+                        <Cell key={i} fill={statusColor(entry.status, i)} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(v: any) => [v, 'Orders']} />

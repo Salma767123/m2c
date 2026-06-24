@@ -86,6 +86,18 @@ export default function Packaging({ formData, setFormData, errors = {} }: Packag
     return currentValue === number
   }
 
+  const getScoreColorSelected = (num: number) => {
+    if (num >= 8) return "bg-emerald-600 border-emerald-600 text-white shadow-lg hover:bg-emerald-700 transform scale-105"
+    if (num >= 6) return "bg-amber-500 border-amber-500 text-white shadow-lg hover:bg-amber-600 transform scale-105"
+    return "bg-red-600 border-red-600 text-white shadow-lg hover:bg-red-700 transform scale-105"
+  }
+
+  const getScoreTextColor = (num: number) => {
+    if (num >= 8) return "text-emerald-600"
+    if (num >= 6) return "text-amber-600"
+    return "text-red-600"
+  }
+
   return (
     <div className="space-y-8">
       <div className="border-b border-slate-200 pb-6">
@@ -148,7 +160,8 @@ export default function Packaging({ formData, setFormData, errors = {} }: Packag
           <div className="flex flex-col gap-3">
             <label className="text-sm font-medium text-slate-700">Select Remark Code (1-10):</label>
             <div className="flex flex-wrap gap-3">
-              {Array.from({ length: 10 }, (_, idx) => `${idx + 1}`).map((num) => {
+              {Array.from({ length: 10 }, (_, idx) => idx + 1).map((numVal) => {
+                const num = `${numVal}`
                 const isSelected = isRemarkNumberSelected(item.remarkKey, num)
                 return (
                   <button
@@ -156,8 +169,8 @@ export default function Packaging({ formData, setFormData, errors = {} }: Packag
                     type="button"
                     onClick={() => handleRemarkNumberSelect(item.remarkKey, num)}
                     className={`w-12 h-12 rounded-full border-2 font-semibold text-sm transition-all duration-200 ${isSelected
-                        ? "bg-brand-500 text-white border-brand-500 shadow-lg hover:bg-brand-600 transform scale-105"
-                        : "bg-white text-slate-700 border-slate-300 hover:border-brand-400 hover:bg-brand-50 hover:scale-105"
+                        ? getScoreColorSelected(numVal)
+                        : "bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50 hover:scale-105"
                       }`}
                   >
                     {num}
@@ -168,7 +181,7 @@ export default function Packaging({ formData, setFormData, errors = {} }: Packag
             {formData[item.remarkKey as keyof typeof formData] && (
               <div className="mt-2">
                 <span className="text-sm text-slate-600">Selected: </span>
-                <span className="text-sm font-semibold text-brand-600">
+                <span className={`text-sm font-semibold ${getScoreTextColor(Number(formData[item.remarkKey as keyof typeof formData]))}`}>
                   Code {formData[item.remarkKey as keyof typeof formData]}
                 </span>
                 <button

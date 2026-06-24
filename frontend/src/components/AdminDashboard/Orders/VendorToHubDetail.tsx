@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Package, CreditCard, Building2, Truck, Star, X, Copy, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Dropdown from "@/components/UI/Dropdown";
@@ -35,6 +35,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
   const [returnToVendor, setReturnToVendor] = useState(false);
 
   const [hubs, setHubs] = useState<Hub[]>([]);
+  // Guard against duplicate status/review submissions from rapid double-clicks.
+  const [isProcessing, setIsProcessing] = useState(false);
+  const processingRef = useRef(false);
 
   useEffect(() => {
     fetchShipmentDetails();
@@ -69,6 +72,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
 
   const handleUpdateStatus = async (newStatus: string, assignedHubId?: string) => {
     if (!shipment) return;
+    if (processingRef.current) return; // block duplicate requests
+    processingRef.current = true;
+    setIsProcessing(true);
     try {
       const res = await orderService.updateAdminShipmentStatus(shipment.id, newStatus, assignedHubId);
       if (res.success) {
@@ -78,6 +84,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       }
     } catch (error: any) {
       showErrorToast(error.message || "Failed to update shipment status");
+    } finally {
+      processingRef.current = false;
+      setIsProcessing(false);
     }
   };
 
@@ -112,6 +121,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       showErrorToast("Please provide a rejection reason");
       return;
     }
+    if (processingRef.current) return; // block duplicate submissions
+    processingRef.current = true;
+    setIsProcessing(true);
 
     try {
       await adminReviewService.createOrUpdateShipmentReview(shipment.id, {
@@ -142,6 +154,9 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
       }
     } catch (error: any) {
       showErrorToast(error.message || "Failed to submit review");
+    } finally {
+      processingRef.current = false;
+      setIsProcessing(false);
     }
   };
 
@@ -191,9 +206,10 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
           {shipment.status === "IN_TRANSIT_TO_ADMIN_HUB" && hasPermission('edit_orders') && (
             <button
               onClick={handleMarkAsReceived}
-              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium"
+              disabled={isProcessing}
+              className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Mark as Received at Hub
+              {isProcessing ? "Updating Status..." : "Mark as Received at Hub"}
             </button>
           )}
           {shipment.status === "RECEIVED_AT_ADMIN_HUB" && hasPermission('edit_orders') && (
@@ -511,9 +527,10 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               </button>
               <button
                 onClick={handleConfirmHub}
-                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                disabled={isProcessing}
+                className="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Confirm
+                {isProcessing ? "Updating Status..." : "Confirm"}
               </button>
             </div>
           </div>
@@ -667,12 +684,13 @@ export default function VendorToHubDetail({ orderId }: VendorToHubDetailProps) {
               </button>
               <button
                 onClick={handleSubmitReview}
-                className={`px-6 py-2 rounded-lg transition-colors font-medium ${isApproved
+                disabled={isProcessing}
+                className={`px-6 py-2 rounded-lg transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed ${isApproved
                   ? "bg-green-600 text-white hover:bg-green-700"
                   : "bg-red-600 text-white hover:bg-red-700"
                 }`}
               >
-                {isApproved ? "Approve Shipment" : "Reject Shipment"}
+                {isProcessing ? "Submitting..." : isApproved ? "Approve Shipment" : "Reject Shipment"}
               </button>
             </div>
           </div>

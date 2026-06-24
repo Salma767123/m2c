@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const { attachVendorPrices } = require('../utils/vendorPricing');
+const { startOfDay, endOfDay, pickGranularity, buildBuckets, makeIndexer } = require('../utils/trendBuckets');
 
 const getVendorDashboardStats = async (req, res) => {
     try {
@@ -146,60 +147,6 @@ const getVendorDashboardStats = async (req, res) => {
     }
 };
 
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-const startOfDay = (d) => {
-    const x = new Date(d);
-    x.setHours(0, 0, 0, 0);
-    return x;
-};
-const endOfDay = (d) => {
-    const x = new Date(d);
-    x.setHours(23, 59, 59, 999);
-    return x;
-};
-
-/**
- * Build contiguous, sorted buckets covering [startDate, endDate] at the
- * requested granularity ('day' | 'week' | 'month'). Each bucket carries a
- * display label and its half-open [start, end) boundaries.
- */
-const buildBuckets = (granularity, startDate, endDate, multiYear) => {
-    const buckets = [];
-
-    if (granularity === 'day' || granularity === 'week') {
-        const step = granularity === 'week' ? 7 : 1;
-        let cursor = startOfDay(startDate);
-        const limit = endOfDay(endDate);
-        while (cursor <= limit) {
-            const next = new Date(cursor);
-            next.setDate(next.getDate() + step);
-            buckets.push({
-                start: new Date(cursor),
-                end: new Date(next),
-                label: `${cursor.getDate()} ${MONTH_LABELS[cursor.getMonth()]}`,
-            });
-            cursor = next;
-        }
-    } else {
-        // month
-        let cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-        const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
-        while (cursor <= lastMonth) {
-            const next = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-            buckets.push({
-                start: new Date(cursor),
-                end: new Date(next),
-                label: multiYear
-                    ? `${MONTH_LABELS[cursor.getMonth()]} '${String(cursor.getFullYear()).slice(2)}`
-                    : MONTH_LABELS[cursor.getMonth()],
-            });
-            cursor = next;
-        }
-    }
-    return buckets;
-};
-
 /**
  * Trend data for the Revenue & Orders charts, aggregated from real order
  * records for the authenticated vendor within the selected date range.
@@ -260,7 +207,7 @@ const getVendorDashboardChart = async (req, res) => {
                 startDate = startOfDay(s);
                 endDate = endOfDay(e);
                 const spanDays = Math.round((endDate - startDate) / 86400000);
-                granularity = spanDays <= 31 ? 'day' : spanDays <= 180 ? 'week' : 'month';
+                granularity = pickGranularity(spanDays);
                 break;
             }
             default:
@@ -271,41 +218,28 @@ const getVendorDashboardChart = async (req, res) => {
         const multiYear = startDate.getFullYear() !== endDate.getFullYear();
         const buckets = buildBuckets(granularity, startDate, endDate, multiYear);
 
-        // Pull only the records that fall inside the selected window.
+        // Pull only the records that fall inside the selected window. Select the
+        // fields attachVendorPrices needs so revenue uses the VENDOR price (what
+        // the vendor is paid) — never the admin/customer price.
         const orderItems = await prisma.orderItem.findMany({
             where: {
                 vendorId,
                 createdAt: { gte: startDate, lte: endDate },
             },
-            select: { totalPrice: true, orderId: true, createdAt: true },
+            select: { productId: true, variantId: true, quantity: true, unitPrice: true, orderId: true, createdAt: true },
         });
+        await attachVendorPrices(orderItems);
 
         const revenue = new Array(buckets.length).fill(0);
         const orderSets = Array.from({ length: buckets.length }, () => new Set());
 
-        const firstStart = buckets.length ? buckets[0].start.getTime() : 0;
-        const dayMs = 86400000;
-
-        const indexFor = (date) => {
-            if (!buckets.length) return -1;
-            if (granularity === 'day') {
-                return Math.floor((startOfDay(date).getTime() - firstStart) / dayMs);
-            }
-            if (granularity === 'week') {
-                return Math.floor((startOfDay(date).getTime() - firstStart) / (dayMs * 7));
-            }
-            // month
-            return (
-                (date.getFullYear() - buckets[0].start.getFullYear()) * 12 +
-                (date.getMonth() - buckets[0].start.getMonth())
-            );
-        };
+        const indexFor = makeIndexer(granularity, buckets);
 
         orderItems.forEach((item) => {
             const date = new Date(item.createdAt);
             const idx = indexFor(date);
             if (idx < 0 || idx >= buckets.length) return;
-            revenue[idx] += item.totalPrice ? Number(item.totalPrice) : 0;
+            revenue[idx] += item.vendorTotalPrice || 0;
             if (item.orderId) orderSets[idx].add(item.orderId);
         });
 

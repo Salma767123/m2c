@@ -3,9 +3,11 @@
 import { useCallback, useState } from 'react';
 import { Button } from '@/components/UI/Button';
 import { User, Calendar, Users, Mail, Plus, Trash2, ArrowLeft, ArrowRight, IdCard, Phone as PhoneIcon, Image as ImageIcon } from 'lucide-react';
-import { ToggleButton, PhoneInput, validatePhoneE164, AccordionSection } from '@/components/VendorHub/FormUI';
+import { ToggleButton, PhoneInput, validatePhoneE164, AccordionSection, LocalLandlineInput, parsePhone, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
 import { scrollToFirstError } from '@/lib/formErrorScroll';
-import { showErrorToast, handleUpload } from '@/lib/toast-utils';
+import { handleUpload } from '@/lib/toast-utils';
+import { centerNotice } from '@/components/UI/CenterNotice';
+import ImageCropModal from '@/components/UI/ImageCropModal';
 
 interface OwnerProfileProps {
   onNext: () => void;
@@ -52,23 +54,36 @@ const SECTION_FIELDS: Record<string, string[]> = {
   size: ['employeeCount'],
 };
 
+// Exact calendar duration between the start date and today, formatted in full
+// words — e.g. "9 Years, 8 Months, 18 Days". Returns '' when no/invalid date
+// so the caller can show a placeholder. Recomputed on every render, so it
+// updates live whenever businessStartDate changes.
 const calculateDuration = (startDate: string) => {
-  if (!startDate) return '00Y / 00M';
+  if (!startDate) return '';
   const start = new Date(startDate);
   const now = new Date();
-  if (isNaN(start.getTime()) || start > now) return '00Y / 00M';
-  
+  if (isNaN(start.getTime()) || start > now) return '';
+
   let years = now.getFullYear() - start.getFullYear();
   let months = now.getMonth() - start.getMonth();
-  
+  let days = now.getDate() - start.getDate();
+
+  if (days < 0) {
+    months -= 1;
+    // Borrow the number of days in the month preceding `now`.
+    days += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+  }
   if (months < 0) {
-    years--;
+    years -= 1;
     months += 12;
   }
-  
-  const yy = years.toString().padStart(2, '0');
-  const mm = months.toString().padStart(2, '0');
-  return `${yy}Y / ${mm}M`;
+  // Guard against rare month-length edges leaving a negative remainder.
+  if (days < 0) days = 0;
+  if (months < 0) months = 0;
+  if (years < 0) years = 0;
+
+  const part = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  return `${part(years, 'Year')}, ${part(months, 'Month')}, ${part(days, 'Day')}`;
 };
 
 // ── Company-type → owner structure (Change 14) ────────────────────────
@@ -150,8 +165,14 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     ownerPhone: data.ownerPhone || '',
     /** Optional secondary phone. */
     ownerPhone2: data.ownerPhone2 || '',
-    /** Optional landline. */
-    ownerLandline: data.ownerLandline || '',
+    /** Local landline STD code (India, locked +91). */
+    ownerLocalLandlineStd: data.ownerLocalLandlineStd || '',
+    /** Local landline subscriber number. */
+    ownerLocalLandlineNumber: data.ownerLocalLandlineNumber || (data.ownerLandline ? parsePhone(data.ownerLandline).national : ''),
+    /** International landline — assembled dial+std+number or empty. */
+    ownerIntlLandlineCountryCode: data.ownerIntlLandlineCountryCode || parsePhone(data.ownerIntlLandline || '').dial,
+    ownerIntlLandlineStd: data.ownerIntlLandlineStd || '',
+    ownerIntlLandlineNumber: data.ownerIntlLandlineNumber || parsePhone(data.ownerIntlLandline || '').national,
     businessStartDate: data.businessStartDate || data.yearEstablished || '',
     employeeCount: data.employeeCount || '',
     /** Owner profile photo — preview URL (object URL or remote) for display. */
@@ -170,9 +191,21 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     email2?: string;
     phone: string;
     phone2?: string;
-    landline?: string;
+    landline?: string; // legacy
+    localLandlineStd: string;
+    localLandline: string;
+    intlLandlineCountryCode: string;
+    intlLandlineStd: string;
+    intlLandlineNumber: string;
   }>>(
-    data.additionalOwners || []
+    (data.additionalOwners || []).map((o: any) => ({
+      ...o,
+      localLandlineStd: o.localLandlineStd || '',
+      localLandline: o.localLandline || (o.landline ? parsePhone(o.landline).national : ''),
+      intlLandlineCountryCode: o.intlLandlineCountryCode || parsePhone(o.intlLandline || '').dial,
+      intlLandlineStd: o.intlLandlineStd || '',
+      intlLandlineNumber: o.intlLandlineNumber || parsePhone(o.intlLandline || '').national,
+    }))
   );
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -196,7 +229,11 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     ownerEmail2: 'contact',
     ownerPhone: 'contact',
     ownerPhone2: 'contact',
-    ownerLandline: 'contact',
+    ownerLocalLandlineStd: 'contact',
+    ownerLocalLandlineNumber: 'contact',
+    ownerIntlLandlineCountryCode: 'contact',
+    ownerIntlLandlineStd: 'contact',
+    ownerIntlLandlineNumber: 'contact',
     businessStartDate: 'history',
     employeeCount: 'size',
   };
@@ -214,7 +251,11 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       ownerEmail2: data.ownerEmail2 || '',
       ownerPhone: data.ownerPhone || '',
       ownerPhone2: data.ownerPhone2 || '',
-      ownerLandline: data.ownerLandline || '',
+      ownerLocalLandlineStd: data.ownerLocalLandlineStd || '',
+      ownerLocalLandlineNumber: data.ownerLocalLandlineNumber || (data.ownerLandline ? parsePhone(data.ownerLandline).national : ''),
+      ownerIntlLandlineCountryCode: data.ownerIntlLandlineCountryCode || parsePhone(data.ownerIntlLandline || '').dial,
+      ownerIntlLandlineStd: data.ownerIntlLandlineStd || '',
+      ownerIntlLandlineNumber: data.ownerIntlLandlineNumber || parsePhone(data.ownerIntlLandline || '').national,
       businessStartDate: data.businessStartDate || data.yearEstablished || '',
       employeeCount: data.employeeCount || '',
       ownerPhoto: data.ownerPhoto || null,
@@ -225,7 +266,16 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     // came in. For multi-owner types we accept the incoming array as-is.
     const incomingConfig = resolveOwnerStructure(data.businessType);
     setAdditionalOwners(
-      incomingConfig.allowMultiple ? data.additionalOwners || [] : [],
+      incomingConfig.allowMultiple
+        ? (data.additionalOwners || []).map((o: any) => ({
+            ...o,
+            localLandlineStd: o.localLandlineStd || '',
+            localLandline: o.localLandline || (o.landline ? parsePhone(o.landline).national : ''),
+            intlLandlineCountryCode: o.intlLandlineCountryCode || parsePhone(o.intlLandline || '').dial,
+            intlLandlineStd: o.intlLandlineStd || '',
+            intlLandlineNumber: o.intlLandlineNumber || parsePhone(o.intlLandline || '').national,
+          }))
+        : [],
     );
   }
 
@@ -247,6 +297,11 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       phone: '',
       phone2: '',
       landline: '',
+      localLandlineStd: '',
+      localLandline: '',
+      intlLandlineCountryCode: '',
+      intlLandlineStd: '',
+      intlLandlineNumber: '',
     }]);
   };
 
@@ -286,10 +341,6 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
             })
           : '';
         setErrors((prev) => (prev[field] === liveErr ? prev : { ...prev, [field]: liveErr }));
-      } else if (field === 'ownerLandline') {
-        const v = (value || '').trim();
-        const liveErr = v && !/^\d{8,15}$/.test(v) ? 'Landline Number must be 8-15 digits' : '';
-        setErrors((prev) => (prev[field] === liveErr ? prev : { ...prev, [field]: liveErr }));
       }
     },
     [],
@@ -312,10 +363,6 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         });
         setErrors((prev) => (prev[field] === err ? prev : { ...prev, [field]: err }));
       }
-    } else if (field === 'ownerLandline') {
-      const v = (formData.ownerLandline || '').trim();
-      const err = v && !/^\d{8,15}$/.test(v) ? 'Landline Number must be 8-15 digits' : '';
-      setErrors((prev) => (prev[field] === err ? prev : { ...prev, [field]: err }));
     }
   }, [formData]);
 
@@ -324,10 +371,31 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   // handleUpload, store the File + an object-URL preview, revoke the prior
   // object URL on replace/remove to avoid leaks.
   const [ownerPhotoError, setOwnerPhotoError] = useState<string | null>(null);
+  // Selected image awaiting crop (1:1). The image is only saved after the user
+  // crops & confirms — never uploaded directly.
+  const [cropState, setCropState] = useState<{ src: string; name: string } | null>(null);
+
+  const openOwnerPhotoCropper = useCallback((file: File) => {
+    // Non-images can't be cropped — route through the normal validator so the
+    // user still gets the "must be an image" error notice.
+    if (!file.type.startsWith('image/')) {
+      handleOwnerPhotoFile(file);
+      return;
+    }
+    setCropState({ src: URL.createObjectURL(file), name: file.name });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const closeCropper = useCallback(() => {
+    setCropState((prev) => {
+      if (prev?.src.startsWith('blob:')) URL.revokeObjectURL(prev.src);
+      return null;
+    });
+  }, []);
 
   const handleOwnerPhotoFile = useCallback((file: File) => {
     const result = handleUpload(file, {
-      label: 'Owner photo',
+      label: 'Owner Photo',
       allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
       allowedLabel: 'PNG, JPG, or WEBP',
       maxBytes: 2 * 1024 * 1024,
@@ -350,14 +418,16 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
   const handleOwnerPhotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) handleOwnerPhotoFile(file);
-  }, [handleOwnerPhotoFile]);
+    if (file) openOwnerPhotoCropper(file);
+    // Reset the input so re-selecting the same file (e.g. after Remove) still fires onChange.
+    e.target.value = '';
+  }, [openOwnerPhotoCropper]);
 
   const handleOwnerPhotoDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
-    if (file) handleOwnerPhotoFile(file);
-  }, [handleOwnerPhotoFile]);
+    if (file) openOwnerPhotoCropper(file);
+  }, [openOwnerPhotoCropper]);
 
   const handleRemoveOwnerPhoto = useCallback(() => {
     setFormData((prev) => {
@@ -422,13 +492,6 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       label: 'Secondary Phone',
     });
     if (phone2Err) newErrors.ownerPhone2 = phone2Err;
-    if (formData.ownerLandline) {
-      const landline = formData.ownerLandline.trim();
-      if (landline && !/^\d{8,15}$/.test(landline)) {
-        newErrors.ownerLandline = 'Landline Number must be 8-15 digits';
-      }
-    }
-
     if (!formData.businessStartDate) newErrors.businessStartDate = 'Start date is required';
     if (!formData.employeeCount) newErrors.employeeCount = 'Please pick an employee range';
 
@@ -464,7 +527,6 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         'ownerEmail2',
         'ownerPhone',
         'ownerPhone2',
-        'ownerLandline',
         'businessStartDate',
         'employeeCount',
       ];
@@ -478,7 +540,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       setTouched(allTouched);
 
       const count = Object.keys(newErrors).length;
-      showErrorToast(
+      centerNotice.warning(
         count === 1
           ? '1 field needs your attention'
           : `${count} fields need your attention`,
@@ -495,7 +557,6 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
             'ownerEmail2',
             'ownerPhone',
             'ownerPhone2',
-            'ownerLandline',
             'businessStartDate',
             'employeeCount',
           ],
@@ -504,7 +565,6 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
             ownerPhoto: '[data-field="ownerPhoto"]',
             ownerPhone: '[name="ownerPhone"]',
             ownerPhone2: '[name="ownerPhone2"]',
-            ownerLandline: '[name="ownerLandline"]',
             employeeCount: '[data-field="employeeCount"]',
           },
         });
@@ -512,10 +572,33 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       return;
     }
 
-    // Filter out empty additional owners
-    const filledOwners = additionalOwners.filter((o) => o.name || o.email || o.phone);
+    // Filter out empty additional owners and assemble their landlines
+    const filledOwners = additionalOwners
+      .filter((o) => o.name || o.email || o.phone)
+      .map((o) => {
+        const ownerLocalLandline = (o.localLandlineStd + o.localLandline).trim();
+        const ownerIntlLandline = (o.intlLandlineCountryCode + o.intlLandlineStd + o.intlLandlineNumber).replace(/^\+?$/, '');
+        return {
+          ...o,
+          localLandline: ownerLocalLandline || undefined,
+          localLandlineStd: o.localLandlineStd || undefined,
+          intlLandline: ownerIntlLandline || undefined,
+          intlLandlineCountryCode: o.intlLandlineCountryCode || undefined,
+          intlLandlineStd: o.intlLandlineStd || undefined,
+          intlLandlineNumber: o.intlLandlineNumber || undefined,
+        };
+      });
+    const localLandline = (formData.ownerLocalLandlineStd + formData.ownerLocalLandlineNumber).trim();
+    const intlLandline = (formData.ownerIntlLandlineCountryCode + formData.ownerIntlLandlineStd + formData.ownerIntlLandlineNumber).replace(/^\+?$/, '');
     onUpdateData({
       ...formData,
+      ownerLandline: localLandline || undefined,
+      ownerLocalLandlineStd: formData.ownerLocalLandlineStd || undefined,
+      ownerLocalLandlineNumber: formData.ownerLocalLandlineNumber || undefined,
+      ownerIntlLandline: intlLandline || undefined,
+      ownerIntlLandlineCountryCode: formData.ownerIntlLandlineCountryCode || undefined,
+      ownerIntlLandlineStd: formData.ownerIntlLandlineStd || undefined,
+      ownerIntlLandlineNumber: formData.ownerIntlLandlineNumber || undefined,
       additionalOwners: filledOwners.length > 0 ? filledOwners : undefined,
     });
     onNext();
@@ -538,7 +621,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     }
     if (section === 'contact') {
       const required = [formData.ownerEmail, formData.ownerPhone];
-      const optional = [formData.ownerEmail2, formData.ownerPhone2, formData.ownerLandline];
+      const optional = [formData.ownerEmail2, formData.ownerPhone2, formData.ownerLocalLandlineNumber, formData.ownerIntlLandlineNumber];
       if (required.every(Boolean)) return 'complete';
       if (required.some(Boolean) || optional.some(Boolean)) return 'partial';
       return 'empty';
@@ -587,6 +670,16 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <ImageCropModal
+        src={cropState?.src ?? null}
+        fileName={cropState?.name}
+        title="Crop Owner Photo"
+        onCancel={closeCropper}
+        onCropped={(file) => {
+          handleOwnerPhotoFile(file);
+          closeCropper();
+        }}
+      />
       {/* Header */}
       <div className="flex items-center gap-3 pb-2">
         <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-50 text-brand-600 shrink-0">
@@ -884,29 +977,36 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               )}
             </div>
 
-            <div className="sm:col-span-2 sm:max-w-md">
-              <label htmlFor="ownerLandline" className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
-                <span>Landline Number</span>
+                <span>Local Landline</span>
                 <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
-              <input
-                id="ownerLandline"
-                type="tel"
-                name="ownerLandline"
-                value={formData.ownerLandline}
-                onChange={(e) => handleInputChange('ownerLandline', e.target.value.replace(/\D/g, ''))}
-                onBlur={() => handleBlur('ownerLandline')}
-                inputMode="tel"
-                autoComplete="off"
-                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                  errors.ownerLandline && touched.ownerLandline ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="2228175000"
+              <LocalLandlineInput
+                locked
+                value={{ countryCode: '+91', std: formData.ownerLocalLandlineStd, number: formData.ownerLocalLandlineNumber }}
+                onChange={(v: LocalLandlineValue) => {
+                  handleInputChange('ownerLocalLandlineStd', v.std);
+                  handleInputChange('ownerLocalLandlineNumber', v.number);
+                }}
               />
-              {errors.ownerLandline && touched.ownerLandline && (
-                <p className="text-red-500 text-xs mt-1">{errors.ownerLandline}</p>
-              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                <span>International Landline</span>
+                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+              </label>
+              <LocalLandlineInput
+                value={{ countryCode: formData.ownerIntlLandlineCountryCode, std: formData.ownerIntlLandlineStd, number: formData.ownerIntlLandlineNumber }}
+                onChange={(v: LocalLandlineValue) => {
+                  handleInputChange('ownerIntlLandlineCountryCode', v.countryCode);
+                  handleInputChange('ownerIntlLandlineStd', v.std);
+                  handleInputChange('ownerIntlLandlineNumber', v.number);
+                }}
+              />
             </div>
           </div>
       </AccordionSection>
@@ -943,12 +1043,12 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               <div key={index} className="p-4 border border-gray-200 rounded-lg bg-gray-50/40 relative">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-semibold text-gray-800">
-                    {ownerStructure.contactLabel} {index + 1}
+                    {ownerStructure.contactLabel} {index + 2}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveOwner(index)}
-                    aria-label={`Remove ${ownerStructure.contactLabel} ${index + 1}`}
+                    aria-label={`Remove ${ownerStructure.contactLabel} ${index + 2}`}
                     className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 rounded"
                   >
                     <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -1077,18 +1177,31 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                     />
                   </div>
 
-                  <div className="sm:col-span-2 sm:max-w-md">
+                  <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Landline <span className="text-gray-400">(optional)</span>
+                      Local Landline <span className="text-gray-400">(optional)</span>
                     </label>
-                    <input
-                      type="tel"
-                      value={owner.landline || ''}
-                      onChange={(e) => handleOwnerFieldChange(index, 'landline', e.target.value)}
-                      autoComplete="off"
-                      inputMode="tel"
-                      className="w-full px-3 py-2 border border-slate-200 hover:border-slate-300 rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm"
-                      placeholder="optional landline"
+                    <LocalLandlineInput
+                      locked
+                      value={{ countryCode: '+91', std: owner.localLandlineStd, number: owner.localLandline }}
+                      onChange={(v: LocalLandlineValue) => {
+                        setAdditionalOwners(prev => prev.map((o, i) =>
+                          i === index ? { ...o, localLandlineStd: v.std, localLandline: v.number } : o
+                        ));
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      International Landline <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <LocalLandlineInput
+                      value={{ countryCode: owner.intlLandlineCountryCode, std: owner.intlLandlineStd, number: owner.intlLandlineNumber }}
+                      onChange={(v: LocalLandlineValue) => {
+                        setAdditionalOwners(prev => prev.map((o, i) =>
+                          i === index ? { ...o, intlLandlineCountryCode: v.countryCode, intlLandlineStd: v.std, intlLandlineNumber: v.number } : o
+                        ));
+                      }}
                     />
                   </div>
                 </div>
@@ -1119,8 +1232,11 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         title="Business History"
         subtitle="When operations began and total business duration"
       >
-        <div className="max-w-3xl">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div>
+          {/* Start, Present, and computed Duration as three equal-width fields
+              on one row (stacks on mobile). The duration is a read-only field
+              styled to match the date inputs — no separate bulky card. */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div>
               <label htmlFor="businessStartDate" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Start Business Date <span className="text-red-500">*</span>
@@ -1143,7 +1259,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                 <p className="text-red-500 text-sm mt-1">{errors.businessStartDate}</p>
               )}
             </div>
-            
+
             <div>
               <label htmlFor="tillDate" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Present Date
@@ -1157,16 +1273,22 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                 className="w-full px-4 py-3 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed"
               />
             </div>
-          </div>
-          
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Business Experience</h3>
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-700 font-medium">Total Business Duration:</span>
-                <span className="text-slate-900 font-semibold text-base">
-                  {calculateDuration(formData.businessStartDate)}
-                </span>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Total Business Duration
+              </label>
+              <div className="flex min-h-[46px] w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                {(() => {
+                  const duration = calculateDuration(formData.businessStartDate);
+                  return duration ? (
+                    <span className="whitespace-nowrap text-sm font-bold tracking-tight text-brand-600">
+                      {duration}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-slate-400">Select a start date</span>
+                  );
+                })()}
               </div>
             </div>
           </div>

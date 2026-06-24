@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const { attachVendorPrices } = require('../utils/vendorPricing');
+const { pickGranularity, buildBuckets, makeIndexer } = require('../utils/trendBuckets');
 
 // Fields needed to derive the vendor price for a line item.
 const VENDOR_PRICE_SELECT = { productId: true, variantId: true, quantity: true, unitPrice: true };
@@ -112,9 +113,10 @@ const getVendorOverviewReport = async (req, res) => {
                 where: { items: { some: { vendorId } }, createdAt: dateFilter },
                 _count: true,
             }),
-            // Revenue over time (monthly for last 6 months)
+            // Revenue over time — within the SELECTED range so the trend graph
+            // reflects the active filter (was hardcoded to the last 6 months).
             prisma.orderItem.findMany({
-                where: { vendorId, order: { createdAt: { gte: new Date(new Date().setMonth(new Date().getMonth() - 6)) }, paymentStatus: 'PAID' } },
+                where: { vendorId, order: { createdAt: dateFilter, paymentStatus: 'PAID' } },
                 select: { ...VENDOR_PRICE_SELECT, order: { select: { createdAt: true } } }
             })
         ]);
@@ -144,16 +146,25 @@ const getVendorOverviewReport = async (req, res) => {
             .sort((a, b) => b.revenue - a.revenue)
             .slice(0, 5);
 
-        // Build monthly revenue chart data
-        const monthMap = {};
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        // Build the revenue trend over the SELECTED range using the shared
+        // bucketing logic (same as the dashboard chart): contiguous, zero-filled
+        // buckets at an adaptive granularity (daily ≤31d, weekly ≤92d, else
+        // monthly), so every date/month in the range is represented.
+        const spanDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+        const granularity = pickGranularity(spanDays);
+        const multiYear = start.getFullYear() !== end.getFullYear();
+        const revBuckets = buildBuckets(granularity, start, end, multiYear);
+        const revByBucket = new Array(revBuckets.length).fill(0);
+        const revIndexFor = makeIndexer(granularity, revBuckets);
         revenueOverTime.forEach(item => {
-            const d = new Date(item.order.createdAt);
-            const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-            if (!monthMap[key]) monthMap[key] = { period: key, revenue: 0 };
-            monthMap[key].revenue += item.vendorTotalPrice || 0;
+            const idx = revIndexFor(new Date(item.order.createdAt));
+            if (idx < 0 || idx >= revBuckets.length) return;
+            revByBucket[idx] += item.vendorTotalPrice || 0;
         });
-        const revenueChartData = Object.values(monthMap).slice(-12);
+        const revenueChartData = revBuckets.map((b, i) => ({
+            period: b.label,
+            revenue: Math.round(revByBucket[i] * 100) / 100,
+        }));
 
         // Order status chart data
         const STATUS_COLORS = {

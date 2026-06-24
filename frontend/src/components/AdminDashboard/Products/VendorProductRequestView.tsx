@@ -564,8 +564,11 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                           )}
                           <div>
                             <h4 className="font-semibold text-gray-900">
-                              {variant.size} - {variant.color}
+                              {variant.variantName?.trim() || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'}
                             </h4>
+                            {(variant.size || variant.color) && (
+                              <p className="text-xs text-gray-500">{[variant.size, variant.color].filter(Boolean).join(' / ')}</p>
+                            )}
                             <p className="text-xs text-gray-500 font-mono">{variant.sku}</p>
                           </div>
                         </div>
@@ -640,7 +643,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                               <div key={imgIndex} className="relative aspect-square rounded-lg overflow-hidden border bg-white">
                                 <Image
                                   src={imageUrl}
-                                  alt={`${variant.size} - ${variant.color} - Image ${imgIndex + 1}`}
+                                  alt={`${variant.variantName?.trim() || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'} - Image ${imgIndex + 1}`}
                                   fill
                                   sizes="(max-width: 768px) 50vw, 25vw"
                                   className="object-cover"
@@ -1113,7 +1116,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                           />
                           <div>
                             <p className="text-sm font-medium text-gray-900">
-                              {variant.size} - {variant.color}
+                              {variant.variantName?.trim() || [variant.size, variant.color].filter(Boolean).join(' - ') || 'Variant'}
                             </p>
                             <p className="text-xs text-gray-500">
                               Vendor Price: ₹{variant.price} | Stock: {variant.stock}

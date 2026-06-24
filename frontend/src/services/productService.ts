@@ -96,6 +96,7 @@ export interface ProductFormData {
 
 export interface ProductVariant {
   id?: string;
+  variantName?: string;
   size: string;
   color: string;
   colorHex?: string;

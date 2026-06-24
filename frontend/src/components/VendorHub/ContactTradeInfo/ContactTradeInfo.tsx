@@ -5,8 +5,9 @@ import { Button } from '@/components/UI/Button';
 import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Dropdown from '@/components/UI/Dropdown';
-import { PhoneInput, CountrySelect, validatePhoneE164, AccordionSection } from '@/components/VendorHub/FormUI';
+import { PhoneInput, LocalLandlineInput, parsePhone, CountryMultiSelect, validatePhoneE164, AccordionSection, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
 import { handleUpload } from '@/lib/toast-utils';
+import ImageCropModal from '@/components/UI/ImageCropModal';
 
 interface ContactTradeInfoProps {
   onNext: () => void;
@@ -26,9 +27,17 @@ interface Contact {
   email2?: string;
   phone1: string;
   phone2?: string;
+  /** Legacy single-string landline — kept for loading old records. */
   landline?: string;
+  localLandlineStd: string;
+  localLandline: string;
+  intlLandlineCountryCode: string;
+  intlLandlineStd: string;
+  intlLandlineNumber: string;
   department: string;
   customDepartment?: string;
+  photo: string | null;
+  photoFile: File | null;
 }
 
 const DESIGNATION_OPTIONS = [
@@ -49,6 +58,11 @@ const parseName = (name: string) => {
   return { first: parts[0], middle: parts.slice(1, -1).join(' '), last: parts[parts.length - 1] };
 };
 
+const parseIntlLandline = (value: string) => {
+  const { dial, national } = parsePhone(value);
+  return { countryCode: dial, std: '', number: national };
+};
+
 export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }: ContactTradeInfoProps) {
   const [formData, setFormData] = useState(() => {
     const mainNameParts = parseName(data?.mainContact?.name || '');
@@ -64,6 +78,15 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         phone1: data?.mainContact?.phone || data?.mainContact?.phone1 || '',
         phone2: data?.mainContact?.phone2 || '',
         landline: data?.mainContact?.landline || '',
+        localLandlineCountryCode: data?.mainContact?.localLandlineCountryCode || '+91',
+        localLandlineStd: data?.mainContact?.localLandlineStd || '',
+        localLandline: data?.mainContact?.localLandline || '',
+        intlLandline: data?.mainContact?.intlLandline || '',
+        intlLandlineCountryCode: data?.mainContact?.intlLandlineCountryCode
+          || parseIntlLandline(data?.mainContact?.intlLandline || '').countryCode,
+        intlLandlineStd: data?.mainContact?.intlLandlineStd || '',
+        intlLandlineNumber: data?.mainContact?.intlLandlineNumber
+          || parseIntlLandline(data?.mainContact?.intlLandline || '').number,
         department: data?.mainContact?.department || '',
         customDepartment: data?.mainContact?.customDepartment || ''
       },
@@ -81,8 +104,15 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
           phone1: c.phone || c.phone1 || '',
           phone2: c.phone2 || '',
           landline: c.landline || '',
+          localLandlineStd: c.localLandlineStd || '',
+          localLandline: c.localLandline || (c.landline ? parsePhone(c.landline).national : ''),
+          intlLandlineCountryCode: c.intlLandlineCountryCode || parseIntlLandline(c.intlLandline || '').countryCode,
+          intlLandlineStd: c.intlLandlineStd || '',
+          intlLandlineNumber: c.intlLandlineNumber || parseIntlLandline(c.intlLandline || '').number,
           department: c.department || '',
-          customDepartment: c.customDepartment || ''
+          customDepartment: c.customDepartment || '',
+          photo: c.photo || null,
+          photoFile: null,
         };
       }),
       hasImportExport: data.hasImportExport || 'no',
@@ -169,6 +199,15 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         phone1: data?.mainContact?.phone || data?.mainContact?.phone1 || '',
         phone2: data?.mainContact?.phone2 || '',
         landline: data?.mainContact?.landline || '',
+        localLandlineCountryCode: data?.mainContact?.localLandlineCountryCode || '+91',
+        localLandlineStd: data?.mainContact?.localLandlineStd || '',
+        localLandline: data?.mainContact?.localLandline || '',
+        intlLandline: data?.mainContact?.intlLandline || '',
+        intlLandlineCountryCode: data?.mainContact?.intlLandlineCountryCode
+          || parseIntlLandline(data?.mainContact?.intlLandline || '').countryCode,
+        intlLandlineStd: data?.mainContact?.intlLandlineStd || '',
+        intlLandlineNumber: data?.mainContact?.intlLandlineNumber
+          || parseIntlLandline(data?.mainContact?.intlLandline || '').number,
         department: data?.mainContact?.department || '',
         customDepartment: data?.mainContact?.customDepartment || ''
       },
@@ -186,8 +225,15 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
           phone1: c.phone || c.phone1 || '',
           phone2: c.phone2 || '',
           landline: c.landline || '',
+          localLandlineStd: c.localLandlineStd || '',
+          localLandline: c.localLandline || (c.landline ? parsePhone(c.landline).national : ''),
+          intlLandlineCountryCode: c.intlLandlineCountryCode || parseIntlLandline(c.intlLandline || '').countryCode,
+          intlLandlineStd: c.intlLandlineStd || '',
+          intlLandlineNumber: c.intlLandlineNumber || parseIntlLandline(c.intlLandline || '').number,
           department: c.department || '',
-          customDepartment: c.customDepartment || ''
+          customDepartment: c.customDepartment || '',
+          photo: c.photo || null,
+          photoFile: null,
         };
       }),
       hasImportExport: data.hasImportExport || 'no',
@@ -198,35 +244,98 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
   const [contactPhoto, setContactPhoto] = useState<string | null>(data?.mainContact?.photo || null);
   const [contactPhotoFile, setContactPhotoFile] = useState<File | null>(null);
+  // Selected image awaiting crop (1:1). Saved only after the user crops & confirms.
+  const [cropState, setCropState] = useState<{ src: string; name: string } | null>(null);
+
+  const closeCropper = () => {
+    setCropState((prev) => {
+      if (prev?.src.startsWith('blob:')) URL.revokeObjectURL(prev.src);
+      return null;
+    });
+  };
+
+  // Validate + store the (already cropped) photo.
+  const applyContactPhoto = (file: File) => {
+    const result = handleUpload(file, {
+      label: 'Profile Photo',
+      allowedTypes: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
+      allowedLabel: 'JPG, PNG or WebP',
+      maxBytes: 5 * 1024 * 1024,
+      maxLabel: '5,120 KB'
+    });
+
+    if (!result.ok) {
+      setErrors(prev => ({ ...prev, 'mainContact.photo': result.message || 'Invalid file upload' }));
+      return;
+    }
+
+    setErrors(prev => ({ ...prev, 'mainContact.photo': '' }));
+    setContactPhotoFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setContactPhoto(reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const handleContactPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const result = handleUpload(file, {
-        label: 'Profile photo',
-        allowedTypes: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
-        allowedLabel: 'JPG, PNG or WebP',
-        maxBytes: 5 * 1024 * 1024,
-        maxLabel: '5,120 KB'
-      });
-
-      if (!result.ok) {
-        setErrors(prev => ({ ...prev, 'mainContact.photo': result.message || 'Invalid file upload' }));
-        return;
-      }
-
-      setErrors(prev => ({ ...prev, 'mainContact.photo': '' }));
-      setContactPhotoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setContactPhoto(reader.result as string);
-      reader.readAsDataURL(file);
+    // Reset the input so re-selecting the same file (e.g. after Remove) still fires onChange.
+    e.target.value = '';
+    if (!file) return;
+    // Non-images can't be cropped — run the validator so the user still sees the error.
+    if (!file.type.startsWith('image/')) {
+      applyContactPhoto(file);
+      return;
     }
+    setCropState({ src: URL.createObjectURL(file), name: file.name });
   };
 
   const removeContactPhoto = () => {
     setContactPhoto(null);
     setContactPhotoFile(null);
     setErrors(prev => ({ ...prev, 'mainContact.photo': '' }));
+  };
+
+  const applyAltContactPhoto = (id: string, file: File) => {
+    const result = handleUpload(file, {
+      label: 'Profile Photo',
+      allowedTypes: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
+      allowedLabel: 'JPG, PNG or WebP',
+      maxBytes: 5 * 1024 * 1024,
+      maxLabel: '5,120 KB'
+    });
+    if (!result.ok) {
+      setErrors(prev => ({ ...prev, [`altContact_${id}_photo`]: result.message || 'Invalid file upload' }));
+      return;
+    }
+    setErrors(prev => ({ ...prev, [`altContact_${id}_photo`]: '' }));
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      setFormData(prev => ({
+        ...prev,
+        alternateContacts: prev.alternateContacts.map((c: Contact) =>
+          c.id === id ? { ...c, photo: dataUrl, photoFile: file } : c
+        ),
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAltContactPhotoChange = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    applyAltContactPhoto(id, file);
+  };
+
+  const removeAltContactPhoto = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      alternateContacts: prev.alternateContacts.map((c: Contact) =>
+        c.id === id ? { ...c, photo: null, photoFile: null } : c
+      ),
+    }));
+    setErrors(prev => ({ ...prev, [`altContact_${id}_photo`]: '' }));
   };
 
   const addAlternateContact = () => {
@@ -243,8 +352,15 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         phone1: '',
         phone2: '',
         landline: '',
+        localLandlineStd: '',
+        localLandline: '',
+        intlLandlineCountryCode: '',
+        intlLandlineStd: '',
+        intlLandlineNumber: '',
         department: '',
-        customDepartment: ''
+        customDepartment: '',
+        photo: null,
+        photoFile: null,
       };
       setFormData(prev => ({
         ...prev,
@@ -288,6 +404,15 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     });
   };
 
+  // Update several mainContact keys at once (used by the composite
+  // Local Landline control, which emits country code + STD + number together).
+  const updateMainContactFields = (fields: Record<string, string>) => {
+    setFormData(prev => ({
+      ...prev,
+      mainContact: { ...prev.mainContact, ...fields },
+    }));
+  };
+
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
   };
@@ -323,6 +448,15 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     });
   };
 
+  const updateAlternateContactFields = (id: string, fields: Record<string, string>) => {
+    setFormData(prev => ({
+      ...prev,
+      alternateContacts: prev.alternateContacts.map((contact: Contact) =>
+        contact.id === id ? { ...contact, ...fields } : contact
+      )
+    }));
+  };
+
   const handleInputChange = (field: string, value: string | string[] | any) => {
     setFormData(prev => ({
       ...prev,
@@ -336,6 +470,11 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
     const main = formData.mainContact;
+
+    if (!contactPhoto) {
+      newErrors['mainContact.photo'] = 'Profile photo is required';
+    }
+
     if (!main.firstName?.trim()) {
       newErrors['mainContact.firstName'] = 'First Name is required';
     } else if (main.firstName.trim().length < 2) {
@@ -401,11 +540,22 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       if (phoneErr) newErrors['mainContact.phone2'] = phoneErr;
     }
 
-    if (main.landline) {
-      const landline = main.landline.trim();
-      if (landline && !/^\d{8,15}$/.test(landline)) {
-        newErrors['mainContact.landline'] = 'Landline Number must be 8-15 digits';
+    // Local landline (country + STD + number) — number is the meaningful part.
+    if (main.localLandline && main.localLandline.trim()) {
+      const num = main.localLandline.trim();
+      const std = (main.localLandlineStd || '').trim();
+      if (!/^\d{5,15}$/.test(num)) {
+        newErrors['mainContact.localLandline'] = 'Landline number must be 5-15 digits';
+      } else if (std && !/^\d{1,6}$/.test(std)) {
+        newErrors['mainContact.localLandline'] = 'STD / area code must be up to 6 digits';
       }
+    }
+
+    // International landline — E.164 (PhoneInput). A bare dial code like "+91"
+    // counts as empty (country picked, nothing typed).
+    const intlVal = (main.intlLandline || '').trim();
+    if (intlVal && !/^\+\d{1,4}$/.test(intlVal) && !/^\+\d{7,16}$/.test(intlVal)) {
+      newErrors['mainContact.intlLandline'] = 'Enter a valid international landline (country code + number)';
     }
 
     if (!main.department?.trim()) {
@@ -416,7 +566,11 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
     formData.alternateContacts.forEach((alt: Contact, idx: number) => {
       const prefix = `altContact_${alt.id}`;
-      
+
+      if (!alt.photo) {
+        newErrors[`${prefix}_photo`] = 'Profile photo is required';
+      }
+
       if (!alt.firstName?.trim()) {
         newErrors[`${prefix}_firstName`] = 'First Name is required';
       } else if (alt.firstName.trim().length < 2) {
@@ -466,13 +620,6 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       if (alt.phone2) {
         const phoneErr = validatePhoneE164(alt.phone2, { label: 'Secondary Phone' });
         if (phoneErr) newErrors[`${prefix}_phone2`] = phoneErr;
-      }
-
-      if (alt.landline) {
-        const landline = alt.landline.trim();
-        if (landline && !/^\d{8,15}$/.test(landline)) {
-          newErrors[`${prefix}_landline`] = 'Landline Number must be 8-15 digits';
-        }
       }
 
       if (!alt.department?.trim()) {
@@ -538,10 +685,20 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       photoFile: contactPhotoFile,
     };
 
-    const transformedAlternateContacts = formData.alternateContacts.map((c: Contact) => ({
-      ...c,
-      name: `${c.firstName} ${c.middleName ? c.middleName + ' ' : ''}${c.lastName}`.trim()
-    }));
+    const transformedAlternateContacts = formData.alternateContacts.map((c: Contact) => {
+      const localLandline = (c.localLandlineStd + c.localLandline).trim();
+      const intlLandline = (c.intlLandlineCountryCode + c.intlLandlineStd + c.intlLandlineNumber).replace(/^\+?$/, '');
+      return {
+        ...c,
+        name: `${c.firstName} ${c.middleName ? c.middleName + ' ' : ''}${c.lastName}`.trim(),
+        localLandline: localLandline || undefined,
+        localLandlineStd: c.localLandlineStd || undefined,
+        intlLandline: intlLandline || undefined,
+        intlLandlineCountryCode: c.intlLandlineCountryCode || undefined,
+        intlLandlineStd: c.intlLandlineStd || undefined,
+        intlLandlineNumber: c.intlLandlineNumber || undefined,
+      };
+    });
 
     onUpdateData({
       ...formData,
@@ -560,6 +717,16 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 space-y-5 font-sans animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <ImageCropModal
+        src={cropState?.src ?? null}
+        fileName={cropState?.name}
+        title="Crop Profile Photo"
+        onCancel={closeCropper}
+        onCropped={(file) => {
+          applyContactPhoto(file);
+          closeCropper();
+        }}
+      />
       {/* Header */}
       <div className="flex items-center gap-3 pb-2">
         <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-50 text-brand-600 shrink-0">
@@ -580,16 +747,16 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       <AccordionSection
         {...sectionProps('mainContact')}
         icon={<User className="w-4.5 h-4.5" aria-hidden="true" />}
-        title="Contact Person"
+        title="Main Contact Person"
         subtitle="Primary contact details"
       >
         <div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
+          <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-4">
+
             {/* Profile Photo Upload moved to the top */}
-            <div className="mb-2" id="mainContact.photo">
+            <div id="mainContact.photo">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Profile Photo
+                Profile Photo <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center gap-4">
                 {contactPhoto ? (
@@ -648,7 +815,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                First Name <span className="text-red-500 text-lg">*</span>
+                First Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -693,7 +860,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Last Name <span className="text-red-500 text-lg">*</span>
+                Last Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -716,7 +883,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Department <span className="text-red-500 text-lg">*</span>
+                Department <span className="text-red-500">*</span>
               </label>
               <div id="mainContact.department">
                 <Dropdown
@@ -727,6 +894,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                   onBlur={() => handleBlur('mainContact.department')}
                   placeholder="Select department"
                   error={errors['mainContact.department'] && touched['mainContact.department']}
+                  buttonClassName="py-3 rounded-lg"
                 />
               </div>
               {errors['mainContact.department'] && touched['mainContact.department'] && (
@@ -736,7 +904,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Designation <span className="text-red-500 text-lg">*</span>
+                Designation <span className="text-red-500">*</span>
               </label>
               <div id="mainContact.designation">
                 <Dropdown
@@ -747,6 +915,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                   onBlur={() => handleBlur('mainContact.designation')}
                   placeholder="Select Designation"
                   error={errors['mainContact.designation'] && touched['mainContact.designation']}
+                  buttonClassName="py-3 rounded-lg"
                 />
               </div>
               {errors['mainContact.designation'] && touched['mainContact.designation'] && (
@@ -757,7 +926,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             {formData.mainContact.designation === 'Others' && (
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Custom Designation <span className="text-red-500 text-lg">*</span>
+                  Custom Designation <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -781,7 +950,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
             {formData.mainContact.department === 'Others' && (
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Custom Department <span className="text-red-500 text-lg">*</span>
+                  Custom Department <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -804,7 +973,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Primary Email <span className="text-red-500 text-lg">*</span>
+                Primary Email <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
@@ -849,7 +1018,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Primary Phone <span className="text-red-500 text-lg">*</span>
+                Primary Phone <span className="text-red-500">*</span>
               </label>
               <PhoneInput
                 name="mainContact.phone1"
@@ -883,28 +1052,66 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
               )}
             </div>
 
-            <div className="md:col-span-2">
-              <label htmlFor="mainContact.landline" className="block text-sm font-medium text-gray-700 mb-2">
-                Landline Number (Optional)
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Local Landline Number (Optional)
               </label>
-              <input
-                id="mainContact.landline"
-                type="tel"
-                name="mainContact.landline"
-                value={formData.mainContact.landline || ''}
-                onChange={(e) => updateMainContact('landline', e.target.value.replace(/\D/g, ''))}
-                onBlur={() => handleBlur('mainContact.landline')}
-                inputMode="tel"
-                autoComplete="off"
-                className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                  errors['mainContact.landline'] && touched['mainContact.landline']
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="2228175000"
+              <LocalLandlineInput
+                name="mainContact.localLandline"
+                locked
+                value={{
+                  countryCode: '+91',
+                  std: formData.mainContact.localLandlineStd || '',
+                  number: formData.mainContact.localLandline || '',
+                }}
+                onChange={(v) => {
+                  updateMainContactFields({
+                    localLandlineCountryCode: '+91',
+                    localLandlineStd: v.std,
+                    localLandline: v.number,
+                  });
+                  setErrors((prev) => ({ ...prev, 'mainContact.localLandline': '' }));
+                }}
+                onBlur={() => handleBlur('mainContact.localLandline')}
+                invalid={!!(errors['mainContact.localLandline'] && touched['mainContact.localLandline'])}
               />
-              {errors['mainContact.landline'] && touched['mainContact.landline'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['mainContact.landline']}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                India (+91) only — STD / area code, then the landline number.
+              </p>
+              {errors['mainContact.localLandline'] && touched['mainContact.localLandline'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['mainContact.localLandline']}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                International Landline Number (Optional)
+              </label>
+              <LocalLandlineInput
+                name="mainContact.intlLandlineNumber"
+                value={{
+                  countryCode: formData.mainContact.intlLandlineCountryCode || '+91',
+                  std: formData.mainContact.intlLandlineStd || '',
+                  number: formData.mainContact.intlLandlineNumber || '',
+                }}
+                onChange={(v) => {
+                  const assembled = v.countryCode + v.std + v.number;
+                  updateMainContactFields({
+                    intlLandlineCountryCode: v.countryCode,
+                    intlLandlineStd: v.std,
+                    intlLandlineNumber: v.number,
+                    intlLandline: assembled,
+                  });
+                  setErrors((prev) => ({ ...prev, 'mainContact.intlLandline': '' }));
+                }}
+                onBlur={() => handleBlur('mainContact.intlLandline')}
+                invalid={!!(errors['mainContact.intlLandline'] && touched['mainContact.intlLandline'])}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Country code, then STD / area code, then the landline number.
+              </p>
+              {errors['mainContact.intlLandline'] && touched['mainContact.intlLandline'] && (
+                <p className="text-red-500 text-sm mt-1">{errors['mainContact.intlLandline']}</p>
               )}
             </div>
           </div>
@@ -915,7 +1122,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       <AccordionSection
         {...sectionProps('alternates')}
         icon={<Mail className="w-4.5 h-4.5" aria-hidden="true" />}
-        title="Contact Person 2 (Optional)"
+        title={formData.alternateContacts.length === 0 ? 'Additional Contact Persons (Optional)' : `Contact Person 2${formData.alternateContacts.length > 1 ? ` – ${formData.alternateContacts.length + 1}` : ''} (Optional)`}
         subtitle="Secondary contact persons"
       >
         <div>
@@ -943,6 +1150,67 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                     </Button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Profile Photo */}
+                    <div className="md:col-span-2" id={`altContact_${contact.id}_photo`}>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Profile Photo <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex items-center gap-4">
+                        {contact.photo ? (
+                          <div className="relative">
+                            <Image
+                              src={contact.photo}
+                              alt="Contact photo"
+                              width={80}
+                              height={80}
+                              className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeAltContactPhoto(contact.id)}
+                              className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className={`w-20 h-20 rounded-full border-2 border-dashed flex items-center justify-center ${
+                            errors[`altContact_${contact.id}_photo`] && touched[`altContact_${contact.id}_photo`]
+                              ? 'border-red-400 bg-red-50'
+                              : 'border-slate-300 bg-slate-50'
+                          }`}>
+                            <Camera className="w-6 h-6 text-slate-400" />
+                          </div>
+                        )}
+                        <div>
+                          <label
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                document.getElementById(`altContact_${contact.id}_photoInput`)?.click();
+                              }
+                            }}
+                            className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                          >
+                            <Camera className="w-4 h-4" />
+                            {contact.photo ? 'Change Photo' : 'Upload Photo'}
+                            <input
+                              id={`altContact_${contact.id}_photoInput`}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              onChange={(e) => handleAltContactPhotoChange(contact.id, e)}
+                              className="hidden"
+                            />
+                          </label>
+                          <p className="text-xs text-slate-500 mt-1">JPG, PNG or WebP. Max 5,120 KB.</p>
+                        </div>
+                      </div>
+                      {errors[`altContact_${contact.id}_photo`] && touched[`altContact_${contact.id}_photo`] && (
+                        <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_photo`]}</p>
+                      )}
+                    </div>
+
                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">First Name <span className="text-red-500">*</span></label>
@@ -1146,27 +1414,33 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                         <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_phone2`]}</p>
                       )}
                     </div>
-                    <div className="md:col-span-2">
-                      <label htmlFor={`altContact_${contact.id}_landline`} className="block text-sm font-medium text-gray-700 mb-2">Landline Number (Optional)</label>
-                      <input
-                        id={`altContact_${contact.id}_landline`}
-                        type="tel"
-                        name={`altContact_${contact.id}_landline`}
-                        value={contact.landline || ''}
-                        onChange={(e) => updateAlternateContact(contact.id, 'landline', e.target.value.replace(/\D/g, ''))}
-                        onBlur={() => handleBlur(`altContact_${contact.id}_landline`)}
-                        inputMode="tel"
-                        autoComplete="off"
-                        className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                          errors[`altContact_${contact.id}_landline`] && touched[`altContact_${contact.id}_landline`]
-                            ? 'border-red-500 bg-red-50'
-                            : 'border-slate-300 hover:border-slate-400'
-                        }`}
-                        placeholder="2228175000"
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                        Local Landline <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+                      </label>
+                      <LocalLandlineInput
+                        locked
+                        value={{ countryCode: '+91', std: contact.localLandlineStd, number: contact.localLandline }}
+                        onChange={(v: LocalLandlineValue) => updateAlternateContactFields(contact.id, {
+                          localLandlineStd: v.std,
+                          localLandline: v.number,
+                        })}
                       />
-                      {errors[`altContact_${contact.id}_landline`] && touched[`altContact_${contact.id}_landline`] && (
-                        <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_landline`]}</p>
-                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
+                        International Landline <span className="text-slate-400 text-xs font-normal">(Optional)</span>
+                      </label>
+                      <LocalLandlineInput
+                        value={{ countryCode: contact.intlLandlineCountryCode, std: contact.intlLandlineStd, number: contact.intlLandlineNumber }}
+                        onChange={(v: LocalLandlineValue) => updateAlternateContactFields(contact.id, {
+                          intlLandlineCountryCode: v.countryCode,
+                          intlLandlineStd: v.std,
+                          intlLandlineNumber: v.number,
+                        })}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1222,95 +1496,49 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
           </div>
 
           {formData.hasImportExport === 'yes' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-20">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div id="importCountries">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Import Countries
                 </label>
-                <div id="importCountries">
-                  <CountrySelect
-                    id="import-countries"
-                    value=""
-                    onChange={(v) => {
-                      if (!formData.importCountries.includes(v)) {
-                        handleInputChange('importCountries', [...formData.importCountries, v]);
-                        if (errors['importCountries']) {
-                          setErrors(prev => ({ ...prev, importCountries: '' }));
-                        }
-                      }
-                    }}
-                    onBlur={() => handleBlur('importCountries')}
-                    placeholder="Select a country to add..."
-                    invalid={!!(errors['importCountries'] && touched['importCountries'])}
-                  />
-                </div>
+                <CountryMultiSelect
+                  label="Select Import Countries"
+                  buttonLabel="Select Import Countries"
+                  value={formData.importCountries}
+                  onChange={(names) => {
+                    handleInputChange('importCountries', names);
+                    handleBlur('importCountries');
+                    if (errors['importCountries'] && names.length > 0) {
+                      setErrors(prev => ({ ...prev, importCountries: '' }));
+                    }
+                  }}
+                  invalid={!!(errors['importCountries'] && touched['importCountries'])}
+                  emptyHint="No import countries selected yet"
+                />
                 {errors['importCountries'] && touched['importCountries'] && (
                   <p className="text-red-500 text-sm mt-1">{errors['importCountries']}</p>
                 )}
-                {formData.importCountries.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {formData.importCountries.map((country: string) => (
-                      <span key={country} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-brand-50 text-brand-700 text-sm font-medium border border-brand-200">
-                        {country}
-                        <button
-                          type="button"
-                          onClick={() => handleInputChange('importCountries', formData.importCountries.filter((c: string) => c !== country))}
-                          className="hover:bg-brand-100 rounded-full p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                          aria-label={`Remove ${country}`}
-                        >
-                          <X className="w-3.5 h-3.5" aria-hidden="true" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {!formData.importCountries.length && (
-                  <p className="text-xs text-slate-500 mt-1">Select one or more countries</p>
-                )}
               </div>
-              <div>
+              <div id="exportCountries">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Export Countries
                 </label>
-                <div id="exportCountries">
-                  <CountrySelect
-                    id="export-countries"
-                    value=""
-                    onChange={(v) => {
-                      if (!formData.exportCountries.includes(v)) {
-                        handleInputChange('exportCountries', [...formData.exportCountries, v]);
-                        if (errors['exportCountries']) {
-                          setErrors(prev => ({ ...prev, exportCountries: '' }));
-                        }
-                      }
-                    }}
-                    onBlur={() => handleBlur('exportCountries')}
-                    placeholder="Select a country to add..."
-                    invalid={!!(errors['exportCountries'] && touched['exportCountries'])}
-                  />
-                </div>
+                <CountryMultiSelect
+                  label="Select Export Countries"
+                  buttonLabel="Select Export Countries"
+                  value={formData.exportCountries}
+                  onChange={(names) => {
+                    handleInputChange('exportCountries', names);
+                    handleBlur('exportCountries');
+                    if (errors['exportCountries'] && names.length > 0) {
+                      setErrors(prev => ({ ...prev, exportCountries: '' }));
+                    }
+                  }}
+                  invalid={!!(errors['exportCountries'] && touched['exportCountries'])}
+                  emptyHint="No export countries selected yet"
+                />
                 {errors['exportCountries'] && touched['exportCountries'] && (
                   <p className="text-red-500 text-sm mt-1">{errors['exportCountries']}</p>
-                )}
-                {formData.exportCountries.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {formData.exportCountries.map((country: string) => (
-                      <span key={country} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-brand-50 text-brand-700 text-sm font-medium border border-brand-200">
-                        {country}
-                        <button
-                          type="button"
-                          onClick={() => handleInputChange('exportCountries', formData.exportCountries.filter((c: string) => c !== country))}
-                          className="hover:bg-brand-100 rounded-full p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                          aria-label={`Remove ${country}`}
-                        >
-                          <X className="w-3.5 h-3.5" aria-hidden="true" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {!formData.exportCountries.length && (
-                  <p className="text-xs text-slate-500 mt-1">Select one or more countries</p>
                 )}
               </div>
             </div>

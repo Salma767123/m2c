@@ -198,6 +198,17 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     console.log('Category match found:', vendorCategories.some(c => c.name === formData.category))
   }, [formData.category, vendorCategories])
 
+  // Preview the auto-generated SKU on the create form so the vendor can see it.
+  useEffect(() => {
+    if (isEdit) return
+    let cancelled = false
+    inventoryService
+      .getNextSku()
+      .then((sku) => { if (!cancelled) setFormData((prev) => (prev.sku ? prev : { ...prev, sku })) })
+      .catch(() => { /* preview is best-effort; the real SKU is assigned on save */ })
+    return () => { cancelled = true }
+  }, [isEdit])
+
   // Load inventory data for editing (only after categories are loaded)
   useEffect(() => {
     if (isEdit && inventoryId && !isLoadingCategories) {
@@ -303,7 +314,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
   const validate = (data: InventoryFormData): Record<string, string> => {
     const e: Record<string, string> = {}
     if (!data.name?.trim()) e.name = 'Product name is required'
-    if (!data.sku?.trim()) e.sku = 'SKU is required'
+    // SKU is auto-generated server-side — not entered by the vendor.
     if (!data.category?.trim()) e.category = 'Category is required'
     if (data.lowStockAlert === undefined || data.lowStockAlert === null || isNaN(data.lowStockAlert) || data.lowStockAlert < 0) {
       e.lowStockAlert = 'Enter a valid low stock alert (0 or more)'
@@ -572,22 +583,18 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      SKU *
+                      SKU
                     </label>
                     <input
                       id="vf-sku"
                       type="text"
                       name="sku"
                       value={formData.sku}
-                      onChange={handleInputChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                        errors.sku
-                          ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
-                          : 'border-slate-200 focus:ring-brand-500/40 focus:border-brand-500'
-                      }`}
-                      placeholder="Enter SKU"
+                      readOnly
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-600 cursor-not-allowed"
+                      placeholder={isEdit ? '' : 'Auto-generated on save'}
                     />
-                    {errors.sku && <p className="mt-1 text-xs text-red-600">{errors.sku}</p>}
+                    <p className="mt-1 text-xs text-slate-500">Auto-generated &amp; permanent — not editable.</p>
                   </div>
                 </div>
 

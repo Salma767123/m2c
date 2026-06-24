@@ -149,15 +149,15 @@ export default function Review({ formData }: ReviewProps) {
         <div className="bg-slate-50 rounded-xl p-6">
           <h3 className="text-slate-900 font-semibold mb-4 flex items-center gap-2">
             <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-            Order Items Details
+            Products
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-300">
-                  <th className="text-left py-3 px-3 font-semibold text-slate-700">Item</th>
+                  <th className="text-left py-3 px-3 font-semibold text-slate-700">Product Name</th>
                   <th className="text-left py-3 px-3 font-semibold text-slate-700">Description</th>
-                  <th className="text-left py-3 px-3 font-semibold text-slate-700">Total Qty</th>
+                  <th className="text-left py-3 px-3 font-semibold text-slate-700">Lot Quantity</th>
                   <th className="text-left py-3 px-3 font-semibold text-slate-700">Inspection Qty</th>
                 </tr>
               </thead>

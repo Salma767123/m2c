@@ -2,6 +2,7 @@ const { prisma } = require('../config/database');
 const { recomputeAndPersistOrderStatus } = require('../utils/computeOrderStatus');
 const { notifications } = require('../utils/notificationService');
 const { attachVendorPrices } = require('../utils/vendorPricing');
+const { withWriteRetry } = require('../utils/dbRetry');
 
 // Maps vendor status → customer notification
 const VENDOR_STATUS_NOTIFY = {
@@ -231,6 +232,21 @@ const updateVendorOrderStatus = async (req, res) => {
             });
         }
 
+        // Idempotency: if the shipment is already at the requested status (e.g. a
+        // duplicate click fired a second request after the first succeeded),
+        // return the current shipment as success instead of erroring.
+        if (shipment.status === status) {
+            const current = await prisma.vendorShipment.findUnique({
+                where: { id: shipment.id },
+                include: SHIPMENT_INCLUDE,
+            });
+            return res.json({
+                success: true,
+                data: current,
+                message: `Order is already marked as ${status.replace(/_/g, ' ')}`,
+            });
+        }
+
         const updateData = {
             status,
             statusHistory: {
@@ -250,18 +266,20 @@ const updateVendorOrderStatus = async (req, res) => {
             updateData.vendorShippedAt = new Date();
         }
 
-        const updatedShipment = await prisma.$transaction(async (tx) => {
-            const updated = await tx.vendorShipment.update({
-                where: { id: shipment.id },
-                data: updateData,
-                include: SHIPMENT_INCLUDE,
-            });
+        const updatedShipment = await withWriteRetry(() =>
+            prisma.$transaction(async (tx) => {
+                const updated = await tx.vendorShipment.update({
+                    where: { id: shipment.id },
+                    data: updateData,
+                    include: SHIPMENT_INCLUDE,
+                });
 
-            // Recompute parent Order status
-            await recomputeAndPersistOrderStatus(tx, shipment.orderId);
+                // Recompute parent Order status
+                await recomputeAndPersistOrderStatus(tx, shipment.orderId);
 
-            return updated;
-        });
+                return updated;
+            })
+        );
 
         // Notify customer about status change (fire-and-forget)
         if (updatedShipment.order?.customerId) {

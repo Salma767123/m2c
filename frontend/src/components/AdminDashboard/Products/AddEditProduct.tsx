@@ -12,6 +12,19 @@ import VariantImageModal from './VariantImageModal'
 import Link from 'next/link'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
 import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
+import { DIMENSION_UNITS, parseDimensions, combineDimensions } from '@/lib/dimensions'
+
+// 1 → A, 26 → Z, 27 → AA … (mirrors the backend variant-suffix logic).
+const variantAlphaSuffix = (n: number): string => {
+  let s = ''
+  let x = n
+  while (x > 0) {
+    const rem = (x - 1) % 26
+    s = String.fromCharCode(65 + rem) + s
+    x = Math.floor((x - 1) / 26)
+  }
+  return s || 'A'
+}
 
 interface InventoryItem {
   id: string
@@ -69,6 +82,7 @@ const standardColors = ['White', 'Black', 'Gray', 'Navy', 'Beige', 'Brown', 'Red
 
 interface ProductVariant {
   id: string
+  variantName?: string
   size: string
   color: string
   colorHex?: string // New field for color picker hex value
@@ -83,6 +97,7 @@ interface ProductVariant {
   originalPriceUSD?: number | null
   priceVisibility?: 'IN_ONLY' | 'COM_ONLY' | 'BOTH'
   stock: number
+  lowStockThreshold?: number
   images: string[]
 }
 
@@ -176,6 +191,7 @@ interface ProductFormData {
   uom: string
   tags: string[]
   dimensions?: string
+  dimensionUnit: string
   weight?: string
   inStock: boolean
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
@@ -220,6 +236,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
   // GST State
   const [gstRates, setGstRates] = useState<GSTSetting[]>([])
   const [isLoadingGst, setIsLoadingGst] = useState(false)
+  // True when "Others" is chosen to enter a custom tax rate.
+  const [gstOthers, setGstOthers] = useState(false)
 
   const [formData, setFormData] = useState<ProductFormData>({
     // Inventory Connection (NEW)
@@ -294,6 +312,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     uom: 'pcs',
     tags: [],
     dimensions: '',
+    dimensionUnit: 'cm',
     weight: '',
     inStock: true,
     status: 'ACTIVE',
@@ -408,6 +427,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
   }, [hasUnsavedChanges])
 
   const [newVariant, setNewVariant] = useState<Partial<ProductVariant>>({
+    variantName: '',
     size: '',
     color: '',
     colorHex: '#000000',
@@ -495,11 +515,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
               variants: product.variants?.map(v => ({
                 id: v.id,
+                variantName: v.variantName,
                 size: v.size,
                 color: v.color,
                 colorHex: v.colorHex || '#000000',
                 sku: v.sku,
                 price: v.price,
+                lowStockThreshold: v.lowStockThreshold ?? undefined,
                 originalPrice: v.originalPrice,
                 discount: v.discount,
                 adminFixedPrice: v.adminFixedPrice || null,
@@ -539,7 +561,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
               uom: product.uom || 'pcs',
               tags: product.tags || [],
-              dimensions: product.dimensions,
+              dimensions: parseDimensions(product.dimensions).value,
+              dimensionUnit: parseDimensions(product.dimensions).unit,
               weight: product.weight,
               inStock: product.inStock,
               status: product.status || 'ACTIVE',
@@ -865,17 +888,20 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
   }
 
   const addVariant = () => {
-    if (newVariant.size && newVariant.color && newVariant.sku) {
+    // SKU is auto-generated server-side; size is optional. Color is required.
+    if (newVariant.color) {
       const variant: ProductVariant = {
         id: Date.now().toString(),
-        size: newVariant.size!,
+        variantName: (newVariant.variantName || '').trim(),
+        size: newVariant.size || '',
         color: newVariant.color!,
         colorHex: newVariant.colorHex || '#000000',
-        sku: newVariant.sku!,
+        sku: '', // assigned by the backend on save
         price: newVariant.price || 0,
         originalPrice: newVariant.originalPrice || undefined,
         discount: newVariant.discount || undefined,
         stock: newVariant.stock || 0,
+        lowStockThreshold: newVariant.lowStockThreshold,
         images: newVariant.images || []
       }
 
@@ -884,7 +910,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
         variants: [...prev.variants, variant]
       }))
 
-      setNewVariant({ size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, images: [] })
+      setNewVariant({ variantName: '', size: '', color: '', colorHex: '#000000', sku: '', price: 0, stock: 0, lowStockThreshold: undefined, images: [] })
     }
   }
 
@@ -1174,9 +1200,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     try {
       const { adminProductService } = await import('@/services/adminProductService')
 
+      // Fold the dimension unit into the dimensions string (e.g. "230x250 cm")
+      // and drop the helper-only field before sending.
+      const submitData: any = {
+        ...formData,
+        dimensions: combineDimensions(formData.dimensions, formData.dimensionUnit),
+      }
+      delete submitData.dimensionUnit
+
       if (isEdit && productId) {
         // Update existing product
-        const response = await adminProductService.updateProduct(productId, formData)
+        const response = await adminProductService.updateProduct(productId, submitData)
 
         if (response.success) {
           showSuccessToast('Product Updated', 'Product has been updated successfully.')
@@ -1185,7 +1219,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
         }
       } else {
         // Create new product
-        const response = await adminProductService.createProduct(formData)
+        const response = await adminProductService.createProduct(submitData)
 
         if (response.success) {
           showSuccessToast('Product Created', 'Product has been created successfully.')
@@ -1526,10 +1560,41 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         value={formData.dimensions}
                         onChange={handleInputChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
-                        placeholder="e.g., 230x250 cm"
+                        placeholder="e.g., 230x250"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Shown on product page. For shipping dimensions, use Logistics tab.</p>
+                      <p className="text-xs text-gray-500 mt-1">Shown on product page.</p>
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Dimension Unit
+                      </label>
+                      <Dropdown
+                        label=""
+                        value={formData.dimensionUnit}
+                        options={DIMENSION_UNITS}
+                        placeholder="Select Unit"
+                        onChange={(value) => setFormData(prev => ({ ...prev, dimensionUnit: value as string }))}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Unit for the dimensions above.</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Base SKU
+                      </label>
+                      <input
+                        type="text"
+                        name="baseSku"
+                        value={formData.baseSku}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
+                        placeholder={isEdit ? '' : 'Auto-generated on save'}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Auto-generated &amp; permanent — not editable.</p>
+                    </div>
+                  </div>
+
+                  {/* Weight, Size and Color */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Display Weight
@@ -1542,30 +1607,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                         placeholder="e.g., 1.2 kg"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Shown on product page. For shipping weight, use Logistics tab.</p>
+                      <p className="text-xs text-gray-500 mt-1">Shown on product page.</p>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Base SKU
-                      </label>
-                      <input
-                        type="text"
-                        name="baseSku"
-                        value={formData.baseSku}
-                        onChange={handleInputChange}
-                        disabled={formData.isFromInventory}
-                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent ${formData.isFromInventory ? 'bg-gray-100 text-gray-600' : ''
-                          }`}
-                        placeholder="e.g., CS-001"
-                      />
-                      {formData.isFromInventory && (
-                        <p className="text-xs text-gray-500 mt-1">From inventory SKU</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Size and Color */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Default Size
@@ -1824,9 +1867,19 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         {/* Variant Details - Two Row Layout */}
                         <div className="space-y-6">
                           {/* First Row: Basic Attributes */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-gray-700">Size *</label>
+                              <label className="block text-sm font-medium text-gray-700">Variant Name</label>
+                              <input
+                                type="text"
+                                value={newVariant.variantName || ''}
+                                onChange={(e) => setNewVariant(prev => ({ ...prev, variantName: e.target.value }))}
+                                placeholder="e.g., Premium Red"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Size</label>
                               <Dropdown
                                 value={newVariant.size || ''}
                                 options={standardSizes}
@@ -1863,19 +1916,20 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                             </div>
 
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-gray-700">SKU *</label>
+                              <label className="block text-sm font-medium text-gray-700">SKU</label>
                               <input
                                 type="text"
-                                value={newVariant.sku}
-                                onChange={(e) => setNewVariant(prev => ({ ...prev, sku: e.target.value }))}
-                                placeholder="e.g., CS-Q-BLK"
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
+                                readOnly
+                                value={formData.baseSku ? `${formData.baseSku}-${variantAlphaSuffix(formData.variants.length + 1)}` : ''}
+                                placeholder="Auto-generated on save"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
                               />
+                              <p className="text-xs text-gray-500">Auto-generated from the product SKU — not editable.</p>
                             </div>
                           </div>
 
                           {/* Second Row: Pricing & Inventory & Image */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="space-y-2">
                               <label className="block text-sm font-medium text-gray-700">Price *</label>
                               <div className="relative">
@@ -1898,6 +1952,18 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                 value={newVariant.stock}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                                 placeholder="0"
+                                min="0"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-sm font-medium text-gray-700">Low Stock Alert</label>
+                              <input
+                                type="number"
+                                value={newVariant.lowStockThreshold ?? ''}
+                                onChange={(e) => setNewVariant(prev => ({ ...prev, lowStockThreshold: e.target.value === '' ? undefined : parseInt(e.target.value) }))}
+                                placeholder="Default"
                                 min="0"
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
                               />
@@ -1952,7 +2018,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                             <Button
                               type="button"
                               onClick={addVariant}
-                              disabled={!newVariant.size || !newVariant.color || !newVariant.sku || !newVariant.price}
+                              disabled={!newVariant.color || !newVariant.price}
                               className="bg-gray-900 text-white hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed px-6 py-2.5 font-medium"
                             >
                               <Package className="h-4 w-4 mr-2" />
@@ -1978,6 +2044,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>Image</TableHead>
+                                  <TableHead>Name</TableHead>
                                   <TableHead>Size</TableHead>
                                   <TableHead>Color</TableHead>
                                   <TableHead>SKU</TableHead>
@@ -2011,11 +2078,21 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                       </button>
                                     </TableCell>
                                     <TableCell>
+                                      <input
+                                        type="text"
+                                        value={variant.variantName || ''}
+                                        onChange={(e) => updateVariant(variant.id, 'variantName', e.target.value)}
+                                        placeholder="—"
+                                        className="w-full min-w-[100px] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
                                       <select
                                         value={variant.size}
                                         onChange={(e) => updateVariant(variant.id, 'size', e.target.value)}
                                         className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
                                       >
+                                        <option value="">—</option>
                                         {standardSizes.map(s => (
                                           <option key={s} value={s}>{s}</option>
                                         ))}
@@ -2045,10 +2122,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                     <TableCell>
                                       <input
                                         type="text"
-                                        value={variant.sku}
-                                        onChange={(e) => updateVariant(variant.id, 'sku', e.target.value)}
-                                        className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
-                                        placeholder="SKU"
+                                        readOnly
+                                        value={variant.sku || (formData.baseSku ? `${formData.baseSku}-${variantAlphaSuffix(idx + 1)}` : '')}
+                                        className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-xs font-mono bg-gray-100 text-gray-600 cursor-not-allowed"
+                                        placeholder="Auto-generated on save"
+                                        title="Auto-generated — not editable"
                                       />
                                     </TableCell>
                                     <TableCell>
@@ -2217,26 +2295,63 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       <div>
                         <Dropdown
                           label="GST Rate"
-                          value={formData.gstPercentage?.toString() || ''}
+                          value={(() => {
+                            if (gstOthers) return 'others'
+                            if (formData.gstPercentage == null) return ''
+                            const inList = gstRates.some(r => r.isActive && r.percentage === formData.gstPercentage)
+                            return inList ? String(formData.gstPercentage) : 'others'
+                          })()}
                           options={[
                             { value: '', label: 'Select GST Rate' },
-                            ...gstRates.filter(rate => rate.isActive).map(rate => ({
-                              value: rate.percentage.toString(),
-                              label: `${rate.percentage}% - ${rate.description || 'GST'}`
-                            }))
+                            ...gstRates.filter(r => r.isActive).map(r => ({
+                              value: r.percentage.toString(),
+                              label: `${r.percentage}% - ${r.description || 'GST'}`,
+                            })),
+                            { value: 'others', label: 'Others (custom tax)' },
                           ]}
-                          onChange={(value) => setFormData(prev => ({
-                            ...prev,
-                            gstPercentage: value ? parseFloat(value as string) : undefined
-                          }))}
-                          placeholder={isLoadingGst ? "Loading rates..." : "Select GST Rate"}
+                          onChange={(value) => {
+                            if (value === 'others') {
+                              setGstOthers(true)
+                              setFormData(prev => {
+                                const inList = gstRates.some(r => r.isActive && r.percentage === prev.gstPercentage)
+                                return { ...prev, gstPercentage: inList ? undefined : prev.gstPercentage }
+                              })
+                            } else {
+                              setGstOthers(false)
+                              setFormData(prev => ({ ...prev, gstPercentage: value ? parseFloat(value as string) : undefined }))
+                            }
+                          }}
+                          placeholder={isLoadingGst ? 'Loading rates...' : 'Select GST Rate'}
                           disabled={isLoadingGst}
                         />
-                        <p className="text-xs text-gray-500 mt-1">Select the applicable GST rate for this product</p>
+                        <p className="text-xs text-gray-500 mt-1">Select the applicable tax rate for this product</p>
                         {!formData.gstPercentage && (
-                          <p className="text-xs text-red-500 mt-1">GST Rate is required</p>
+                          <p className="text-xs text-red-500 mt-1">Tax rate is required</p>
                         )}
                       </div>
+                      {(gstOthers || (formData.gstPercentage != null && !gstRates.some(r => r.isActive && r.percentage === formData.gstPercentage))) && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Custom Tax Rate (%)</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={formData.gstPercentage ?? ''}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                gstPercentage: e.target.value === '' ? undefined : parseFloat(e.target.value)
+                              }))}
+                              placeholder="e.g., 12"
+                              className="w-full px-4 py-3 pr-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">%</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">Enter any other applicable tax percentage</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                   {/* Single Price Section */}

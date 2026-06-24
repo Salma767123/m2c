@@ -1,4 +1,5 @@
 import { toast } from "@/hooks/use-toast"
+import { centerNotice } from "@/components/UI/CenterNotice"
 
 export const showSuccessToast = (title: string, description?: string) => {
   toast({
@@ -84,14 +85,18 @@ export function validateUpload(
   return { ok: true };
 }
 
-/** Success toast for a completed upload — keeps copy consistent. */
+/**
+ * Success notice for a completed upload. Shown as a center-screen modal (used by
+ * the vendor registration flow) with professional confirmation wording, e.g.
+ * "GST Certificate Uploaded Successfully".
+ */
 export function notifyUploadSuccess(label: string, fileName: string) {
-  showSuccessToast(`${label} uploaded`, fileName);
+  centerNotice.success(`${label} Uploaded Successfully`, fileName);
 }
 
-/** Failure toast — `message` should be the actionable reason from `validateUpload`. */
+/** Failure notice — actionable, e.g. "Failed to Upload GST Certificate. Please try again." */
 export function notifyUploadError(label: string, message: string) {
-  showErrorToast(`Couldn't upload ${label.toLowerCase()}`, message);
+  centerNotice.error(`Failed to Upload ${label}`, message || "Please try again.");
 }
 
 /**

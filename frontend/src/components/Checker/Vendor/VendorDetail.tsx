@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
+import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
 const MAIN_STATUS_COLORS: Record<string, string> = {
   "New Assignment": "bg-blue-50 text-blue-700 border-blue-200/85",
   "Under Review by Admin": "bg-orange-50 text-orange-700 border-orange-200/85",
@@ -284,10 +285,15 @@ export default function VendorDetail({
           { key: "companyName", label: "Company Name" },
           { key: "companyType", label: "Company Type", type: "badge" },
           { key: "businessType", label: "Business Type", transform: (val: string) => getBusinessTypeLabel(val) },
+          { key: "factoryOwnershipType", label: "Factory Ownership", transform: (val: string) => getOwnershipTypeLabel(val) },
           { key: "establishedYear", label: "Year Established" },
-          { key: "gstNumber", label: "GST Number" },
+          { key: "annualTurnover", label: "Annual Turnover" },
+          { key: "gstNumber", label: "GST Number", condition: fullVendor.gstNumber },
+          { key: "_unregistered", label: "Vendor Type", valueOverride: !fullVendor.gstNumber ? "Unregistered — identified by email" : undefined, condition: !fullVendor.gstNumber },
           { key: "companyIdNumber", label: getCompanyIdLabel(fullVendor.businessType), condition: fullVendor.companyIdNumber },
+          { key: "iecCode", label: "IEC Code (Import Export Code)", condition: fullVendor.iecCode },
           { key: "panNumber", label: "PAN Number" },
+          { key: "aadhaarNumber", label: "Aadhaar Number", condition: fullVendor.aadhaarNumber },
           { key: "website", label: "Website", type: "url" },
           { key: "companyDescription", label: "Company Description" }
         ]
@@ -297,44 +303,38 @@ export default function VendorDetail({
         title: "Warehouse / Factory Address",
         icon: <Warehouse className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "ownershipType", label: "Ownership Type", transform: (val: string) => getOwnershipTypeLabel(val) },
-          {
-            key: "warehouseAddress",
-            label: "Warehouse Address",
-            valueOverride: formatAddressHelper(
-              fullVendor.warehouseAddress,
-              fullVendor.warehouseCity,
-              fullVendor.warehouseState,
-              fullVendor.warehouseZipCode,
-              fullVendor.warehouseCountry
-            )
-          },
+          { key: "ownershipType", label: "Warehouse Ownership", transform: (val: string) => getOwnershipTypeLabel(val) },
+          { key: "warehouseAddress", label: "Address Line 1", condition: fullVendor.warehouseAddress },
+          { key: "warehouseAddressLine2", label: "Address Line 2", condition: fullVendor.warehouseAddressLine2 },
+          { key: "warehouseAddressLine3", label: "Address Line 3", condition: fullVendor.warehouseAddressLine3 },
+          { key: "warehouseLandmark", label: "Landmark", condition: fullVendor.warehouseLandmark },
+          { key: "warehouseCity", label: "City", condition: fullVendor.warehouseCity },
+          { key: "warehouseState", label: "State", condition: fullVendor.warehouseState },
+          { key: "warehouseZipCode", label: "PIN / ZIP Code", condition: fullVendor.warehouseZipCode },
+          { key: "warehouseCountry", label: "Country", condition: fullVendor.warehouseCountry },
           { key: "warehouseSize", label: "Warehouse Size" },
           { key: "storageCapacity", label: "Storage Capacity" },
-          { key: "mapLink", label: "Google Maps Link", type: "url" }
+          { key: "factorySize", label: "Factory Size" },
         ]
       },
       {
         id: "owner_profile",
-        title: "Owner Profile",
+        title: "Owner Identity",
         icon: <UserCircle className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "ownerEmail", label: "Owner Email" },
-          { key: "ownerEmail2", label: "Owner Email 2" },
-          { key: "ownerPhone", label: "Owner Phone" },
-          { key: "ownerPhone2", label: "Owner Phone 2" },
-          { key: "ownerLandline", label: "Owner Landline" },
-          {
-            key: "ownerAddress",
-            label: "Owner Address",
-            valueOverride: formatAddressHelper(
-              fullVendor.ownerAddress,
-              fullVendor.ownerCity,
-              fullVendor.ownerState,
-              fullVendor.ownerZipCode,
-              fullVendor.ownerCountry
-            )
-          },
+          { key: "ownerName", label: "Owner Full Name" },
+          { key: "designation", label: "Designation" },
+          { key: "ownerPhone", label: "Primary Phone" },
+          { key: "ownerPhone2", label: "Secondary Phone" },
+          { key: "ownerEmail", label: "Primary Email" },
+          { key: "ownerEmail2", label: "Secondary Email" },
+          { key: "ownerLandline", label: "Local Landline", valueOverride: formatLocalLandline({ countryCode: '+91', std: fullVendor.ownerLocalLandlineStd as any, number: fullVendor.ownerLandline as any }) || undefined },
+          { key: "ownerIntlLandline", label: "International Landline", valueOverride: formatIntlLandline(fullVendor.ownerIntlLandline as any) || undefined },
+          { key: "ownerAddress", label: "Owner Address", condition: fullVendor.ownerAddress },
+          { key: "ownerCity", label: "City", condition: fullVendor.ownerCity },
+          { key: "ownerState", label: "State", condition: fullVendor.ownerState },
+          { key: "ownerZipCode", label: "PIN / ZIP Code", condition: fullVendor.ownerZipCode },
+          { key: "ownerCountry", label: "Country", condition: fullVendor.ownerCountry },
           { key: "businessStartDate", label: "Business Start Date", type: "date" },
           { key: "employeeCount", label: "Employee Count", transform: (val: string) => getEmployeeCountLabel(val) }
         ]
@@ -345,13 +345,15 @@ export default function VendorDetail({
         icon: <Package className="w-5 h-5 text-brand-600" />,
         fields: [
           { key: "vendorType", label: "Vendor Role Type", type: "badge" },
-          { key: "productionCapacity", label: "Production Capacity" },
-          { key: "minimumOrderQuantity", label: "Minimum Order Quantity" },
-          { key: "deliveryTime", label: "Delivery Time" },
-          { key: "qualityControl", label: "Quality Control Measures" },
+          { key: "vendorTypes", label: "Vendor Types", type: "list" },
           { key: "productCategories", label: "Product Categories", type: "list" },
           { key: "productTypes", label: "Product Types", type: "list" },
           { key: "specializations", label: "Specializations", type: "list" },
+          { key: "productionCapacity", label: "Production Capacity" },
+          { key: "minimumOrderQuantity", label: "Minimum Order Quantity" },
+          { key: "deliveryTime", label: "Delivery Time" },
+          { key: "paymentTerms", label: "Payment Terms", type: "list" },
+          { key: "qualityControl", label: "Quality Control Measures" },
           { key: "categoryRemarks", label: "Category Remarks" }
         ]
       },
@@ -374,37 +376,38 @@ export default function VendorDetail({
       },
       {
         id: "contact",
-        title: "Contact Information",
+        title: "Contact & Communication Details",
         icon: <Phone className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "ownerName", label: "Owner Name" },
-          { key: "designation", label: "Designation" },
-          { key: "businessPhone", label: "Business Phone" },
-          { key: "businessEmail", label: "Business Email" },
-          { key: "phoneNumber2", label: "Alternate Phone" },
-          { key: "businessEmail2", label: "Alternate Email" },
-          { key: "landlineNumber", label: "Landline Number" },
-          {
-            key: "businessAddress",
-            label: "Business Address",
-            valueOverride: formatAddressHelper(
-              fullVendor.businessAddress,
-              fullVendor.businessCity,
-              fullVendor.businessState,
-              fullVendor.businessZipCode,
-              fullVendor.businessCountry
-            )
-          }
+          { key: "businessPhone", label: "Phone Number 1" },
+          { key: "phoneNumber2", label: "Phone Number 2" },
+          { key: "businessEmail", label: "Email 1" },
+          { key: "businessEmail2", label: "Email 2" },
+          { key: "landlineNumber", label: "Local Landline Number", valueOverride: formatLocalLandline({ countryCode: '+91', std: fullVendor.localLandlineStd as any, number: fullVendor.landlineNumber as any }) || undefined },
+          { key: "intlLandline", label: "International Landline Number", valueOverride: formatIntlLandline(fullVendor.intlLandline as any) || undefined },
+          { key: "businessAddress", label: "Address Line 1", condition: fullVendor.businessAddress },
+          { key: "addressLine2", label: "Address Line 2", condition: fullVendor.addressLine2 },
+          { key: "addressLine3", label: "Address Line 3", condition: fullVendor.addressLine3 },
+          { key: "landmark", label: "Landmark", condition: fullVendor.landmark },
+          { key: "businessCity", label: "City", condition: fullVendor.businessCity },
+          { key: "businessState", label: "State", condition: fullVendor.businessState },
+          { key: "businessZipCode", label: "PIN / ZIP Code", condition: fullVendor.businessZipCode },
+          { key: "businessCountry", label: "Country", condition: fullVendor.businessCountry },
         ]
       },
       {
         id: "trade",
-        title: "Trade & Regulatory ID Details",
+        title: "Trade & Regulatory Details",
         icon: <FileText className="w-5 h-5 text-brand-600" />,
         fields: [
           { key: "tradeLicenseNumber", label: "Trade License Number" },
           { key: "businessRegistrationNumber", label: "Business Registration Number" },
-          { key: "taxIdentificationNumber", label: "Tax Identification Number" }
+          { key: "taxIdentificationNumber", label: "Tax Identification Number" },
+          { key: "importExperience", label: "Import Experience", transform: (val: any) => val ? "Yes" : "No", condition: fullVendor.importExperience !== undefined && fullVendor.importExperience !== null },
+          { key: "exportExperience", label: "Export Experience", transform: (val: any) => val ? "Yes" : "No", condition: fullVendor.exportExperience !== undefined && fullVendor.exportExperience !== null },
+          { key: "importCountries", label: "Import Countries", type: "list" },
+          { key: "exportCountries", label: "Export Countries", type: "list" },
+          { key: "primaryMarkets", label: "Primary Markets", type: "list" },
         ]
       },
       {
@@ -566,13 +569,14 @@ export default function VendorDetail({
                         {additional.map((owner: any, idx: number) => (
                           <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
                             <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
-                            {owner.name && <Field label="Name" value={owner.name} />}
+                            {owner.name && <Field label="Full Name" value={owner.name} />}
                             {owner.designation && <Field label="Designation" value={owner.designation} />}
                             {owner.email && <Field label="Email" value={owner.email} />}
-                            {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
+                            {owner.email2 && <Field label="Email 2" value={owner.email2} />}
                             {owner.phone && <Field label="Phone" value={owner.phone} />}
-                            {owner.phone2 && <Field label="Secondary Phone" value={owner.phone2} />}
-                            {owner.landline && <Field label="Landline" value={owner.landline} />}
+                            {owner.phone2 && <Field label="Phone 2" value={owner.phone2} />}
+                            {(owner.localLandline || owner.landline) && <Field label="Local Landline" value={formatLocalLandline({ countryCode: '+91', std: owner.localLandlineStd, number: owner.localLandline || owner.landline })} />}
+                            {owner.intlLandline && <Field label="International Landline" value={formatIntlLandline(owner.intlLandline)} />}
                           </div>
                         ))}
                       </div>
@@ -714,36 +718,48 @@ export default function VendorDetail({
               )
             }
           } else if (section.id === "trade") {
-            const alternate = fullVendor.alternateContacts
-            if (Array.isArray(alternate) && alternate.length > 0) {
+            const mainContactPerson = fullVendor.mainContact && typeof fullVendor.mainContact === "object" ? fullVendor.mainContact : null
+            const alternate = Array.isArray(fullVendor.alternateContacts) ? fullVendor.alternateContacts : []
+            const allContacts = [
+              ...(mainContactPerson ? [{ ...mainContactPerson, _label: "Contact Person 1 (Main)" }] : []),
+              ...alternate.map((c: any, i: number) => ({ ...c, _label: `Contact Person ${i + 2}` })),
+            ]
+            if (allContacts.length > 0) {
               hasCustomData = true
               customContent = (
                 <div className="col-span-full border-t border-slate-100 pt-6 mt-4">
                   <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-1.5">
-                    <UserCircle className="w-4.5 h-4.5 text-slate-400" /> Alternate Contacts ({alternate.length})
+                    <UserCircle className="w-4.5 h-4.5 text-slate-400" /> Contact Persons ({allContacts.length})
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {alternate.map((contact: any, idx: number) => (
-                      <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
-                        <p className="text-sm font-bold text-slate-800">Contact {idx + 1}</p>
-                        {contact.name && <Field label="Name" value={contact.name} />}
-                        {(contact.customDesignation || contact.designation) && (
-                          <Field label="Designation" value={contact.customDesignation || contact.designation} />
-                        )}
-                        {(contact.email1 || contact.email) && (
-                          <Field label="Email" value={contact.email1 || contact.email} />
-                        )}
-                        {contact.email2 && <Field label="Secondary Email" value={contact.email2} />}
-                        {(contact.phone1 || contact.phone) && (
-                          <Field label="Phone" value={contact.phone1 || contact.phone} />
-                        )}
-                        {contact.phone2 && <Field label="Secondary Phone" value={contact.phone2} />}
-                        {contact.landline && <Field label="Landline" value={contact.landline} />}
-                        {(contact.customDepartment || contact.department) && (
-                          <Field label="Department" value={contact.customDepartment || contact.department} />
-                        )}
-                      </div>
-                    ))}
+                    {allContacts.map((contact: any, idx: number) => {
+                      const nameParts = [contact.firstName, contact.middleName, contact.lastName].filter(Boolean)
+                      const fullName = nameParts.length > 0 ? nameParts.join(" ") : (contact.name || "")
+                      const designation = contact.designation === "Others" ? contact.customDesignation : contact.designation
+                      const department = contact.department === "Others" ? contact.customDepartment : contact.department
+                      const localLL = formatLocalLandline({ countryCode: '+91', std: contact.localLandlineStd, number: contact.localLandline || contact.landline })
+                      const intlLL = formatIntlLandline(contact.intlLandlineNumber ? `+${contact.intlLandlineCountryCode || ""} ${contact.intlLandlineStd || ""} ${contact.intlLandlineNumber}`.trim() : contact.intlLandline)
+                      return (
+                        <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                          {contact.photo && (
+                            <div className="flex justify-center">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={contact.photo} alt={fullName || "Contact"} className="w-16 h-16 rounded-full object-cover border-2 border-slate-200" />
+                            </div>
+                          )}
+                          <p className="text-sm font-bold text-slate-800">{contact._label}</p>
+                          {fullName && <Field label="Full Name" value={fullName} />}
+                          {designation && <Field label="Designation" value={designation} />}
+                          {department && <Field label="Department" value={department} />}
+                          {(contact.email1 || contact.email) && <Field label="Primary Email" value={contact.email1 || contact.email} />}
+                          {contact.email2 && <Field label="Secondary Email" value={contact.email2} />}
+                          {(contact.phone1 || contact.phone) && <Field label="Primary Phone" value={contact.phone1 || contact.phone} />}
+                          {contact.phone2 && <Field label="Secondary Phone" value={contact.phone2} />}
+                          {localLL && <Field label="Local Landline Number" value={localLL} />}
+                          {intlLL && <Field label="International Landline Number" value={intlLL} />}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )
@@ -1151,6 +1167,20 @@ export default function VendorDetail({
               </div>
             )) : <p className="text-sm text-slate-500 text-center py-8">No pending inspections found.</p>}
           </div>
+        </div>
+      )}
+
+      {/* Bottom Start Inspection CTA — same action as the header button */}
+      {firstUpcoming && onStartInspection && (
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={handleOpenInspection}
+            className="flex items-center gap-3 px-8 py-4 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-base rounded-2xl transition-all duration-200 shadow-lg hover:shadow-xl shadow-brand-500/25"
+          >
+            <Play className="w-5 h-5" />
+            {isContinuing ? 'Continue Inspection' : 'Start Factory Inspection'}
+            {firstUpcoming.poNumber ? ` · ${firstUpcoming.poNumber}` : ''}
+          </button>
         </div>
       )}
         </>

@@ -27,6 +27,7 @@ export interface CartItem {
     singleUnitColorHex?: string;
   };
   variant?: {
+    variantName?: string;
     size: string;
     color: string;
     colorHex?: string;

@@ -85,9 +85,9 @@ export default function Preparation({ formData, setFormData, errors = {} }: Prep
   return (
     <div className="space-y-8">
       <div className="border-b border-slate-200 pb-6">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">B. Item Quantities & Readiness</h2>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">B. Product Quantities & Readiness</h2>
         <p className="text-slate-600">
-          Review the assigned items to inspect
+          Review the assigned products to inspect
         </p>
       </div>
 
@@ -100,46 +100,46 @@ export default function Preparation({ formData, setFormData, errors = {} }: Prep
       {/* Items Section */}
       <div>
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-slate-900">Order Items</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Products</h3>
         </div>
 
         {formData.items.length === 0 ? (
           <div className="text-center py-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-300">
-            <p className="text-slate-600">No items assigned yet.</p>
+            <p className="text-slate-600">No products assigned yet.</p>
           </div>
         ) : (
           <div className="space-y-4">
             {formData.items.map((item, index) => (
               <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold text-slate-900">Item #{index + 1}</h4>
+                  <h4 className="font-semibold text-slate-900">Product #{index + 1}</h4>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-slate-700 font-medium mb-2 text-sm">Item Name:</label>
+                    <label className="block text-slate-700 font-medium mb-2 text-sm">Product Name:</label>
                     <input
                       type="text"
                       value={item.itemName}
                       readOnly
-                      placeholder="Enter item name"
+                      placeholder="Enter product name"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
                     />
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-slate-700 font-medium mb-2 text-sm">Item Description:</label>
+                    <label className="block text-slate-700 font-medium mb-2 text-sm">Product Description:</label>
                     <input
                       type="text"
                       value={item.itemDescription}
                       readOnly
-                      placeholder="Enter item description"
+                      placeholder="Enter product description"
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-medium mb-2 text-sm">Total Quantity:<span className="text-red-500 ml-0.5" aria-label="required">*</span></label>
+                    <label className="block text-slate-700 font-medium mb-2 text-sm">Lot Quantity:<span className="text-red-500 ml-0.5" aria-label="required">*</span></label>
                     <input
                       type="number"
                       value={item.totalQuantity}

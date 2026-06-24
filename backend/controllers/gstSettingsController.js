@@ -3,11 +3,24 @@ const { prisma } = require('../config/database');
 // Get all GST settings
 const getGSTSettings = async (req, res) => {
     try {
-        const settings = await prisma.gSTSetting.findMany({
+        let settings = await prisma.gSTSetting.findMany({
             orderBy: {
                 createdAt: 'desc'
             }
         });
+
+        // Ensure the default 5% GST rate always exists so it shows everywhere
+        // by default. Created once when the table is empty; admins can add more.
+        if (settings.length === 0) {
+            try {
+                await prisma.gSTSetting.create({
+                    data: { percentage: 5, description: 'GST', isActive: true },
+                });
+            } catch (seedErr) {
+                console.warn('Default GST seed skipped:', seedErr.message);
+            }
+            settings = await prisma.gSTSetting.findMany({ orderBy: { createdAt: 'desc' } });
+        }
 
         res.json({
             success: true,

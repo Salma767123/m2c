@@ -3,6 +3,7 @@ const { prisma } = require('../config/database');
 const { generateInvoiceNo } = require('../utils/invoiceGenerator');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
 const { notifications } = require('../utils/notificationService');
+const { checkAndAlertLowStock } = require('../utils/lowStockAlert');
 
 // Create new order
 const createOrder = async (req, res) => {
@@ -535,6 +536,13 @@ const createOrder = async (req, res) => {
                 message: `Your order #${result.orderId} has been placed successfully.`,
                 data: { orderId: result.id }
             }).catch(() => {});
+        }
+
+        // Fire-and-forget: email vendors whose stock dropped to its low-stock
+        // alert level because of this order (deduped per low-stock episode).
+        const affectedInventoryIds = [...new Set(stockUpdates.map(u => u.inventoryItemId).filter(Boolean))];
+        for (const invId of affectedInventoryIds) {
+            checkAndAlertLowStock(invId).catch(() => {});
         }
 
         res.status(201).json({

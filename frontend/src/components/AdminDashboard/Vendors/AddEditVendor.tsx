@@ -95,7 +95,6 @@ interface VendorFormData {
         { file: File | null; url: string; name: string; isExisting?: boolean }
       >
     | any[];
-  mapLink: string;
 
   // Owner Profile
   ownerName: string;
@@ -242,7 +241,6 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     warehouseZip: "",
     warehouseCountry: "India",
     factoryImages: {},
-    mapLink: "",
 
     // Owner Profile
     ownerName: "",
@@ -627,8 +625,6 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           });
           return record;
         })(),
-        mapLink: vendor.mapLink || "",
-
         // Owner Profile
         ownerName: vendor.ownerName || "",
         designation: vendor.designation || "",

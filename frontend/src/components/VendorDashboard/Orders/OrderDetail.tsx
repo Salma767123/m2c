@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Package, MapPin, Truck, X, RefreshCw, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
@@ -56,6 +56,11 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
   const [trackingId, setTrackingId] = useState("");
   const [showReshipModal, setShowReshipModal] = useState(false);
   const [reshipLoading, setReshipLoading] = useState(false);
+  // Guard against duplicate status updates: the button is disabled while a
+  // request is in flight, and the ref blocks any racing call before React
+  // re-renders with the disabled state.
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const updatingRef = useRef(false);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -80,6 +85,11 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
     shipmentDetails?: { carrier: string; trackingId: string }
   ) => {
     if (!shipment) return;
+    // Block duplicate clicks/requests for the same action (ref check is
+    // synchronous, so it stops a second call before the disabled state paints).
+    if (updatingRef.current) return;
+    updatingRef.current = true;
+    setIsUpdatingStatus(true);
     try {
       const res = await orderService.updateVendorOrderStatus(shipment.id, newStatus, shipmentDetails);
       if (res.success) {
@@ -89,6 +99,9 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
     } catch (error: any) {
       showErrorToast(error.message || "Failed to update status");
       throw error;
+    } finally {
+      updatingRef.current = false;
+      setIsUpdatingStatus(false);
     }
   };
 
@@ -173,27 +186,29 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
           {(status === "ORDER_CREATED" || status === "VENDOR_PROCESSING") && (
             <button
               onClick={handleMarkAsPacked}
-              disabled={!shipment.assignedHubId}
-              className={`px-4 py-2.5 rounded-lg transition-colors font-semibold ${shipment.assignedHubId
+              disabled={!shipment.assignedHubId || isUpdatingStatus}
+              className={`px-4 py-2.5 rounded-lg transition-colors font-semibold flex items-center gap-2 ${shipment.assignedHubId && !isUpdatingStatus
                   ? "bg-purple-600 text-white hover:bg-purple-700"
                   : "bg-slate-200 text-slate-400 cursor-not-allowed"
                 }`}
               title={!shipment.assignedHubId ? "Wait for admin to assign a hub" : ""}
             >
-              Mark as Packed
+              {isUpdatingStatus && <RefreshCw className="h-4 w-4 animate-spin" />}
+              {isUpdatingStatus ? "Updating Status..." : "Mark as Packed"}
             </button>
           )}
           {status === "PACKED_BY_VENDOR" && (
             <button
               onClick={handleOpenShippingModal}
-              disabled={!shipment.assignedHubId}
-              className={`px-4 py-2.5 rounded-lg transition-colors font-semibold ${shipment.assignedHubId
+              disabled={!shipment.assignedHubId || isUpdatingStatus}
+              className={`px-4 py-2.5 rounded-lg transition-colors font-semibold flex items-center gap-2 ${shipment.assignedHubId && !isUpdatingStatus
                   ? "bg-brand-500 text-white hover:bg-brand-600"
                   : "bg-slate-200 text-slate-400 cursor-not-allowed"
                 }`}
               title={!shipment.assignedHubId ? "Wait for admin to assign a hub" : ""}
             >
-              Ship to Hub
+              {isUpdatingStatus && <RefreshCw className="h-4 w-4 animate-spin" />}
+              {isUpdatingStatus ? "Updating Status..." : "Ship to Hub"}
             </button>
           )}
           {status === "IN_TRANSIT_TO_ADMIN_HUB" && (
@@ -497,15 +512,18 @@ export default function VendorOrderDetail({ orderId }: OrderDetailProps) {
             <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowShippingModal(false)}
-                className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+                disabled={isUpdatingStatus}
+                className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmShipping}
-                className="px-4 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-semibold"
+                disabled={isUpdatingStatus}
+                className="px-4 py-2.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors font-semibold flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Confirm Shipping
+                {isUpdatingStatus && <RefreshCw className="h-4 w-4 animate-spin" />}
+                {isUpdatingStatus ? "Updating Status..." : "Confirm Shipping"}
               </button>
             </div>
           </div>

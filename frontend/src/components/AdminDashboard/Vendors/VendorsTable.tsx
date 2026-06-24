@@ -302,7 +302,7 @@ export default function VendorsTable() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <input
                 type="text"
-                placeholder="Search vendors..."
+                placeholder="Search by company, GST number, owner, email…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -375,8 +375,12 @@ export default function VendorsTable() {
                     <TableCell>
                       <div>
                         <div className="font-medium">{vendor.companyName}</div>
-                        <div className="text-sm text-gray-500">{vendor.email}</div>
-                        <div className="text-xs text-gray-400">{vendor.ownerName}</div>
+                        {(vendor as any).gstNumber ? (
+                          <div className="text-xs text-gray-500 font-mono">GST: {(vendor as any).gstNumber}</div>
+                        ) : (
+                          <div className="text-xs text-gray-400 italic">Unregistered</div>
+                        )}
+                        <div className="text-xs text-gray-400">{vendor.email}</div>
                       </div>
                     </TableCell>
                     <TableCell>{getLocationString(vendor)}</TableCell>

@@ -384,6 +384,103 @@ async function sendNewVendorRegistrationEmailToAdmins({ companyName, ownerName, 
 }
 
 /**
+ * Generate the low-stock alert email template. On-brand (brand-red header,
+ * clean table rows) to match the platform's other vendor emails.
+ *
+ * `lowUnits` is an array of { label, sku, stock, threshold } — the base product
+ * and/or the specific variants that are at/below their alert level.
+ */
+function getLowStockEmailTemplate({ companyName, ownerName, productName, category, sku, currentStock, minStock, lowUnits, dashboardUrl }) {
+  const subject = `⚠️ Low Stock Alert — ${productName}`;
+
+  const rows = (lowUnits || []).map(u => `
+            <tr style="border-bottom:1px solid #e5e7eb;">
+              <td style="padding:10px 12px;color:#111827;font-weight:600;">${u.label}</td>
+              <td style="padding:10px 12px;color:#6b7280;font-family:monospace;font-size:13px;">${u.sku || '—'}</td>
+              <td style="padding:10px 12px;text-align:center;color:#dc2626;font-weight:700;">${u.stock}</td>
+              <td style="padding:10px 12px;text-align:center;color:#6b7280;">${u.threshold}</td>
+            </tr>`).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Low Stock Alert</title></head>
+    <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 0;">
+        <tr><td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+            <!-- Header -->
+            <tr><td style="background-color:#e01a1b;padding:32px 40px;text-align:center;">
+              <div style="font-size:30px;line-height:1;margin-bottom:8px;">⚠️</div>
+              <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Low Stock Alert</h1>
+              <p style="margin:8px 0 0;color:#ffe2e2;font-size:14px;">One of your products needs restocking</p>
+            </td></tr>
+            <!-- Body -->
+            <tr><td style="padding:36px 40px;">
+              <p style="margin:0 0 16px;color:#374151;font-size:16px;line-height:1.6;">Dear <strong>${ownerName || companyName}</strong>,</p>
+              <p style="margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6;">
+                Stock for the following product in <strong>${companyName}</strong> has reached its low-stock alert level. Please restock soon to avoid running out.
+              </p>
+
+              <!-- Product summary -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:24px;">
+                <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:12px 16px;color:#6b7280;width:40%;">Product</td><td style="padding:12px 16px;color:#111827;font-weight:600;">${productName}</td></tr>
+                <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:12px 16px;color:#6b7280;">SKU</td><td style="padding:12px 16px;color:#111827;font-family:monospace;">${sku || '—'}</td></tr>
+                <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:12px 16px;color:#6b7280;">Category</td><td style="padding:12px 16px;color:#111827;">${category || '—'}</td></tr>
+                <tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:12px 16px;color:#6b7280;">Total Current Stock</td><td style="padding:12px 16px;color:#111827;font-weight:600;">${currentStock}</td></tr>
+                <tr><td style="padding:12px 16px;color:#6b7280;">Min Stock Alert</td><td style="padding:12px 16px;color:#111827;">${minStock}</td></tr>
+              </table>
+
+              ${rows ? `
+              <p style="margin:0 0 10px;color:#374151;font-size:14px;font-weight:600;">Units at or below their alert level:</p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:24px;">
+                <tr style="background:#f9fafb;">
+                  <th align="left" style="padding:10px 12px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;">Unit</th>
+                  <th align="left" style="padding:10px 12px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;">SKU</th>
+                  <th align="center" style="padding:10px 12px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;">Stock</th>
+                  <th align="center" style="padding:10px 12px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;">Alert at</th>
+                </tr>
+                ${rows}
+              </table>` : ''}
+
+              <div style="text-align:center;margin-top:8px;">
+                <a href="${dashboardUrl}" style="display:inline-block;background-color:#e01a1b;color:#ffffff;padding:12px 30px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">Update Stock</a>
+              </div>
+            </td></tr>
+            <!-- Footer -->
+            <tr><td style="padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center;">
+              <p style="margin:0;color:#9ca3af;font-size:13px;">This is an automated stock alert. Please do not reply to this email.</p>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  return { subject, html };
+}
+
+/**
+ * Send the low-stock alert email to a vendor.
+ */
+async function sendLowStockAlertEmail({ to, companyName, ownerName, productName, category, sku, currentStock, minStock, lowUnits }) {
+  const dashboardUrl = process.env.FRONTEND_URL
+    ? `${process.env.FRONTEND_URL}/vendor/dashboard/inventory`
+    : 'http://localhost:3000/vendor/dashboard/inventory';
+
+  const emailTemplate = getLowStockEmailTemplate({
+    companyName, ownerName, productName, category, sku, currentStock, minStock, lowUnits, dashboardUrl,
+  });
+
+  return await sendVendorEmail({
+    to,
+    subject: emailTemplate.subject,
+    html: emailTemplate.html,
+  });
+}
+
+/**
  * Generate a secure random password
  */
 function generateSecurePassword(length = 12) {
@@ -400,5 +497,6 @@ module.exports = {
   sendVendorRejectionEmail,
   sendVendorSuspensionEmail,
   sendNewVendorRegistrationEmailToAdmins,
+  sendLowStockAlertEmail,
   generateSecurePassword
 };

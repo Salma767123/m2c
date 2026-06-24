@@ -85,6 +85,7 @@ export interface ProductImage {
 
 export interface ProductVariant {
   id: string
+  variantName?: string
   sku: string
   size: string
   color: string

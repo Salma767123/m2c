@@ -9,6 +9,7 @@ const {
   getStockHistory,
   getInventoryStats,
   getVendorCategories,
+  getNextSku,
   getAllInventory,
   getAllInventoryStats,
   getInventoryByVendor,
@@ -41,6 +42,9 @@ router.get('/stats', getInventoryStats);
 
 // Get vendor's selected categories
 router.get('/categories', getVendorCategories);
+
+// Preview next auto-generated SKU (must precede '/:id')
+router.get('/next-sku', getNextSku);
 
 // CRUD operations
 router.post('/', createInventoryItem);

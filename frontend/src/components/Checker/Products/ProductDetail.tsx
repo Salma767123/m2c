@@ -456,6 +456,7 @@ function ImagesTab({
                             <thead>
                                 <tr className="bg-slate-50 text-left text-xs text-slate-600 uppercase tracking-wide">
                                     <th className="px-3 py-2 rounded-l-lg w-16">Image</th>
+                                    <th className="px-3 py-2">Variant</th>
                                     <th className="px-3 py-2">SKU</th>
                                     <th className="px-3 py-2">Size</th>
                                     <th className="px-3 py-2">Color</th>
@@ -466,7 +467,7 @@ function ImagesTab({
                             <tbody>
                                 {variants.map((v) => {
                                     const thumb = variantThumb(v)
-                                    const caption = `${v.sku} — ${v.size} / ${v.color}`
+                                    const caption = `${v.sku} — ${[v.variantName, v.size, v.color].filter(Boolean).join(' / ') || 'Variant'}`
                                     return (
                                         <tr key={v.id} className="border-b border-slate-100 last:border-0 align-middle">
                                             <td className="px-3 py-2">
@@ -492,8 +493,9 @@ function ImagesTab({
                                                     </div>
                                                 )}
                                             </td>
+                                            <td className="px-3 py-2 font-medium text-slate-700">{v.variantName?.trim() || '—'}</td>
                                             <td className="px-3 py-2 font-mono text-xs">{v.sku}</td>
-                                            <td className="px-3 py-2">{v.size}</td>
+                                            <td className="px-3 py-2">{v.size || '—'}</td>
                                             <td className="px-3 py-2">
                                                 <span className="inline-flex items-center gap-1.5">
                                                     {v.colorHex && (

@@ -3,6 +3,7 @@ const {
   resolveProductImageUrls,
   resolveVariantImageUrls,
 } = require('../config/cloudinary');
+const { generateBaseSku, reconcileBaseSku, variantSkuFor } = require('../utils/skuGenerator');
 
 const generateSlug = (name) => {
   return name
@@ -104,11 +105,12 @@ const createProduct = async (req, res) => {
     let { images, variants } = req.body;
     ({ images, variants } = await ensureImageUrls({ images, variants }));
 
-    // Validate required fields
-    if (!name || !description || !category || !baseSku) {
+    // Validate required fields. SKU is NOT required from the client — it is
+    // auto-generated server-side (immutable, globally unique) below.
+    if (!name || !description || !category) {
       return res.status(400).json({
         success: false,
-        message: 'Name, description, category, and base SKU are required'
+        message: 'Name, description, and category are required'
       });
     }
 
@@ -116,18 +118,6 @@ const createProduct = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'At least one variant is required when variants are enabled'
-      });
-    }
-
-    // Check if base SKU already exists
-    const existingSku = await prisma.product.findFirst({
-      where: { baseSku }
-    });
-
-    if (existingSku) {
-      return res.status(400).json({
-        success: false,
-        message: 'Base SKU already exists. Please use a unique SKU.'
       });
     }
 
@@ -150,35 +140,26 @@ const createProduct = async (req, res) => {
       }
     }
 
-    // Validate variant SKUs if variants exist
-    if (hasVariants && variants && variants.length > 0) {
-      const variantSkus = variants.map(v => v.sku);
-      const duplicateSkus = variantSkus.filter((sku, index) => variantSkus.indexOf(sku) !== index);
-
-      if (duplicateSkus.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Duplicate variant SKUs found: ${duplicateSkus.join(', ')}`
-        });
-      }
-
-      // Check if any variant SKU already exists
-      const existingVariantSkus = await prisma.productVariant.findMany({
-        where: {
-          sku: { in: variantSkus }
-        }
-      });
-
-      if (existingVariantSkus.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Variant SKUs already exist: ${existingVariantSkus.map(v => v.sku).join(', ')}`
-        });
-      }
-    }
+    // Fetch the vendor's company name for the SKU company-code prefix.
+    const vendorRecord = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { companyName: true },
+    });
 
     // Start transaction with extended timeout for multiple DB operations
     const result = await prisma.$transaction(async (tx) => {
+      // Base SKU: reuse the inventory item's master SKU when this product is
+      // created from inventory (so they stay identical); otherwise auto-generate
+      // a fresh immutable SKU INSIDE the transaction (atomic counter increment).
+      const baseSku = (isFromInventory && inventoryItem?.sku)
+        ? inventoryItem.sku
+        : await generateBaseSku(tx, vendorRecord?.companyName);
+      const variantCount = hasVariants && variants ? variants.length : 0;
+      if (variantCount > 0) {
+        // Variants are assigned alphabetical suffixes A, B, C … in order.
+        variants = variants.map((v, i) => ({ ...v, sku: variantSkuFor(baseSku, i + 1) }));
+      }
+
       // Determine the stock to use
       let productStock = 0;
       let baseStockValue = 0;
@@ -226,6 +207,7 @@ const createProduct = async (req, res) => {
           fabricSpecifications: fabricSpecifications || {},
           hasVariants: hasVariants || false,
           baseSku,
+          variantSeq: variantCount,
           totalStock: productStock,
           lowStockThreshold: parseInt(lowStockThreshold) || 10,
           trackInventory: trackInventory !== false,
@@ -253,7 +235,8 @@ const createProduct = async (req, res) => {
       if (hasVariants && variants && variants.length > 0) {
         const variantData = variants.map(variant => ({
           productId: product.id,
-          size: variant.size,
+          variantName: variant.variantName || null,
+          size: variant.size || '',
           color: variant.color,
           colorHex: variant.colorHex,
           sku: variant.sku,
@@ -267,6 +250,7 @@ const createProduct = async (req, res) => {
           originalPriceUSD: variant.originalPriceUSD ? parseFloat(variant.originalPriceUSD) : null,
           priceVisibility: variant.priceVisibility || 'BOTH',
           stock: parseInt(variant.stock) || 0,
+          lowStockThreshold: variant.lowStockThreshold != null && variant.lowStockThreshold !== '' ? parseInt(variant.lowStockThreshold) : null,
           images: variant.images || []
         }));
 
@@ -405,6 +389,7 @@ const getVendorProducts = async (req, res) => {
         variants: {
           select: {
             id: true,
+            variantName: true,
             size: true,
             color: true,
             price: true,
@@ -561,24 +546,25 @@ const updateProduct = async (req, res) => {
     }
 
     // Check if base SKU is being changed and if new SKU already exists
-    if (updateData.baseSku && updateData.baseSku !== existingProduct.baseSku) {
-      const existingSku = await prisma.product.findFirst({
-        where: {
-          baseSku: updateData.baseSku,
-          id: { not: id }
-        }
-      });
+    // SKU is immutable — never change the base SKU on update, whatever the
+    // client sends.
+    updateData.baseSku = existingProduct.baseSku;
 
-      if (existingSku) {
-        return res.status(400).json({
-          success: false,
-          message: 'Base SKU already exists. Please use a unique SKU.'
-        });
-      }
+    // Allocate variant SKUs without reusing past suffixes: existing variants
+    // keep their SKU; brand-new variants get the next alphabetical suffix from
+    // Product.variantSeq (a high-water mark that only ever increments).
+    if (updateData.variants && updateData.variants.length > 0) {
+      const existingSkuSet = new Set((existingProduct.variants || []).map(v => v.sku));
+      let seq = existingProduct.variantSeq || (existingProduct.variants?.length || 0);
+      updateData.variants = updateData.variants.map(v => {
+        if (v.sku && existingSkuSet.has(v.sku)) return v; // keep existing variant SKU
+        seq += 1;
+        return { ...v, sku: variantSkuFor(existingProduct.baseSku, seq) };
+      });
+      updateData.__nextVariantSeq = seq;
     }
 
-    // Validate variant SKUs if variants are being updated
-    if (updateData.variants && updateData.variants.length > 0) {
+    if (false && updateData.variants && updateData.variants.length > 0) {
       const variantSkus = updateData.variants.map(v => v.sku);
       const duplicateSkus = variantSkus.filter((sku, index) => variantSkus.indexOf(sku) !== index);
 
@@ -646,6 +632,7 @@ const updateProduct = async (req, res) => {
           }),
           ...(updateData.hasVariants !== undefined && { hasVariants: updateData.hasVariants }),
           ...(updateData.baseSku && { baseSku: updateData.baseSku }),
+          ...(updateData.__nextVariantSeq !== undefined && { variantSeq: updateData.__nextVariantSeq }),
 
           // Use calculated stock if available, otherwise just update if provided
           ...(newTotalStock !== undefined && { totalStock: newTotalStock }),
@@ -699,7 +686,8 @@ const updateProduct = async (req, res) => {
 
             return {
               productId: id,
-              size: variant.size,
+              variantName: variant.variantName || null,
+              size: variant.size || '',
               color: variant.color,
               colorHex: variant.colorHex,
               sku: variant.sku,
@@ -713,6 +701,7 @@ const updateProduct = async (req, res) => {
               originalPriceUSD: originalUSD,
               priceVisibility: variant.priceVisibility || 'BOTH',
               stock: parseInt(variant.stock) || 0,
+              lowStockThreshold: variant.lowStockThreshold != null && variant.lowStockThreshold !== '' ? parseInt(variant.lowStockThreshold) : null,
               images: variant.images || []
             };
           });
@@ -1083,7 +1072,7 @@ const approveProduct = async (req, res) => {
       if (missingPrices.length > 0) {
         return res.status(400).json({
           success: false,
-          message: `Admin prices are required for all variants. Missing prices for: ${missingPrices.map(v => `${v.size}-${v.color}`).join(', ')}`
+          message: `Admin prices are required for all variants. Missing prices for: ${missingPrices.map(v => (v.variantName && v.variantName.trim()) || [v.size, v.color].filter(Boolean).join('-') || v.sku || 'variant').join(', ')}`
         });
       }
 
@@ -1578,35 +1567,26 @@ const createProductByAdmin = async (req, res) => {
       }
     }
 
-    // Validate variant SKUs if variants exist
-    if (hasVariants && variants && variants.length > 0) {
-      const variantSkus = variants.map(v => v.sku);
-      const duplicateSkus = variantSkus.filter((sku, index) => variantSkus.indexOf(sku) !== index);
-
-      if (duplicateSkus.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Duplicate variant SKUs found: ${duplicateSkus.join(', ')}`
-        });
-      }
-
-      // Check if any variant SKU already exists
-      const existingVariantSkus = await prisma.productVariant.findMany({
-        where: {
-          sku: { in: variantSkus }
-        }
-      });
-
-      if (existingVariantSkus.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Variant SKUs already exist: ${existingVariantSkus.map(v => v.sku).join(', ')}`
-        });
-      }
-    }
+    // Fetch the vendor's company name for the SKU company-code prefix.
+    const vendorRecord = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { companyName: true },
+    });
 
     // Start transaction with extended timeout for multiple DB operations
     const result = await prisma.$transaction(async (tx) => {
+      // Base SKU: reuse the inventory item's master SKU when this product is
+      // created from inventory (so they stay identical); otherwise auto-generate
+      // a fresh immutable SKU INSIDE the transaction (atomic counter increment).
+      const baseSku = (isFromInventory && inventoryItem?.sku)
+        ? inventoryItem.sku
+        : await generateBaseSku(tx, vendorRecord?.companyName);
+      const variantCount = hasVariants && variants ? variants.length : 0;
+      if (variantCount > 0) {
+        // Variants are assigned alphabetical suffixes A, B, C … in order.
+        variants = variants.map((v, i) => ({ ...v, sku: variantSkuFor(baseSku, i + 1) }));
+      }
+
       // Determine the stock to use
       let productStock = 0;
       let baseStockValue = 0;
@@ -1658,6 +1638,7 @@ const createProductByAdmin = async (req, res) => {
           fabricSpecifications: fabricSpecifications || {},
           hasVariants: hasVariants || false,
           baseSku,
+          variantSeq: variantCount,
           totalStock: productStock,
           lowStockThreshold: parseInt(lowStockThreshold) || 10,
           trackInventory: trackInventory !== false,
@@ -1687,7 +1668,8 @@ const createProductByAdmin = async (req, res) => {
       if (hasVariants && variants && variants.length > 0) {
         const variantData = variants.map(variant => ({
           productId: product.id,
-          size: variant.size,
+          variantName: variant.variantName || null,
+          size: variant.size || '',
           color: variant.color,
           colorHex: variant.colorHex,
           sku: variant.sku,
@@ -1701,6 +1683,7 @@ const createProductByAdmin = async (req, res) => {
           originalPriceUSD: variant.originalPriceUSD ? parseFloat(variant.originalPriceUSD) : null,
           priceVisibility: variant.priceVisibility || 'BOTH',
           stock: parseInt(variant.stock) || 0,
+          lowStockThreshold: variant.lowStockThreshold != null && variant.lowStockThreshold !== '' ? parseInt(variant.lowStockThreshold) : null,
           images: variant.images || []
         }));
 
@@ -1830,24 +1813,25 @@ const updateProductByAdmin = async (req, res) => {
     }
 
     // Check if base SKU is being changed and if new SKU already exists
-    if (updateData.baseSku && updateData.baseSku !== existingProduct.baseSku) {
-      const existingSku = await prisma.product.findFirst({
-        where: {
-          baseSku: updateData.baseSku,
-          id: { not: id }
-        }
-      });
+    // SKU is immutable — never change the base SKU on update, whatever the
+    // client sends.
+    updateData.baseSku = existingProduct.baseSku;
 
-      if (existingSku) {
-        return res.status(400).json({
-          success: false,
-          message: 'Base SKU already exists. Please use a unique SKU.'
-        });
-      }
+    // Allocate variant SKUs without reusing past suffixes: existing variants
+    // keep their SKU; brand-new variants get the next alphabetical suffix from
+    // Product.variantSeq (a high-water mark that only ever increments).
+    if (updateData.variants && updateData.variants.length > 0) {
+      const existingSkuSet = new Set((existingProduct.variants || []).map(v => v.sku));
+      let seq = existingProduct.variantSeq || (existingProduct.variants?.length || 0);
+      updateData.variants = updateData.variants.map(v => {
+        if (v.sku && existingSkuSet.has(v.sku)) return v; // keep existing variant SKU
+        seq += 1;
+        return { ...v, sku: variantSkuFor(existingProduct.baseSku, seq) };
+      });
+      updateData.__nextVariantSeq = seq;
     }
 
-    // Validate variant SKUs if variants are being updated
-    if (updateData.variants && updateData.variants.length > 0) {
+    if (false && updateData.variants && updateData.variants.length > 0) {
       const variantSkus = updateData.variants.map(v => v.sku);
       const duplicateSkus = variantSkus.filter((sku, index) => variantSkus.indexOf(sku) !== index);
 
@@ -2008,7 +1992,8 @@ const updateProductByAdmin = async (req, res) => {
 
             return {
               productId: id,
-              size: variant.size,
+              variantName: variant.variantName || null,
+              size: variant.size || '',
               color: variant.color,
               colorHex: variant.colorHex,
               sku: variant.sku,
@@ -2022,6 +2007,7 @@ const updateProductByAdmin = async (req, res) => {
               originalPriceUSD: originalUSD,
               priceVisibility: variant.priceVisibility || 'BOTH',
               stock: parseInt(variant.stock) || 0,
+              lowStockThreshold: variant.lowStockThreshold != null && variant.lowStockThreshold !== '' ? parseInt(variant.lowStockThreshold) : null,
               images: variant.images || []
             };
           });
@@ -2238,6 +2224,7 @@ const getAllProductsForAdmin = async (req, res) => {
           variants: {
             select: {
               id: true,
+              variantName: true,
               size: true,
               color: true,
               price: true,
@@ -2426,6 +2413,7 @@ const getPublicProducts = async (req, res) => {
         variants: {
           select: {
             id: true,
+            variantName: true,
             size: true,
             color: true,
             colorHex: true,
@@ -2527,6 +2515,7 @@ const getPublicProduct = async (req, res) => {
         variants: {
           select: {
             id: true,
+            variantName: true,
             size: true,
             color: true,
             colorHex: true,

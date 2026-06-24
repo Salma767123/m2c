@@ -1,6 +1,7 @@
 const { prisma } = require('../config/database');
 const { recomputeAndPersistOrderStatus } = require('../utils/computeOrderStatus');
 const { ACTIVE_ITEMS_FILTER } = require('../utils/activeItemsFilter');
+const { withWriteRetry } = require('../utils/dbRetry');
 
 const SETTLEMENT_DUE_DAYS = 30;
 
@@ -237,8 +238,24 @@ const updateShipmentStatusAdmin = async (req, res) => {
             });
         }
 
+        // Idempotency: a duplicate request asking for the status the shipment is
+        // already in (with no hub change) is a no-op — return success instead of
+        // re-writing history or tripping the optimistic-lock conflict.
+        if ((!status || status === shipment.status) && !assignedHubId) {
+            const current = await prisma.vendorShipment.findUnique({
+                where: { id: shipment.id },
+                include: {
+                    items: true,
+                    order: { select: { id: true, orderId: true, customerName: true, totalAmount: true } },
+                    hub: true,
+                    statusHistory: { orderBy: { timestamp: 'desc' } },
+                },
+            });
+            return res.json({ success: true, data: current });
+        }
+
         const nextStatus = status || shipment.status;
-        const updatedShipment = await prisma.$transaction(async (tx) => {
+        const updatedShipment = await withWriteRetry(() => prisma.$transaction(async (tx) => {
             // Optimistic locking
             const fresh = await tx.vendorShipment.findUnique({
                 where: { id: shipment.id },
@@ -314,7 +331,7 @@ const updateShipmentStatusAdmin = async (req, res) => {
             }
 
             return updated;
-        });
+        }));
 
         // Notify vendor about shipment status change
         if (status || assignedHubId) {

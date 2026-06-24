@@ -3,13 +3,11 @@
 import { useCallback, useState } from "react";
 
 import { Button } from "@/components/UI/Button";
-import LocationPicker from "@/components/UI/LocationPicker";
 import {
   Warehouse,
   Upload,
   MapPin,
   Camera,
-  Map,
   X,
   ShieldUser,
   ArrowLeft,
@@ -17,7 +15,8 @@ import {
 } from "lucide-react";
 import { CountrySelect, ToggleButton, AccordionSection } from "@/components/VendorHub/FormUI";
 import { scrollToFirstError } from "@/lib/formErrorScroll";
-import { showErrorToast, handleUpload } from "@/lib/toast-utils";
+import { handleUpload } from "@/lib/toast-utils";
+import { centerNotice } from "@/components/UI/CenterNotice";
 
 interface WarehouseDetailsProps {
   onNext: () => void;
@@ -130,7 +129,6 @@ export default function WarehouseDetails({
     // the warehouse is still in the same country (the common case).
     warehouseCountry: data.warehouseCountry || data.country || "India",
     factoryImages: normaliseFactoryImages(data.factoryImages),
-    mapLink: data.mapLink || "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -158,7 +156,6 @@ export default function WarehouseDetails({
       // already picked on the previous step) before any hard-coded default.
       warehouseCountry: data.warehouseCountry || data.country || "India",
       factoryImages: normaliseFactoryImages(data.factoryImages),
-      mapLink: data.mapLink || "",
     });
   }
 
@@ -191,11 +188,6 @@ export default function WarehouseDetails({
   const handleNext = useCallback(() => {
     const newErrors: Record<string, string> = {};
 
-    // When linked from CompanyDetails, ownership + address are already
-    // validated upstream and locked here. Skip the per-field required
-    // checks — they'd never fail (CompanyDetails blocked submit) and the
-    // user has no way to fix anything from this step. We still validate
-    // the map link since that's specific to the warehouse.
     if (!isLinked) {
       if (!formData.ownershipType)
         newErrors.ownershipType = 'Please select a facility ownership type';
@@ -207,9 +199,6 @@ export default function WarehouseDetails({
         newErrors.warehouseZip = 'ZIP / postal code is required';
       if (!formData.warehouseCountry)
         newErrors.warehouseCountry = 'Please select a country';
-    }
-    if (!formData.mapLink) {
-      newErrors.mapLink = 'Drop a pin on the map or paste a Google Maps link';
     }
 
     // Required factory image slots (Change 11)
@@ -228,7 +217,7 @@ export default function WarehouseDetails({
       setTouched(allTouched);
 
       const errorCount = Object.keys(newErrors).length;
-      showErrorToast(
+      centerNotice.warning(
         errorCount === 1
           ? '1 field needs your attention'
           : `${errorCount} fields need your attention`,
@@ -248,7 +237,6 @@ export default function WarehouseDetails({
         'warehouseZip',
         'warehouseCountry',
         ...FACTORY_IMAGE_SLOTS.map((s) => `factoryImage:${s.id}`),
-        'mapLink',
       ];
       const firstErrorKey = fieldOrder.find((f) => newErrors[f]) ?? Object.keys(newErrors)[0];
       const targetSection: SectionKey | undefined =
@@ -264,9 +252,6 @@ export default function WarehouseDetails({
           selectorMap: {
             ownershipType: '[data-field="ownershipType"]',
             warehouseCountry: '[data-field="warehouseCountry"]',
-            mapLink: '[data-field-name="mapLink"]',
-            // Slot anchors use the same `data-field="factoryImage:<id>"`
-            // attribute the helper's default selector falls through to.
           },
         });
       }, 350);
@@ -329,7 +314,7 @@ export default function WarehouseDetails({
   }, []);
 
   // ── Accordion Section State ────────────────────────────────────────
-  type SectionKey = 'ownership' | 'address' | 'photos' | 'map';
+  type SectionKey = 'ownership' | 'address' | 'photos';
   const [activeSection, setActiveSection] = useState<SectionKey>('ownership');
 
   // Maps error field keys → their parent accordion section
@@ -341,7 +326,6 @@ export default function WarehouseDetails({
     warehouseState: 'address',
     warehouseZip: 'address',
     warehouseCountry: 'address',
-    mapLink: 'map',
   };
   // factory image slot errors are handled separately in the photos section
 
@@ -370,10 +354,6 @@ export default function WarehouseDetails({
       if (requiredDone && optionalSlots.every((s) => !!formData.factoryImages[s.id])) return 'complete';
       if (requiredDone) return 'complete';
       if (anyFilled) return 'partial';
-      return 'empty';
-    }
-    if (section === 'map') {
-      if (formData.mapLink) return 'complete';
       return 'empty';
     }
     return 'empty';
@@ -873,29 +853,6 @@ export default function WarehouseDetails({
               );
             })}
             </div>
-          </div>
-        </AccordionSection>
-
-        {/* ═══════════════════════════════════════════════════════════════
-            SECTION 4 — Location Map
-            ═══════════════════════════════════════════════════════════════ */}
-        <AccordionSection
-          {...sectionProps('map')}
-          icon={<Map className="w-4 h-4" aria-hidden="true" />}
-          title="Location Map"
-          subtitle="Search address or drop a pin — Google Maps embed generates automatically"
-        >
-          <div data-field-name="mapLink">
-            <LocationPicker
-              label="Warehouse Location"
-              required
-              value={formData.mapLink}
-              onChange={(link) => {
-                handleInputChange('mapLink', link);
-                onUpdateData({ ...formData, mapLink: link });
-              }}
-              error={errors.mapLink && touched.mapLink ? errors.mapLink : undefined}
-            />
           </div>
         </AccordionSection>
 

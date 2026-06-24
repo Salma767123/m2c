@@ -69,11 +69,7 @@ function validateFactoryDetails(d: any): StepErrors {
 
 function validateLegalRegistration(d: any): StepErrors {
     const e: StepErrors = {}
-    if (isBlank(d.businessRegistrationNumber)) {
-        e.businessRegistrationNumber = "Business registration number is required"
-    }
-    if (isBlank(d.gstTaxId)) e.gstTaxId = "GST / Tax ID is required"
-    if (isBlank(d.factoryLicenseNumber)) e.factoryLicenseNumber = "Factory license number is required"
+    if (isBlank(d.gstTaxId)) e.gstTaxId = "GST Number is required"
     return e
 }
 
@@ -176,9 +172,7 @@ const FIELD_TO_STEP: Record<string, Step> = {
     contactPersonName: "factoryDetails",
     contactPhoneNumber: "factoryDetails",
     factoryAddress: "factoryDetails",
-    businessRegistrationNumber: "legalRegistration",
     gstTaxId: "legalRegistration",
-    factoryLicenseNumber: "legalRegistration",
     categoryToInspect: "productionInfo",
     productsManufactured: "productionInfo",
     monthlyProductionCapacity: "productionInfo",

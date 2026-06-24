@@ -13,9 +13,10 @@
  * incrementally without rewriting an entire step at once.
  */
 
-import React, { useState, useRef, useEffect, useMemo, useId } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useId, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
-import { ChevronDown, Check, Search, MapPin, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, Check, Search, MapPin, Loader2, AlertCircle, CheckCircle2, Plus, X } from 'lucide-react';
 import { Country, type ICountry } from 'country-state-city';
 import { parsePhoneNumberFromString, validatePhoneNumberLength } from 'libphonenumber-js';
 import { searchAddress, type AddressSuggestion } from '@/lib/addressSearch';
@@ -732,13 +733,13 @@ export function PhoneInput({
 }: PhoneInputProps) {
   const { dial, national } = parsePhone(value);
 
-  // shadcn-country-dropdown phone-input style — unified h-10 field with
+  // shadcn-country-dropdown phone-input style — unified h-11 field with
   // rounded-md border, the country trigger blends into the input (no
   // visible vertical divider), brand-red focus ring on focus-within.
   return (
     <div
       className={[
-        'flex h-10 items-center rounded-md border bg-white shadow-sm transition-colors',
+        'flex h-11 items-center rounded-md border bg-white shadow-sm transition-colors',
         'focus-within:ring-2 focus-within:ring-offset-0',
         invalid
           ? 'border-red-400 focus-within:border-red-500 focus-within:ring-red-500/25'
@@ -762,6 +763,464 @@ export function PhoneInput({
         autoComplete={autoComplete}
         inputMode="tel"
         className="h-full min-w-0 flex-1 rounded-r-md bg-transparent pl-1.5 pr-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed sm:text-sm"
+      />
+    </div>
+  );
+}
+
+// ── LocalLandlineInput — country dial code + STD/area code + number ──────
+//
+// "Option B" landline capture: the country code comes from the same curated
+// dropdown PhoneInput uses (finite ISO list), while the STD/area code and the
+// subscriber number are free-text — area codes are too numerous and varied to
+// enumerate in a dropdown. The three segments live in one unified field shell
+// so it sits flush beside PhoneInput. State is kept as three separate values
+// (not a single combined string) because STD-code length varies, so splitting
+// a combined string back out would be ambiguous.
+export interface LocalLandlineValue {
+  countryCode: string; // dial code with leading "+", e.g. "+91"
+  std: string;         // STD / area / city code, e.g. "44"
+  number: string;      // subscriber number, e.g. "28175000"
+}
+
+export function LocalLandlineInput({
+  value,
+  onChange,
+  onBlur,
+  invalid,
+  disabled,
+  name,
+  locked,
+}: {
+  value: LocalLandlineValue;
+  onChange: (v: LocalLandlineValue) => void;
+  onBlur?: () => void;
+  invalid?: boolean;
+  disabled?: boolean;
+  name?: string;
+  locked?: boolean;
+}) {
+  const cc = value.countryCode || DEFAULT_DIAL;
+  return (
+    <div
+      className={[
+        'flex h-11 items-center rounded-md border bg-white shadow-sm transition-colors',
+        'focus-within:ring-2 focus-within:ring-offset-0',
+        invalid
+          ? 'border-red-400 focus-within:border-red-500 focus-within:ring-red-500/25'
+          : 'border-slate-200 hover:border-slate-300 focus-within:border-brand-500 focus-within:ring-brand-500/20',
+        disabled ? 'cursor-not-allowed bg-slate-50 opacity-60' : '',
+      ].join(' ')}
+    >
+      {locked ? (
+        <span className="flex h-full shrink-0 items-center gap-1.5 rounded-l-md bg-slate-50 px-2.5 text-sm font-medium text-slate-700 select-none">
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200" aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="https://flagcdn.com/w40/in.png" alt="" className="h-full w-full scale-[1.25] object-cover" loading="lazy" />
+          </div>
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>+91</span>
+        </span>
+      ) : (
+        <CountryDialPicker
+          value={cc}
+          onChange={(code) => onChange({ ...value, countryCode: code })}
+          disabled={disabled}
+        />
+      )}
+      <span className="h-5 w-px shrink-0 bg-slate-200" aria-hidden="true" />
+      <input
+        type="tel"
+        inputMode="numeric"
+        value={value.std}
+        disabled={disabled}
+        onBlur={onBlur}
+        onChange={(e) => onChange({ ...value, std: e.target.value.replace(/\D/g, '') })}
+        placeholder="STD"
+        aria-label="STD / area code"
+        className="h-full w-16 min-w-0 bg-transparent px-2 text-center text-base text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed sm:text-sm"
+      />
+      <span className="h-5 w-px shrink-0 bg-slate-200" aria-hidden="true" />
+      <input
+        type="tel"
+        inputMode="tel"
+        name={name}
+        value={value.number}
+        disabled={disabled}
+        onBlur={onBlur}
+        onChange={(e) => onChange({ ...value, number: e.target.value.replace(/\D/g, '') })}
+        placeholder="Landline number"
+        className="h-full min-w-0 flex-1 rounded-r-md bg-transparent pl-2 pr-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed sm:text-sm"
+      />
+    </div>
+  );
+}
+
+// ── Landline formatting helpers ─────────────────────────────────────────
+//
+// The main contact stores landlines in two shapes:
+//   • Local:  localLandlineCountryCode + localLandlineStd + localLandline
+//   • Intl:   intlLandline — a single E.164 string (same as PhoneInput)
+// Older records only have a single `landline` string. `getLandlineDisplay`
+// resolves all three so every display screen stays a one-liner with a
+// built-in fallback to the legacy value.
+
+export function formatLocalLandline(parts?: {
+  countryCode?: string | null;
+  std?: string | null;
+  number?: string | null;
+} | null): string {
+  if (!parts) return '';
+  const cc = (parts.countryCode || '').toString().trim();
+  const std = (parts.std || '').toString().trim();
+  const num = (parts.number || '').toString().trim();
+  if (!num) return '';
+  return [cc, std, num].filter(Boolean).join(' ');
+}
+
+export function formatIntlLandline(value?: string | null): string {
+  if (!value) return '';
+  const { dial, national } = parsePhone(value);
+  if (!national) return '';
+  return `${dial} ${national}`;
+}
+
+export function getLandlineDisplay(c?: {
+  localLandlineCountryCode?: string | null;
+  localLandlineStd?: string | null;
+  localLandline?: string | null;
+  intlLandline?: string | null;
+  landline?: string | null;
+} | null): { local: string; intl: string; legacy: string; hasNew: boolean } {
+  if (!c) return { local: '', intl: '', legacy: '', hasNew: false };
+  const local = formatLocalLandline({
+    countryCode: c.localLandlineCountryCode,
+    std: c.localLandlineStd,
+    number: c.localLandline,
+  });
+  const intl = formatIntlLandline(c.intlLandline);
+  const legacy = (c.landline || '').toString().trim();
+  return { local, intl, legacy, hasNew: Boolean(local || intl) };
+}
+
+// ── Country flag helper ─────────────────────────────────────────────────
+// Resolves a stored country NAME to its flag image (flagcdn, same source as
+// the phone country picker) — used by the chips + the picker modal.
+export function countryFlagUrl(name?: string | null): string | null {
+  if (!name) return null;
+  const c = PHONE_COUNTRY_CODES.find((x) => x.name === name);
+  return c ? `https://flagcdn.com/w40/${c.iso.toLowerCase()}.png` : null;
+}
+
+// ── CountryPickerModal — searchable, multi-select country grid ──────────
+//
+// A modal of flag country cards (checkbox + flag + name) with a live search
+// box and Cancel / Done actions. Selection is held in a local draft and only
+// committed to the parent on Done, so Cancel/Esc discards. Backed by the same
+// PHONE_COUNTRY_CODES list the rest of the form uses, and stores country
+// NAMES (so the saved data shape is unchanged). Rendered through a portal to
+// document.body so it overlays correctly regardless of accordion clipping.
+export function CountryPickerModal({
+  open,
+  title,
+  selected,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  title: string;
+  selected: string[];
+  onClose: () => void;
+  onDone: (names: string[]) => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [query, setQuery] = useState('');
+  const [draft, setDraft] = useState<string[]>(selected);
+  // Drives the exit animation: while closing we keep the modal mounted for a
+  // beat so the fade / zoom-out can play before the parent unmounts it.
+  const [closing, setClosing] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => setMounted(true), []);
+
+  // Re-seed the working draft + clear the search each time the modal opens.
+  useEffect(() => {
+    if (open) {
+      setDraft(selected);
+      setQuery('');
+      setClosing(false);
+    }
+    // Only re-seed on the open→true transition, not on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Play the exit animation, then run `after` (onClose / onDone) once it ends.
+  const animateOut = useCallback((after: () => void) => {
+    if (timerRef.current) return; // a close/done is already in flight
+    setClosing(true);
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      setClosing(false);
+      after();
+    }, 180);
+  }, []);
+
+  const requestClose = useCallback(() => animateOut(onClose), [animateOut, onClose]);
+
+  // Clear a pending exit timer if the component unmounts mid-animation.
+  useEffect(() => () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+  }, []);
+
+  // Lock background scroll + wire Esc-to-close while open.
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') requestClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, requestClose]);
+
+  if (!mounted || !open) return null;
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? PHONE_COUNTRY_CODES.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.code.includes(q) ||
+          c.iso.toLowerCase() === q,
+      )
+    : PHONE_COUNTRY_CODES;
+
+  const toggle = (name: string) =>
+    setDraft((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    );
+
+  return createPortal(
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-end justify-center overflow-hidden p-0 sm:items-center sm:p-4">
+      {/* Backdrop — dims + blurs the whole page (sidebar, header, content). */}
+      <div
+        className={`absolute inset-0 bg-slate-900/50 backdrop-blur-[6px] ${
+          closing ? 'animate-out fade-out duration-150' : 'animate-in fade-in duration-200'
+        }`}
+        onClick={requestClose}
+        aria-hidden="true"
+      />
+      {/* Dialog */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={`relative z-10 flex w-full max-w-2xl max-h-[88vh] flex-col rounded-t-2xl bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl ${
+          closing
+            ? 'animate-out fade-out zoom-out-95 slide-out-to-bottom-4 duration-150'
+            : 'animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-200'
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-bold text-slate-900">{title}</h3>
+            <p className="mt-0.5 text-xs text-slate-500">{draft.length} selected</p>
+          </div>
+          <button
+            type="button"
+            onClick={requestClose}
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-5 pt-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search countries..."
+              className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+          </div>
+        </div>
+
+        {/* Grid */}
+        <div className="flex-1 overflow-y-auto px-5 py-4" style={{ overscrollBehavior: 'contain' }}>
+          {filtered.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-sm font-medium text-slate-700">No matches</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Nothing matches &ldquo;{query}&rdquo;. Try another country name.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((c) => {
+                const sel = draft.includes(c.name);
+                return (
+                  <button
+                    key={`${c.iso}-${c.code}`}
+                    type="button"
+                    onClick={() => toggle(c.name)}
+                    aria-pressed={sel}
+                    className={[
+                      'flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-all duration-150',
+                      sel
+                        ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500/30'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
+                    ].join(' ')}
+                  >
+                    <span
+                      className={[
+                        'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+                        sel ? 'border-brand-500 bg-brand-500 text-white' : 'border-slate-300 bg-white',
+                      ].join(' ')}
+                    >
+                      {sel && <Check className="h-3 w-3" />}
+                    </span>
+                    <span className="h-4 w-6 shrink-0 overflow-hidden rounded-sm border border-slate-100 bg-slate-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`https://flagcdn.com/w40/${c.iso.toLowerCase()}.png`}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    </span>
+                    <span className="truncate text-sm font-medium text-slate-700">{c.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3.5">
+          <button
+            type="button"
+            onClick={() => setDraft([])}
+            className="text-xs font-semibold text-slate-500 transition-colors hover:text-slate-700 disabled:opacity-40"
+            disabled={draft.length === 0}
+          >
+            Clear all
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={requestClose}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => animateOut(() => onDone(draft))}
+              className="rounded-lg bg-brand-500 px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-brand-500/25 transition-colors hover:bg-brand-600"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ── CountryMultiSelect — "+ Select…" button + chips + picker modal ──────
+//
+// Drop-in replacement for the old multi-select dropdown. Stores an array of
+// country NAMES (unchanged data shape), shows each pick as a flag chip with a
+// remove ✕, and opens CountryPickerModal to add/edit the selection.
+export function CountryMultiSelect({
+  label,
+  buttonLabel,
+  value,
+  onChange,
+  onBlur,
+  invalid,
+  emptyHint,
+}: {
+  label: string;
+  buttonLabel: string;
+  value: string[];
+  onChange: (names: string[]) => void;
+  onBlur?: () => void;
+  invalid?: boolean;
+  emptyHint?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={[
+          'inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40',
+          invalid
+            ? 'border-red-400 bg-red-50 text-red-600 hover:bg-red-100'
+            : 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100',
+        ].join(' ')}
+      >
+        <Plus className="h-4 w-4" aria-hidden="true" />
+        {buttonLabel}
+      </button>
+
+      {value.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {value.map((name) => {
+            const flag = countryFlagUrl(name);
+            return (
+              <span
+                key={name}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1 pl-2 pr-1 text-sm text-slate-700 shadow-sm"
+              >
+                {flag && (
+                  <span className="h-3.5 w-5 shrink-0 overflow-hidden rounded-sm border border-slate-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={flag} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  </span>
+                )}
+                <span className="font-medium">{name}</span>
+                <button
+                  type="button"
+                  onClick={() => onChange(value.filter((n) => n !== name))}
+                  className="ml-0.5 rounded-full p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                  aria-label={`Remove ${name}`}
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      ) : (
+        emptyHint && <p className="mt-2 text-xs text-slate-400">{emptyHint}</p>
+      )}
+
+      <CountryPickerModal
+        open={open}
+        title={label}
+        selected={value}
+        onClose={() => setOpen(false)}
+        onDone={(names) => {
+          onChange(names);
+          setOpen(false);
+          onBlur?.();
+        }}
       />
     </div>
   );
@@ -1351,8 +1810,8 @@ export function Hint({
 //
 // The `isOpen` / `onActivate` props are kept on the interface for
 // backwards-compatibility (callers still pass them) but are intentionally
-// ignored — the body always renders. Status badge: "Fix required" on
-// error, else "Done" / "In progress" from `status`.
+// ignored — the body always renders. Status badge: "Fix Error" on
+// error, else "Completed" / "In Progress" from `status`.
 //
 // `headerExtra` is an optional action slot rendered on the header's right
 // edge. Pass `null` (the default) when not needed.
@@ -1414,16 +1873,16 @@ export function AccordionSection({
           {hasErrors ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">
               <AlertCircle className="w-3 h-3" aria-hidden="true" />
-              Fix required
+              Fix Error
             </span>
           ) : status === 'complete' ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
               <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
-              Done
+              Completed
             </span>
           ) : status === 'partial' ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
-              In progress
+              In Progress
             </span>
           ) : null}
         </div>
