@@ -9,6 +9,7 @@ export interface QCCheckerData {
     name: string;
     phone: string;
     address?: string;
+    addressLine2?: string;
     city?: string;
     state?: string;
     zipCode?: string;
@@ -37,6 +38,7 @@ export interface CreateQCCheckerData {
     email: string;
     phone: string;
     address?: string;
+    addressLine2?: string;
     city?: string;
     state?: string;
     zipCode?: string;
