@@ -428,8 +428,8 @@ function VendorContactDetails({ contact }: { contact?: Record<string, any> | nul
                     <p className="text-slate-500 text-sm mt-0.5">Company-level contact details from vendor registration.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <ReadField label="Phone Number 1" value={contact.businessPhone} />
-                    <ReadField label="Phone Number 2" value={contact.phoneNumber2} />
+                    <ReadField label="Primary Phone" value={contact.businessPhone} />
+                    <ReadField label="Secondary Phone" value={contact.phoneNumber2} />
                     <ReadField label="Primary Email" value={contact.businessEmail} />
                     <ReadField label="Secondary Email" value={contact.businessEmail2} />
                     {bizLocalLL && <ReadField label="Local Landline Number" value={bizLocalLL} />}

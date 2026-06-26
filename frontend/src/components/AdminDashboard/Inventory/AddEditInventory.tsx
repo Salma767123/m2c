@@ -730,7 +730,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                 <div className="space-y-3">
                   <label className="block text-sm font-medium text-slate-700 mb-3">
                     Product Source Type
-                    <span className="text-xs text-slate-500 ml-2">(Select one option)</span>
+                    <span className="text-xs text-slate-500 ml-2">(Optional - Select one if applicable)</span>
                   </label>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -751,8 +751,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           )}
                         </div>
                         <div>
-                          <h4 className="font-medium text-slate-900">Supplier</h4>
-                          <p className="text-sm text-slate-600">Product sourced from external supplier</p>
+                          <h4 className="font-medium text-slate-900">Trader</h4>
+                          <p className="text-sm text-slate-600">Product sourced from external trader</p>
                         </div>
                       </div>
                     </div>
@@ -787,12 +787,12 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                   <div className="space-y-4 p-4 bg-gray-50 border border-gray-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
                     <h4 className="font-medium text-gray-900 mb-3 flex items-center">
                       <span className="w-2 h-2 bg-gray-800 rounded-full mr-2"></span>
-                      Supplier Information
+                      Trader Information
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Supplier Name *
+                          Trader Name *
                         </label>
                         <input
                           type="text"
@@ -998,7 +998,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Source Type:</span>
                     <span className="font-medium text-gray-800">
-                      {formData.sourceType === 'supplier' ? 'Supplier' : 'Manufacture'}
+                      {formData.sourceType === 'supplier' ? 'Trader' : 'Manufacture'}
                     </span>
                   </div>
                 )}

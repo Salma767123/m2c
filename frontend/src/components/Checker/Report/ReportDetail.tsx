@@ -298,7 +298,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
           <InfoRow label="Factory Name" value={fd.factoryName} />
           <InfoRow label="Factory Address" value={fd.factoryAddress} />
           <InfoRow label="Contact Person" value={fd.contactPersonName} />
-          <InfoRow label="Contact Phone" value={fd.contactPhoneNumber} />
+          <InfoRow label="Primary Phone" value={fd.contactPhoneNumber} />
         </div>
       </Section>
 
@@ -308,7 +308,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
           <InfoRow label="GST Number" value={fd.gstTaxId} />
           {fd.panNumber && <InfoRow label={fd.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={fd.panNumber} />}
           {fd.iecCode && <InfoRow label="IEC Code" value={fd.iecCode} />}
-          {fd.companyIdNumber && <InfoRow label="Company ID / CIN" value={fd.companyIdNumber} />}
+          {fd.companyIdNumber && <InfoRow label="CIN Number (for Pvt Ltd) / LLPIN Number (for LLP) / Partnership Deed Details (for Partnership Firm) / IEC Code (for Proprietorship)" value={fd.companyIdNumber} />}
         </div>
         {/* Document verification results */}
         {fd.docVerifications && Object.keys(fd.docVerifications).length > 0 && (

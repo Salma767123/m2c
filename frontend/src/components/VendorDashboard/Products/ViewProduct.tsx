@@ -273,16 +273,16 @@ export default function ViewProduct({ productId }: ViewProductProps) {
                   <InfoField label="Composition" value={product.fabricSpecifications.composition} />
                 )}
                 {product.fabricSpecifications?.weight && (
-                  <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Fabric Weight" value={product.fabricSpecifications.weight} />
+                  <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Weight" value={product.fabricSpecifications.weight} />
                 )}
                 {product.dimensions && (
                   <InfoField icon={<Ruler className="h-3.5 w-3.5" />} label="Dimensions" value={product.dimensions} />
                 )}
                 {product.weight && (
-                  <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Weight" value={product.weight} />
+                  <InfoField icon={<Scale className="h-3.5 w-3.5" />} label="Shipping Weight" value={product.weight} />
                 )}
                 {product.uom && (
-                  <InfoField label="Unit of Measure" value={product.uom} />
+                  <InfoField label="Unit of Measurement" value={product.uom} />
                 )}
                 {product.dispatchTimeline && (
                   <InfoField

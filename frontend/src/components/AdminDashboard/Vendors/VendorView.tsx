@@ -956,6 +956,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
     'llp': 'LLPIN Number',
   };
   const companyIdLabel = idLabelByType[v.businessType] || 'Business Registration ID';
+  const panLabel = v.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -980,13 +981,13 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               )}
               {v.iecCode && (
                 <div>
-                  <p className="text-sm text-gray-600">IEC Code (Import Export Code)</p>
+                  <p className="text-sm text-gray-600">IEC Code</p>
                   <p className="font-medium">{v.iecCode}</p>
                 </div>
               )}
               {v.panNumber && (
                 <div>
-                  <p className="text-sm text-gray-600">PAN Number</p>
+                  <p className="text-sm text-gray-600">{panLabel}</p>
                   <p className="font-medium">{v.panNumber}</p>
                 </div>
               )}
@@ -998,7 +999,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               )}
               {v.factoryOwnershipType && (
                 <div>
-                  <p className="text-sm text-gray-600">Factory Ownership Type</p>
+                  <p className="text-sm text-gray-600">Ownership Type</p>
                   <p className="font-medium capitalize">{v.factoryOwnershipType}</p>
                 </div>
               )}
@@ -1073,13 +1074,13 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {vendor.warehouseSize && (
                   <div>
-                    <p className="text-sm text-gray-600">Warehouse Size</p>
+                    <p className="text-sm text-gray-600">Warehousing Capacity</p>
                     <p className="font-medium">{vendor.warehouseSize}</p>
                   </div>
                 )}
                 {vendor.storageCapacity && (
                   <div>
-                    <p className="text-sm text-gray-600">Storage Capacity</p>
+                    <p className="text-sm text-gray-600">Warehousing Capacity</p>
                     <p className="font-medium">{vendor.storageCapacity}</p>
                   </div>
                 )}
@@ -1815,13 +1816,13 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                     )}
                     {(contact.localLandline || contact.landline) && (
                       <div>
-                        <p className="text-sm text-gray-600">Local Landline</p>
+                        <p className="text-sm text-gray-600">Local Landline Number</p>
                         <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: contact.localLandlineStd, number: contact.localLandline || contact.landline })}</p>
                       </div>
                     )}
                     {contact.intlLandline && (
                       <div>
-                        <p className="text-sm text-gray-600">International Landline</p>
+                        <p className="text-sm text-gray-600">International Landline Number</p>
                         <p className="font-medium">{formatIntlLandline(contact.intlLandline)}</p>
                       </div>
                     )}
@@ -1889,7 +1890,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Import Experience</p>
+                <p className="text-sm text-gray-600 mb-1">Import Countries</p>
                 <p className="font-medium">{(vendor as any).importExperience ? 'Yes' : 'No'}</p>
                 {Array.isArray((vendor as any).importCountries) && (vendor as any).importCountries.length > 0 && (
                   <div className="mt-2">
@@ -1903,7 +1904,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                 )}
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-1">Export Experience</p>
+                <p className="text-sm text-gray-600 mb-1">Export Countries</p>
                 <p className="font-medium">{(vendor as any).exportExperience ? 'Yes' : 'No'}</p>
                 {Array.isArray((vendor as any).exportCountries) && (vendor as any).exportCountries.length > 0 && (
                   <div className="mt-2">

@@ -32,7 +32,7 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 
 // Maps document type to the corresponding registration number field in formData
 const DOC_TYPE_TO_NUMBER: Record<string, { label: string; field: string }> = {
-    GST_CERTIFICATE: { label: "GST No.", field: "gstTaxId" },
+    GST_CERTIFICATE: { label: "GST Number", field: "gstTaxId" },
     PAN_CARD: { label: "PAN No.", field: "panNumber" },
     IEC_CERTIFICATE: { label: "IEC Code", field: "iecCode" },
     COMPANY_REGISTRATION: { label: "Company ID / CIN", field: "companyIdNumber" },
@@ -140,9 +140,9 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                 {formData.companyIdNumber && (
                     <div>
                         <label className="block text-slate-700 font-semibold mb-3 text-sm">
-                            {formData.businessType === "pvt-ltd" ? "CIN" :
-                             formData.businessType === "partnership-firm" ? "Partnership Deed No." :
-                             formData.businessType === "llp" ? "LLPIN" : "Company ID Number"}
+                            {formData.businessType === "pvt-ltd" ? "CIN Number" :
+                             formData.businessType === "partnership-firm" ? "Partnership Deed Details" :
+                             formData.businessType === "llp" ? "LLPIN Number" : "Company ID Number"}
                         </label>
                         <input
                             type="text"
@@ -173,7 +173,7 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                                 ? (isProp ? 'Proprietor PAN Card' : 'Company PAN Card')
                                 : (DOC_TYPE_LABELS[doc.type] || doc.name || doc.type)
                             const numberMetaLabel = doc.type === 'PAN_CARD'
-                                ? (isProp ? 'Proprietor PAN No.' : 'Company PAN No.')
+                                ? (isProp ? 'Proprietor PAN Number' : 'Company PAN Number')
                                 : DOC_TYPE_TO_NUMBER[doc.type]?.label
                             const verif = (formData.docVerifications || {})[idx] || { verified: "", remarks: "" }
                             const isVerified = verif.verified === "yes"

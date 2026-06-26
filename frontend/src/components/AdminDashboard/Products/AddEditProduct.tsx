@@ -1746,7 +1746,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Weight (GSM)
+                        Weight
                       </label>
                       <input
                         type="text"
@@ -1762,7 +1762,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Weave
+                        Type of Weave
                       </label>
                       <input
                         type="text"
@@ -1791,7 +1791,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   {/* Care Instructions */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Care Instructions
+                      Care Instructions *
                     </label>
                     <div className="space-y-2">
                       <div className="flex gap-2">
@@ -1958,7 +1958,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                             </div>
 
                             <div className="space-y-2">
-                              <label className="block text-sm font-medium text-gray-700">Low Stock Alert</label>
+                              <label className="block text-sm font-medium text-gray-700">Low Stock Threshold</label>
                               <input
                                 type="number"
                                 value={newVariant.lowStockThreshold ?? ''}
@@ -2743,7 +2743,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Weight per Unit *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Weight *</label>
                         <input
                           type="number"
                           step="0.01"
@@ -2759,7 +2759,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         <p className="text-xs text-gray-500 mt-1">Weight per single unit</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Weight Unit *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Unit of Measurement *</label>
                         <select
                           value={formData.logisticsConfig?.weightUom || 'KG'}
                           onChange={(e) => setFormData(prev => ({

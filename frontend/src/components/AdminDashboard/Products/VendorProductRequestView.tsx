@@ -715,7 +715,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {product.uom && (
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Selling Unit (UOM)</span>
+                    <span className="text-sm font-medium text-gray-500">Unit of Measurement</span>
                     <span className="text-gray-900">{product.uom}</span>
                   </div>
                 )}
@@ -948,7 +948,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 <p className="text-xs text-gray-500">{product.vendor.ownerName}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">Owner</p>
+                <p className="text-sm font-medium text-gray-900">Owner Name</p>
                 <p className="text-sm text-gray-600">{product.vendor.ownerName}</p>
               </div>
               <div>
@@ -1036,13 +1036,13 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                       )}
                       {lc.airCostPerKg > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Air Cost per KG</p>
+                          <p className="text-sm font-medium text-gray-900">Air Cost per {lc.weightUom}</p>
                           <p className="text-sm text-gray-600">₹{lc.airCostPerKg}</p>
                         </div>
                       )}
                       {lc.shipCostPerKg > 0 && (
                         <div>
-                          <p className="text-sm font-medium text-gray-900">Ship Cost per KG</p>
+                          <p className="text-sm font-medium text-gray-900">Ship Cost per {lc.weightUom}</p>
                           <p className="text-sm text-gray-600">₹{lc.shipCostPerKg}</p>
                         </div>
                       )}

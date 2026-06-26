@@ -307,8 +307,8 @@ export default function ProductInspectionDetail({ productId }: Props) {
                                     <th className="p-3 border-b text-xs uppercase tracking-wider">Sample Name</th>
                                     <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Carton (L×W×H) cm</th>
                                     <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Product (L×W) cm</th>
-                                    <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Retail Wt (kg)</th>
-                                    <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Gross Wt (kg)</th>
+                                    <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Retail Wt</th>
+                                    <th className="p-3 border-b text-xs uppercase tracking-wider text-center">Gross Wt</th>
                                 </tr>
                             </thead>
                             <tbody>

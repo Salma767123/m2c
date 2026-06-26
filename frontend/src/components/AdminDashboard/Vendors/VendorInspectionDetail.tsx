@@ -276,8 +276,8 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
             <div className="space-y-3">
               <div className="flex justify-between"><span className="text-gray-600">Factory Name</span><span className="font-medium">{formData.factoryName || "N/A"}</span></div>
               <div className="flex justify-between"><span className="text-gray-600">Address</span><span className="font-medium">{formData.factoryAddress || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Contact Person</span><span className="font-medium">{formData.contactPersonName || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Phone</span><span className="font-medium">{formData.contactPhoneNumber || "N/A"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">Contact Person Name</span><span className="font-medium">{formData.contactPersonName || "N/A"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">Contact Phone Number</span><span className="font-medium">{formData.contactPhoneNumber || "N/A"}</span></div>
             </div>
           </CardContent>
         </Card>
@@ -289,7 +289,7 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
               <Shield className="h-5 w-5 text-blue-600" /> Legal & Registration
             </h3>
             <div className="space-y-3">
-              <div className="flex justify-between"><span className="text-gray-600">GST / Tax ID</span><span className="font-medium">{formData.gstTaxId || "N/A"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">GST Number</span><span className="font-medium">{formData.gstTaxId || "N/A"}</span></div>
               {formData.panNumber && <div className="flex justify-between"><span className="text-gray-600">PAN Number</span><span className="font-medium font-mono">{formData.panNumber}</span></div>}
               {formData.iecCode && <div className="flex justify-between"><span className="text-gray-600">IEC Code</span><span className="font-medium font-mono">{formData.iecCode}</span></div>}
               {formData.companyIdNumber && <div className="flex justify-between"><span className="text-gray-600">Company ID / CIN</span><span className="font-medium font-mono">{formData.companyIdNumber}</span></div>}
@@ -305,9 +305,9 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
             </h3>
             <div className="space-y-3">
               <div className="flex justify-between"><span className="text-gray-600">Products Manufactured</span><span className="font-medium">{formData.productsManufactured || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Monthly Capacity</span><span className="font-medium">{formData.monthlyProductionCapacity || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Workers</span><span className="font-medium">{formData.numberOfProductionWorkers || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Category</span><span className="font-medium">{formData.categoryToInspect || "N/A"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">Monthly Production Capacity</span><span className="font-medium">{formData.monthlyProductionCapacity || "N/A"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">Number of Production Workers</span><span className="font-medium">{formData.numberOfProductionWorkers || "N/A"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">Category to Inspect</span><span className="font-medium">{formData.categoryToInspect || "N/A"}</span></div>
             </div>
           </CardContent>
         </Card>

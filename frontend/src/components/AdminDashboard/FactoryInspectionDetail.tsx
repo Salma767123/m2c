@@ -281,7 +281,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                             <InfoCard label="Factory Name" value={formData.factoryName} />
                             <InfoCard label="Factory Address" value={formData.factoryAddress} />
                             <InfoCard label="Contact Person" value={formData.contactPersonName} />
-                            <InfoCard label="Contact Phone" value={formData.contactPhoneNumber} />
+                            <InfoCard label="Primary Phone" value={formData.contactPhoneNumber} />
                         </div>
                     </Section>
 
@@ -291,7 +291,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                             <InfoCard label="GST Number" value={formData.gstTaxId} />
                             {formData.panNumber && <InfoCard label={formData.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={formData.panNumber} />}
                             {formData.iecCode && <InfoCard label="IEC Code" value={formData.iecCode} />}
-                            {formData.companyIdNumber && <InfoCard label="Company ID / CIN" value={formData.companyIdNumber} />}
+                            {formData.companyIdNumber && <InfoCard label="CIN Number" value={formData.companyIdNumber} />}
                         </div>
                         {/* Document verification results */}
                         {formData.docVerifications && Object.keys(formData.docVerifications).length > 0 && (

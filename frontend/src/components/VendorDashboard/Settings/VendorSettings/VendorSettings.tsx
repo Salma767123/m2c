@@ -541,7 +541,7 @@ function MainContactSection({
 
         {!editing ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-            {mcName && <Field label="Name" value={mcName} />}
+            {mcName && <Field label="Main Contact Name" value={mcName} />}
             {(mc.customDesignation || mc.designation) && (
               <Field label="Designation" value={mc.customDesignation || mc.designation} />
             )}
@@ -556,8 +556,8 @@ function MainContactSection({
               const ll = getLandlineDisplay(mc);
               return (
                 <>
-                  {ll.local && <Field label="Local Landline" value={ll.local} />}
-                  {ll.intl && <Field label="International Landline" value={ll.intl} />}
+                  {ll.local && <Field label="Local Landline Number" value={ll.local} />}
+                  {ll.intl && <Field label="International Landline Number" value={ll.intl} />}
                   {!ll.hasNew && ll.legacy && <Field label="Landline" value={ll.legacy} />}
                 </>
               );
@@ -945,11 +945,11 @@ export default function VendorSettings() {
     mk("Website", v.website, { type: "url" }),
   ]);
   const companyContact = compact([
-    mk("Business Email", v.businessEmail),
+    mk("Primary Email", v.businessEmail),
     mk("Secondary Email", v.businessEmail2),
     mk("Primary Phone", v.businessPhone),
     mk("Secondary Phone", v.phoneNumber2),
-    mk("Landline Number", v.landlineNumber),
+    mk("Local Landline Number", v.landlineNumber),
   ]);
   const companyAddress = compact([
     mk(
@@ -1002,14 +1002,14 @@ export default function VendorSettings() {
   // ===================================================================
   const ownerIdentity = compact([
     mk("Designation", v.designation),
-    mk("Owner Full Name", buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)),
+    mk("Owner Name", buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)),
   ]);
   const ownerContact = compact([
     mk("Primary Email", v.ownerEmail),
     mk("Secondary Email", v.ownerEmail2),
     mk("Primary Phone", v.ownerPhone),
     mk("Secondary Phone", v.ownerPhone2),
-    mk("Landline Number", v.ownerLandline),
+    mk("Local Landline Number", v.ownerLandline),
   ]);
   const businessHistory = compact([
     mk("Start Business Date", v.businessStartDate, { type: "date" }),
@@ -1033,7 +1033,7 @@ export default function VendorSettings() {
     mk("Vendor Type", v.vendorTypes, { type: "list" }) ||
       mk("Vendor Type", v.vendorType, { type: "badge" }),
   ]);
-  const marketFocus = compact([mk("Market Type", v.primaryMarkets, { type: "list" })]);
+  const marketFocus = compact([mk("Market Focus", v.primaryMarkets, { type: "list" })]);
   const productOfferings = compact([
     mk("Product Categories", v.productCategories, { type: "list" }),
     mk("Product Types", v.productTypes, { type: "list" }),
@@ -1301,7 +1301,7 @@ export default function VendorSettings() {
                 {additionalOwners.map((owner: any, idx: number) => (
                   <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
                     <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
-                    {(owner.name || owner.firstName) && <Field label="Full Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
+                    {(owner.name || owner.firstName) && <Field label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
                     {owner.designation && <Field label="Designation" value={owner.designation} />}
                     {owner.email && <Field label="Primary Email" value={owner.email} />}
                     {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}

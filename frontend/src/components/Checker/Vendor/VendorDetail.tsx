@@ -292,7 +292,7 @@ export default function VendorDetail({
           { key: "gstNumber", label: "GST Number", condition: fullVendor.gstNumber },
           { key: "_unregistered", label: "Vendor Type", valueOverride: !fullVendor.gstNumber ? "Unregistered — identified by email" : undefined, condition: !fullVendor.gstNumber },
           { key: "companyIdNumber", label: getCompanyIdLabel(fullVendor.businessType), condition: fullVendor.companyIdNumber },
-          { key: "iecCode", label: "IEC Code (Import Export Code)", condition: fullVendor.iecCode },
+          { key: "iecCode", label: "IEC Code", condition: fullVendor.iecCode },
           { key: "panNumber", label: fullVendor.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number' },
           { key: "aadhaarNumber", label: "Aadhaar Number", condition: fullVendor.aadhaarNumber },
           { key: "website", label: "Website", type: "url" },
@@ -304,14 +304,14 @@ export default function VendorDetail({
         title: "Warehouse / Factory Address",
         icon: <Warehouse className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "ownershipType", label: "Warehouse Ownership", transform: (val: string) => getOwnershipTypeLabel(val) },
+          { key: "ownershipType", label: "Ownership Type", transform: (val: string) => getOwnershipTypeLabel(val) },
           { key: "warehouseAddress", label: "Address Line 1", condition: fullVendor.warehouseAddress },
           { key: "warehouseAddressLine2", label: "Address Line 2", condition: fullVendor.warehouseAddressLine2 },
           { key: "warehouseAddressLine3", label: "Address Line 3", condition: fullVendor.warehouseAddressLine3 },
           { key: "warehouseLandmark", label: "Landmark", condition: fullVendor.warehouseLandmark },
           { key: "warehouseCity", label: "City", condition: fullVendor.warehouseCity },
           { key: "warehouseState", label: "State", condition: fullVendor.warehouseState },
-          { key: "warehouseZipCode", label: "PIN / ZIP Code", condition: fullVendor.warehouseZipCode },
+          { key: "warehouseZipCode", label: "ZIP / Postal Code", condition: fullVendor.warehouseZipCode },
           { key: "warehouseCountry", label: "Country", condition: fullVendor.warehouseCountry },
           { key: "warehouseSize", label: "Warehouse Size" },
           { key: "storageCapacity", label: "Storage Capacity" },
@@ -334,10 +334,10 @@ export default function VendorDetail({
           { key: "ownerAddress", label: "Owner Address", condition: fullVendor.ownerAddress },
           { key: "ownerCity", label: "City", condition: fullVendor.ownerCity },
           { key: "ownerState", label: "State", condition: fullVendor.ownerState },
-          { key: "ownerZipCode", label: "PIN / ZIP Code", condition: fullVendor.ownerZipCode },
+          { key: "ownerZipCode", label: "ZIP / Postal Code", condition: fullVendor.ownerZipCode },
           { key: "ownerCountry", label: "Country", condition: fullVendor.ownerCountry },
           { key: "businessStartDate", label: "Business Start Date", type: "date" },
-          { key: "employeeCount", label: "Employee Count", transform: (val: string) => getEmployeeCountLabel(val) }
+          { key: "employeeCount", label: "Number of Employees", transform: (val: string) => getEmployeeCountLabel(val) }
         ]
       },
       {
@@ -380,8 +380,8 @@ export default function VendorDetail({
         title: "Contact & Communication Details",
         icon: <Phone className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "businessPhone", label: "Phone Number 1" },
-          { key: "phoneNumber2", label: "Phone Number 2" },
+          { key: "businessPhone", label: "Primary Phone" },
+          { key: "phoneNumber2", label: "Secondary Phone" },
           { key: "businessEmail", label: "Primary Email" },
           { key: "businessEmail2", label: "Secondary Email" },
           { key: "landlineNumber", label: "Local Landline Number", valueOverride: formatLocalLandline({ countryCode: '+91', std: fullVendor.localLandlineStd as any, number: fullVendor.landlineNumber as any }) || undefined },
@@ -392,7 +392,7 @@ export default function VendorDetail({
           { key: "landmark", label: "Landmark", condition: fullVendor.landmark },
           { key: "businessCity", label: "City", condition: fullVendor.businessCity },
           { key: "businessState", label: "State", condition: fullVendor.businessState },
-          { key: "businessZipCode", label: "PIN / ZIP Code", condition: fullVendor.businessZipCode },
+          { key: "businessZipCode", label: "ZIP / Postal Code", condition: fullVendor.businessZipCode },
           { key: "businessCountry", label: "Country", condition: fullVendor.businessCountry },
         ]
       },
@@ -570,7 +570,7 @@ export default function VendorDetail({
                         {additional.map((owner: any, idx: number) => (
                           <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
                             <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
-                            {(owner.name || owner.firstName) && <Field label="Full Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
+                            {(owner.name || owner.firstName) && <Field label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
                             {owner.designation && <Field label="Designation" value={owner.designation} />}
                             {owner.email && <Field label="Primary Email" value={owner.email} />}
                             {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
@@ -749,7 +749,7 @@ export default function VendorDetail({
                             </div>
                           )}
                           <p className="text-sm font-bold text-slate-800">{contact._label}</p>
-                          {fullName && <Field label="Full Name" value={fullName} />}
+                          {fullName && <Field label="Name" value={fullName} />}
                           {designation && <Field label="Designation" value={designation} />}
                           {department && <Field label="Department" value={department} />}
                           {(contact.email1 || contact.email) && <Field label="Primary Email" value={contact.email1 || contact.email} />}
