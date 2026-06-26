@@ -5,7 +5,7 @@ import { Button } from '@/components/UI/Button';
 import { Phone, Mail, User, Plus, Trash2, Globe, MapPin, Camera, X, ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Dropdown from '@/components/UI/Dropdown';
-import { PhoneInput, LocalLandlineInput, parsePhone, CountryMultiSelect, validatePhoneE164, AccordionSection, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
+import { PhoneInput, LocalLandlineInput, parsePhone, CountryMultiSelect, validatePhoneE164, AccordionSection, TitleSelect, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
 import { handleUpload } from '@/lib/toast-utils';
 import ImageCropModal from '@/components/UI/ImageCropModal';
 
@@ -18,6 +18,7 @@ interface ContactTradeInfoProps {
 
 interface Contact {
   id: string;
+  title?: string;
   firstName: string;
   middleName: string;
   lastName: string;
@@ -68,6 +69,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     const mainNameParts = parseName(data?.mainContact?.name || '');
     return {
       mainContact: {
+        title: data?.mainContact?.title || '',
         firstName: data?.mainContact?.firstName || mainNameParts.first,
         middleName: data?.mainContact?.middleName || mainNameParts.middle,
         lastName: data?.mainContact?.lastName || mainNameParts.last,
@@ -94,6 +96,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         const altNameParts = parseName(c.name || '');
         return {
           id: c.id || Date.now().toString(),
+          title: c.title || '',
           firstName: c.firstName || altNameParts.first,
           middleName: c.middleName || altNameParts.middle,
           lastName: c.lastName || altNameParts.last,
@@ -115,7 +118,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
           photoFile: null,
         };
       }),
-      hasImportExport: data.hasImportExport || 'no',
+      hasImportExport: data.hasImportExport || '',
       importCountries: data.importCountries || [],
       exportCountries: data.exportCountries || [],
     };
@@ -189,6 +192,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     const mainNameParts = parseName(data?.mainContact?.name || '');
     setFormData({
       mainContact: {
+        title: data?.mainContact?.title || '',
         firstName: data?.mainContact?.firstName || mainNameParts.first,
         middleName: data?.mainContact?.middleName || mainNameParts.middle,
         lastName: data?.mainContact?.lastName || mainNameParts.last,
@@ -215,6 +219,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         const altNameParts = parseName(c.name || '');
         return {
           id: c.id || Date.now().toString(),
+          title: c.title || '',
           firstName: c.firstName || altNameParts.first,
           middleName: c.middleName || altNameParts.middle,
           lastName: c.lastName || altNameParts.last,
@@ -236,7 +241,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
           photoFile: null,
         };
       }),
-      hasImportExport: data.hasImportExport || 'no',
+      hasImportExport: data.hasImportExport || '',
       importCountries: data.importCountries || [],
       exportCountries: data.exportCountries || [],
     });
@@ -347,6 +352,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     if (formData.alternateContacts.length < 3) {
       const newContact: Contact = {
         id: Date.now().toString(),
+        title: '',
         firstName: '',
         middleName: '',
         lastName: '',
@@ -685,7 +691,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
     // Transform for storage
     const transformedMainContact = {
       ...formData.mainContact,
-      name: `${formData.mainContact.firstName} ${formData.mainContact.middleName ? formData.mainContact.middleName + ' ' : ''}${formData.mainContact.lastName}`.trim(),
+      name: [formData.mainContact.title, formData.mainContact.firstName, formData.mainContact.middleName, formData.mainContact.lastName].filter(Boolean).join(' '),
       photo: contactPhoto,
       photoFile: contactPhotoFile,
     };
@@ -695,7 +701,7 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
       const intlLandline = (c.intlLandlineCountryCode + c.intlLandlineStd + c.intlLandlineNumber).replace(/^\+?$/, '');
       return {
         ...c,
-        name: `${c.firstName} ${c.middleName ? c.middleName + ' ' : ''}${c.lastName}`.trim(),
+        name: [c.title, c.firstName, c.middleName, c.lastName].filter(Boolean).join(' '),
         localLandline: localLandline || undefined,
         localLandlineStd: c.localLandlineStd || undefined,
         intlLandline: intlLandline || undefined,
@@ -762,132 +768,132 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
         <div>
           <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-4">
 
-            {/* Profile Photo Upload moved to the top */}
-            <div id="mainContact.photo">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Profile Photo <span className="text-red-500">*</span>
-              </label>
-              <div className="flex items-center gap-4">
-                {contactPhoto ? (
-                  <div className="relative">
-                    <Image
-                      src={contactPhoto}
-                      alt="Contact photo"
-                      width={80}
-                      height={80}
-                      className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
-                    />
-                    <button
-                      type="button"
-                      onClick={removeContactPhoto}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-20 h-20 rounded-full bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center">
-                    <Camera className="w-6 h-6 text-slate-400" />
-                  </div>
-                )}
-                <div>
-                  <label
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        const fileInput = document.getElementById('contact-photo-file-input');
-                        if (fileInput) {
-                          fileInput.click();
+            {/* Profile Photo — top left */}
+            <div className="md:col-span-2 flex justify-start" id="mainContact.photo">
+              <div className="w-fit">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Profile Photo <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-4">
+                  {contactPhoto ? (
+                    <div className="relative">
+                      <Image
+                        src={contactPhoto}
+                        alt="Contact photo"
+                        width={80}
+                        height={80}
+                        className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeContactPhoto}
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 rounded-full bg-slate-50 border-2 border-dashed border-slate-300 flex items-center justify-center">
+                      <Camera className="w-6 h-6 text-slate-400" />
+                    </div>
+                  )}
+                  <div>
+                    <label
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          const fileInput = document.getElementById('contact-photo-file-input');
+                          if (fileInput) fileInput.click();
                         }
-                      }
-                    }}
-                    className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                  >
-                    <Camera className="w-4 h-4" />
-                    {contactPhoto ? 'Change Photo' : 'Upload Photo'}
-                    <input
-                      id="contact-photo-file-input"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      onChange={handleContactPhotoChange}
-                      className="hidden"
-                    />
-                  </label>
-                  <p className="text-xs text-slate-500 mt-1">JPG, PNG or WebP. Max 5,120 KB.</p>
+                      }}
+                      className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                    >
+                      <Camera className="w-4 h-4" />
+                      {contactPhoto ? 'Change Photo' : 'Upload Photo'}
+                      <input
+                        id="contact-photo-file-input"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleContactPhotoChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <p className="text-xs text-slate-500 mt-1">JPG, PNG or WebP. Max 5,120 KB.</p>
+                  </div>
                 </div>
+                {errors['mainContact.photo'] && (
+                  <p className="text-red-500 text-sm mt-1">{errors['mainContact.photo']}</p>
+                )}
               </div>
-              {errors['mainContact.photo'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['mainContact.photo']}</p>
-              )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                First Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="mainContact.firstName"
-                value={formData.mainContact.firstName}
-                onChange={(e) => updateMainContact('firstName', e.target.value)}
-                onBlur={() => handleBlur('mainContact.firstName')}
-                className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                  errors['mainContact.firstName'] && touched['mainContact.firstName']
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="John"
-                required
-              />
-              {errors['mainContact.firstName'] && touched['mainContact.firstName'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['mainContact.firstName']}</p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Middle Name (Optional)
-              </label>
-              <input
-                type="text"
-                name="mainContact.middleName"
-                value={formData.mainContact.middleName}
-                onChange={(e) => updateMainContact('middleName', e.target.value)}
-                onBlur={() => handleBlur('mainContact.middleName')}
-                className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                  errors['mainContact.middleName'] && touched['mainContact.middleName']
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="William"
-              />
-              {errors['mainContact.middleName'] && touched['mainContact.middleName'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['mainContact.middleName']}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Last Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="mainContact.lastName"
-                value={formData.mainContact.lastName}
-                onChange={(e) => updateMainContact('lastName', e.target.value)}
-                onBlur={() => handleBlur('mainContact.lastName')}
-                className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                  errors['mainContact.lastName'] && touched['mainContact.lastName']
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="Smith"
-                required
-              />
-              {errors['mainContact.lastName'] && touched['mainContact.lastName'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['mainContact.lastName']}</p>
-              )}
+            {/* Name row: Title | First | Middle | Last — single line */}
+            <div className="md:col-span-2 grid grid-cols-[130px_1fr_1fr_1fr] gap-4 items-start">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                <TitleSelect
+                  value={formData.mainContact.title || ''}
+                  onChange={(v) => updateMainContact('title', v)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  First Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="mainContact.firstName"
+                  value={formData.mainContact.firstName}
+                  onChange={(e) => updateMainContact('firstName', e.target.value)}
+                  onBlur={() => handleBlur('mainContact.firstName')}
+                  className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 text-slate-900 ${
+                    errors['mainContact.firstName'] && touched['mainContact.firstName']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="First name"
+                  required
+                />
+                {errors['mainContact.firstName'] && touched['mainContact.firstName'] && (
+                  <p className="text-red-500 text-xs mt-1">{errors['mainContact.firstName']}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Middle Name <span className="text-slate-400 text-xs font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  name="mainContact.middleName"
+                  value={formData.mainContact.middleName}
+                  onChange={(e) => updateMainContact('middleName', e.target.value)}
+                  className="w-full h-10 px-3 border border-slate-300 hover:border-slate-400 rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 text-slate-900"
+                  placeholder="Middle name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="mainContact.lastName"
+                  value={formData.mainContact.lastName}
+                  onChange={(e) => updateMainContact('lastName', e.target.value)}
+                  onBlur={() => handleBlur('mainContact.lastName')}
+                  className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 text-slate-900 ${
+                    errors['mainContact.lastName'] && touched['mainContact.lastName']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="Last name"
+                  required
+                />
+                {errors['mainContact.lastName'] && touched['mainContact.lastName'] && (
+                  <p className="text-red-500 text-xs mt-1">{errors['mainContact.lastName']}</p>
+                )}
+              </div>
             </div>
 
             <div>
@@ -1220,64 +1226,63 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
                       )}
                     </div>
 
-                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name={`altContact_${contact.id}_firstName`}
-                        value={contact.firstName}
-                        onChange={(e) => updateAlternateContact(contact.id, 'firstName', e.target.value)}
-                        onBlur={() => handleBlur(`altContact_${contact.id}_firstName`)}
-                        className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                          errors[`altContact_${contact.id}_firstName`] && touched[`altContact_${contact.id}_firstName`]
-                            ? 'border-red-500 bg-red-50'
-                            : 'border-slate-300 hover:border-slate-400'
-                        }`}
-                        placeholder="Jane"
-                      />
-                      {errors[`altContact_${contact.id}_firstName`] && touched[`altContact_${contact.id}_firstName`] && (
-                        <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_firstName`]}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name (Optional)</label>
-                      <input
-                        type="text"
-                        name={`altContact_${contact.id}_middleName`}
-                        value={contact.middleName}
-                        onChange={(e) => updateAlternateContact(contact.id, 'middleName', e.target.value)}
-                        onBlur={() => handleBlur(`altContact_${contact.id}_middleName`)}
-                        className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                          errors[`altContact_${contact.id}_middleName`] && touched[`altContact_${contact.id}_middleName`]
-                            ? 'border-red-500 bg-red-50'
-                            : 'border-slate-300 hover:border-slate-400'
-                        }`}
-                        placeholder="A."
-                      />
-                      {errors[`altContact_${contact.id}_middleName`] && touched[`altContact_${contact.id}_middleName`] && (
-                        <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_middleName`]}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name <span className="text-red-500">*</span></label>
-                      <input
-                        type="text"
-                        name={`altContact_${contact.id}_lastName`}
-                        value={contact.lastName}
-                        onChange={(e) => updateAlternateContact(contact.id, 'lastName', e.target.value)}
-                        onBlur={() => handleBlur(`altContact_${contact.id}_lastName`)}
-                        className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-slate-900 ${
-                          errors[`altContact_${contact.id}_lastName`] && touched[`altContact_${contact.id}_lastName`]
-                            ? 'border-red-500 bg-red-50'
-                            : 'border-slate-300 hover:border-slate-400'
-                        }`}
-                        placeholder="Doe"
-                      />
-                      {errors[`altContact_${contact.id}_lastName`] && touched[`altContact_${contact.id}_lastName`] && (
-                        <p className="text-red-500 text-sm mt-1">{errors[`altContact_${contact.id}_lastName`]}</p>
-                      )}
-                    </div>
+                    <div className="md:col-span-2 grid grid-cols-[130px_1fr_1fr_1fr] gap-4 items-start">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                        <TitleSelect
+                          value={contact.title || ''}
+                          onChange={(v) => updateAlternateContact(contact.id, 'title', v)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">First Name <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          name={`altContact_${contact.id}_firstName`}
+                          value={contact.firstName}
+                          onChange={(e) => updateAlternateContact(contact.id, 'firstName', e.target.value)}
+                          onBlur={() => handleBlur(`altContact_${contact.id}_firstName`)}
+                          className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 text-slate-900 ${
+                            errors[`altContact_${contact.id}_firstName`] && touched[`altContact_${contact.id}_firstName`]
+                              ? 'border-red-400 bg-red-50'
+                              : 'border-slate-300 hover:border-slate-400'
+                          }`}
+                          placeholder="First name"
+                        />
+                        {errors[`altContact_${contact.id}_firstName`] && touched[`altContact_${contact.id}_firstName`] && (
+                          <p className="text-red-500 text-xs mt-1">{errors[`altContact_${contact.id}_firstName`]}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name <span className="text-slate-400 text-xs font-normal">(optional)</span></label>
+                        <input
+                          type="text"
+                          name={`altContact_${contact.id}_middleName`}
+                          value={contact.middleName}
+                          onChange={(e) => updateAlternateContact(contact.id, 'middleName', e.target.value)}
+                          className="w-full h-10 px-3 border border-slate-300 hover:border-slate-400 rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 text-slate-900"
+                          placeholder="Middle name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Last Name <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          name={`altContact_${contact.id}_lastName`}
+                          value={contact.lastName}
+                          onChange={(e) => updateAlternateContact(contact.id, 'lastName', e.target.value)}
+                          onBlur={() => handleBlur(`altContact_${contact.id}_lastName`)}
+                          className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 text-slate-900 ${
+                            errors[`altContact_${contact.id}_lastName`] && touched[`altContact_${contact.id}_lastName`]
+                              ? 'border-red-400 bg-red-50'
+                              : 'border-slate-300 hover:border-slate-400'
+                          }`}
+                          placeholder="Last name"
+                        />
+                        {errors[`altContact_${contact.id}_lastName`] && touched[`altContact_${contact.id}_lastName`] && (
+                          <p className="text-red-500 text-xs mt-1">{errors[`altContact_${contact.id}_lastName`]}</p>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Department <span className="text-red-500">*</span></label>

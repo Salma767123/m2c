@@ -109,7 +109,7 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                 {/* PAN — read-only from registration */}
                 {formData.panNumber && (
                     <div>
-                        <label className="block text-slate-700 font-semibold mb-3 text-sm">PAN Number</label>
+                        <label className="block text-slate-700 font-semibold mb-3 text-sm">{formData.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'}</label>
                         <input
                             type="text"
                             value={formData.panNumber}
@@ -168,7 +168,13 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
 
                     <div className="space-y-4">
                         {legalDocs.map((doc: any, idx: number) => {
-                            const label = DOC_TYPE_LABELS[doc.type] || doc.name || doc.type
+                            const isProp = formData.businessType === 'proprietorship'
+                            const label = doc.type === 'PAN_CARD'
+                                ? (isProp ? 'Proprietor PAN Card' : 'Company PAN Card')
+                                : (DOC_TYPE_LABELS[doc.type] || doc.name || doc.type)
+                            const numberMetaLabel = doc.type === 'PAN_CARD'
+                                ? (isProp ? 'Proprietor PAN No.' : 'Company PAN No.')
+                                : DOC_TYPE_TO_NUMBER[doc.type]?.label
                             const verif = (formData.docVerifications || {})[idx] || { verified: "", remarks: "" }
                             const isVerified = verif.verified === "yes"
                             const isRejected = verif.verified === "no"
@@ -206,7 +212,7 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                                             <p className="text-base font-bold text-slate-900">{label}</p>
                                             {docNumber && (
                                                 <p className="text-sm font-mono text-slate-600 mt-0.5">
-                                                    <span className="text-slate-400 font-sans font-medium">{numberMeta?.label}: </span>
+                                                    <span className="text-slate-400 font-sans font-medium">{numberMetaLabel}: </span>
                                                     {docNumber}
                                                 </p>
                                             )}

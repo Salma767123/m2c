@@ -123,6 +123,13 @@ function NoticeCard({ notice }: { notice: CenterNotice }) {
         </div>
         <h3 className="text-lg font-bold text-slate-900 mt-4">{notice.title}</h3>
         {notice.message && <p className="text-sm text-slate-600 mt-1.5 leading-relaxed break-words">{notice.message}</p>}
+        <button
+          type="button"
+          onClick={close}
+          className="mt-5 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg transition-colors duration-200"
+        >
+          OK
+        </button>
       </div>
     </div>
   );

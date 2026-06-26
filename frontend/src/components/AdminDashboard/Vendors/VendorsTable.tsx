@@ -32,6 +32,7 @@ function getPageRange(current: number, total: number): Array<number | '…'> {
 import { formatDate } from '@/lib/utils'
 import RejectionModal from './RejectionModal'
 import SuspensionModal from './SuspensionModal'
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { toast } from '@/hooks/use-toast'
 import { hasPermission } from '@/lib/auth'
 
@@ -119,6 +120,10 @@ export default function VendorsTable() {
     isOpen: false,
     vendor: null
   })
+  const [approvalModal, setApprovalModal] = useState<{ isOpen: boolean; vendor: VendorProfile | null }>({
+    isOpen: false,
+    vendor: null
+  })
 
   // Fetch vendors from backend
   const fetchVendors = async () => {
@@ -174,18 +179,25 @@ export default function VendorsTable() {
     }))
   }
 
-  // Handle vendor approval
-  const handleApproveVendor = async (vendorId: string) => {
+  // Handle vendor approval — open confirmation modal first
+  const handleApproveVendor = (vendor: VendorProfile) => {
+    setApprovalModal({ isOpen: true, vendor })
+  }
+
+  // Called when admin confirms approval in the modal
+  const handleApproveConfirm = async () => {
+    if (!approvalModal.vendor) return
+
     try {
-      setActionLoading(vendorId)
-      await VendorService.approveVendor(vendorId)
-      
+      setActionLoading(approvalModal.vendor.id)
+      setApprovalModal({ isOpen: false, vendor: null })
+      await VendorService.approveVendor(approvalModal.vendor.id)
+
       toast({
         title: 'Success',
         description: 'Vendor approved successfully'
       })
-      
-      // Refresh the vendors list
+
       fetchVendors()
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to approve vendor'
@@ -447,7 +459,7 @@ export default function VendorsTable() {
                               size="sm"
                               className="text-green-600 hover:bg-green-50"
                               title="Approve Vendor"
-                              onClick={() => handleApproveVendor(vendor.id)}
+                              onClick={() => handleApproveVendor(vendor)}
                               disabled={actionLoading === vendor.id}
                             >
                               {actionLoading === vendor.id ? (
@@ -651,6 +663,21 @@ export default function VendorsTable() {
           status: suspensionModal.vendor.status
         } : null}
         isLoading={actionLoading === suspensionModal.vendor?.id}
+      />
+
+      {/* Approval Confirmation Modal */}
+      <DeleteConfirmModal
+        show={approvalModal.isOpen}
+        variant="confirm"
+        title="Confirm Vendor Approval"
+        subtitle="Once approved, the vendor will be able to access the platform and proceed with the next steps."
+        itemName={approvalModal.vendor?.companyName}
+        itemDetail={approvalModal.vendor?.ownerName}
+        confirmLabel="Approve"
+        loadingLabel="Approving..."
+        loading={actionLoading === approvalModal.vendor?.id}
+        onConfirm={handleApproveConfirm}
+        onCancel={() => setApprovalModal({ isOpen: false, vendor: null })}
       />
     </Card>
   )

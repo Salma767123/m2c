@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/UI/Button';
 import { Badge } from '@/components/UI/Badge';
 import { hasPermission } from '@/lib/auth';
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal';
 
 interface Vendor {
   id: string;
@@ -17,6 +18,10 @@ interface Vendor {
 export default function VendorManagement() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [approvalModal, setApprovalModal] = useState<{ isOpen: boolean; vendor: Vendor | null }>({
+    isOpen: false,
+    vendor: null,
+  });
 
   useEffect(() => {
     // Fetch vendors from API
@@ -36,9 +41,15 @@ export default function VendorManagement() {
     }
   };
 
-  const handleApprove = async (vendorId: string) => {
+  const handleApprove = (vendor: Vendor) => {
+    setApprovalModal({ isOpen: true, vendor });
+  };
+
+  const handleApproveConfirm = async () => {
+    if (!approvalModal.vendor) return;
     // API call to approve vendor
-    console.log('Approving vendor:', vendorId);
+    console.log('Approving vendor:', approvalModal.vendor.id);
+    setApprovalModal({ isOpen: false, vendor: null });
   };
 
   const handleReject = async (vendorId: string) => {
@@ -77,7 +88,7 @@ export default function VendorManagement() {
                         <>
                           <Button
                             size="sm"
-                            onClick={() => handleApprove(vendor.id)}
+                            onClick={() => handleApprove(vendor)}
                             className="bg-green-600 hover:bg-green-700"
                           >
                             Approve
@@ -100,6 +111,17 @@ export default function VendorManagement() {
           )}
         </div>
       </div>
+      <DeleteConfirmModal
+        show={approvalModal.isOpen}
+        variant="confirm"
+        title="Confirm Vendor Approval"
+        subtitle="Once approved, the vendor will be able to access the platform and proceed with the next steps."
+        itemName={approvalModal.vendor?.companyName}
+        itemDetail={approvalModal.vendor?.ownerName}
+        confirmLabel="Approve"
+        onConfirm={handleApproveConfirm}
+        onCancel={() => setApprovalModal({ isOpen: false, vendor: null })}
+      />
     </div>
   );
 }

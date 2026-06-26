@@ -308,8 +308,7 @@ function ContactCard({ label, contact }: { label: string; contact: Record<string
 }
 
 // ── Owner Card ─────────────────────────────────────────────────────────────────
-// isPrimary=true  → Owner 1 uses "Primary Phone / Secondary Phone / Primary Email / Secondary Email"
-// isPrimary=false → Additional owners use "Phone / Phone 2 / Email / Email 2" (registration labels)
+// All owners use consistent "Primary / Secondary" labels regardless of isPrimary.
 
 function OwnerCard({ label, name, designation, phone, phone2, email, email2, localLL, intlLL, photo, isPrimary = false }: {
     label: string
@@ -347,10 +346,10 @@ function OwnerCard({ label, name, designation, phone, phone2, email, email2, loc
                 </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <ReadField label={isPrimary ? "Primary Phone" : "Phone"} value={phone} />
-                <ReadField label={isPrimary ? "Secondary Phone" : "Phone 2"} value={phone2} />
-                <ReadField label={isPrimary ? "Primary Email" : "Email"} value={email} />
-                <ReadField label={isPrimary ? "Secondary Email" : "Email 2"} value={email2} />
+                <ReadField label="Primary Phone" value={phone} />
+                <ReadField label="Secondary Phone" value={phone2} />
+                <ReadField label="Primary Email" value={email} />
+                <ReadField label="Secondary Email" value={email2} />
                 {localLL && <ReadField label="Local Landline Number" value={localLL} />}
                 {intlLL && <ReadField label="International Landline Number" value={intlLL} />}
             </div>
@@ -431,8 +430,8 @@ function VendorContactDetails({ contact }: { contact?: Record<string, any> | nul
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <ReadField label="Phone Number 1" value={contact.businessPhone} />
                     <ReadField label="Phone Number 2" value={contact.phoneNumber2} />
-                    <ReadField label="Email 1" value={contact.businessEmail} />
-                    <ReadField label="Email 2" value={contact.businessEmail2} />
+                    <ReadField label="Primary Email" value={contact.businessEmail} />
+                    <ReadField label="Secondary Email" value={contact.businessEmail2} />
                     {bizLocalLL && <ReadField label="Local Landline Number" value={bizLocalLL} />}
                     {bizIntlLL && <ReadField label="International Landline Number" value={bizIntlLL} />}
                 </div>

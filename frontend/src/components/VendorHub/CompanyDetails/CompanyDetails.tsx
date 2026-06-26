@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/UI/Button";
-import { Building2, Globe, Mail, Phone, MapPin, Image, Home, Building, User, Users, Scale, HelpCircle, Loader2, Briefcase, ArrowRight, Upload, Eye, RefreshCw, X, CheckCircle2 } from "lucide-react";
+import { Building2, Globe, Mail, Phone, MapPin, Image, Home, Building, User, Users, Scale, HelpCircle, Loader2, Briefcase, ArrowRight, Upload, Eye, RefreshCw, X, CheckCircle2, ChevronDown, AlertCircle } from "lucide-react";
 import { ToggleButton, PhoneInput, parsePhone, CountrySelect, validatePhoneE164, PHONE_COUNTRY_CODES, AddressAutocomplete, AccordionSection, LocalLandlineInput, type LocalLandlineValue } from "@/components/VendorHub/FormUI";
 import { IconFile, IconFileText } from "@tabler/icons-react";
 import { handleUpload } from "@/lib/toast-utils";
 import { centerNotice } from "@/components/UI/CenterNotice";
-import { lookupZipCode } from "@/lib/zipLookup";
+import { useZipLookup } from "@/hooks/useZipLookup";
+import { zipPlaceLabel } from "@/lib/zipLookup";
+import type { ZipPlace } from "@/lib/zipLookup";
+import { ZipAreaSelect } from "@/components/VendorHub/ZipAreaSelect";
 import { scrollToFirstError } from "@/lib/formErrorScroll";
 
 interface CompanyDetailsProps {
@@ -248,8 +251,8 @@ interface DocUploadProps {
   /** Anchor for scrollToFirstError (matches handleNext's selectorMap). */
   dataField?: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLElement>) => void;
+  onDragOver: (e: React.DragEvent<HTMLElement>) => void;
   onRemove: () => void;
 }
 
@@ -318,7 +321,9 @@ function DocUpload({
             )}
             <label
               htmlFor={inputId}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-600 hover:bg-white hover:text-brand-600 cursor-pointer transition-colors"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById(inputId)?.click(); } }}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-600 hover:bg-white hover:text-brand-600 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-md"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Replace
             </label>
@@ -333,26 +338,24 @@ function DocUpload({
         </div>
       ) : (
         <>
-          <div
-            className={`flex items-center gap-2.5 rounded-lg border-2 border-dashed px-3 py-2 min-h-[46px] transition-all duration-200 ${
+          <label
+            htmlFor={inputId}
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById(inputId)?.click(); } }}
+            className={`flex items-center gap-2.5 rounded-lg border-2 border-dashed px-3 py-2 min-h-[46px] transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
               invalid ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
             }`}
             onDragOver={onDragOver}
             onDrop={onDrop}
-            role="region"
             aria-label={`${title} upload dropzone`}
             data-field={dataField}
-            tabIndex={-1}
           >
             <Upload className="w-4 h-4 text-slate-300 shrink-0" />
             <span className="text-xs text-slate-400 flex-1 truncate">Drag &amp; drop or browse</span>
-            <label
-              htmlFor={inputId}
-              className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors duration-200 shrink-0"
-            >
+            <span className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg transition-colors duration-200 shrink-0">
               Browse
-            </label>
-          </div>
+            </span>
+          </label>
           {hint && <p className="mt-1 text-[11px] text-slate-400">{hint}</p>}
         </>
       )}
@@ -480,50 +483,22 @@ export default function CompanyDetails({
   // ── ZIP / postal-code auto-fill ─────────────────────────────────
   // When the user finishes typing a ZIP, we look it up via zippopotam.us
   // and pre-fill City + State. The user can still edit any field after.
-  // AbortController cancels stale lookups when the ZIP changes again.
-  const [zipLoading, setZipLoading] = useState(false);
-  const zipAbortRef = useRef<AbortController | null>(null);
-
-  const runZipLookup = useCallback(
-    async (zip: string, countryName: string) => {
-      const trimmed = zip.trim();
-      if (!trimmed || !countryName) return;
-      // Resolve country name → ISO-3166-1 alpha-2 (the API is per-country)
-      const iso = PHONE_COUNTRY_CODES.find((c) => c.name === countryName)?.iso;
-      if (!iso) return;
-
-      zipAbortRef.current?.abort();
-      const controller = new AbortController();
-      zipAbortRef.current = controller;
-
-      setZipLoading(true);
-      try {
-        const result = await lookupZipCode(trimmed, iso, controller.signal);
-        if (!result) return;
-        setFormData((prev) => ({
-          ...prev,
-          city: result.city || prev.city,
-          state: result.state || prev.state,
-        }));
-        // Clear any prior errors on the fields we just populated
-        setErrors((prev) => ({ ...prev, city: '', state: '' }));
-        centerNotice.info(
-          'Address Auto-filled',
-          `${result.city}${result.state ? ', ' + result.state : ''}`,
-        );
-      } finally {
-        if (zipAbortRef.current === controller) {
-          setZipLoading(false);
-        }
-      }
-    },
-    [],
-  );
-
-  // Cancel any in-flight ZIP lookup on unmount
-  useEffect(() => {
-    return () => zipAbortRef.current?.abort();
+  // ── ZIP / PIN code lookup (company address) ──────────────────────────
+  const handleZipResult = useCallback((place: ZipPlace) => {
+    setFormData((prev) => ({
+      ...prev,
+      city: place.area || place.city || prev.city,
+      state: place.state || prev.state,
+    }));
+    setErrors((prev) => ({ ...prev, city: '', state: '' }));
   }, []);
+
+  const {
+    loading: zipLoading,
+    places: zipPlaces,
+    runLookup: runZipLookup,
+    clear: clearZip,
+  } = useZipLookup(handleZipResult);
 
   // Note (was: real-time "Same as warehouse" sync) ─────────────────────
   // We previously pushed mirrored warehouse fields to VendorPanel on every
@@ -785,13 +760,13 @@ export default function CompanyDetails({
     e.target.value = '';
   }, [handleLogoFile]);
 
-  const handleLogoDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleLogoDrop = useCallback((e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) handleLogoFile(file);
   }, [handleLogoFile]);
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
   }, []);
 
@@ -838,7 +813,7 @@ export default function CompanyDetails({
     e.target.value = '';
   }, [handleGstFile]);
 
-  const handleGstDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleGstDrop = useCallback((e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) handleGstFile(file);
@@ -859,7 +834,7 @@ export default function CompanyDetails({
 
   const handlePanCardFile = useCallback((file: File) => {
     const result = handleUpload(file, {
-      label: 'Company PAN Card',
+      label: formDataRef.current.businessType === 'proprietorship' ? 'Proprietor PAN Card' : 'Company PAN Card',
       allowedTypes: ALLOWED_DOC_TYPES,
       allowedLabel: ALLOWED_DOC_LABEL,
       maxBytes: MAX_DOC_BYTES,
@@ -891,7 +866,7 @@ export default function CompanyDetails({
     e.target.value = '';
   }, [handlePanCardFile]);
 
-  const handlePanCardDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handlePanCardDrop = useCallback((e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) handlePanCardFile(file);
@@ -949,7 +924,7 @@ export default function CompanyDetails({
     e.target.value = '';
   }, [handleTypeCertFile]);
 
-  const handleTypeCertDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleTypeCertDrop = useCallback((e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) handleTypeCertFile(file);
@@ -995,7 +970,7 @@ export default function CompanyDetails({
     e.target.value = '';
   }, [handleIecCertFile]);
 
-  const handleIecCertDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleIecCertDrop = useCallback((e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) handleIecCertFile(file);
@@ -1047,7 +1022,7 @@ export default function CompanyDetails({
     e.target.value = '';
   }, [handleAadhaarFile]);
 
-  const handleAadhaarDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleAadhaarDrop = useCallback((e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) handleAadhaarFile(file);
@@ -1061,6 +1036,60 @@ export default function CompanyDetails({
     setFormData((prev) => ({ ...prev, aadhaarFile: null, aadhaarDocument: null }));
     setAadhaarError(null);
   }, []);
+
+  // ── Website reachability verification ─────────────────────────────
+  type WebsiteStatus = 'idle' | 'checking' | 'verified' | 'error';
+  const [websiteStatus, setWebsiteStatus] = useState<WebsiteStatus>('idle');
+  const [websiteError, setWebsiteError] = useState('');
+  const websiteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (websiteTimerRef.current) clearTimeout(websiteTimerRef.current);
+
+    const raw = formData.website.trim();
+    if (!raw) {
+      setWebsiteStatus('idle');
+      setWebsiteError('');
+      return;
+    }
+
+    // Normalise: prepend https:// if the user omitted the scheme
+    let urlStr = raw;
+    if (!/^https?:\/\//i.test(raw)) urlStr = `https://${raw}`;
+
+    let parsed: URL;
+    try {
+      parsed = new URL(urlStr);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error();
+    } catch {
+      setWebsiteStatus('error');
+      setWebsiteError('Enter a valid URL, e.g. https://example.com');
+      return;
+    }
+
+    setWebsiteStatus('checking');
+    websiteTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/check-url?url=${encodeURIComponent(parsed.toString())}`);
+        const json = await res.json();
+        if (json.reachable) {
+          setWebsiteStatus('verified');
+          setWebsiteError('');
+        } else {
+          setWebsiteStatus('error');
+          setWebsiteError(json.error || 'Website could not be reached');
+        }
+      } catch {
+        setWebsiteStatus('error');
+        setWebsiteError('Could not verify — check your internet connection');
+      }
+    }, 800);
+
+    return () => {
+      if (websiteTimerRef.current) clearTimeout(websiteTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.website]);
 
   // Helper function to get file icon and color based on file type
   const getFileIcon = useCallback((file: File | null) => {
@@ -1132,7 +1161,7 @@ export default function CompanyDetails({
       }
 
       if (!currentFormData.panNumber) {
-        newErrors.panNumber = 'Company PAN Number is required';
+        newErrors.panNumber = `${currentFormData.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} is required`;
       } else if (!PAN_PATTERN.test(currentFormData.panNumber)) {
         newErrors.panNumber = 'PAN must be 5 letters + 4 digits + 1 letter (e.g. AAAAA0000A)';
       }
@@ -1220,7 +1249,7 @@ export default function CompanyDetails({
       // Company PAN Card upload stays mandatory for the four registered types,
       // but is OPTIONAL for custom "Others" vendors (no typeMeta).
       if (typeMeta && !currentFormData.panCardDocument) {
-        newErrors.panCardDocument = 'Company PAN Card upload is required';
+        newErrors.panCardDocument = `${currentFormData.businessType === 'proprietorship' ? 'Proprietor PAN Card' : 'Company PAN Card'} upload is required`;
       }
       // The IEC Certificate (Proprietorship) is optional; every other
       // type-specific certificate (CIN / Deed / LLPIN) stays mandatory.
@@ -1553,6 +1582,8 @@ export default function CompanyDetails({
               const meta = COMPANY_TYPE_META[formData.businessType as CompanyTypeId];
               const isUnreg = formData.businessType === UNREGISTERED_TYPE_ID;
               const isProp = formData.businessType === 'proprietorship';
+              const panCardLabel = isProp ? 'Proprietor PAN Card' : 'Company PAN Card';
+              const panNumberLabel = isProp ? 'Proprietor PAN Number' : 'Company PAN Number';
               const idErr = !!(errors.companyIdNumber && touched.companyIdNumber);
               const panErr = !!(errors.panNumber && touched.panNumber);
               const iecErr = !!(errors.iecCode && touched.iecCode);
@@ -1781,7 +1812,7 @@ export default function CompanyDetails({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                         <div>
                           <label htmlFor="panNumber" className="block text-sm font-semibold text-slate-700 mb-1">
-                            Company PAN Number <span className="text-brand-500" aria-hidden="true">*</span>
+                            {panNumberLabel} <span className="text-brand-500" aria-hidden="true">*</span>
                           </label>
                           <input
                             id="panNumber"
@@ -1806,7 +1837,7 @@ export default function CompanyDetails({
                           )}
                         </div>
                         <DocUpload
-                          title="Company PAN Card"
+                          title={panCardLabel}
                           requiredMark="required"
                           inputId="panCardUpload"
                           accept="application/pdf,image/*,.doc,.docx"
@@ -1836,7 +1867,7 @@ export default function CompanyDetails({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                         <div>
                           <label htmlFor="panNumber" className="block text-sm font-semibold text-slate-700 mb-1">
-                            Company PAN Number
+                            {panNumberLabel}
                           </label>
                           <input
                             id="panNumber"
@@ -1861,7 +1892,7 @@ export default function CompanyDetails({
                           )}
                         </div>
                         <DocUpload
-                          title="Company PAN Card"
+                          title={panCardLabel}
                           requiredMark="optional"
                           inputId="panCardUpload"
                           accept="application/pdf,image/*,.doc,.docx"
@@ -1906,7 +1937,7 @@ export default function CompanyDetails({
                   {isUnreg && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                       <DocUpload
-                        title="Company PAN Card"
+                        title={panCardLabel}
                         requiredMark="optional"
                         inputId="panCardUpload"
                         accept="application/pdf,image/*,.doc,.docx"
@@ -2085,15 +2116,53 @@ export default function CompanyDetails({
                 <span>Website</span>
                 <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
-              <input
-                type="url"
-                name="website"
-                value={formData.website}
-                onChange={(e) => handleInputChange("website", e.target.value)}
-                className="w-full text-sm font-medium px-4 py-2.5 border border-slate-300 hover:border-slate-400 rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
-                placeholder="www.yourcompany.com"
-                autoComplete="url"
-              />
+              <div className="relative">
+                <input
+                  type="url"
+                  name="website"
+                  value={formData.website}
+                  onChange={(e) => handleInputChange("website", e.target.value)}
+                  className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                    websiteStatus === 'verified'
+                      ? 'border-emerald-400 pr-28'
+                      : websiteStatus === 'error'
+                      ? 'border-red-400 bg-red-50/40 pr-28'
+                      : websiteStatus === 'checking'
+                      ? 'border-slate-300 pr-28'
+                      : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="www.yourcompany.com"
+                  autoComplete="url"
+                />
+                {/* Inline status badge — absolutely positioned inside the input */}
+                {websiteStatus !== 'idle' && (
+                  <span
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-xs font-semibold pointer-events-none select-none ${
+                      websiteStatus === 'verified'
+                        ? 'text-emerald-600'
+                        : websiteStatus === 'error'
+                        ? 'text-red-500'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {websiteStatus === 'checking' && (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking…</>
+                    )}
+                    {websiteStatus === 'verified' && (
+                      <><CheckCircle2 className="w-3.5 h-3.5" /> Verified</>
+                    )}
+                    {websiteStatus === 'error' && (
+                      <><AlertCircle className="w-3.5 h-3.5" /> Unreachable</>
+                    )}
+                  </span>
+                )}
+              </div>
+              {/* Error detail shown below the field */}
+              {websiteStatus === 'error' && websiteError && (
+                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                  {websiteError}
+                </p>
+              )}
             </div>
           </div>
         </AccordionSection>
@@ -2268,17 +2337,30 @@ export default function CompanyDetails({
               <label className="block text-sm font-semibold text-slate-700 mb-1">
                 City <span className="text-brand-500" aria-hidden="true">*</span>
               </label>
-              <input
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={(e) => handleInputChange("city", e.target.value)}
-                onBlur={() => handleBlur("city")}
-                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                  errors.city && touched.city ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="City"
-              />
+              {zipPlaces.length > 1 ? (
+                <ZipAreaSelect
+                  places={zipPlaces}
+                  value={formData.city}
+                  onChange={(p) => {
+                    handleInputChange("city", p.area || p.city);
+                    handleInputChange("state", p.state);
+                  }}
+                  onBlur={() => handleBlur("city")}
+                  invalid={!!(errors.city && touched.city)}
+                />
+              ) : (
+                <input
+                  type="text"
+                  name="city"
+                  value={formData.city}
+                  onChange={(e) => handleInputChange("city", e.target.value)}
+                  onBlur={() => handleBlur("city")}
+                  className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                    errors.city && touched.city ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="City"
+                />
+              )}
               {errors.city && touched.city && (
                 <p className="text-red-500 text-xs mt-1">{errors.city}</p>
               )}
@@ -2337,7 +2419,11 @@ export default function CompanyDetails({
                   type="text"
                   name="zipCode"
                   value={formData.zipCode}
-                  onChange={(e) => handleInputChange("zipCode", e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange("zipCode", e.target.value);
+                    if (!e.target.value.trim()) clearZip();
+                    else if (e.target.value.trim().length >= 6) runZipLookup(e.target.value, formData.country);
+                  }}
                   onBlur={(e) => {
                     handleBlur("zipCode");
                     runZipLookup(e.target.value, formData.country);
@@ -2355,6 +2441,9 @@ export default function CompanyDetails({
                   </span>
                 )}
               </div>
+              <p className="mt-1 text-xs text-slate-400">
+                Enter ZIP/PIN Code to automatically fetch available State, District, City, and Area details.
+              </p>
               {errors.zipCode && touched.zipCode && (
                 <p className="text-red-500 text-xs mt-1" role="alert">{errors.zipCode}</p>
               )}

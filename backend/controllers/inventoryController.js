@@ -60,6 +60,13 @@ const createInventoryItem = async (req, res) => {
       });
     }
 
+    if (parseInt(lowStockAlert) < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Low stock alert must be 5 or more'
+      });
+    }
+
     // Validate source type specific fields
     if (sourceType === 'SUPPLIER' && !supplier) {
       return res.status(400).json({
@@ -328,7 +335,7 @@ const updateInventoryItem = async (req, res) => {
       ...(manufacturingDate !== undefined && {
         manufacturingDate: manufacturingDate ? new Date(manufacturingDate) : null
       }),
-      ...(lowStockAlert !== undefined && { lowStockAlert: parseInt(lowStockAlert) }),
+      ...(lowStockAlert !== undefined && { lowStockAlert: Math.max(5, parseInt(lowStockAlert)) }),
       ...(location !== undefined && { location }),
       ...(status && { status }),
       ...(sourceType !== undefined && { sourceType }),

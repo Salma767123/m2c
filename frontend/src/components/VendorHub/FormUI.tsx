@@ -1894,3 +1894,149 @@ export function AccordionSection({
     </div>
   );
 }
+
+// ── TitleSelect — compact popover for Mr. / Mrs. / Ms. ──────────────────────
+// Matches the CountrySelect trigger design: h-10, rounded-md, shadow-sm,
+// border-slate-200, brand-500 focus ring and open ring. No search needed
+// since there are only three options.
+
+const TITLE_OPTIONS = ['Mr.', 'Mrs.', 'Ms.'];
+
+export interface TitleSelectProps {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+  id?: string;
+  disabled?: boolean;
+}
+
+export function TitleSelect({ value, onChange, onBlur, id, disabled }: TitleSelectProps) {
+  const [open, setOpen] = useState(false);
+  const [flipUp, setFlipUp] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listboxId = useId();
+  const ALL_OPTIONS = ['', ...TITLE_OPTIONS];
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+        onBlur?.();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open, onBlur]);
+
+  const toggle = () => {
+    if (disabled) return;
+    if (!open) {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (rect) setFlipUp(window.innerHeight - rect.bottom < 160);
+      setHighlight(ALL_OPTIONS.indexOf(value));
+    }
+    setOpen((v) => !v);
+  };
+
+  const choose = (v: string) => {
+    onChange(v);
+    setOpen(false);
+    onBlur?.();
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  const handleTriggerKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) {
+        const rect = triggerRef.current?.getBoundingClientRect();
+        if (rect) setFlipUp(window.innerHeight - rect.bottom < 160);
+        setHighlight(ALL_OPTIONS.indexOf(value));
+        setOpen(true);
+      } else {
+        setHighlight((h) => {
+          const next = e.key === 'ArrowDown'
+            ? Math.min(h + 1, ALL_OPTIONS.length - 1)
+            : Math.max(h - 1, 0);
+          return next;
+        });
+      }
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      if (open) {
+        e.preventDefault();
+        if (highlight >= 0) choose(ALL_OPTIONS[highlight]);
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      onBlur?.();
+    } else if (e.key === 'Tab') {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        ref={triggerRef}
+        id={id}
+        type="button"
+        disabled={disabled}
+        onClick={toggle}
+        onKeyDown={handleTriggerKeyDown}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        className={[
+          'flex h-10 w-full cursor-pointer items-center justify-between gap-1.5 rounded-md border bg-white px-3 text-left text-sm shadow-sm',
+          'transition-colors focus-visible:outline-none focus-visible:ring-2',
+          'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60',
+          open
+            ? 'border-brand-500 ring-2 ring-brand-500/20'
+            : 'border-slate-200 hover:border-slate-300 focus-visible:border-brand-500 focus-visible:ring-brand-500/20',
+        ].join(' ')}
+      >
+        <span className={value ? 'text-slate-900' : 'text-slate-400'}>
+          {value || 'Title'}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {open && (
+        <ul
+          id={listboxId}
+          role="listbox"
+          aria-label="Title options"
+          className={[
+            'absolute left-0 z-50 min-w-full rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5 py-1 overflow-hidden',
+            flipUp ? 'bottom-[calc(100%+4px)]' : 'top-[calc(100%+4px)]',
+          ].join(' ')}
+        >
+          {ALL_OPTIONS.map((opt, i) => (
+            <li
+              key={i}
+              role="option"
+              aria-selected={value === opt}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => choose(opt)}
+              onMouseEnter={() => setHighlight(i)}
+              className={[
+                'px-3 py-2 cursor-pointer text-sm transition-colors select-none',
+                highlight === i ? 'bg-brand-50' : '',
+                value === opt ? 'text-brand-700 font-semibold bg-brand-50' : i === 0 ? 'text-slate-500 hover:bg-slate-50' : 'text-slate-700 hover:bg-slate-50',
+              ].join(' ')}
+            >
+              {opt === '' ? '—' : opt}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

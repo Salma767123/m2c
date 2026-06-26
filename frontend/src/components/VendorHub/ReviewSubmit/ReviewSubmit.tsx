@@ -359,38 +359,40 @@ export default function ReviewSubmit({ onPrev, onGoToStep, data }: ReviewSubmitP
 
   if (isSubmitted) {
     return (
-      <div className="max-w-2xl mx-auto py-16 px-4 text-center animate-fade-in animate-in fade-in duration-500">
-        <div className="w-20 h-20 rounded-full bg-success-50 border border-success-100 flex items-center justify-center mx-auto mb-6">
-          <CheckCircle2 className="w-10 h-10 text-success-500" />
-        </div>
-        <h1 className="text-headline-lg text-slate-900 mb-4 font-bold">Registration Submitted Successfully!</h1>
-        <p className="text-lg text-slate-600 mb-8">
-          Thank you for registering as a vendor. Our team will review your application
-          and contact you within <strong className="text-slate-900 font-semibold">48 hours</strong>.
-        </p>
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 text-left mb-8 shadow-sm">
-          <h3 className="font-bold text-slate-900 mb-3">What happens next?</h3>
-          <ul className="space-y-3 text-sm text-slate-600">
-            <li className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-tertiary-50 border border-tertiary-100 text-tertiary-500 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">1</span>
-              Our team will verify your submitted documents and information
-            </li>
-            <li className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-tertiary-50 border border-tertiary-100 text-tertiary-500 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">2</span>
-              You may receive a call for additional verification if needed
-            </li>
-            <li className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-tertiary-50 border border-tertiary-100 text-tertiary-500 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">3</span>
-              Once approved, you&apos;ll receive access to your vendor dashboard
-            </li>
-          </ul>
-        </div>
-        <div className="flex justify-center">
-          <Link href="/vendor">
-            <Button variant="outline" className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors h-11 px-8 text-base font-semibold rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30">
-              Vendor Login
-            </Button>
-          </Link>
+      <div className="fixed inset-0 z-[200] bg-white flex items-center justify-center animate-in fade-in duration-500 overflow-y-auto">
+        <div className="max-w-2xl w-full px-6 py-16 text-center">
+          <div className="w-20 h-20 rounded-full bg-success-50 border border-success-100 flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-10 h-10 text-success-500" />
+          </div>
+          <h1 className="text-headline-lg text-slate-900 mb-4 font-bold">Registration Submitted Successfully!</h1>
+          <p className="text-lg text-slate-600 mb-8">
+            Thank you for registering as a vendor. Our team will review your application
+            and contact you within <strong className="text-slate-900 font-semibold">48 hours</strong>.
+          </p>
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 text-left mb-8 shadow-sm">
+            <h3 className="font-bold text-slate-900 mb-3">What happens next?</h3>
+            <ul className="space-y-3 text-sm text-slate-600">
+              <li className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-tertiary-50 border border-tertiary-100 text-tertiary-500 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">1</span>
+                Our team will verify your submitted documents and information
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-tertiary-50 border border-tertiary-100 text-tertiary-500 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">2</span>
+                You may receive a call for additional verification if needed
+              </li>
+              <li className="flex items-start gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-tertiary-50 border border-tertiary-100 text-tertiary-500 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">3</span>
+                Once approved, you&apos;ll receive access to your vendor dashboard
+              </li>
+            </ul>
+          </div>
+          <div className="flex justify-center">
+            <Link href="/vendor">
+              <Button variant="outline" className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors h-11 px-8 text-base font-semibold rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30">
+                Vendor Login
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );

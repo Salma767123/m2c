@@ -4,11 +4,23 @@ interface EditInventoryPageProps {
   params: Promise<{
     id: string
   }>
+  searchParams: Promise<{
+    from?: string
+    returnTo?: string
+  }>
 }
 
-export default async function EditInventoryPage({ params }: EditInventoryPageProps) {
+export default async function EditInventoryPage({ params, searchParams }: EditInventoryPageProps) {
   const { id } = await params
-  return <AddEditInventory inventoryId={id} isEdit={true} />
+  const { from, returnTo } = await searchParams
+  return (
+    <AddEditInventory
+      inventoryId={id}
+      isEdit={true}
+      fromProductCreation={from === 'product-creation'}
+      returnTo={returnTo ? decodeURIComponent(returnTo) : undefined}
+    />
+  )
 }
 
 export const metadata = {

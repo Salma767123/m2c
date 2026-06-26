@@ -31,6 +31,7 @@ import {
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
+import { buildFullName } from "@/lib/utils"
 const MAIN_STATUS_COLORS: Record<string, string> = {
   "New Assignment": "bg-blue-50 text-blue-700 border-blue-200/85",
   "Under Review by Admin": "bg-orange-50 text-orange-700 border-orange-200/85",
@@ -292,7 +293,7 @@ export default function VendorDetail({
           { key: "_unregistered", label: "Vendor Type", valueOverride: !fullVendor.gstNumber ? "Unregistered — identified by email" : undefined, condition: !fullVendor.gstNumber },
           { key: "companyIdNumber", label: getCompanyIdLabel(fullVendor.businessType), condition: fullVendor.companyIdNumber },
           { key: "iecCode", label: "IEC Code (Import Export Code)", condition: fullVendor.iecCode },
-          { key: "panNumber", label: "PAN Number" },
+          { key: "panNumber", label: fullVendor.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number' },
           { key: "aadhaarNumber", label: "Aadhaar Number", condition: fullVendor.aadhaarNumber },
           { key: "website", label: "Website", type: "url" },
           { key: "companyDescription", label: "Company Description" }
@@ -322,7 +323,7 @@ export default function VendorDetail({
         title: "Owner Identity",
         icon: <UserCircle className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "ownerName", label: "Owner Full Name" },
+          { key: "ownerName", label: "Owner Full Name", valueOverride: buildFullName(fullVendor.ownerTitle, fullVendor.ownerFirstName, fullVendor.ownerMiddleName, fullVendor.ownerLastName, fullVendor.ownerName) || undefined },
           { key: "designation", label: "Designation" },
           { key: "ownerPhone", label: "Primary Phone" },
           { key: "ownerPhone2", label: "Secondary Phone" },
@@ -381,8 +382,8 @@ export default function VendorDetail({
         fields: [
           { key: "businessPhone", label: "Phone Number 1" },
           { key: "phoneNumber2", label: "Phone Number 2" },
-          { key: "businessEmail", label: "Email 1" },
-          { key: "businessEmail2", label: "Email 2" },
+          { key: "businessEmail", label: "Primary Email" },
+          { key: "businessEmail2", label: "Secondary Email" },
           { key: "landlineNumber", label: "Local Landline Number", valueOverride: formatLocalLandline({ countryCode: '+91', std: fullVendor.localLandlineStd as any, number: fullVendor.landlineNumber as any }) || undefined },
           { key: "intlLandline", label: "International Landline Number", valueOverride: formatIntlLandline(fullVendor.intlLandline as any) || undefined },
           { key: "businessAddress", label: "Address Line 1", condition: fullVendor.businessAddress },
@@ -569,12 +570,12 @@ export default function VendorDetail({
                         {additional.map((owner: any, idx: number) => (
                           <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
                             <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
-                            {owner.name && <Field label="Full Name" value={owner.name} />}
+                            {(owner.name || owner.firstName) && <Field label="Full Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
                             {owner.designation && <Field label="Designation" value={owner.designation} />}
-                            {owner.email && <Field label="Email" value={owner.email} />}
-                            {owner.email2 && <Field label="Email 2" value={owner.email2} />}
-                            {owner.phone && <Field label="Phone" value={owner.phone} />}
-                            {owner.phone2 && <Field label="Phone 2" value={owner.phone2} />}
+                            {owner.email && <Field label="Primary Email" value={owner.email} />}
+                            {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
+                            {owner.phone && <Field label="Primary Phone" value={owner.phone} />}
+                            {owner.phone2 && <Field label="Secondary Phone" value={owner.phone2} />}
                             {(owner.localLandline || owner.landline) && <Field label="Local Landline" value={formatLocalLandline({ countryCode: '+91', std: owner.localLandlineStd, number: owner.localLandline || owner.landline })} />}
                             {owner.intlLandline && <Field label="International Landline" value={formatIntlLandline(owner.intlLandline)} />}
                           </div>

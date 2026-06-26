@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import Dropdown from '@/components/UI/Dropdown'
 import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react'
 import VariantImageModal from './VariantImageModal'
+import CareInstructionModal, { CareIcon, CARE_INSTRUCTIONS, CATEGORY_COLORS } from './CareInstructionModal'
 import ResultModal from '@/components/UI/ResultModal'
+import { centerNotice } from '@/components/UI/CenterNotice'
 import Link from 'next/link'
 import { useToast } from '@/hooks/use-toast'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
@@ -138,9 +140,9 @@ interface ProductImage {
 interface FabricSpecification {
   type: string
   composition: string
-  weight: string
+  weightValue: string
+  weightUnit: string
   weave: string
-  finish: string
   careInstructions: string[]
 }
 
@@ -202,6 +204,7 @@ interface ProductFormData {
   dimensions?: string
   dimensionUnit: string
   weight?: string
+  weightUnit: string
   inStock: boolean
   status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK'
   approvalStatus?: 'PENDING' | 'QC_APPROVED' | 'APPROVED' | 'REJECTED' | 'REINSPECTION'
@@ -216,6 +219,8 @@ interface AddEditProductProps {
   inventoryId?: string // Pre-select an inventory item when coming from inventory page
 }
 
+
+const PRODUCT_FORM_DRAFT_KEY = 'vendorProductFormDraft'
 
 export default function AddEditProduct({ productId, isEdit = false, inventoryId }: AddEditProductProps) {
   const router = useRouter()
@@ -257,9 +262,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     fabricSpecifications: {
       type: '',
       composition: '',
-      weight: '',
+      weightValue: '',
+      weightUnit: 'GSM',
       weave: '',
-      finish: '',
       careInstructions: []
     },
 
@@ -275,7 +280,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
     // Stock Management
     totalStock: 0,
-    lowStockThreshold: 10,
+    lowStockThreshold: 5,
     trackInventory: true,
 
     // Dispatch & Shipping
@@ -291,12 +296,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     dimensions: '',
     dimensionUnit: 'cm',
     weight: '',
+    weightUnit: 'kg',
     inStock: true,
     status: 'ACTIVE'
   })
 
   const [selectedTag, setSelectedTag] = useState('')
-  const [newCareInstruction, setNewCareInstruction] = useState('')
+  const [careModalOpen, setCareModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('basic')
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -315,10 +321,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     subCategory: 'basic',
     coverImage: 'basic',
     fabricType: 'fabric',
+    careInstructions: 'fabric',
     variants: 'variants',
     basePrice: 'pricing',
     processingDays: 'shipping',
     shippingDays: 'shipping',
+    weight: 'shipping',
+    weightUnit: 'shipping',
   }
 
   const clearError = (name: string) => {
@@ -357,6 +366,24 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     { value: 'Best Seller', label: 'Best Seller' }
   ]
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<any>(null)
+
+  // Restore form draft saved before navigating to Edit Inventory Item
+  useEffect(() => {
+    if (isEdit) return
+    try {
+      const raw = sessionStorage.getItem(PRODUCT_FORM_DRAFT_KEY)
+      if (!raw) return
+      const { formData: savedFormData, activeTab: savedTab, selectedInventoryItem: savedItem } = JSON.parse(raw)
+      setFormData(savedFormData)
+      setActiveTab(savedTab)
+      if (savedItem) setSelectedInventoryItem(savedItem)
+    } catch {
+      // ignore malformed draft
+    } finally {
+      sessionStorage.removeItem(PRODUCT_FORM_DRAFT_KEY)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // GST State
   const [gstRates, setGstRates] = useState<GSTSetting[]>([])
@@ -528,14 +555,17 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
               fabricType: product.fabricType || '',
               material: product.material || '',
-              fabricSpecifications: product.fabricSpecifications || {
-                type: '',
-                composition: '',
-                weight: '',
-                weave: '',
-                finish: '',
-                careInstructions: []
-              },
+              fabricSpecifications: (() => {
+                const fs = (product.fabricSpecifications as any) || {}
+                return {
+                  type: fs.type || '',
+                  composition: fs.composition || '',
+                  weightValue: fs.weightValue || fs.weight || '',
+                  weightUnit: fs.weightUnit || 'GSM',
+                  weave: fs.weave || '',
+                  careInstructions: Array.isArray(fs.careInstructions) ? fs.careInstructions : [],
+                }
+              })(),
 
               variants: product.variants || [],
               hasVariants: product.hasVariants,
@@ -563,6 +593,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               dimensions: parseDimensions(product.dimensions).value,
               dimensionUnit: parseDimensions(product.dimensions).unit,
               weight: product.weight || '',
+              weightUnit: (product as any).weightUnit || 'kg',
               inStock: product.inStock,
               status: product.status,
               approvalStatus: product.approvalStatus,
@@ -666,8 +697,24 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       subCategory: inventoryItem.subcategory || '', // Set subcategory from inventory
       baseSku: inventoryItem.sku,
       basePrice: 0, // Will need to be set by user since inventory doesn't have selling price
-      totalStock: inventoryItem.currentStock
+      totalStock: inventoryItem.currentStock,
+      lowStockThreshold: inventoryItem.lowStockAlert ?? 5,
     }))
+  }
+
+  const handleEditInventoryItem = () => {
+    if (!selectedInventoryItem) return
+    try {
+      sessionStorage.setItem(PRODUCT_FORM_DRAFT_KEY, JSON.stringify({
+        formData,
+        activeTab,
+        selectedInventoryItem,
+      }))
+    } catch {
+      // ignore storage errors (e.g. private browsing quota)
+    }
+    const returnTo = encodeURIComponent(window.location.pathname + window.location.search)
+    router.push(`/vendor/dashboard/inventory/edit/${selectedInventoryItem.id}?from=product-creation&returnTo=${returnTo}`)
   }
 
   const clearInventorySelection = () => {
@@ -682,7 +729,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       subCategory: '', // Clear subcategory as well
       baseSku: '',
       basePrice: 0,
-      totalStock: 0
+      totalStock: 0,
+      lowStockThreshold: 5,
     }))
   }
   const addVariant = () => {
@@ -751,17 +799,18 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
 
 
   // Care Instructions Functions
-  const addCareInstruction = () => {
-    if (newCareInstruction.trim()) {
-      setFormData(prev => ({
+  const handleAddCareInstructions = (instructions: string[]) => {
+    setFormData(prev => {
+      // Preserve any existing custom instructions (not in the standard catalogue)
+      const customExisting = prev.fabricSpecifications.careInstructions.filter(
+        label => !CARE_INSTRUCTIONS.find(c => c.label === label)
+      )
+      const combined = [...new Set([...customExisting, ...instructions])]
+      return {
         ...prev,
-        fabricSpecifications: {
-          ...prev.fabricSpecifications,
-          careInstructions: [...prev.fabricSpecifications.careInstructions, newCareInstruction.trim()]
-        }
-      }))
-      setNewCareInstruction('')
-    }
+        fabricSpecifications: { ...prev.fabricSpecifications, careInstructions: combined }
+      }
+    })
   }
 
   const removeCareInstruction = (instruction: string) => {
@@ -851,11 +900,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     })
 
     clearError(imageType === 'cover' ? 'coverImage' : 'images')
-    setUploadResult({
-      show: true,
-      type: 'success',
-      text: `${files.length > 1 ? `${files.length} images` : 'Image'} uploaded successfully.`,
-    })
+    centerNotice.success(
+      'Image Uploaded',
+      `${files.length > 1 ? `${files.length} images` : 'Image'} uploaded successfully.`,
+    )
 
     // Reset input
     e.target.value = ''
@@ -956,6 +1004,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (!formData.category) newErrors.category = 'Please select a category.'
     if (!formData.subCategory) newErrors.subCategory = 'Please select a sub-category.'
     if (!formData.fabricType) newErrors.fabricType = 'Please select a fabric type.'
+    if (formData.fabricSpecifications.careInstructions.length === 0) {
+      newErrors.careInstructions = 'Please add at least one care instruction.'
+    }
     if (formData.hasVariants && formData.variants.length === 0) {
       newErrors.variants = 'Please add at least one variant or disable variants.'
     }
@@ -993,6 +1044,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (!hasCoverImage) newErrors.coverImage = 'Please upload a cover image for the product.'
     if (formData.dispatchTimeline.processingDays <= 0) newErrors.processingDays = 'Enter the processing days (at least 1).'
     if (formData.dispatchTimeline.shippingDays <= 0) newErrors.shippingDays = 'Enter the shipping days (at least 1).'
+    if (!formData.weight || formData.weight.trim() === '') newErrors.weight = 'Shipping weight is required.'
+    if (!formData.weightUnit) newErrors.weightUnit = 'Please select a weight unit.'
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
@@ -1242,16 +1295,21 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             variant="outline"
                             size="sm"
                             onClick={clearInventorySelection}
+                            className="hover:bg-slate-100 hover:border-slate-400 transition-colors"
                           >
                             <X className="h-4 w-4 mr-1" />
                             Change
                           </Button>
                         </div>
-                        <Link href={`/vendor/dashboard/inventory/edit/${selectedInventoryItem.id}`}>
-                          <Button variant="outline" size="sm" className="mt-3">
-                            Edit Inventory Item
-                          </Button>
-                        </Link>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 hover:bg-brand-500 hover:text-white hover:border-brand-500 transition-colors"
+                          onClick={handleEditInventoryItem}
+                        >
+                          Edit Inventory Item
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -1567,101 +1625,114 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Composition
+                    </label>
+                    <input
+                      type="text"
+                      name="fabricSpecifications.composition"
+                      value={formData.fabricSpecifications.composition}
+                      onChange={handleInputChange}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                      placeholder="e.g., 100% Cotton"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Composition
+                        Weight
                       </label>
                       <input
-                        type="text"
-                        name="fabricSpecifications.composition"
-                        value={formData.fabricSpecifications.composition}
+                        type="number"
+                        name="fabricSpecifications.weightValue"
+                        value={formData.fabricSpecifications.weightValue}
+                        onFocus={(e) => e.currentTarget.select()}
                         onChange={handleInputChange}
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                        placeholder="e.g., 100% Cotton"
+                        placeholder="e.g., 200"
+                        min="0"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Weight (GSM)
+                        GSM
                       </label>
                       <input
                         type="text"
-                        name="fabricSpecifications.weight"
-                        value={formData.fabricSpecifications.weight}
+                        name="fabricSpecifications.weightUnit"
+                        value={formData.fabricSpecifications.weightUnit}
                         onChange={handleInputChange}
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                        placeholder="e.g., 200 GSM"
+                        placeholder="e.g., GSM, Oz"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Weave
-                      </label>
-                      <input
-                        type="text"
-                        name="fabricSpecifications.weave"
-                        value={formData.fabricSpecifications.weave}
-                        onChange={handleInputChange}
-                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                        placeholder="e.g., Percale, Sateen"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Finish
-                      </label>
-                      <input
-                        type="text"
-                        name="fabricSpecifications.finish"
-                        value={formData.fabricSpecifications.finish}
-                        onChange={handleInputChange}
-                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                        placeholder="e.g., Pre-shrunk, Mercerized"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      Type of Weave
+                    </label>
+                    <input
+                      type="text"
+                      name="fabricSpecifications.weave"
+                      value={formData.fabricSpecifications.weave}
+                      onChange={handleInputChange}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                      placeholder="e.g., Percale, Sateen, Twill"
+                    />
                   </div>
 
                   {/* Care Instructions */}
-                  <div>
+                  <div id="vf-careInstructions">
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Care Instructions
+                      Care Instructions <span className="text-red-500">*</span>
                     </label>
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newCareInstruction}
-                          onChange={(e) => setNewCareInstruction(e.target.value)}
-                          placeholder="Add care instruction"
-                          className="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCareInstruction())}
-                        />
-                        <Button type="button" onClick={addCareInstruction} className="bg-brand-500 text-white">
-                          Add
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        {formData.fabricSpecifications.careInstructions.map((instruction) => (
-                          <div
-                            key={instruction}
-                            className="flex items-center justify-between p-2 bg-slate-50 rounded-md"
-                          >
-                            <span className="text-sm">{instruction}</span>
-                            <button
-                              type="button"
-                              onClick={() => removeCareInstruction(instruction)}
-                              className="text-slate-700 hover:text-red-600"
+                    <button
+                      type="button"
+                      onClick={() => setCareModalOpen(true)}
+                      className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-left transition-colors ${
+                        errors.careInstructions
+                          ? 'border-red-400 bg-red-50/40 text-red-500 focus:ring-red-500/40'
+                          : 'border-slate-300 text-slate-500 hover:border-brand-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500'
+                      }`}
+                    >
+                      {formData.fabricSpecifications.careInstructions.length > 0
+                        ? `${formData.fabricSpecifications.careInstructions.length} instruction(s) selected — click to edit`
+                        : 'Click to select care instructions…'}
+                    </button>
+                    {errors.careInstructions && (
+                      <p className="text-xs text-red-600 mt-1">{errors.careInstructions}</p>
+                    )}
+                    {formData.fabricSpecifications.careInstructions.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {formData.fabricSpecifications.careInstructions.map(instruction => {
+                          const std = CARE_INSTRUCTIONS.find(c => c.label === instruction)
+                          const iconColor = std ? (CATEGORY_COLORS[std.category] || 'text-slate-500') : 'text-slate-500'
+                          return (
+                            <div
+                              key={instruction}
+                              className="flex items-center gap-1.5 pl-2 pr-1.5 py-1 bg-slate-100 border border-slate-200 rounded-full text-slate-700 text-xs font-medium"
                             >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
+                              {std && (
+                                <span className={`flex-shrink-0 ${iconColor}`}>
+                                  <CareIcon paths={std.paths} className="w-4 h-4" />
+                                </span>
+                              )}
+                              <span>{instruction}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeCareInstruction(instruction)}
+                                className="ml-0.5 p-0.5 rounded-full hover:bg-slate-300 text-slate-400 hover:text-slate-700 transition-colors"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )
+                        })}
                       </div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1816,7 +1887,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 onFocus={(e) => e.currentTarget.select()}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, lowStockThreshold: e.target.value === '' ? undefined : parseInt(e.target.value) }))}
                                 placeholder="Default"
-                                min="0"
+                                min="5"
                                 className="w-full h-11 px-3.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
                               />
                               <p className="text-xs text-slate-500">Alerts when this variant hits this level (blank = product Min Stock)</p>
@@ -2152,9 +2223,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         )}
                       </div>
                       {(gstOthers || (formData.gstPercentage != null && !gstRates.some(r => r.isActive && r.percentage === formData.gstPercentage))) && (
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">Custom Tax Rate (%)</label>
-                          <div className="relative">
+                        <div className="flex flex-col justify-end">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Custom Tax Rate</label>
+                          <div className="relative w-36">
                             <input
                               type="number"
                               min="0"
@@ -2167,11 +2238,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 gstPercentage: e.target.value === '' ? undefined : parseFloat(e.target.value)
                               }))}
                               placeholder="e.g., 12"
-                              className="w-full h-11 pr-8 pl-3.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
+                              className="w-full h-10 pr-8 pl-3 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
                             />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-800 pointer-events-none select-none">%</span>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">Enter any other applicable tax percentage</p>
+                          <p className="text-xs text-slate-500 mt-1.5">Enter a custom tax percentage</p>
                         </div>
                       )}
                     </div>
@@ -2213,6 +2284,23 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           <p className="text-xs text-slate-600 mt-1">Price for single unit</p>
                         )}
                       </div>
+
+                      {/* Total Amount (auto-calculated) */}
+                      {formData.basePrice > 0 && formData.gstPercentage != null && formData.gstPercentage > 0 && (
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            Total Amount <span className="text-xs font-normal text-slate-500">(incl. tax)</span>
+                          </label>
+                          <div className="flex min-h-[42px] w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                            <span className="text-sm font-bold tracking-tight text-brand-500">
+                              ₹{(formData.basePrice * (1 + formData.gstPercentage / 100)).toFixed(2)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            ₹{formData.basePrice.toFixed(2)} + {formData.gstPercentage}% tax
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -2280,14 +2368,33 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           <label className="block text-sm font-semibold text-slate-700 mb-2">
                             Low Stock Threshold
                           </label>
-                          <input
-                            type="number"
-                            name="lowStockThreshold"
-                            value={formData.lowStockThreshold}
-                            onFocus={(e) => e.currentTarget.select()}
-                            onChange={handleInputChange}
-                            className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                          />
+                          {selectedInventoryItem ? (
+                            <>
+                              <div className="flex min-h-[42px] w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                                <span className="text-sm font-bold tracking-tight text-brand-500">
+                                  {formData.lowStockThreshold}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Synced from inventory item
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <input
+                                type="number"
+                                name="lowStockThreshold"
+                                value={formData.lowStockThreshold}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={handleInputChange}
+                                min={5}
+                                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                              />
+                              <p className="text-xs text-slate-500 mt-1">
+                                Select an inventory item to auto-fill
+                              </p>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -2351,20 +2458,45 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                    <div className="flex flex-col">
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Shipping Weight (kg)
+                        Shipping Weight *
                       </label>
                       <input
                         type="text"
+                        id="vf-weight"
                         name="weight"
                         value={formData.weight}
                         onChange={handleInputChange}
-                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                        className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors ${errors.weight ? 'border-red-400' : 'border-slate-300'}`}
                         placeholder="e.g., 1.2"
                       />
-                      <p className="text-xs text-slate-500 mt-1">Used to calculate shipping</p>
+                      {errors.weight
+                        ? <p className="text-xs text-red-500 mt-1">{errors.weight}</p>
+                        : <p className="text-xs text-slate-500 mt-1">Used to calculate shipping</p>
+                      }
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Unit of Measurement *
+                      </label>
+                      <Dropdown
+                        id="vf-weightUnit"
+                        label=""
+                        value={formData.weightUnit}
+                        options={[
+                          { value: 'kg', label: 'Kilograms (kg)' },
+                          { value: 'g', label: 'Grams (g)' },
+                          { value: 'lb', label: 'Pounds (lb)' },
+                          { value: 'oz', label: 'Ounces (oz)' },
+                        ]}
+                        placeholder="Select unit"
+                        buttonClassName="py-2.5 rounded-lg"
+                        error={!!errors.weightUnit}
+                        onChange={(val) => setFormData(prev => ({ ...prev, weightUnit: val as string }))}
+                      />
+                      {errors.weightUnit && <p className="text-xs text-red-500 mt-1">{errors.weightUnit}</p>}
                     </div>
                   </div>
 
@@ -2753,6 +2885,13 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
           </div>
         </div>
       </form>
+
+      <CareInstructionModal
+        isOpen={careModalOpen}
+        selected={formData.fabricSpecifications.careInstructions}
+        onAdd={handleAddCareInstructions}
+        onClose={() => setCareModalOpen(false)}
+      />
 
       {editingVariantId && (
         <VariantImageModal

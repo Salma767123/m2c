@@ -438,6 +438,11 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
       return
     }
 
+    if (formData.lowStockAlert < 5) {
+      console.error('Low stock alert must be 5 or more')
+      return
+    }
+
     // SKU is auto-generated server-side — not entered by the admin.
 
     // Stock is no longer editable during inventory creation (set during product creation)
@@ -705,6 +710,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     value={formData.lowStockAlert}
                     onChange={handleInputChange}
                     required
+                    min="5"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222] focus:border-[#222222]"
                     placeholder="e.g. 5"
                   />

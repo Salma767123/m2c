@@ -71,6 +71,16 @@ interface VendorFormData {
   /** Type-specific business certificate (IEC / CIN / Deed / LLPIN). */
   typeCertDocument: string | null;
   typeCertFile: File | null;
+  /** IEC certificate (separate from the type-specific cert — always stored as EXPORT_LICENSE). */
+  iecCertDocument?: string | null;
+  iecCertFile?: File | null;
+  /** Aadhaar card document (unregistered vendor identity proof). */
+  aadhaarDocument?: string | null;
+  aadhaarFile?: File | null;
+  /** Aadhaar number — stored in its own column. */
+  aadhaarNumber?: string;
+  /** Import Export Code number — stored in its own column. */
+  iecCode?: string;
   /** Login password for the vendor account (collected on Step 1). */
   password: string;
 
@@ -98,6 +108,10 @@ interface VendorFormData {
 
   // Owner Profile
   ownerName: string;
+  ownerTitle?: string;
+  ownerFirstName?: string;
+  ownerMiddleName?: string;
+  ownerLastName?: string;
   /** Owner designation chip — Proprietor / CEO / Director / etc. */
   designation: string;
   ownerEmail: string;
@@ -109,6 +123,9 @@ interface VendorFormData {
   businessStartDate: string;
   yearEstablished: string;
   employeeCount: string;
+  /** Owner profile photo URL (Cloudinary). Separate from mainContact.photo. */
+  ownerPhoto?: string | null;
+  ownerPhotoFile?: File | null;
   additionalOwners: any[];
 
   // Vendor Type & Products
@@ -228,6 +245,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     panCardFile: null,
     typeCertDocument: null,
     typeCertFile: null,
+    iecCertDocument: null,
+    iecCertFile: null,
+    aadhaarDocument: null,
+    aadhaarFile: null,
+    aadhaarNumber: "",
+    iecCode: "",
     password: "",
 
     // Warehouse Details
@@ -244,6 +267,10 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
 
     // Owner Profile
     ownerName: "",
+    ownerTitle: "",
+    ownerFirstName: "",
+    ownerMiddleName: "",
+    ownerLastName: "",
     designation: "",
     ownerEmail: "",
     ownerEmail2: "",
@@ -253,6 +280,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     businessStartDate: "",
     yearEstablished: "",
     employeeCount: "",
+    ownerPhoto: null,
+    ownerPhotoFile: null,
     additionalOwners: [],
 
     // Vendor Type & Products
@@ -563,6 +592,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         panCardFile: null,
         typeCertDocument: findDocUrl("COMPANY_REGISTRATION"),
         typeCertFile: null,
+        iecCertDocument: findDocUrl("EXPORT_LICENSE"),
+        iecCertFile: null,
+        aadhaarDocument: findDocUrl("AADHAAR_CARD"),
+        aadhaarFile: null,
+        aadhaarNumber: (vendor as any).aadhaarNumber || "",
+        iecCode: (vendor as any).iecCode || "",
         // Password is never returned by the server — left empty in edit mode.
         // Admins should not be able to read/edit existing passwords from here.
         password: "",
@@ -627,6 +662,10 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         })(),
         // Owner Profile
         ownerName: vendor.ownerName || "",
+        ownerTitle: (vendor as any).ownerTitle || "",
+        ownerFirstName: (vendor as any).ownerFirstName || "",
+        ownerMiddleName: (vendor as any).ownerMiddleName || "",
+        ownerLastName: (vendor as any).ownerLastName || "",
         designation: vendor.designation || "",
         ownerEmail: vendor.ownerEmail || "",
         ownerEmail2: vendor.ownerEmail2 || "",
@@ -641,6 +680,8 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         // pointed at `annualTurnover` — a stale proxy from before the
         // dedicated `employeeCount` column existed.)
         employeeCount: vendor.employeeCount || "",
+        ownerPhoto: vendor.ownerPhoto || null,
+        ownerPhotoFile: null,
         additionalOwners: vendor.additionalOwners || [],
 
         // Vendor Type & Products

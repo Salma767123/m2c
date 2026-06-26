@@ -289,7 +289,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     <Section title="Section 2 — Legal & Registration" icon={ShieldCheck} accent="bg-indigo-50 text-indigo-800">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                             <InfoCard label="GST Number" value={formData.gstTaxId} />
-                            {formData.panNumber && <InfoCard label="PAN Number" value={formData.panNumber} />}
+                            {formData.panNumber && <InfoCard label={formData.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={formData.panNumber} />}
                             {formData.iecCode && <InfoCard label="IEC Code" value={formData.iecCode} />}
                             {formData.companyIdNumber && <InfoCard label="Company ID / CIN" value={formData.companyIdNumber} />}
                         </div>
@@ -302,9 +302,10 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                         ? formData.vendorDocuments.filter((d: any) => d?.type && d.type !== 'OTHER' && d?.documentUrl)
                                         : []
                                     const doc = docList[Number(idx)]
+                                    const isProp = formData.businessType === 'proprietorship'
                                     const label = doc
                                         ? (doc.type === 'GST_CERTIFICATE' ? 'GST Certificate' :
-                                           doc.type === 'PAN_CARD' ? 'PAN Card' :
+                                           doc.type === 'PAN_CARD' ? (isProp ? 'Proprietor PAN Card' : 'Company PAN Card') :
                                            doc.type === 'COMPANY_REGISTRATION' ? 'Company Registration' :
                                            doc.name || doc.type)
                                         : `Document ${Number(idx) + 1}`

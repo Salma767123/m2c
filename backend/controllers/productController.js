@@ -107,10 +107,17 @@ const createProduct = async (req, res) => {
 
     // Validate required fields. SKU is NOT required from the client — it is
     // auto-generated server-side (immutable, globally unique) below.
-    if (!name || !description || !category) {
+    if (!name || !description || !category || !subCategory) {
       return res.status(400).json({
         success: false,
-        message: 'Name, description, and category are required'
+        message: 'Name, description, category, and sub-category are required'
+      });
+    }
+
+    if (lowStockThreshold !== undefined && parseInt(lowStockThreshold) < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Low stock alert must be 5 or more'
       });
     }
 
@@ -209,7 +216,7 @@ const createProduct = async (req, res) => {
           baseSku,
           variantSeq: variantCount,
           totalStock: productStock,
-          lowStockThreshold: parseInt(lowStockThreshold) || 10,
+          lowStockThreshold: parseInt(lowStockThreshold) || 5,
           trackInventory: trackInventory !== false,
           dispatchTimeline: dispatchTimeline ? {
             processingDays: parseInt(dispatchTimeline.processingDays) || 1,
@@ -1517,6 +1524,13 @@ const createProductByAdmin = async (req, res) => {
       });
     }
 
+    if (lowStockThreshold !== undefined && parseInt(lowStockThreshold) < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Low stock alert must be 5 or more'
+      });
+    }
+
     // Verify vendor exists
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId }
@@ -1640,7 +1654,7 @@ const createProductByAdmin = async (req, res) => {
           baseSku,
           variantSeq: variantCount,
           totalStock: productStock,
-          lowStockThreshold: parseInt(lowStockThreshold) || 10,
+          lowStockThreshold: parseInt(lowStockThreshold) || 5,
           trackInventory: trackInventory !== false,
           dispatchTimeline: dispatchTimeline ? {
             processingDays: parseInt(dispatchTimeline.processingDays) || 1,

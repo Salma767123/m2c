@@ -306,7 +306,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
       <Section title="Section 2 — Legal & Registration" icon={ShieldCheck} accent="bg-brand-50 text-brand-700">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
           <InfoRow label="GST Number" value={fd.gstTaxId} />
-          {fd.panNumber && <InfoRow label="PAN Number" value={fd.panNumber} />}
+          {fd.panNumber && <InfoRow label={fd.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={fd.panNumber} />}
           {fd.iecCode && <InfoRow label="IEC Code" value={fd.iecCode} />}
           {fd.companyIdNumber && <InfoRow label="Company ID / CIN" value={fd.companyIdNumber} />}
         </div>
@@ -320,8 +320,9 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                 : []
               const doc = docList[Number(idx)]
               if (!doc) return null
+              const isProp = fd.businessType === "proprietorship"
               const label = (doc.type === "GST_CERTIFICATE" ? "GST Certificate" :
-                             doc.type === "PAN_CARD" ? "PAN Card" :
+                             doc.type === "PAN_CARD" ? (isProp ? "Proprietor PAN Card" : "Company PAN Card") :
                              doc.type === "COMPANY_REGISTRATION" ? "Company Registration" :
                              doc.name || doc.type) as string
               return (

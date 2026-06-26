@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { SquarePen, Calendar, Building2, Warehouse, UserCircle, Tags, Factory, ShieldCheck, Briefcase } from 'lucide-react';
 import { AccordionSection, getLandlineDisplay } from '../FormUI';
+import { buildFullName } from '@/lib/utils';
 
 /**
  * Read-only summary of a vendor's collected registration data. Shared by
@@ -285,7 +286,7 @@ export default function VendorDataSummary({
             />
           )}
           {data.iecCode && <InfoRow label="IEC Code" value={data.iecCode} />}
-          {data.panNumber && <InfoRow label="Company PAN Number" value={data.panNumber} />}
+          {data.panNumber && <InfoRow label={data.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={data.panNumber} />}
           {data.aadhaarNumber && <InfoRow label="Aadhaar Number" value={data.aadhaarNumber} />}
           <InfoRow label="Primary Email" value={data.email} />
           {data.email2 && <InfoRow label="Secondary Email" value={data.email2} />}
@@ -322,7 +323,7 @@ export default function VendorDataSummary({
           <InfoRow label="Same as Warehouse" value={data.sameAsWarehouse ? 'Yes' : 'No'} />
           <InfoRow label="Company Logo" value={<DocValue src={data.logo || data.logoFile} alt="Company logo" />} />
           <InfoRow label="GST Certificate" value={<DocValue src={data.gstDocument || data.gstFile} alt="GST certificate" />} />
-          <InfoRow label="Company PAN Card" value={<DocValue src={data.panCardDocument || data.panCardFile} alt="Company PAN card" />} />
+          <InfoRow label={data.businessType === 'proprietorship' ? 'Proprietor PAN Card' : 'Company PAN Card'} value={<DocValue src={data.panCardDocument || data.panCardFile} alt="PAN card" />} />
           {(data.typeCertFile || data.typeCertDocument) && (
             <InfoRow label="Business Reg. Certificate" value={<DocValue src={data.typeCertDocument || data.typeCertFile} alt="Business registration certificate" />} />
           )}
@@ -393,7 +394,7 @@ export default function VendorDataSummary({
               <InfoRow label="Profile Photo" value={<Thumb src={ownerPhotoUrl} alt="Owner profile photo" rounded />} />
             ) : null;
           })()}
-          <InfoRow label="Owner Name" value={data.ownerName} />
+          <InfoRow label="Owner Name" value={buildFullName(data.ownerTitle, data.ownerFirstName, data.ownerMiddleName, data.ownerLastName, data.ownerName)} />
           {data.designation && (
             <InfoRow
               label="Designation"
@@ -435,12 +436,12 @@ export default function VendorDataSummary({
               {data.additionalOwners.map((owner: any, index: number) => (
                 <div key={index} className="pl-4 border-l-2 border-slate-200 space-y-1 my-2">
                   <p className="text-sm font-bold text-slate-800 px-6 mt-2">Owner {index + 2}</p>
-                  <InfoRow label="Name" value={owner.name} />
+                  <InfoRow label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />
                   {owner.designation && <InfoRow label="Designation" value={owner.designation} />}
-                  <InfoRow label="Email" value={owner.email} />
-                  {owner.email2 && <InfoRow label="Email 2" value={owner.email2} />}
-                  <InfoRow label="Phone" value={owner.phone} />
-                  {owner.phone2 && <InfoRow label="Phone 2" value={owner.phone2} />}
+                  <InfoRow label="Primary Email" value={owner.email} />
+                  {owner.email2 && <InfoRow label="Secondary Email" value={owner.email2} />}
+                  <InfoRow label="Primary Phone" value={owner.phone} />
+                  {owner.phone2 && <InfoRow label="Secondary Phone" value={owner.phone2} />}
                   {owner.landline && <InfoRow label="Landline" value={owner.landline} />}
                 </div>
               ))}
@@ -664,7 +665,7 @@ export default function VendorDataSummary({
               <InfoRow label="Profile Photo" value={<Thumb src={contactPhotoUrl} alt="Main contact photo" rounded />} />
             ) : null;
           })()}
-          <InfoRow label="Main Contact Name" value={data.mainContact?.name || 'Not provided'} />
+          <InfoRow label="Main Contact Name" value={buildFullName(data.mainContact?.title, data.mainContact?.firstName, data.mainContact?.middleName, data.mainContact?.lastName, data.mainContact?.name) || 'Not provided'} />
           <InfoRow
             label="Main Contact Designation"
             value={data.mainContact?.customDesignation || data.mainContact?.designation || 'Not provided'}
@@ -697,7 +698,7 @@ export default function VendorDataSummary({
               {data.alternateContacts.map((contact: any, index: number) => (
                 <div key={contact.id || index} className="space-y-1">
                   <div className="font-bold text-sm text-slate-900 px-6 py-2">Contact {index + 1}:</div>
-                  <InfoRow label="Name" value={contact.name || 'Not provided'} />
+                  <InfoRow label="Name" value={buildFullName(contact.title, contact.firstName, contact.middleName, contact.lastName, contact.name) || 'Not provided'} />
                   <InfoRow
                     label="Designation"
                     value={contact.customDesignation || contact.designation || 'Not provided'}

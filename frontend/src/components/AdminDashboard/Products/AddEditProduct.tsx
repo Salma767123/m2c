@@ -298,7 +298,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
 
     // Stock Management
     totalStock: 0,
-    lowStockThreshold: 10,
+    lowStockThreshold: 5,
     trackInventory: true,
 
     // Dispatch & Shipping
@@ -1964,7 +1964,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                 value={newVariant.lowStockThreshold ?? ''}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, lowStockThreshold: e.target.value === '' ? undefined : parseInt(e.target.value) }))}
                                 placeholder="Default"
-                                min="0"
+                                min="5"
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white"
                               />
                             </div>
@@ -2657,6 +2657,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                             name="lowStockThreshold"
                             value={formData.lowStockThreshold}
                             onChange={handleInputChange}
+                            min={5}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                           />
                         </div>

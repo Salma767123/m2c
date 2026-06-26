@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
+import ImageCropModal from "@/components/UI/ImageCropModal";
 
 import { Button } from "@/components/UI/Button";
 import {
@@ -17,6 +18,11 @@ import { CountrySelect, ToggleButton, AccordionSection } from "@/components/Vend
 import { scrollToFirstError } from "@/lib/formErrorScroll";
 import { handleUpload } from "@/lib/toast-utils";
 import { centerNotice } from "@/components/UI/CenterNotice";
+import { useZipLookup } from "@/hooks/useZipLookup";
+import { zipPlaceLabel } from "@/lib/zipLookup";
+import type { ZipPlace } from "@/lib/zipLookup";
+import { Loader2 } from "lucide-react";
+import { ZipAreaSelect } from "@/components/VendorHub/ZipAreaSelect";
 
 interface WarehouseDetailsProps {
   onNext: () => void;
@@ -60,11 +66,11 @@ interface FactoryImageValue {
 const FACTORY_IMAGE_SLOTS: FactoryImageSlotConfig[] = [
   { id: 'nameBoard', label: 'Factory Name Board', description: 'Signage showing the factory name', required: true },
   { id: 'frontView', label: 'Front View', description: 'Main entrance / facade', required: true },
-  { id: 'backView', label: 'Back View', description: 'Rear of the building', required: false },
-  { id: 'leftView', label: 'Left View', description: 'Left-side elevation', required: false },
-  { id: 'rightView', label: 'Right View', description: 'Right-side elevation', required: false },
-  { id: 'roadView', label: 'Road View', description: 'Approach road / driveway', required: false },
-  { id: 'insideFactory', label: 'Inside Factory', description: 'Production floor or interior', required: false },
+  { id: 'backView', label: 'Back View', description: 'Rear of the building', required: true },
+  { id: 'leftView', label: 'Left View', description: 'Left-side elevation', required: true },
+  { id: 'rightView', label: 'Right View', description: 'Right-side elevation', required: true },
+  { id: 'roadView', label: 'Road View', description: 'Approach road / driveway', required: true },
+  { id: 'insideFactory', label: 'Inside Factory', description: 'Production floor or interior', required: true },
   { id: 'others', label: 'Others', description: 'Any additional photo', required: false },
 ];
 
@@ -134,6 +140,18 @@ export default function WarehouseDetails({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // Pending crop — set when a factory image file is chosen, cleared after
+  // the user confirms or cancels the crop modal.
+  const [cropPending, setCropPending] = useState<{
+    slotId: FactoryImageSlotId;
+    src: string;
+    fileName: string;
+  } | null>(null);
+  // Keep a ref to the pending URL so the cleanup callbacks always see the
+  // latest value without needing it in their dependency arrays.
+  const cropPendingRef = useRef(cropPending);
+  cropPendingRef.current = cropPending;
+
   // Render-phase sync (Vercel §5.1 — same pattern as CompanyDetails) to
   // avoid the `react-hooks/set-state-in-effect` rule that flags state
   // updates inside useEffect. When the `data` prop reference changes
@@ -184,6 +202,23 @@ export default function WarehouseDetails({
   const handleBlur = useCallback((field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
   }, []);
+
+  // ── ZIP / PIN code lookup (warehouse address) ─────────────────────────
+  const handleWarehouseZipResult = useCallback((place: ZipPlace) => {
+    setFormData((prev) => ({
+      ...prev,
+      warehouseCity: place.area || place.city || prev.warehouseCity,
+      warehouseState: place.state || prev.warehouseState,
+    }));
+    setErrors((prev) => ({ ...prev, warehouseCity: '', warehouseState: '' }));
+  }, []);
+
+  const {
+    loading: warehouseZipLoading,
+    places: warehouseZipPlaces,
+    runLookup: runWarehouseZipLookup,
+    clear: clearWarehouseZip,
+  } = useZipLookup(handleWarehouseZipResult);
 
   const handleNext = useCallback(() => {
     const newErrors: Record<string, string> = {};
@@ -279,28 +314,47 @@ export default function WarehouseDetails({
       });
       if (!result.ok) return;
 
+      // Open the square crop modal — the file is saved only after the user
+      // confirms. Revoke any prior pending object URL to avoid memory leaks.
+      const pending = cropPendingRef.current;
+      if (pending) URL.revokeObjectURL(pending.src);
+      setCropPending({ slotId, src: URL.createObjectURL(file), fileName: file.name });
+    },
+    [],
+  );
+
+  const handleCropConfirm = useCallback(
+    (croppedFile: File) => {
+      const pending = cropPendingRef.current;
+      if (!pending) return;
+      URL.revokeObjectURL(pending.src);
       setFormData((prev) => {
-        const existing = prev.factoryImages[slotId];
-        if (existing?.url && existing.file) {
-          URL.revokeObjectURL(existing.url);
-        }
+        const existing = prev.factoryImages[pending.slotId];
+        if (existing?.url && existing.file) URL.revokeObjectURL(existing.url);
         return {
           ...prev,
           factoryImages: {
             ...prev.factoryImages,
-            [slotId]: {
-              file,
-              url: URL.createObjectURL(file),
-              name: file.name,
+            [pending.slotId]: {
+              file: croppedFile,
+              url: URL.createObjectURL(croppedFile),
+              name: pending.fileName,
             },
           },
         };
       });
-      const errKey = `factoryImage:${slotId}`;
+      const errKey = `factoryImage:${pending.slotId}`;
       setErrors((prev) => (prev[errKey] ? { ...prev, [errKey]: '' } : prev));
+      setCropPending(null);
     },
     [],
   );
+
+  const handleCropCancel = useCallback(() => {
+    const pending = cropPendingRef.current;
+    if (pending) URL.revokeObjectURL(pending.src);
+    setCropPending(null);
+  }, []);
 
   const handleSlotRemove = useCallback((slotId: FactoryImageSlotId) => {
     setFormData((prev) => {
@@ -626,24 +680,38 @@ export default function WarehouseDetails({
               <label htmlFor="warehouseCity" className="block text-sm font-semibold text-slate-700 mb-1">
                 City {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
               </label>
-              <input
-                id="warehouseCity"
-                type="text"
-                name="warehouseCity"
-                value={formData.warehouseCity}
-                onChange={(e) => handleInputChange('warehouseCity', e.target.value)}
-                onBlur={() => handleBlur('warehouseCity')}
-                disabled={isLinked}
-                readOnly={isLinked}
-                aria-readonly={isLinked}
-                autoComplete="address-level2"
-                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                  isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
-                    : errors.warehouseCity && touched.warehouseCity ? 'border-red-500 bg-red-50'
-                    : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="City"
-              />
+              {!isLinked && warehouseZipPlaces.length > 1 ? (
+                <ZipAreaSelect
+                  id="warehouseCity"
+                  places={warehouseZipPlaces}
+                  value={formData.warehouseCity}
+                  onChange={(p) => {
+                    handleInputChange('warehouseCity', p.area || p.city);
+                    handleInputChange('warehouseState', p.state);
+                  }}
+                  onBlur={() => handleBlur('warehouseCity')}
+                  invalid={!!(errors.warehouseCity && touched.warehouseCity)}
+                />
+              ) : (
+                <input
+                  id="warehouseCity"
+                  type="text"
+                  name="warehouseCity"
+                  value={formData.warehouseCity}
+                  onChange={(e) => handleInputChange('warehouseCity', e.target.value)}
+                  onBlur={() => handleBlur('warehouseCity')}
+                  disabled={isLinked}
+                  readOnly={isLinked}
+                  aria-readonly={isLinked}
+                  autoComplete="address-level2"
+                  className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                    isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
+                      : errors.warehouseCity && touched.warehouseCity ? 'border-red-500 bg-red-50'
+                      : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="City"
+                />
+              )}
               {errors.warehouseCity && touched.warehouseCity && !isLinked && (
                 <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseCity}</p>
               )}
@@ -711,24 +779,43 @@ export default function WarehouseDetails({
               <label htmlFor="warehouseZip" className="block text-sm font-semibold text-slate-700 mb-1">
                 ZIP / Postal Code {!isLinked && <span className="text-brand-500" aria-hidden="true">*</span>}
               </label>
-              <input
-                id="warehouseZip"
-                type="text"
-                name="warehouseZip"
-                value={formData.warehouseZip}
-                onChange={(e) => handleInputChange('warehouseZip', e.target.value)}
-                onBlur={() => handleBlur('warehouseZip')}
-                disabled={isLinked}
-                readOnly={isLinked}
-                aria-readonly={isLinked}
-                autoComplete="postal-code"
-                className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                  isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
-                    : errors.warehouseZip && touched.warehouseZip ? 'border-red-500 bg-red-50'
-                    : 'border-slate-300 hover:border-slate-400'
-                }`}
-                placeholder="ZIP Code"
-              />
+              <div className="relative">
+                <input
+                  id="warehouseZip"
+                  type="text"
+                  name="warehouseZip"
+                  value={formData.warehouseZip}
+                  onChange={(e) => {
+                    handleInputChange('warehouseZip', e.target.value);
+                    if (!e.target.value.trim()) clearWarehouseZip();
+                    else if (e.target.value.trim().length >= 6) runWarehouseZipLookup(e.target.value, formData.warehouseCountry);
+                  }}
+                  onBlur={(e) => {
+                    handleBlur('warehouseZip');
+                    if (!isLinked) runWarehouseZipLookup(e.target.value, formData.warehouseCountry);
+                  }}
+                  disabled={isLinked}
+                  readOnly={isLinked}
+                  aria-readonly={isLinked}
+                  autoComplete="postal-code"
+                  className={`w-full text-sm font-medium px-4 py-2.5 ${warehouseZipLoading ? 'pr-9' : ''} border rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                    isLinked ? 'bg-slate-50 text-slate-500 border-slate-200 cursor-not-allowed'
+                      : errors.warehouseZip && touched.warehouseZip ? 'border-red-500 bg-red-50'
+                      : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                  placeholder="ZIP Code"
+                />
+                {warehouseZipLoading && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-500" aria-live="polite" aria-label="Looking up postal code">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  </span>
+                )}
+              </div>
+              {!isLinked && (
+                <p className="mt-1 text-xs text-slate-400">
+                  Enter ZIP/PIN Code to automatically fetch available State, District, City, and Area details.
+                </p>
+              )}
               {errors.warehouseZip && touched.warehouseZip && !isLinked && (
                 <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.warehouseZip}</p>
               )}
@@ -817,7 +904,9 @@ export default function WarehouseDetails({
                     ) : (
                       <label
                         htmlFor={inputId}
-                        className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer text-center px-2 focus-within:ring-2 focus-within:ring-brand-500/40 rounded-lg"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById(inputId)?.click(); } }}
+                        className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer text-center px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
                       >
                         <Upload className="w-5 h-5 text-slate-300" aria-hidden="true" />
                         <span className="text-[11px] font-semibold text-brand-600">Upload</span>
@@ -847,7 +936,12 @@ export default function WarehouseDetails({
                   {value && (
                     <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px]">
                       <p className="truncate text-slate-600" title={value.name}>{value.name}</p>
-                      <label htmlFor={inputId} className="shrink-0 cursor-pointer text-brand-600 hover:text-brand-500 font-semibold">
+                      <label
+                        htmlFor={inputId}
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById(inputId)?.click(); } }}
+                        className="shrink-0 cursor-pointer text-brand-600 hover:text-brand-500 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded"
+                      >
                         Replace
                       </label>
                     </div>
@@ -864,6 +958,17 @@ export default function WarehouseDetails({
         </AccordionSection>
 
       </div>{/* end accordion sections */}
+
+      {/* Square crop modal — shown when a factory image file is chosen */}
+      <ImageCropModal
+        src={cropPending?.src ?? null}
+        fileName={cropPending?.fileName}
+        title="Crop Factory Image"
+        cropShape="rect"
+        showGrid={true}
+        onCancel={handleCropCancel}
+        onCropped={handleCropConfirm}
+      />
 
       {/* ── Footer Navigation ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between pt-4 gap-3">

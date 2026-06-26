@@ -92,6 +92,10 @@ interface ImageCropModalProps {
   /** Original file name (used to name the output). */
   fileName?: string;
   title?: string;
+  /** 'round' for circular overlay (profile photos), 'rect' for square overlay (facility images). Default: 'round'. */
+  cropShape?: "round" | "rect";
+  /** Show rule-of-thirds grid inside the crop area. Default: false. */
+  showGrid?: boolean;
   onCancel: () => void;
   onCropped: (file: File) => void;
 }
@@ -100,6 +104,8 @@ export default function ImageCropModal({
   src,
   fileName,
   title = "Crop Profile Photo",
+  cropShape = "round",
+  showGrid = false,
   onCancel,
   onCropped,
 }: ImageCropModalProps) {
@@ -108,6 +114,26 @@ export default function ImageCropModal({
   const [rotation, setRotation] = React.useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = React.useState<Area | null>(null);
   const [saving, setSaving] = React.useState(false);
+
+  // Lock body scroll while the modal is visible; restore on close / unmount.
+  React.useEffect(() => {
+    if (!src) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [src]);
+
+  // Close on Escape key.
+  React.useEffect(() => {
+    if (!src || saving) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [src, saving, onCancel]);
 
   const onCropComplete = React.useCallback((_: Area, areaPixels: Area) => {
     setCroppedAreaPixels(areaPixels);
@@ -134,12 +160,38 @@ export default function ImageCropModal({
   if (!src) return null;
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-white/20 backdrop-blur-xl" onClick={saving ? undefined : onCancel} />
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-          <h3 className="text-base font-bold text-slate-900">{title}</h3>
+    /*
+     * Outer shell: full-screen fixed, uses --z-modal (400) so it sits above the
+     * sticky registration sidebar (--z-sticky 200) and any dropdowns (--z-dropdown 100).
+     * `items-center` on sm+ and `items-end` on mobile ensures the sheet docks to the
+     * bottom edge on small phones and centers on larger screens.
+     */
+    <div className="fixed inset-0 z-[var(--z-modal)] flex items-end sm:items-center justify-center p-0 sm:p-4">
+
+      {/* Backdrop — dark semi-transparent overlay with subtle blur */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={saving ? undefined : onCancel}
+        aria-hidden="true"
+      />
+
+      {/*
+       * Modal card — flex column so the crop area fills all remaining space
+       * between the fixed-height header / controls / footer.
+       * max-h prevents the card from exceeding the viewport on short screens.
+       */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="crop-modal-title"
+        className="relative w-full sm:max-w-md bg-white sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ maxHeight: "min(92dvh, 700px)" }}
+      >
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="flex-shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+          <h3 id="crop-modal-title" className="text-base font-bold text-slate-900">
+            {title}
+          </h3>
           <button
             type="button"
             onClick={onCancel}
@@ -151,16 +203,25 @@ export default function ImageCropModal({
           </button>
         </div>
 
-        {/* Crop area (1:1) */}
-        <div className="relative w-full aspect-square bg-slate-900">
+        {/*
+         * ── Crop area ──────────────────────────────────────────────────────
+         * flex-1 + min-h-0 lets this section shrink/grow to fill whatever
+         * space remains after the header, controls, and footer take their share.
+         * The 1:1 crop *overlay* is maintained by react-easy-crop's `aspect` prop;
+         * the container itself does not need to be square.
+         */}
+        <div
+          className="relative flex-1 min-h-0 overflow-hidden bg-slate-900"
+          style={{ minHeight: "220px" }}
+        >
           <Cropper
             image={src}
             crop={crop}
             zoom={zoom}
             rotation={rotation}
             aspect={1}
-            cropShape="round"
-            showGrid={false}
+            cropShape={cropShape}
+            showGrid={showGrid}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onRotationChange={setRotation}
@@ -168,8 +229,9 @@ export default function ImageCropModal({
           />
         </div>
 
-        {/* Controls */}
-        <div className="px-5 py-4 space-y-3">
+        {/* ── Controls ───────────────────────────────────────────────────── */}
+        <div className="flex-shrink-0 px-5 py-4 space-y-3 bg-white">
+          {/* Zoom slider */}
           <div className="flex items-center gap-3">
             <ZoomOut className="w-4 h-4 text-slate-400 shrink-0" />
             <input
@@ -185,26 +247,27 @@ export default function ImageCropModal({
             <ZoomIn className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
 
+          {/* Action buttons */}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={() => setZoom((z) => Math.min(3, +(z + 0.2).toFixed(2)))}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 <ZoomIn className="w-3.5 h-3.5" /> Zoom in
               </button>
               <button
                 type="button"
                 onClick={() => setZoom((z) => Math.max(1, +(z - 0.2).toFixed(2)))}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 <ZoomOut className="w-3.5 h-3.5" /> Zoom out
               </button>
               <button
                 type="button"
                 onClick={() => setRotation((r) => (r + 90) % 360)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 <RotateCw className="w-3.5 h-3.5" /> Rotate
               </button>
@@ -212,15 +275,15 @@ export default function ImageCropModal({
             <button
               type="button"
               onClick={reset}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Reset
             </button>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50/60">
+        {/* ── Footer ─────────────────────────────────────────────────────── */}
+        <div className="flex-shrink-0 flex items-center justify-end gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50/60">
           <button
             type="button"
             onClick={onCancel}

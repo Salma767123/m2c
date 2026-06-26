@@ -43,8 +43,10 @@ import adminReviewService, { AdminOrderReview } from '@/services/adminReviewServ
 import { toast } from '@/hooks/use-toast'
 import RejectionModal from './RejectionModal'
 import SuspensionModal from './SuspensionModal'
+import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { hasPermission } from '@/lib/auth'
 import { getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
+import { buildFullName } from '@/lib/utils'
 
 interface VendorViewProps {
   vendorId: string
@@ -58,6 +60,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
   const [activeTab, setActiveTab] = useState('overview')
   const [rejectionModal, setRejectionModal] = useState(false)
   const [suspensionModal, setSuspensionModal] = useState(false)
+  const [approvalModal, setApprovalModal] = useState(false)
 
   useEffect(() => {
     const fetchVendorData = async () => {
@@ -81,11 +84,16 @@ export default function VendorView({ vendorId }: VendorViewProps) {
     fetchVendorData()
   }, [vendorId])
 
-  const handleApprove = async () => {
+  const handleApprove = () => {
+    setApprovalModal(true)
+  }
+
+  const handleApproveConfirm = async () => {
     if (!vendor) return
 
     try {
       setActionLoading('approve')
+      setApprovalModal(false)
       await VendorService.approveVendor(vendor.id)
 
       setVendor({ ...vendor, status: 'APPROVED', approvedAt: new Date().toISOString() })
@@ -515,6 +523,21 @@ export default function VendorView({ vendorId }: VendorViewProps) {
         }}
         isLoading={actionLoading === 'suspend'}
       />
+
+      {/* Approval Confirmation Modal */}
+      <DeleteConfirmModal
+        show={approvalModal}
+        variant="confirm"
+        title="Confirm Vendor Approval"
+        subtitle="Once approved, the vendor will be able to access the platform and proceed with the next steps."
+        itemName={vendor.companyName}
+        itemDetail={vendor.ownerName}
+        confirmLabel="Approve"
+        loadingLabel="Approving..."
+        loading={actionLoading === 'approve'}
+        onConfirm={handleApproveConfirm}
+        onCancel={() => setApprovalModal(false)}
+      />
     </div>
   )
 }
@@ -705,7 +728,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
                 <div>
                   <p className="text-sm text-gray-600">Owner Full Name</p>
-                  <p className="font-medium">{vendor.ownerName}</p>
+                  <p className="font-medium">{buildFullName((vendor as any).ownerTitle, (vendor as any).ownerFirstName, (vendor as any).ownerMiddleName, (vendor as any).ownerLastName, vendor.ownerName)}</p>
                 </div>
                 {(vendor as any).designation && (
                   <div>
@@ -784,7 +807,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 flex-1 text-sm">
                           <div>
                             <p className="text-gray-500">Full Name</p>
-                            <p className="font-medium">{owner.name}</p>
+                            <p className="font-medium">{buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)}</p>
                           </div>
                           {owner.designation && (
                             <div>
@@ -793,22 +816,22 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                             </div>
                           )}
                           <div>
-                            <p className="text-gray-500">Email</p>
+                            <p className="text-gray-500">Primary Email</p>
                             <p className="font-medium">{owner.email}</p>
                           </div>
                           {owner.email2 && (
                             <div>
-                              <p className="text-gray-500">Email 2</p>
+                              <p className="text-gray-500">Secondary Email</p>
                               <p className="font-medium">{owner.email2}</p>
                             </div>
                           )}
                           <div>
-                            <p className="text-gray-500">Phone</p>
+                            <p className="text-gray-500">Primary Phone</p>
                             <p className="font-medium">{owner.phone}</p>
                           </div>
                           {owner.phone2 && (
                             <div>
-                              <p className="text-gray-500">Phone 2</p>
+                              <p className="text-gray-500">Secondary Phone</p>
                               <p className="font-medium">{owner.phone2}</p>
                             </div>
                           )}
@@ -1675,7 +1698,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
               <div>
                 <p className="text-sm text-gray-600">Full Name</p>
-                <p className="font-medium">{vendor.mainContact.name || 'N/A'}</p>
+                <p className="font-medium">{buildFullName((vendor.mainContact as any).title, (vendor.mainContact as any).firstName, (vendor.mainContact as any).middleName, (vendor.mainContact as any).lastName, vendor.mainContact.name) || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Designation</p>
@@ -1762,7 +1785,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-600">Full Name</p>
-                      <p className="font-medium">{contact.name || 'N/A'}</p>
+                      <p className="font-medium">{buildFullName(contact.title, contact.firstName, contact.middleName, contact.lastName, contact.name) || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Designation</p>

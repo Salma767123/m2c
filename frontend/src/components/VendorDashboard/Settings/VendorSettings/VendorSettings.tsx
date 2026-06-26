@@ -29,6 +29,7 @@ import {
   Upload,
 } from "lucide-react";
 import VendorService, { VendorProfile } from "@/services/vendorService";
+import { buildFullName } from "@/lib/utils";
 import ResultModal from "@/components/UI/ResultModal";
 import { PhoneInput, LocalLandlineInput, getLandlineDisplay } from "@/components/VendorHub/FormUI";
 
@@ -547,9 +548,9 @@ function MainContactSection({
             {(mc.customDepartment || mc.department) && (
               <Field label="Department" value={mc.customDepartment || mc.department} />
             )}
-            {primaryEmail && <Field label="Email" value={primaryEmail} />}
+            {primaryEmail && <Field label="Primary Email" value={primaryEmail} />}
             {mc.email2 && <Field label="Secondary Email" value={mc.email2} />}
-            {primaryPhone && <Field label="Phone" value={primaryPhone} />}
+            {primaryPhone && <Field label="Primary Phone" value={primaryPhone} />}
             {mc.phone2 && <Field label="Secondary Phone" value={mc.phone2} />}
             {(() => {
               const ll = getLandlineDisplay(mc);
@@ -939,7 +940,7 @@ export default function VendorSettings() {
     mk("GST Number", v.gstNumber),
     mk(getCompanyIdLabel(v.businessType), v.companyIdNumber),
     mk("IEC Code", v.iecCode),
-    mk("PAN Number", v.panNumber),
+    mk(v.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number', v.panNumber),
     mk("Aadhaar Number", v.aadhaarNumber),
     mk("Website", v.website, { type: "url" }),
   ]);
@@ -1001,7 +1002,7 @@ export default function VendorSettings() {
   // ===================================================================
   const ownerIdentity = compact([
     mk("Designation", v.designation),
-    mk("Owner Full Name", v.ownerName),
+    mk("Owner Full Name", buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)),
   ]);
   const ownerContact = compact([
     mk("Primary Email", v.ownerEmail),
@@ -1121,9 +1122,9 @@ export default function VendorSettings() {
         {(contact.customDepartment || contact.department) && (
           <Field label="Department" value={contact.customDepartment || contact.department} />
         )}
-        {(contact.email1 || contact.email) && <Field label="Email" value={contact.email1 || contact.email} />}
+        {(contact.email1 || contact.email) && <Field label="Primary Email" value={contact.email1 || contact.email} />}
         {contact.email2 && <Field label="Secondary Email" value={contact.email2} />}
-        {(contact.phone1 || contact.phone) && <Field label="Phone" value={contact.phone1 || contact.phone} />}
+        {(contact.phone1 || contact.phone) && <Field label="Primary Phone" value={contact.phone1 || contact.phone} />}
         {contact.phone2 && <Field label="Secondary Phone" value={contact.phone2} />}
         {contact.landline && <Field label="Landline" value={contact.landline} />}
       </div>
@@ -1300,11 +1301,11 @@ export default function VendorSettings() {
                 {additionalOwners.map((owner: any, idx: number) => (
                   <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
                     <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
-                    {owner.name && <Field label="Full Name" value={owner.name} />}
+                    {(owner.name || owner.firstName) && <Field label="Full Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
                     {owner.designation && <Field label="Designation" value={owner.designation} />}
-                    {owner.email && <Field label="Email" value={owner.email} />}
+                    {owner.email && <Field label="Primary Email" value={owner.email} />}
                     {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
-                    {owner.phone && <Field label="Phone" value={owner.phone} />}
+                    {owner.phone && <Field label="Primary Phone" value={owner.phone} />}
                     {owner.phone2 && <Field label="Secondary Phone" value={owner.phone2} />}
                     {owner.landline && <Field label="Landline" value={owner.landline} />}
                   </div>

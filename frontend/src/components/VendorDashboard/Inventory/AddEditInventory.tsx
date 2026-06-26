@@ -41,6 +41,8 @@ interface InventoryFormData {
 interface AddEditInventoryProps {
   inventoryId?: string
   isEdit?: boolean
+  fromProductCreation?: boolean
+  returnTo?: string
 }
 
 // Default locations - these can be made dynamic later if needed
@@ -52,7 +54,39 @@ const locations = [
   'Display Area'
 ]
 
-export default function AddEditInventory({ inventoryId, isEdit = false }: AddEditInventoryProps) {
+// Calendar-exact duration between two date strings, e.g. "1 Year / 2 Months / 23 Days".
+// Returns '' when either date is missing/invalid or end < start.
+const calcDateRangeDuration = (startDate: string, endDate: string): string => {
+  if (!startDate || !endDate) return ''
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return ''
+
+  let years = end.getFullYear() - start.getFullYear()
+  let months = end.getMonth() - start.getMonth()
+  let days = end.getDate() - start.getDate()
+
+  if (days < 0) {
+    months -= 1
+    days += new Date(end.getFullYear(), end.getMonth(), 0).getDate()
+  }
+  if (months < 0) {
+    years -= 1
+    months += 12
+  }
+  if (days < 0) days = 0
+  if (months < 0) months = 0
+  if (years < 0) years = 0
+
+  const part = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+  return [
+    years > 0 ? part(years, 'Year') : '',
+    months > 0 ? part(months, 'Month') : '',
+    days > 0 ? part(days, 'Day') : '',
+  ].filter(Boolean).join(' / ') || '0 Days'
+}
+
+export default function AddEditInventory({ inventoryId, isEdit = false, fromProductCreation = false, returnTo }: AddEditInventoryProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(isEdit && !!inventoryId)
@@ -316,8 +350,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
     if (!data.name?.trim()) e.name = 'Product name is required'
     // SKU is auto-generated server-side — not entered by the vendor.
     if (!data.category?.trim()) e.category = 'Category is required'
-    if (data.lowStockAlert === undefined || data.lowStockAlert === null || isNaN(data.lowStockAlert) || data.lowStockAlert < 0) {
-      e.lowStockAlert = 'Enter a valid low stock alert (0 or more)'
+    if (data.lowStockAlert === undefined || data.lowStockAlert === null || isNaN(data.lowStockAlert) || data.lowStockAlert < 5) {
+      e.lowStockAlert = 'Enter a valid low stock alert (5 or more)'
     }
     if (data.sourceType === 'supplier' && !data.supplier?.trim()) {
       e.supplier = 'Supplier name is required when supplier is selected'
@@ -540,16 +574,42 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-slate-900">
-            {isEdit ? 'Edit Inventory Item' : 'Add New Inventory Item'}
-          </h1>
+      {/* Sticky header */}
+      <div className="sticky top-0 z-20 bg-slate-50 py-4 border-b border-slate-200">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            {fromProductCreation && returnTo && (
+              <Link href={returnTo}>
+                <Button variant="ghost" size="sm">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Product
+                </Button>
+              </Link>
+            )}
+            <h1 className="text-2xl font-bold text-slate-900">
+              {isEdit ? 'Edit Inventory Item' : 'Add New Inventory Item'}
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href={fromProductCreation && returnTo ? returnTo : '/vendor/dashboard/inventory'} className="shrink-0">
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </Link>
+            <Button
+              type="submit"
+              form="inventory-form"
+              disabled={isLoading}
+              className="bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isLoading ? 'Saving...' : (isEdit ? 'Update Item' : 'Create Item')}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form id="inventory-form" onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -623,7 +683,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                   <div>
                     <Dropdown
                       id="subcategory"
-                      label="Subcategory"
+                      label="Subcategory *"
                       value={formData.subcategory}
                       options={filteredSubcategories.map(sub => sub.name)}
                       placeholder={formData.category ? "Select Subcategory" : "Select category first"}
@@ -680,6 +740,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                         : 'border-slate-200 focus:ring-brand-500/40 focus:border-brand-500'
                     }`}
                     placeholder="e.g. 5"
+                    min="5"
                   />
                   {errors.lowStockAlert
                     ? <p className="text-xs text-red-600 mt-1">{errors.lowStockAlert}</p>
@@ -720,8 +781,8 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                           )}
                         </div>
                         <div>
-                          <h4 className="font-medium text-slate-900">Supplier</h4>
-                          <p className="text-sm text-slate-600">Product sourced from external supplier</p>
+                          <h4 className="font-medium text-slate-900">Trader</h4>
+                          <p className="text-sm text-slate-600">Product sourced from external trader</p>
                         </div>
                       </div>
                     </div>
@@ -754,7 +815,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                     <div className="p-3 bg-brand-50 border border-brand-200 rounded-lg">
                       <p className="text-sm text-brand-700">
                         💡 You can skip this section if you don't want to specify a source type.
-                        Select "Supplier" if you purchase from external vendors, or "Manufacture" if you make the products yourself.
+                        Select "Trader" if you purchase from external vendors, or "Manufacture" if you make the products yourself.
                       </p>
                     </div>
                   )}
@@ -765,12 +826,12 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                   <div className="space-y-4 p-4 bg-slate-50 border border-slate-300 rounded-lg animate-in slide-in-from-top-2 duration-300">
                     <h4 className="font-medium text-slate-900 mb-3 flex items-center">
                       <span className="w-2 h-2 bg-brand-600 rounded-full mr-2"></span>
-                      Supplier Information
+                      Trader Information
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Supplier Name *
+                          Trader Name *
                         </label>
                         <input
                           id="vf-supplier"
@@ -782,7 +843,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                             ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
                             : 'border-slate-200 focus:ring-brand-500/40 focus:border-slate-500'
                             }`}
-                          placeholder="Enter supplier name"
+                          placeholder="Enter trader name"
                         />
                         {errors.supplier && (
                           <p className="text-xs text-red-600 mt-1">{errors.supplier}</p>
@@ -870,6 +931,25 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                         )}
                       </div>
                     </div>
+
+                    {/* Duration between Manufacturing Date and Last Restocked */}
+                    {formData.manufacturingDate && formData.lastRestocked && !errors.lastRestocked && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Duration
+                        </label>
+                        <div className="flex min-h-[40px] w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5">
+                          {(() => {
+                            const d = calcDateRangeDuration(formData.manufacturingDate!, formData.lastRestocked!)
+                            return d ? (
+                              <span className="text-sm font-bold tracking-tight text-brand-500">{d}</span>
+                            ) : (
+                              <span className="text-sm text-slate-400">—</span>
+                            )
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -987,7 +1067,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Source Type:</span>
                     <span className="font-medium text-slate-800">
-                      {formData.sourceType === 'supplier' ? 'Supplier' : 'Manufacture'}
+                      {formData.sourceType === 'supplier' ? 'Trader' : 'Manufacture'}
                     </span>
                   </div>
                 )}

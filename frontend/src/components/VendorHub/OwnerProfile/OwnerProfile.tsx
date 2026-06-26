@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { Button } from '@/components/UI/Button';
 import { User, Calendar, Users, Mail, Plus, Trash2, ArrowLeft, ArrowRight, IdCard, Phone as PhoneIcon, Image as ImageIcon } from 'lucide-react';
-import { ToggleButton, PhoneInput, validatePhoneE164, AccordionSection, LocalLandlineInput, parsePhone, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
+import { ToggleButton, PhoneInput, validatePhoneE164, AccordionSection, LocalLandlineInput, parsePhone, TitleSelect, type LocalLandlineValue } from '@/components/VendorHub/FormUI';
 import { scrollToFirstError } from '@/lib/formErrorScroll';
 import { handleUpload } from '@/lib/toast-utils';
 import { centerNotice } from '@/components/UI/CenterNotice';
@@ -47,7 +47,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // section toggles by whether any partial rows exist), so they're not
 // listed here. Keep these in lockstep with the validation in handleNext.
 const SECTION_FIELDS: Record<string, string[]> = {
-  identity: ['designation', 'ownerName', 'ownerPhoto'],
+  identity: ['designation', 'ownerFirstName', 'ownerLastName', 'ownerPhoto'],
   contact: ['ownerEmail', 'ownerEmail2', 'ownerPhone', 'ownerPhone2', 'ownerLandline'],
   team: [],
   history: ['businessStartDate'],
@@ -83,7 +83,11 @@ const calculateDuration = (startDate: string) => {
   if (years < 0) years = 0;
 
   const part = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  return `${part(years, 'Year')}, ${part(months, 'Month')}, ${part(days, 'Day')}`;
+  return [
+    years > 0 ? part(years, 'Year') : '',
+    months > 0 ? part(months, 'Month') : '',
+    days > 0 ? part(days, 'Day') : '',
+  ].filter(Boolean).join(' / ') || '0 Days';
 };
 
 // ── Company-type → owner structure (Change 14) ────────────────────────
@@ -153,7 +157,10 @@ function resolveOwnerStructure(businessType: string | undefined): OwnerStructure
 
 export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: OwnerProfileProps) {
   const [formData, setFormData] = useState({
-    ownerName: data.ownerName || '',
+    ownerTitle: data.ownerTitle || '',
+    ownerFirstName: data.ownerFirstName || (data.ownerName ? data.ownerName.split(' ')[0] : ''),
+    ownerMiddleName: data.ownerMiddleName || '',
+    ownerLastName: data.ownerLastName || (data.ownerName && data.ownerName.includes(' ') ? data.ownerName.split(' ').slice(1).join(' ') : ''),
     /** Designation id — one of the predefined options, or the raw user-typed
      *  value when the chip is "Other". `DESIGNATION_OTHER` ('other') is the
      *  placeholder used while the input is empty. */
@@ -185,7 +192,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   // partnership / Pvt Ltd / LLP vendor get the same detail per director/partner.
   // All fields except name / email / phone are optional.
   const [additionalOwners, setAdditionalOwners] = useState<Array<{
-    name: string;
+    title?: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
     designation?: string;
     email: string;
     email2?: string;
@@ -200,6 +210,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   }>>(
     (data.additionalOwners || []).map((o: any) => ({
       ...o,
+      title: o.title || '',
+      firstName: o.firstName || (o.name ? o.name.split(' ')[0] : ''),
+      middleName: o.middleName || '',
+      lastName: o.lastName || (o.name && o.name.includes(' ') ? o.name.split(' ').slice(1).join(' ') : ''),
       localLandlineStd: o.localLandlineStd || '',
       localLandline: o.localLandline || (o.landline ? parsePhone(o.landline).national : ''),
       intlLandlineCountryCode: o.intlLandlineCountryCode || parsePhone(o.intlLandline || '').dial,
@@ -222,7 +236,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   // to auto-open the section containing the first failed field (mirrors
   // Step 1's pattern at CompanyDetails.tsx:929).
   const FIELD_SECTION_MAP: Record<string, SectionKey> = {
-    ownerName: 'identity',
+    ownerTitle: 'identity',
+    ownerFirstName: 'identity',
+    ownerMiddleName: 'identity',
+    ownerLastName: 'identity',
     designation: 'identity',
     ownerPhoto: 'identity',
     ownerEmail: 'contact',
@@ -245,7 +262,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   if (data !== prevData) {
     setPrevData(data);
     setFormData({
-      ownerName: data.ownerName || '',
+      ownerTitle: data.ownerTitle || '',
+      ownerFirstName: data.ownerFirstName || (data.ownerName ? data.ownerName.split(' ')[0] : ''),
+      ownerMiddleName: data.ownerMiddleName || '',
+      ownerLastName: data.ownerLastName || (data.ownerName && data.ownerName.includes(' ') ? data.ownerName.split(' ').slice(1).join(' ') : ''),
       designation: data.designation || '',
       ownerEmail: data.ownerEmail || '',
       ownerEmail2: data.ownerEmail2 || '',
@@ -269,6 +289,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       incomingConfig.allowMultiple
         ? (data.additionalOwners || []).map((o: any) => ({
             ...o,
+            title: o.title || '',
+            firstName: o.firstName || (o.name ? o.name.split(' ')[0] : ''),
+            middleName: o.middleName || '',
+            lastName: o.lastName || (o.name && o.name.includes(' ') ? o.name.split(' ').slice(1).join(' ') : ''),
             localLandlineStd: o.localLandlineStd || '',
             localLandline: o.localLandline || (o.landline ? parsePhone(o.landline).national : ''),
             intlLandlineCountryCode: o.intlLandlineCountryCode || parsePhone(o.intlLandline || '').dial,
@@ -290,7 +314,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     // programmatic call shouldn't be able to bypass the rule either.
     if (!resolveOwnerStructure(data.businessType).allowMultiple) return;
     setAdditionalOwners(prev => [...prev, {
-      name: '',
+      title: '',
+      firstName: '',
+      middleName: '',
+      lastName: '',
       designation: '',
       email: '',
       email2: '',
@@ -423,7 +450,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     e.target.value = '';
   }, [openOwnerPhotoCropper]);
 
-  const handleOwnerPhotoDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleOwnerPhotoDrop = useCallback((e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) openOwnerPhotoCropper(file);
@@ -439,14 +466,15 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     setOwnerPhotoError(null);
   }, []);
 
-  const handleOwnerPhotoDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleOwnerPhotoDragOver = useCallback((e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
   }, []);
 
   const handleNext = useCallback(() => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.ownerName) newErrors.ownerName = 'Owner full name is required';
+    if (!formData.ownerFirstName) newErrors.ownerFirstName = 'First name is required';
+    if (!formData.ownerLastName) newErrors.ownerLastName = 'Last name is required';
 
     // Owner profile photo is mandatory — accept either a freshly chosen File
     // or an existing uploaded photo (edit mode).
@@ -499,8 +527,9 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     // company type actually allows multiple — proprietorship has none).
     const allowMultiple = resolveOwnerStructure(data.businessType).allowMultiple;
     if (allowMultiple) additionalOwners.forEach((owner, index) => {
-      if (owner.name || owner.email || owner.phone) {
-        if (!owner.name) newErrors[`additionalOwner_${index}_name`] = 'Name is required';
+      if (owner.firstName || owner.email || owner.phone) {
+        if (!owner.firstName) newErrors[`additionalOwner_${index}_firstName`] = 'First name is required';
+        if (!owner.lastName) newErrors[`additionalOwner_${index}_lastName`] = 'Last name is required';
         if (!owner.email) {
           newErrors[`additionalOwner_${index}_email`] = 'Email is required';
         } else if (!EMAIL_RE.test(owner.email)) {
@@ -521,7 +550,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       // Step 1's behaviour — CompanyDetails.tsx → handleNext).
       const fieldOrder = [
         'designation',
-        'ownerName',
+        'ownerTitle',
+        'ownerFirstName',
+        'ownerMiddleName',
+        'ownerLastName',
         'ownerPhoto',
         'ownerEmail',
         'ownerEmail2',
@@ -551,7 +583,10 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         scrollToFirstError(newErrors, {
           fieldOrder: [
             'designation',
-            'ownerName',
+            'ownerTitle',
+            'ownerFirstName',
+            'ownerMiddleName',
+            'ownerLastName',
             'ownerPhoto',
             'ownerEmail',
             'ownerEmail2',
@@ -574,12 +609,13 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
     // Filter out empty additional owners and assemble their landlines
     const filledOwners = additionalOwners
-      .filter((o) => o.name || o.email || o.phone)
+      .filter((o) => o.firstName || o.email || o.phone)
       .map((o) => {
         const ownerLocalLandline = (o.localLandlineStd + o.localLandline).trim();
         const ownerIntlLandline = (o.intlLandlineCountryCode + o.intlLandlineStd + o.intlLandlineNumber).replace(/^\+?$/, '');
         return {
           ...o,
+          name: [o.title, o.firstName, o.middleName, o.lastName].filter(Boolean).join(' '),
           localLandline: ownerLocalLandline || undefined,
           localLandlineStd: o.localLandlineStd || undefined,
           intlLandline: ownerIntlLandline || undefined,
@@ -592,6 +628,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     const intlLandline = (formData.ownerIntlLandlineCountryCode + formData.ownerIntlLandlineStd + formData.ownerIntlLandlineNumber).replace(/^\+?$/, '');
     onUpdateData({
       ...formData,
+      ownerName: [formData.ownerTitle, formData.ownerFirstName, formData.ownerMiddleName, formData.ownerLastName].filter(Boolean).join(' '),
       ownerLandline: localLandline || undefined,
       ownerLocalLandlineStd: formData.ownerLocalLandlineStd || undefined,
       ownerLocalLandlineNumber: formData.ownerLocalLandlineNumber || undefined,
@@ -613,7 +650,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
   const allowMultipleOwners = resolveOwnerStructure(data.businessType).allowMultiple;
   const getSectionStatus = (section: SectionKey): 'complete' | 'partial' | 'empty' => {
     if (section === 'identity') {
-      const required = [formData.ownerName, formData.designation, formData.ownerPhoto];
+      const required = [formData.ownerFirstName, formData.ownerLastName, formData.designation, formData.ownerPhoto];
       const filled = required.filter(Boolean).length;
       if (filled === required.length) return 'complete';
       if (filled > 0) return 'partial';
@@ -630,8 +667,8 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       // Optional section — "complete" once at least one row is filled,
       // "partial" if any partial row exists, otherwise "empty".
       if (!allowMultipleOwners) return 'empty';
-      const filledRows = additionalOwners.filter((o) => o.name && o.email && o.phone);
-      const partialRows = additionalOwners.filter((o) => o.name || o.email || o.phone);
+      const filledRows = additionalOwners.filter((o) => o.firstName && o.email && o.phone);
+      const partialRows = additionalOwners.filter((o) => o.firstName || o.email || o.phone);
       if (filledRows.length > 0 && filledRows.length === additionalOwners.length) return 'complete';
       if (partialRows.length > 0) return 'partial';
       return 'empty';
@@ -707,168 +744,218 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
         title="Owner Identity"
         subtitle="Designation and owner full name"
       >
-          {/* Designation — chip group + "Other" conditional input */}
-          {(() => {
-            const d = formData.designation;
-            const isOtherTyped =
-              !!d && d !== DESIGNATION_OTHER && !DESIGNATION_IDS.has(d);
-            const otherSelected = d === DESIGNATION_OTHER || isOtherTyped;
-            const otherValue = isOtherTyped ? d : '';
-            const invalid = !!(errors.designation && touched.designation);
-            return (
-              <div>
-                <label
-                  id="designation-label"
-                  className="block text-sm font-medium text-gray-700 mb-1.5"
-                >
-                  Designation <span className="text-red-500" aria-hidden="true">*</span>
-                </label>
-                <p className="text-xs text-gray-500 -mt-0.5 mb-2">
-                  Role of this person at the company.
-                </p>
-                <div
-                  className="flex flex-wrap gap-2"
-                  role="radiogroup"
-                  aria-labelledby="designation-label"
-                  data-field="designation"
-                >
-                  {designationOptions.map((opt) => (
-                    <ToggleButton
-                      key={opt.id}
-                      selected={d === opt.id}
-                      invalid={invalid && !d}
-                      onClick={() => handleInputChange('designation', d === opt.id ? '' : opt.id)}
-                    >
-                      {opt.label}
-                    </ToggleButton>
-                  ))}
-                  <ToggleButton
-                    selected={otherSelected}
-                    invalid={invalid && !d}
-                    onClick={() => {
-                      handleInputChange('designation', otherSelected ? '' : DESIGNATION_OTHER);
-                    }}
+          {/* Top row: Designation (left) | Profile Photo (right) — side by side */}
+          <div className="grid grid-cols-[1fr_auto] gap-5 items-start">
+
+            {/* Designation — chip group + "Other" conditional input */}
+            {(() => {
+              const d = formData.designation;
+              const isOtherTyped =
+                !!d && d !== DESIGNATION_OTHER && !DESIGNATION_IDS.has(d);
+              const otherSelected = d === DESIGNATION_OTHER || isOtherTyped;
+              const otherValue = isOtherTyped ? d : '';
+              const invalid = !!(errors.designation && touched.designation);
+              return (
+                <div>
+                  <label
+                    id="designation-label"
+                    className="block text-sm font-medium text-gray-700 mb-1.5"
                   >
-                    Other
-                  </ToggleButton>
-                </div>
-
-                {otherSelected && (
-                  <div className="mt-3 max-w-md">
-                    <label
-                      htmlFor="designationOther"
-                      className="block text-sm font-medium text-gray-700 mb-1.5"
-                    >
-                      Specify your designation
-                      <span className="text-red-500 ml-1" aria-hidden="true">*</span>
-                    </label>
-                    <input
-                      id="designationOther"
-                      type="text"
-                      name="designationOther"
-                      value={otherValue}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        // Empty input falls back to placeholder so chip stays selected
-                        handleInputChange('designation', v.trim() === '' ? DESIGNATION_OTHER : v);
-                      }}
-                      onBlur={() => handleBlur('designation')}
-                      placeholder="e.g. Partner, Co-Founder, Head of Operations…"
-                      autoComplete="off"
-                      className={`w-full px-4 py-2.5 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                        invalid ? 'border-red-500 bg-red-50' : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    />
-                  </div>
-                )}
-
-                {invalid && (
-                  <p className="text-red-600 text-sm mt-2 font-medium" role="alert">
-                    {errors.designation}
+                    Designation <span className="text-red-500" aria-hidden="true">*</span>
+                  </label>
+                  <p className="text-xs text-gray-500 -mt-0.5 mb-2">
+                    Role of this person at the company.
                   </p>
-                )}
-              </div>
-            );
-          })()}
+                  <div
+                    className="flex flex-wrap gap-2"
+                    role="radiogroup"
+                    aria-labelledby="designation-label"
+                    data-field="designation"
+                  >
+                    {designationOptions.map((opt) => (
+                      <ToggleButton
+                        key={opt.id}
+                        selected={d === opt.id}
+                        invalid={invalid && !d}
+                        onClick={() => handleInputChange('designation', d === opt.id ? '' : opt.id)}
+                      >
+                        {opt.label}
+                      </ToggleButton>
+                    ))}
+                    <ToggleButton
+                      selected={otherSelected}
+                      invalid={invalid && !d}
+                      onClick={() => {
+                        handleInputChange('designation', otherSelected ? '' : DESIGNATION_OTHER);
+                      }}
+                    >
+                      Other
+                    </ToggleButton>
+                  </div>
 
-          {/* Owner Name + Profile Photo — 2 fields per row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-          <div>
-            <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Owner Full Name <span className="text-red-500" aria-hidden="true">*</span>
-            </label>
-            <input
-              id="ownerName"
-              type="text"
-              name="ownerName"
-              value={formData.ownerName}
-              onChange={(e) => handleInputChange('ownerName', e.target.value)}
-              onBlur={() => handleBlur('ownerName')}
-              autoComplete="name"
-              className={`w-full px-4 py-3 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
-                errors.ownerName && touched.ownerName
-                  ? 'border-red-500 bg-red-50'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
-              placeholder="Enter owner's full name"
-            />
-            {errors.ownerName && touched.ownerName && (
-              <p className="text-red-600 text-sm mt-1 font-medium" role="alert">
-                {errors.ownerName}
-              </p>
-            )}
+                  {otherSelected && (
+                    <div className="mt-3 max-w-sm">
+                      <label
+                        htmlFor="designationOther"
+                        className="block text-sm font-medium text-gray-700 mb-1.5"
+                      >
+                        Specify your designation
+                        <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                      </label>
+                      <input
+                        id="designationOther"
+                        type="text"
+                        name="designationOther"
+                        value={otherValue}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          handleInputChange('designation', v.trim() === '' ? DESIGNATION_OTHER : v);
+                        }}
+                        onBlur={() => handleBlur('designation')}
+                        placeholder="e.g. Partner, Co-Founder, Head of Operations…"
+                        autoComplete="off"
+                        className={`w-full px-4 py-2.5 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors ${
+                          invalid ? 'border-red-500 bg-red-50' : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      />
+                    </div>
+                  )}
+
+                  {invalid && (
+                    <p className="text-red-600 text-sm mt-2 font-medium" role="alert">
+                      {errors.designation}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Owner Profile Photo — right column, vertically aligned with Designation */}
+            {(() => {
+              const photoInvalid = !!(errors.ownerPhoto && touched.ownerPhoto) || !!ownerPhotoError;
+              return (
+                <div className="w-64 shrink-0">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Owner Profile Photo <span className="text-red-500" aria-hidden="true">*</span>
+                  </label>
+                  <label
+                    htmlFor="ownerPhotoUpload"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('ownerPhotoUpload')?.click(); } }}
+                    className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-3 transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${
+                      photoInvalid ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                    }`}
+                    onDragOver={handleOwnerPhotoDragOver}
+                    onDrop={handleOwnerPhotoDrop}
+                    data-field="ownerPhoto"
+                  >
+                    <div className="w-10 h-10 shrink-0 bg-white rounded-full border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
+                      {formData.ownerPhoto ? (
+                        <img src={formData.ownerPhoto as string} alt="Owner Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon className="w-4 h-4 text-slate-300" aria-hidden="true" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-slate-500 truncate">
+                        {formData.ownerPhoto ? (formData.ownerPhotoFile?.name || 'photo.png') : 'Drag & drop or browse'}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">PNG, JPG, WEBP — max 2 MB</p>
+                    </div>
+                    <input id="ownerPhotoUpload" type="file" accept="image/*" onChange={handleOwnerPhotoChange} className="hidden" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg transition-colors duration-200">
+                        Browse
+                      </span>
+                      {formData.ownerPhoto && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); handleRemoveOwnerPhoto(); }}
+                          className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </label>
+                  {(ownerPhotoError || (errors.ownerPhoto && touched.ownerPhoto)) && (
+                    <p className="text-red-500 text-xs mt-1">{ownerPhotoError || errors.ownerPhoto}</p>
+                  )}
+                </div>
+              );
+            })()}
+
           </div>
 
-          {/* Owner Profile Photo — mandatory, image-only upload */}
-          {(() => {
-            const photoInvalid = !!(errors.ownerPhoto && touched.ownerPhoto) || !!ownerPhotoError;
-            return (
+          {/* Owner Name — single row: Title | First | Middle | Last */}
+          <div className="grid grid-cols-[130px_1fr_1fr_1fr] gap-4 items-start">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Owner Profile Photo <span className="text-red-500" aria-hidden="true">*</span>
+              <label htmlFor="ownerTitle" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Title
               </label>
-              <div
-                className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-3 transition-all duration-200 ${
-                  photoInvalid ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+              <TitleSelect
+                id="ownerTitle"
+                value={formData.ownerTitle}
+                onChange={(v) => handleInputChange('ownerTitle', v)}
+              />
+            </div>
+            <div>
+              <label htmlFor="ownerFirstName" className="block text-sm font-medium text-gray-700 mb-1.5">
+                First Name <span className="text-red-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="ownerFirstName"
+                type="text"
+                name="ownerFirstName"
+                value={formData.ownerFirstName}
+                onChange={(e) => handleInputChange('ownerFirstName', e.target.value)}
+                onBlur={() => handleBlur('ownerFirstName')}
+                autoComplete="given-name"
+                className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 ${
+                  errors.ownerFirstName && touched.ownerFirstName ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'
                 }`}
-                onDragOver={handleOwnerPhotoDragOver}
-                onDrop={handleOwnerPhotoDrop}
-                role="region"
-                aria-label="Owner photo upload dropzone"
-                data-field="ownerPhoto"
-                tabIndex={-1}
-              >
-                <div className="w-12 h-12 shrink-0 bg-white rounded-full border border-slate-100 overflow-hidden flex items-center justify-center shadow-sm">
-                  {formData.ownerPhoto ? (
-                    <img src={formData.ownerPhoto as string} alt="Owner Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <ImageIcon className="w-5 h-5 text-slate-300" aria-hidden="true" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs text-slate-500 truncate">
-                    {formData.ownerPhoto ? (formData.ownerPhotoFile?.name || 'photo.png') : 'Drag & drop or browse'}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">PNG, JPG, WEBP — max 2 MB</p>
-                </div>
-                <input id="ownerPhotoUpload" type="file" accept="image/*" onChange={handleOwnerPhotoChange} className="hidden" />
-                <div className="flex items-center gap-2 shrink-0">
-                  <label htmlFor="ownerPhotoUpload" className="inline-flex items-center justify-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors duration-200">
-                    Browse
-                  </label>
-                  {formData.ownerPhoto && (
-                    <button type="button" onClick={handleRemoveOwnerPhoto} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-red-500 hover:bg-red-50 transition-colors duration-200">
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-              {(ownerPhotoError || (errors.ownerPhoto && touched.ownerPhoto)) && (
-                <p className="text-red-500 text-xs mt-1">{ownerPhotoError || errors.ownerPhoto}</p>
+                placeholder="First name"
+              />
+              {errors.ownerFirstName && touched.ownerFirstName && (
+                <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.ownerFirstName}</p>
               )}
             </div>
-            );
-          })()}
+            <div>
+              <label htmlFor="ownerMiddleName" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Middle Name <span className="text-slate-400 text-xs font-normal">(optional)</span>
+              </label>
+              <input
+                id="ownerMiddleName"
+                type="text"
+                name="ownerMiddleName"
+                value={formData.ownerMiddleName}
+                onChange={(e) => handleInputChange('ownerMiddleName', e.target.value)}
+                autoComplete="additional-name"
+                className="w-full h-10 px-3 border border-slate-200 hover:border-slate-300 rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500"
+                placeholder="Middle name"
+              />
+            </div>
+            <div>
+              <label htmlFor="ownerLastName" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Last Name <span className="text-red-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="ownerLastName"
+                type="text"
+                name="ownerLastName"
+                value={formData.ownerLastName}
+                onChange={(e) => handleInputChange('ownerLastName', e.target.value)}
+                onBlur={() => handleBlur('ownerLastName')}
+                autoComplete="family-name"
+                className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 ${
+                  errors.ownerLastName && touched.ownerLastName ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'
+                }`}
+                placeholder="Last name"
+              />
+              {errors.ownerLastName && touched.ownerLastName && (
+                <p className="text-red-600 text-xs mt-1 font-medium" role="alert">{errors.ownerLastName}</p>
+              )}
+            </div>
           </div>
       </AccordionSection>
 
@@ -1065,27 +1152,57 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                     The earlier 3-col grid left empty placeholder columns on
                     rows 1 and 2 which read as awkward visual gaps. */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Full Name <span className="text-red-500" aria-hidden="true">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={owner.name}
-                      onChange={(e) => handleOwnerFieldChange(index, 'name', e.target.value)}
-                      autoComplete="off"
-                      className={`w-full px-3 py-2 border rounded-lg outline-none focus-visible:ring-1 focus-visible:ring-brand-500 focus-visible:border-brand-500 transition-colors text-sm ${
-                        errors[`additionalOwner_${index}_name`]
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                      placeholder={`${ownerStructure.contactLabel} name`}
-                    />
-                    {errors[`additionalOwner_${index}_name`] && (
-                      <p className="text-red-600 text-xs mt-1 font-medium" role="alert">
-                        {errors[`additionalOwner_${index}_name`]}
-                      </p>
-                    )}
+                  {/* Name row: Title | First | Middle | Last — single line */}
+                  <div className="sm:col-span-2 grid grid-cols-[100px_1fr_1fr_1fr] gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                      <TitleSelect
+                        value={owner.title || ''}
+                        onChange={(v) => handleOwnerFieldChange(index, 'title', v)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        First Name <span className="text-red-500" aria-hidden="true">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={owner.firstName || ''}
+                        onChange={(e) => handleOwnerFieldChange(index, 'firstName', e.target.value)}
+                        className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 ${errors[`additionalOwner_${index}_firstName`] ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'}`}
+                        placeholder="First name"
+                      />
+                      {errors[`additionalOwner_${index}_firstName`] && (
+                        <p className="text-red-600 text-xs mt-1 font-medium">{errors[`additionalOwner_${index}_firstName`]}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Middle Name <span className="text-gray-400">(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={owner.middleName || ''}
+                        onChange={(e) => handleOwnerFieldChange(index, 'middleName', e.target.value)}
+                        className="w-full h-10 px-3 border border-slate-200 hover:border-slate-300 rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500"
+                        placeholder="Middle name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Last Name <span className="text-red-500" aria-hidden="true">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={owner.lastName || ''}
+                        onChange={(e) => handleOwnerFieldChange(index, 'lastName', e.target.value)}
+                        className={`w-full h-10 px-3 border rounded-md text-sm shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 ${errors[`additionalOwner_${index}_lastName`] ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'}`}
+                        placeholder="Last name"
+                      />
+                      {errors[`additionalOwner_${index}_lastName`] && (
+                        <p className="text-red-600 text-xs mt-1 font-medium">{errors[`additionalOwner_${index}_lastName`]}</p>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1103,7 +1220,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Email <span className="text-red-500" aria-hidden="true">*</span>
+                      Primary Email <span className="text-red-500" aria-hidden="true">*</span>
                     </label>
                     <input
                       type="email"
@@ -1127,7 +1244,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Email 2 <span className="text-gray-400">(optional)</span>
+                      Secondary Email <span className="text-gray-400">(optional)</span>
                     </label>
                     <input
                       type="email"
@@ -1143,7 +1260,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
 
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Phone <span className="text-red-500" aria-hidden="true">*</span>
+                      Primary Phone <span className="text-red-500" aria-hidden="true">*</span>
                     </label>
                     <input
                       type="tel"
@@ -1164,7 +1281,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Phone 2 <span className="text-gray-400">(optional)</span>
+                      Secondary Phone <span className="text-gray-400">(optional)</span>
                     </label>
                     <input
                       type="tel"
@@ -1282,7 +1399,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                 {(() => {
                   const duration = calculateDuration(formData.businessStartDate);
                   return duration ? (
-                    <span className="whitespace-nowrap text-sm font-bold tracking-tight text-brand-600">
+                    <span className="whitespace-nowrap text-sm font-bold tracking-tight text-brand-500">
                       {duration}
                     </span>
                   ) : (

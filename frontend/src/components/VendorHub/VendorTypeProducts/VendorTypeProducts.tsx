@@ -15,6 +15,7 @@ import {
   Briefcase,
   ListTree,
   FolderPlus,
+  CheckCircle2,
 } from "lucide-react";
 import Image from "next/image";
 import { categoryService, Category } from "@/services/categoryService";
@@ -790,25 +791,31 @@ export default function VendorTypeProducts({
                     type="button"
                     key={type.id}
                     onClick={() => toggleMarketType(type.id)}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 active:scale-[0.98] ${
+                    className={`relative p-5 rounded-xl cursor-pointer transition-all duration-200 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 active:scale-[0.99] ${
                       isSelected
-                        ? "border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10"
+                        ? "border-2 border-brand-500 bg-brand-50/60 shadow-md shadow-brand-500/10 ring-1 ring-brand-500/10"
                         : hasError
-                          ? "border-red-500 bg-red-50 hover:bg-red-100 hover:border-red-600"
-                          : "border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm"
+                          ? "border-2 border-red-400 bg-white hover:border-red-500 hover:bg-red-50/30"
+                          : "border-2 border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50/20 hover:shadow-sm"
                     }`}
                   >
-                    <div
-                      className={`font-semibold text-base ${isSelected ? "text-brand-900" : "text-slate-900"}`}
+                    {/* Check badge — top-right corner */}
+                    <span
+                      className={`absolute top-3 right-3 transition-all duration-200 ${
+                        isSelected ? "opacity-100 scale-100" : "opacity-0 scale-75"
+                      }`}
+                      aria-hidden="true"
                     >
+                      <CheckCircle2 className="w-5 h-5 text-brand-500" />
+                    </span>
+
+                    <p className={`font-bold text-base pr-6 ${isSelected ? "text-brand-700" : "text-slate-800"}`}>
                       {type.label}
-                    </div>
+                    </p>
                     {type.description && (
-                      <div
-                        className={`text-sm mt-1 ${isSelected ? "text-brand-700" : "text-slate-500"}`}
-                      >
+                      <p className={`text-sm mt-1 ${isSelected ? "text-brand-600/80" : "text-slate-500"}`}>
                         {type.description}
-                      </div>
+                      </p>
                     )}
                   </button>
                 );
@@ -848,14 +855,7 @@ export default function VendorTypeProducts({
                 </div>
               ) : error ? (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">
-                  {error}{" "}
-                  <button
-                    type="button"
-                    onClick={() => window.location.reload()}
-                    className="font-semibold underline underline-offset-2 hover:text-red-700"
-                  >
-                    Retry
-                  </button>
+                  {error}
                 </div>
               ) : categories.length === 0 ? (
                 <p className="py-8 text-center text-sm text-slate-500">
