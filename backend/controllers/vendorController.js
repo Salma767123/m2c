@@ -1121,75 +1121,102 @@ const getAllVendors = async (req, res) => {
     const formattedVendors = vendors.map(vendor => {
       const { inspections, ...rest } = vendor;
 
-      // Calculate completion percentage based on actual filled data
-      const hasValue = (v) => v !== null && v !== undefined && v !== '' && v !== 0;
-      const hasArray = (v) => Array.isArray(v) && v.length > 0;
-      const hasObj = (v) => v && typeof v === 'object' && Object.keys(v).length > 0;
+      // Mirror the step-count formula used by VendorPanel.tsx and AddEditVendor.tsx
+      // so the admin list always shows the same percentage as the registration sidebar.
+      //
+      // Vendors submitted via the vendor portal store completedSteps as 1-indexed
+      // [1..8]; vendors saved via the admin edit form store 0-indexed [0..7].
+      // Detect by checking whether any stored value equals 8 (impossible in
+      // 0-indexed where the max step index is 7).
+      let completionPercentage;
+      const rawCompleted = Array.isArray(vendor.completedSteps) ? vendor.completedSteps : [];
 
-      const sections = [
-        // 1. Company Details
-        {
-          fields: [vendor.companyName, vendor.gstNumber, vendor.businessEmail, vendor.businessPhone, vendor.businessAddress, vendor.businessCity, vendor.businessState, vendor.businessCountry],
-          check: (f) => f.filter(hasValue).length / f.length
-        },
-        // 2. Warehouse
-        {
-          fields: [vendor.warehouseAddress, vendor.warehouseCity, vendor.warehouseState, vendor.warehouseCountry],
-          check: (f) => f.filter(hasValue).length / f.length
-        },
-        // 3. Owner Profile
-        {
-          fields: [vendor.ownerName, vendor.ownerEmail, vendor.ownerPhone, vendor.establishedYear, vendor.annualTurnover],
-          check: (f) => f.filter(hasValue).length / f.length
-        },
-        // 4. Vendor Type & Products
-        {
-          fields: [vendor.vendorType, vendor.productCategories],
-          check: () => {
-            let score = 0, total = 2;
-            if (hasValue(vendor.vendorType)) score++;
-            if (hasArray(vendor.productCategories)) score++;
-            return score / total;
-          }
-        },
-        // 5. Manufacturing Facilities (optional for non-manufacturers)
-        {
-          fields: [],
-          check: () => {
-            const isManufacturer = vendor.vendorType === 'manufacturer' || (Array.isArray(vendor.vendorType) && vendor.vendorType.includes('manufacturer'));
-            if (!isManufacturer) return 1; // skip = full credit
-            return hasObj(vendor.facilityDetails) ? 1 : 0;
-          }
-        },
-        // 6. Certifications & Logistics
-        {
-          fields: [],
-          check: () => {
-            let score = 0, total = 2;
-            if (vendor.certifications && vendor.certifications.length > 0) score++;
-            if (hasArray(vendor.shippingMethods)) score++;
-            return score / total;
-          }
-        },
-        // 7. Contact & Trade Info
-        {
-          fields: [],
-          check: () => {
-            if (!vendor.mainContact) return 0;
-            const mc = typeof vendor.mainContact === 'string' ? JSON.parse(vendor.mainContact) : vendor.mainContact;
-            const contactFields = [mc.name, mc.email || mc.email1, mc.phone || mc.phone1, mc.department];
-            return contactFields.filter(hasValue).length / contactFields.length;
-          }
-        },
-        // 8. Review & Submit
-        {
-          fields: [],
-          check: () => hasValue(vendor.submittedAt) ? 1 : 0
-        }
-      ];
+      if (rawCompleted.length > 0) {
+        const isOneIndexed = rawCompleted.some(s => s >= 8);
+        const storedCompletedSteps = isOneIndexed ? rawCompleted.map(s => s - 1) : rawCompleted;
+        const rawAppStep = typeof vendor.applicationStep === 'number' ? vendor.applicationStep : 0;
+        const currentStep = rawAppStep >= 8 ? rawAppStep - 1 : rawAppStep;
 
-      const sectionScores = sections.map(s => typeof s.check === 'function' ? s.check(s.fields) : 0);
-      const completionPercentage = Math.round((sectionScores.reduce((sum, s) => sum + s, 0) / sections.length) * 100);
+        const isManufacturerVendor = vendor.vendorType === 'manufacturer' ||
+          (Array.isArray(vendor.vendorType) && vendor.vendorType.includes('manufacturer'));
+
+        const isStepSkipped = (idx) =>
+          idx === 4 &&
+          storedCompletedSteps.includes(3) &&
+          !isManufacturerVendor;
+
+        const TOTAL_STEPS = 8;
+        const visibleStepCount = Array.from({ length: TOTAL_STEPS }, (_, i) => i)
+          .filter(i => !isStepSkipped(i)).length;
+        const completedVisibleCount = storedCompletedSteps.filter(i => !isStepSkipped(i)).length;
+        const inProgressCredit =
+          !isStepSkipped(currentStep) && !storedCompletedSteps.includes(currentStep) ? 0.4 : 0;
+        completionPercentage = Math.min(100, Math.round(
+          ((completedVisibleCount + inProgressCredit) / visibleStepCount) * 100
+        ));
+      } else {
+        // Fallback: field-completeness for vendors without stored step data
+        // (in-progress vendor-portal registrations or imported records).
+        const hasValue = (v) => v !== null && v !== undefined && v !== '' && v !== 0;
+        const hasArray = (v) => Array.isArray(v) && v.length > 0;
+        const hasObj = (v) => v && typeof v === 'object' && Object.keys(v).length > 0;
+
+        const sections = [
+          {
+            fields: [vendor.companyName, vendor.gstNumber, vendor.businessEmail, vendor.businessPhone, vendor.businessAddress, vendor.businessCity, vendor.businessState, vendor.businessCountry],
+            check: (f) => f.filter(hasValue).length / f.length
+          },
+          {
+            fields: [vendor.warehouseAddress, vendor.warehouseCity, vendor.warehouseState, vendor.warehouseCountry],
+            check: (f) => f.filter(hasValue).length / f.length
+          },
+          {
+            fields: [vendor.ownerName, vendor.ownerEmail, vendor.ownerPhone, vendor.establishedYear, vendor.annualTurnover],
+            check: (f) => f.filter(hasValue).length / f.length
+          },
+          {
+            fields: [vendor.vendorType, vendor.productCategories],
+            check: () => {
+              let score = 0, total = 2;
+              if (hasValue(vendor.vendorType)) score++;
+              if (hasArray(vendor.productCategories)) score++;
+              return score / total;
+            }
+          },
+          {
+            fields: [],
+            check: () => {
+              const isManufacturer = vendor.vendorType === 'manufacturer' || (Array.isArray(vendor.vendorType) && vendor.vendorType.includes('manufacturer'));
+              if (!isManufacturer) return 1;
+              return hasObj(vendor.facilityDetails) ? 1 : 0;
+            }
+          },
+          {
+            fields: [],
+            check: () => {
+              let score = 0, total = 2;
+              if (vendor.certifications && vendor.certifications.length > 0) score++;
+              if (hasArray(vendor.shippingMethods)) score++;
+              return score / total;
+            }
+          },
+          {
+            fields: [],
+            check: () => {
+              if (!vendor.mainContact) return 0;
+              const mc = typeof vendor.mainContact === 'string' ? JSON.parse(vendor.mainContact) : vendor.mainContact;
+              const contactFields = [mc.name, mc.email || mc.email1, mc.phone || mc.phone1, mc.department];
+              return contactFields.filter(hasValue).length / contactFields.length;
+            }
+          },
+          {
+            fields: [],
+            check: () => hasValue(vendor.submittedAt) ? 1 : 0
+          }
+        ];
+        const sectionScores = sections.map(s => typeof s.check === 'function' ? s.check(s.fields) : 0);
+        completionPercentage = Math.round((sectionScores.reduce((sum, s) => sum + s, 0) / sections.length) * 100);
+      }
 
       return {
         ...rest,
@@ -1694,7 +1721,20 @@ const updateVendorById = async (req, res) => {
       taxIdentificationNumber: updateData.taxIdentificationNumber || null,
 
       // Status (admin can update these)
-      status: updateData.status?.toUpperCase() || existingVendor.status
+      status: updateData.status?.toUpperCase() || existingVendor.status,
+
+      // Step tracking — sent by the admin edit form so the vendor list shows
+      // the same progress % as the sidebar showed during editing.
+      ...(updateData.completedSteps !== undefined && {
+        completedSteps: Array.isArray(updateData.completedSteps)
+          ? updateData.completedSteps.map(Number)
+          : (safeJsonParse(updateData.completedSteps) || []).map(Number)
+      }),
+      ...(updateData.applicationStep !== undefined && {
+        applicationStep: typeof updateData.applicationStep === 'number'
+          ? updateData.applicationStep
+          : (parseInt(updateData.applicationStep, 10) || 0)
+      })
     };
 
     // ── Bank details upsert (admin update path) ─────────────────────────

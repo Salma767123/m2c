@@ -5,14 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/UI/Card';
 import {
   IndianRupee,
   ShoppingCart,
-  Calendar,
   ChevronDown,
-  ChevronUp,
   Check,
   AlertCircle,
   Loader2,
   Inbox,
 } from 'lucide-react';
+import DateRangeCalendar, { parseDate } from '@/components/Shared/DateRangeCalendar';
 import {
   AreaChart,
   Area,
@@ -49,8 +48,6 @@ const PRESETS: { value: ChartRange; label: string }[] = [
   { value: 'last_3_years', label: 'Last 3 years' },
   { value: 'custom', label: 'Custom' },
 ];
-
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 // Compact INR for axis ticks. Scales to k / L (lakh) / Cr (crore) and keeps
 // small values readable (e.g. ₹250 instead of collapsing to ₹0k).
@@ -137,159 +134,6 @@ function ThemedSelect({
 }
 
 /* ------------------------------------------------------------------ */
-/* Calendar date picker (brand themed)                                 */
-/* ------------------------------------------------------------------ */
-function formatDate(d: Date | null) {
-  if (!d) return 'dd/mm/yyyy';
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}/${d.getFullYear()}`;
-}
-
-function isSameDay(a: Date | null, b: Date | null) {
-  return !!a && !!b && a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
-}
-
-function MiniDatePicker({
-  value,
-  onChange,
-  placeholderLabel,
-}: {
-  value: Date | null;
-  onChange: (d: Date | null) => void;
-  placeholderLabel: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [view, setView] = useState<Date>(value ?? new Date());
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const year = view.getFullYear();
-  const month = view.getMonth();
-  const today = new Date();
-
-  const cells = useMemo(() => {
-    const startWeekday = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const result: { date: Date; current: boolean }[] = [];
-    for (let i = 0; i < 42; i++) {
-      const dayNum = i - startWeekday + 1;
-      const date = new Date(year, month, dayNum);
-      result.push({ date, current: dayNum >= 1 && dayNum <= daysInMonth });
-    }
-    return result;
-  }, [year, month]);
-
-  return (
-    <div ref={ref} className="relative">
-      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{placeholderLabel}</span>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 w-[140px] text-xs font-semibold bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-xs transition-colors hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
-      >
-        <Calendar className="w-4 h-4 text-brand-500 shrink-0" />
-        <span className={value ? 'text-slate-700' : 'text-slate-400'}>{formatDate(value)}</span>
-      </button>
-
-      {open && (
-        <div className="absolute left-0 z-50 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-900">
-              {view.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </h3>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setView(new Date(year, month - 1, 1))}
-                className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                aria-label="Previous month"
-              >
-                <ChevronUp className="w-4 h-4 text-slate-500" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setView(new Date(year, month + 1, 1))}
-                className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                aria-label="Next month"
-              >
-                <ChevronDown className="w-4 h-4 text-slate-500" />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-7 mb-1">
-            {WEEKDAYS.map((d, i) => (
-              <div key={i} className="text-center text-xs font-semibold text-slate-500 py-1">{d}</div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-0.5">
-            {cells.map(({ date, current }, i) => {
-              const selected = isSameDay(date, value);
-              const isToday = isSameDay(date, today);
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => {
-                    onChange(date);
-                    setView(date);
-                    setOpen(false);
-                  }}
-                  className={`h-9 w-9 mx-auto flex items-center justify-center text-sm rounded-lg transition-colors ${
-                    selected
-                      ? 'bg-brand-500 text-white font-semibold'
-                      : isToday
-                        ? 'text-brand-600 font-semibold ring-1 ring-brand-200'
-                        : current
-                          ? 'text-slate-700 hover:bg-slate-100'
-                          : 'text-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  {date.getDate()}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => {
-                onChange(null);
-                setOpen(false);
-              }}
-              className="text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              Clear
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onChange(today);
-                setView(today);
-                setOpen(false);
-              }}
-              className="text-sm font-semibold text-brand-500 hover:text-brand-600 transition-colors"
-            >
-              Today
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* Trend chart: owns its filter + fetches real aggregated data         */
 /* ------------------------------------------------------------------ */
 type TrendType = 'revenue' | 'orders';
@@ -306,18 +150,12 @@ function TrendChart({
   const isRevenue = type === 'revenue';
 
   const [preset, setPreset] = useState<ChartRange>('last_year');
-  const today = useMemo(() => new Date(), []);
-  const [fromDate, setFromDate] = useState<Date | null>(new Date(today.getFullYear(), 0, 1));
-  const [toDate, setToDate] = useState<Date | null>(today);
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
 
   const [data, setData] = useState<ChartPoint[]>(initialData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const dateError =
-    preset === 'custom' && fromDate && toDate && fromDate > toDate
-      ? 'Start date must be on or before end date'
-      : null;
 
   const fetchData = useCallback(
     async (range: ChartRange, from: Date | null, to: Date | null) => {
@@ -358,18 +196,14 @@ function TrendChart({
     setPreset(range);
     if (range !== 'custom') {
       fetchData(range, null, null);
-    } else {
-      fetchData('custom', fromDate, toDate);
     }
+    // For custom, wait for the user to pick both dates in the calendar.
   };
 
-  const handleFrom = (d: Date | null) => {
-    setFromDate(d);
-    if (d && toDate && d <= toDate) fetchData('custom', d, toDate);
-  };
-  const handleTo = (d: Date | null) => {
-    setToDate(d);
-    if (fromDate && d && fromDate <= d) fetchData('custom', fromDate, d);
+  const handleDateRange = (from: string, to: string) => {
+    setCustomFrom(from);
+    setCustomTo(to);
+    if (from && to) fetchData('custom', parseDate(from), parseDate(to));
   };
 
   const hasData = data.length > 0 && data.some((d) => (isRevenue ? d.revenue : d.orders) > 0);
@@ -391,23 +225,17 @@ function TrendChart({
         <div className="flex flex-wrap items-end gap-2">
           <ThemedSelect value={preset} options={PRESETS} onChange={handlePreset} />
           {preset === 'custom' && (
-            <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
-              <MiniDatePicker value={fromDate} placeholderLabel="From" onChange={handleFrom} />
-              <span className="text-xs font-medium text-slate-400 pb-1.5">to</span>
-              <MiniDatePicker value={toDate} placeholderLabel="To" onChange={handleTo} />
-            </div>
+            <DateRangeCalendar
+              from={customFrom}
+              to={customTo}
+              onChange={handleDateRange}
+              placeholder="Select date range"
+            />
           )}
         </div>
       </CardHeader>
 
       <CardContent>
-        {dateError && (
-          <div className="mb-3 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm font-medium text-red-700">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            {dateError}
-          </div>
-        )}
-
         {loading ? (
           <div className="flex flex-col items-center justify-center text-slate-400" style={{ height: 300 }}>
             <Loader2 className="w-6 h-6 animate-spin mb-2" />

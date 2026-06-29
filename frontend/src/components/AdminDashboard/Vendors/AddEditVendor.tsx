@@ -862,6 +862,10 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   };
 
   const handleSubmit = async () => {
+    // Attach step-tracking fields so the admin vendor list can show the same
+    // progress % as the form sidebar. completedSteps and currentStep are
+    // 0-indexed frontend state; the backend normalises either convention.
+    const dataToSend = { ...formData, completedSteps, applicationStep: currentStep };
     try {
       if (mode === "edit" && vendorId) {
         // Update existing vendor
@@ -869,7 +873,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           .default;
         const response = await VendorService.updateVendorById(
           vendorId,
-          formData,
+          dataToSend,
         );
 
         // Show success message using toast instead of alert
@@ -885,7 +889,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         // Create new vendor from admin panel
         const VendorService = (await import("@/services/vendorService"))
           .default;
-        const response = await VendorService.createVendorByAdmin(formData);
+        const response = await VendorService.createVendorByAdmin(dataToSend);
 
         const { toast } = await import("@/hooks/use-toast");
         toast({
