@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { convertINRtoUSD } from '@/lib/currency';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
 import { BagType } from '@/services/bagTypeService';
+import { showErrorToast } from '@/lib/toast-utils';
+import { centerNotice } from '@/components/UI/CenterNotice';
 
 interface BagTypeModalProps {
   isOpen: boolean;
@@ -55,7 +57,7 @@ export default function BagTypeModal({ isOpen, onClose, mode, bagType, onSubmit,
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be less than 5MB');
+      showErrorToast('File Too Large', 'Image must be less than 5MB.');
       return;
     }
 
@@ -64,6 +66,7 @@ export default function BagTypeModal({ isOpen, onClose, mode, bagType, onSubmit,
       const base64 = reader.result as string;
       setFormData(prev => ({ ...prev, image: base64 }));
       setImagePreview(base64);
+      centerNotice.success('Image Uploaded', `${file.name} uploaded successfully.`);
     };
     reader.readAsDataURL(file);
   };

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
 import Dropdown from "../../UI/Dropdown";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
+import { centerNotice } from "@/components/UI/CenterNotice";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService } from "@/services/qcCheckerService";
 import ImageCropModal from "@/components/UI/ImageCropModal";
@@ -132,6 +133,7 @@ export default function EditQCChecker() {
   const applyProfilePhoto = async (file: File) => {
     const dataUrl = await readFileAsDataUrl(file);
     setFormData((prev) => ({ ...prev, profilePhoto: dataUrl }));
+    centerNotice.success('Photo Uploaded', 'Profile photo updated successfully.');
   };
 
   const handleIdProofChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,6 +152,7 @@ export default function EditQCChecker() {
     const dataUrl = await readFileAsDataUrl(file);
     setFormData((prev) => ({ ...prev, idProof: dataUrl }));
     setIdProofName(file.name);
+    centerNotice.success('Document Uploaded', `${file.name} uploaded successfully.`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -5,6 +5,8 @@ import { X, Tag, Percent, Calendar, TrendingUp, Info, Upload, Megaphone, Chevron
 import Dropdown from '@/components/UI/Dropdown';
 import { Coupon } from '@/services/couponService';
 import { categoryService } from '@/services/categoryService';
+import { showErrorToast } from '@/lib/toast-utils';
+import { centerNotice } from '@/components/UI/CenterNotice';
 
 interface CouponModalProps {
   isOpen: boolean;
@@ -50,7 +52,7 @@ const CouponModal = ({
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be less than 5MB');
+      showErrorToast('File Too Large', 'Image must be less than 5MB.');
       return;
     }
 
@@ -59,6 +61,7 @@ const CouponModal = ({
       const base64 = reader.result as string;
       setFormData({ ...formData, popupImage: base64 });
       setPopupImagePreview(base64);
+      centerNotice.success('Image Uploaded', `${file.name} uploaded successfully.`);
     };
     reader.readAsDataURL(file);
   };

@@ -4,6 +4,7 @@ import { X, Upload, Trash2, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/UI/Button';
 import { useState } from 'react';
 import { showWarningToast, showErrorToast } from '@/lib/toast-utils';
+import { centerNotice } from '@/components/UI/CenterNotice';
 
 interface VariantImageModalProps {
     isOpen: boolean;
@@ -47,6 +48,7 @@ export default function VariantImageModal({
             if (event.target?.result) {
                 // Replace existing images with the new one (enforce 1 image limit)
                 onUpdateImages(variantData.id, [event.target.result as string]);
+                centerNotice.success('Image Uploaded', `${file.name} added to this variant.`);
             }
             setIsUploading(false);
             // Clear input

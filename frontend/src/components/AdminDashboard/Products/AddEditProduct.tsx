@@ -11,6 +11,7 @@ import { ArrowLeft, Save, X, Upload, Package, Image as ImageIcon } from 'lucide-
 import VariantImageModal from './VariantImageModal'
 import Link from 'next/link'
 import { showSuccessToast, showErrorToast, showWarningToast } from '@/lib/toast-utils'
+import { centerNotice } from '@/components/UI/CenterNotice'
 import { gstSettingsService, type GSTSetting } from '@/services/gstSettingsService'
 import { DIMENSION_UNITS, parseDimensions, combineDimensions } from '@/lib/dimensions'
 
@@ -959,6 +960,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
           ...prev,
           images: [event.target?.result as string] // Overwrite with new single image
         }))
+        centerNotice.success('Image Uploaded', `${file.name} added to this variant.`)
       }
     }
     reader.readAsDataURL(file)
@@ -1046,7 +1048,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
     }
 
     // Process files (all validations passed)
-    Array.from(files).forEach((file) => {
+    const validFiles = Array.from(files)
+    validFiles.forEach((file) => {
       const reader = new FileReader()
       reader.onload = (event) => {
         const newImage: ProductImage = {
@@ -1061,6 +1064,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
           ...prev,
           images: [...prev.images, newImage]
         }))
+        centerNotice.success('Image Uploaded', `${file.name} added successfully.`)
       }
       reader.readAsDataURL(file)
     })

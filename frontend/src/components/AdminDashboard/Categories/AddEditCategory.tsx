@@ -9,6 +9,8 @@ import { ArrowLeft, Save, X, Plus, Trash2, Upload } from 'lucide-react'
 import Link from 'next/link'
 import { categoryService, Category, CategoryFormData, SubcategoryFormData } from '@/services/categoryService'
 import { useToast } from '@/hooks/use-toast'
+import { showErrorToast } from '@/lib/toast-utils'
+import { centerNotice } from '@/components/UI/CenterNotice'
  
 interface AddEditCategoryProps {
   categoryId?: string
@@ -161,11 +163,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > MAX_FILE_SIZE) {
-        toast({
-          title: 'Error',
-          description: `File size exceeds 5MB limit. Please upload a smaller image.`,
-          variant: 'destructive',
-        })
+        showErrorToast('File Too Large', 'File size exceeds 5MB limit. Please upload a smaller image.')
         e.target.value = ''
         return
       }
@@ -195,10 +193,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
         
         if (data.secure_url) {
           setCategoryData(prev => ({ ...prev, image: data.secure_url }))
-          toast({
-            title: 'Success',
-            description: 'Image uploaded successfully',
-          })
+          centerNotice.success('Image Uploaded', 'Image uploaded successfully.')
         } else {
           // Log the full error response
           console.error('Cloudinary upload failed:', data)
@@ -206,11 +201,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
         }
       } catch (error) {
         console.error('Image upload error:', error)
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to upload image. Please try again.',
-          variant: 'destructive',
-        })
+        showErrorToast('Upload Failed', error instanceof Error ? error.message : 'Failed to upload image. Please try again.')
         setCategoryData(prev => ({ ...prev, image: '' }))
       }
     }
@@ -220,11 +211,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > MAX_FILE_SIZE) {
-        toast({
-          title: 'Error',
-          description: `File size exceeds 5MB limit. Please upload a smaller image.`,
-          variant: 'destructive',
-        })
+        showErrorToast('File Too Large', 'File size exceeds 5MB limit. Please upload a smaller image.')
         e.target.value = ''
         return
       }
@@ -234,37 +221,30 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
         formData.append('file', file)
         formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'm2c_categories')
         formData.append('folder', 'categories/subcategories')
-        
+
         // Upload to Cloudinary
         const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`
-        
+
         const response = await fetch(cloudinaryUrl, {
           method: 'POST',
           body: formData
         })
-        
+
         const data = await response.json()
         console.log('Cloudinary response:', data)
-        
+
         if (data.secure_url) {
           if (isNew) {
             setNewSubcategory(prev => ({ ...prev, image: data.secure_url }))
           }
-          toast({
-            title: 'Success',
-            description: 'Image uploaded successfully',
-          })
+          centerNotice.success('Image Uploaded', 'Image uploaded successfully.')
         } else {
           console.error('Cloudinary upload failed:', data)
           throw new Error(data.error?.message || 'Upload failed')
         }
       } catch (error) {
         console.error('Image upload error:', error)
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to upload image. Please try again.',
-          variant: 'destructive',
-        })
+        showErrorToast('Upload Failed', error instanceof Error ? error.message : 'Failed to upload image. Please try again.')
       }
     }
   }
@@ -273,11 +253,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > MAX_FILE_SIZE) {
-        toast({
-          title: 'Error',
-          description: `File size exceeds 5MB limit. Please upload a smaller image.`,
-          variant: 'destructive',
-        })
+        showErrorToast('File Too Large', 'File size exceeds 5MB limit. Please upload a smaller image.')
         e.target.value = ''
         return
       }
@@ -287,35 +263,28 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
         formData.append('file', file)
         formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'm2c_categories')
         formData.append('folder', 'categories/subcategories')
-        
+
         // Upload to Cloudinary
         const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`
-        
+
         const response = await fetch(cloudinaryUrl, {
           method: 'POST',
           body: formData
         })
-        
+
         const data = await response.json()
         console.log('Cloudinary response:', data)
-        
+
         if (data.secure_url) {
           updateSubcategory(subcategoryId, 'image', data.secure_url)
-          toast({
-            title: 'Success',
-            description: 'Image uploaded successfully',
-          })
+          centerNotice.success('Image Uploaded', 'Image uploaded successfully.')
         } else {
           console.error('Cloudinary upload failed:', data)
           throw new Error(data.error?.message || 'Upload failed')
         }
       } catch (error) {
         console.error('Image upload error:', error)
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to upload image. Please try again.',
-          variant: 'destructive',
-        })
+        showErrorToast('Upload Failed', error instanceof Error ? error.message : 'Failed to upload image. Please try again.')
       }
     }
   }

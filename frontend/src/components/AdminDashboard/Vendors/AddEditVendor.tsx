@@ -852,19 +852,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
   const goToStep = async (step: number) => {
     if (isStepSkipped(step)) return;
 
-    // Allow navigation to current step or completed steps.
-    const canNavigate = step === currentStep || completedSteps.includes(step);
+    // All steps are freely navigable in the admin panel.
+    const canNavigate = true;
 
     if (canNavigate) {
       setCurrentStep(step);
     } else {
-      const { toast } = await import("@/hooks/use-toast");
-      toast({
-        title: "Step Locked",
-        description:
-          "Please complete the current section before proceeding to this step.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -1093,11 +1086,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                     const isCompleted =
                       completedSteps.includes(index) && !skipped;
                     const isCurrent = index === currentStep && !skipped;
-                    const isAccessible =
-                      !skipped &&
-                      (index <= currentStep ||
-                        isCompleted ||
-                        (index > 0 && completedSteps.includes(index - 1)));
+                    const isAccessible = !skipped;
 
                     return (
                       <li

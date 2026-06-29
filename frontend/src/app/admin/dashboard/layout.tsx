@@ -8,6 +8,7 @@ import ProtectedRoute from '@/components/AdminDashboard/ProtectedRoute'
 import { NotificationProvider } from '@/components/Shared/NotificationProvider'
 import { useStorageSync } from '@/hooks/useStorageSync'
 import { clearAuth } from '@/lib/auth'
+import { CenterNoticeHost } from '@/components/UI/CenterNotice'
 
 export default function DashboardLayout({
   children,
@@ -55,6 +56,7 @@ export default function DashboardLayout({
           {/* <Footer /> */}
         </div>
       </div>
+      <CenterNoticeHost />
       </NotificationProvider>
     </ProtectedRoute>
   )
