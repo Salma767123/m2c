@@ -20,6 +20,7 @@ import {
 import Image from "next/image";
 import { categoryService, Category } from "@/services/categoryService";
 import { AccordionSection } from "@/components/VendorHub/FormUI";
+import { validateUpload, notifyUploadError, notifyUploadSuccess } from "@/lib/toast-utils";
 
 interface VendorTypeProductsProps {
   onNext: () => void;
@@ -174,15 +175,25 @@ export default function VendorTypeProducts({
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const files = Array.from(e.target.files || []);
-    const validFiles = files.filter(
-      (f) =>
-        f.size <= 5 * 1024 * 1024 &&
-        ["image/jpeg", "image/png", "image/webp"].includes(f.type),
-    );
 
-    validFiles.forEach((file) => {
+    files.forEach((file) => {
+      const result = validateUpload(file, {
+        label: 'Product Image',
+        allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        allowedLabel: 'JPEG, PNG, or WEBP',
+        maxBytes: 5 * 1024 * 1024,
+        maxLabel: '5,120 KB',
+      });
+      if (!result.ok) {
+        notifyUploadError('Product Image', result.message);
+        return;
+      }
+
       compressImageToDataUrl(file).then((preview) => {
-        if (!preview) return;
+        if (!preview) {
+          notifyUploadError('Product Image', 'Could not process this image. Please try again.');
+          return;
+        }
         setCategoryProducts((prev) => {
           const categoryList = prev[categoryId] || [];
           return {
@@ -199,6 +210,7 @@ export default function VendorTypeProducts({
             }),
           };
         });
+        notifyUploadSuccess('Product Image', file.name);
       });
     });
     e.target.value = "";
@@ -319,15 +331,25 @@ export default function VendorTypeProducts({
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const files = Array.from(e.target.files || []);
-    const validFiles = files.filter(
-      (f) =>
-        f.size <= 5 * 1024 * 1024 &&
-        ["image/jpeg", "image/png", "image/webp"].includes(f.type),
-    );
 
-    validFiles.forEach((file) => {
+    files.forEach((file) => {
+      const result = validateUpload(file, {
+        label: 'Product Image',
+        allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        allowedLabel: 'JPEG, PNG, or WEBP',
+        maxBytes: 5 * 1024 * 1024,
+        maxLabel: '5,120 KB',
+      });
+      if (!result.ok) {
+        notifyUploadError('Product Image', result.message);
+        return;
+      }
+
       compressImageToDataUrl(file).then((preview) => {
-        if (!preview) return;
+        if (!preview) {
+          notifyUploadError('Product Image', 'Could not process this image. Please try again.');
+          return;
+        }
         setAdditionalCategories((prev) =>
           prev.map((c) => {
             if (c.id === categoryId) {
@@ -348,6 +370,7 @@ export default function VendorTypeProducts({
             return c;
           }),
         );
+        notifyUploadSuccess('Product Image', file.name);
       });
     });
     e.target.value = "";
