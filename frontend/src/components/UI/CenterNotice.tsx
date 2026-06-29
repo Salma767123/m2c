@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 import { CheckCircle2, XCircle, AlertTriangle, Info, X } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,11 +94,14 @@ function NoticeCard({ notice }: { notice: CenterNotice }) {
     return () => window.clearTimeout(t);
   }, [close, notice.duration]);
 
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-      {/* Light, blurred backdrop — no heavy dark overlay */}
+  // Rendered via portal so position:fixed is always relative to the viewport,
+  // escaping any stacking context created by layout ancestors (transforms,
+  // will-change, overflow, etc.). z-[9999] sits above every layout layer.
+  const content = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      {/* Dim + blur the entire page while the popup is visible */}
       <div
-        className={`absolute inset-0 bg-white/10 backdrop-blur-[4px] transition-opacity duration-200 ${
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${
           leaving ? "opacity-0" : "opacity-100"
         }`}
         onClick={close}
@@ -133,18 +137,26 @@ function NoticeCard({ notice }: { notice: CenterNotice }) {
       </div>
     </div>
   );
+
+  return ReactDOM.createPortal(content, document.body);
 }
 
-// Mount once near the registration form. Renders the most recent notice
-// (center-screen, one at a time) so messages don't pile up over the backdrop.
+// Mount once in any layout. Renders the most recent notice center-screen,
+// one at a time, via a portal so it always floats above every UI layer.
 export function CenterNoticeHost() {
   const [list, setList] = React.useState<CenterNotice[]>(notices);
+  const [mounted, setMounted] = React.useState(false);
+
   React.useEffect(() => {
+    setMounted(true);
     listeners.add(setList);
     return () => {
       listeners.delete(setList);
     };
   }, []);
+
+  // Avoid SSR mismatch — portal targets document.body which only exists client-side.
+  if (!mounted) return null;
 
   const current = list[list.length - 1];
   if (!current) return null;
