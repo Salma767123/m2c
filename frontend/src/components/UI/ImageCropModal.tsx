@@ -115,6 +115,19 @@ export default function ImageCropModal({
   const [croppedAreaPixels, setCroppedAreaPixels] = React.useState<Area | null>(null);
   const [saving, setSaving] = React.useState(false);
 
+  // Reset all crop state each time a new image is loaded. Because this
+  // component returns null (not unmounts) when src is null, stale state
+  // from a previous crop session persists — including `saving = true` which
+  // locks the Apply button for every subsequent upload.
+  React.useEffect(() => {
+    if (!src) return;
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setRotation(0);
+    setCroppedAreaPixels(null);
+    setSaving(false);
+  }, [src]);
+
   // Lock body scroll while the modal is visible; restore on close / unmount.
   React.useEffect(() => {
     if (!src) return;
@@ -153,6 +166,7 @@ export default function ImageCropModal({
       onCropped(file);
     } catch (e) {
       console.error("Crop failed:", e);
+    } finally {
       setSaving(false);
     }
   };

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { CountrySelect, ToggleButton, AccordionSection } from "@/components/VendorHub/FormUI";
 import { scrollToFirstError } from "@/lib/formErrorScroll";
-import { handleUpload } from "@/lib/toast-utils";
+import { validateUpload, notifyUploadError, notifyUploadSuccess } from "@/lib/toast-utils";
 import { centerNotice } from "@/components/UI/CenterNotice";
 import { useZipLookup } from "@/hooks/useZipLookup";
 import { zipPlaceLabel } from "@/lib/zipLookup";
@@ -305,17 +305,20 @@ export default function WarehouseDetails({
     (slotId: FactoryImageSlotId, file: File) => {
       const slot = FACTORY_IMAGE_SLOTS.find((s) => s.id === slotId);
       const label = slot ? slot.label : 'Image';
-      const result = handleUpload(file, {
+      const result = validateUpload(file, {
         label,
         allowedTypes: FACTORY_IMAGE_ALLOWED_TYPES,
         allowedLabel: 'PNG, JPG, WEBP, or GIF',
         maxBytes: FACTORY_IMAGE_MAX_BYTES,
         maxLabel: FACTORY_IMAGE_MAX_LABEL,
       });
-      if (!result.ok) return;
+      if (!result.ok) {
+        notifyUploadError(label, result.message);
+        return;
+      }
 
-      // Open the square crop modal — the file is saved only after the user
-      // confirms. Revoke any prior pending object URL to avoid memory leaks.
+      // Open the crop modal — success notice fires after the user confirms
+      // the crop, not here, so it reflects the actual applied image.
       const pending = cropPendingRef.current;
       if (pending) URL.revokeObjectURL(pending.src);
       setCropPending({ slotId, src: URL.createObjectURL(file), fileName: file.name });
@@ -328,6 +331,8 @@ export default function WarehouseDetails({
       const pending = cropPendingRef.current;
       if (!pending) return;
       URL.revokeObjectURL(pending.src);
+      const slot = FACTORY_IMAGE_SLOTS.find((s) => s.id === pending.slotId);
+      const label = slot ? slot.label : 'Factory Image';
       setFormData((prev) => {
         const existing = prev.factoryImages[pending.slotId];
         if (existing?.url && existing.file) URL.revokeObjectURL(existing.url);
@@ -346,6 +351,7 @@ export default function WarehouseDetails({
       const errKey = `factoryImage:${pending.slotId}`;
       setErrors((prev) => (prev[errKey] ? { ...prev, [errKey]: '' } : prev));
       setCropPending(null);
+      notifyUploadSuccess(label, pending.fileName);
     },
     [],
   );
