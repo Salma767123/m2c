@@ -90,8 +90,8 @@ export function validateUpload(
  * the vendor registration flow) with professional confirmation wording, e.g.
  * "GST Certificate Uploaded Successfully".
  */
-export function notifyUploadSuccess(label: string, fileName: string) {
-  centerNotice.success(`${label} Uploaded Successfully`, fileName);
+export function notifyUploadSuccess(label: string, _fileName: string) {
+  centerNotice.success(`${label} Uploaded`, `${label} has been uploaded successfully.`);
 }
 
 /** Failure notice — actionable, e.g. "Failed to Upload GST Certificate. Please try again." */
