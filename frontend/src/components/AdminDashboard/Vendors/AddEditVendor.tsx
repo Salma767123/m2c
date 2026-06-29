@@ -322,7 +322,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
       photo: null,
     },
     alternateContacts: [],
-    hasImportExport: "no",
+    hasImportExport: "",
     importCountries: [],
     exportCountries: [],
     tradeLicenseNumber: "",
@@ -771,7 +771,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
         // Treat either flag as "yes" so the FE chip reflects any kind of
         // international trade experience the vendor declared.
         hasImportExport:
-          vendor.importExperience || vendor.exportExperience ? "yes" : "no",
+          vendor.importExperience || vendor.exportExperience ? "yes" : "",
         importCountries: vendor.importCountries || [],
         exportCountries: vendor.exportCountries || [],
         tradeLicenseNumber: vendor.tradeLicenseNumber || "",
