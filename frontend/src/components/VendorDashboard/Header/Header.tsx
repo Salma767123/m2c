@@ -211,7 +211,7 @@ export default function VendorHeader({ onMenuToggle, isSidebarOpen = true }: Ven
                         ? 'bg-amber-50 text-amber-700 border-amber-200'
                         : 'bg-red-50 text-red-700 border-red-200'
                     }`}>
-                      {vendor.status}
+                      {vendor.status === 'APPROVED' ? 'Active' : vendor.status === 'PENDING' ? 'Pending' : 'Inactive'}
                     </span>
                   </div>
                 </div>

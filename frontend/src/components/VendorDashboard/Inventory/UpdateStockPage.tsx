@@ -227,7 +227,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   }
 
   const handleVariantStockChange = (variantId: string, value: string) => {
-    const numValue = parseInt(value) || 0
+    const numValue = value === '' ? 0 : parseInt(value)
     setVariantStocks(prev => ({
       ...prev,
       [variantId]: numValue < 0 ? 0 : numValue
@@ -445,7 +445,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                         <div className="w-32">
                           <input
                             type="number"
-                            value={variantStocks[variant.id] || 0}
+                            value={variantStocks[variant.id] || ''}
                             onFocus={(e) => e.currentTarget.select()}
                             onChange={(e) => handleVariantStockChange(variant.id, e.target.value)}
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-brand-500/40 focus:border-transparent"

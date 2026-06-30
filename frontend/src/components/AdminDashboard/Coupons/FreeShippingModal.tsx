@@ -242,7 +242,7 @@ const FreeShippingModal = ({ isOpen, onClose, onSaved }: FreeShippingModalProps)
                 </label>
                 <input
                   type="number"
-                  value={minOrderValue}
+                  value={minOrderValue || ''}
                   onChange={(e) => setMinOrderValue(Number(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                   placeholder="e.g., 500"

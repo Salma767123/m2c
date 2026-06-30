@@ -2826,6 +2826,7 @@ const assignQc = async (req, res) => {
       where: { id: vendorId },
       data: {
         assignedQcId: checkerId,
+        assignedQcAt: new Date(),
         status: statusUpdate
       },
       include: {

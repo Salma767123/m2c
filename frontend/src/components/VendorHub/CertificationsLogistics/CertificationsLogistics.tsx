@@ -601,10 +601,10 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
         </div>
         <div className="min-w-0">
           <h2 className="text-headline-md text-gray-900 leading-tight" style={{ textWrap: "balance" as any }}>
-            Quality, Certifications & Logistics
+            Certifications & Quality Control
           </h2>
           <p className="text-sm text-gray-600 mt-0.5">
-            Showcase your quality standards and logistics capabilities
+            Showcase your certifications and quality standards
           </p>
         </div>
       </div>
@@ -757,9 +757,11 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                             ) : (
                               <label
                                 htmlFor={inputId}
+                                tabIndex={0}
                                 onDrop={(e) => handleFileDrop(certId, cert.name, e)}
                                 onDragOver={handleDragOver}
-                                className={`flex items-center justify-center gap-2 px-3 py-4 text-xs border border-dashed rounded-md cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-brand-500/40 ${
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
+                                className={`flex items-center justify-center gap-2 px-3 py-4 text-xs border border-dashed rounded-md cursor-pointer transition-colors outline-none focus-within:ring-2 focus-within:ring-brand-500/40 ${
                                   errors[`certFile_${certId}`]
                                     ? 'border-red-500 bg-red-50 hover:bg-red-100'
                                     : 'border-slate-300 hover:border-brand-500/40 hover:bg-brand-50/20'
@@ -1007,9 +1009,11 @@ export default function CertificationsLogistics({ onNext, onPrev, onUpdateData, 
                           ) : (
                             <label
                               htmlFor={inputId}
+                              tabIndex={0}
                               onDrop={(e) => handleFileDrop(other.id, label, e)}
                               onDragOver={handleDragOver}
-                              className={`flex items-center justify-center gap-2 px-3 py-2 text-xs border border-dashed rounded-md cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-brand-500/40 ${
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
+                              className={`flex items-center justify-center gap-2 px-3 py-2 text-xs border border-dashed rounded-md cursor-pointer transition-colors outline-none focus-within:ring-2 focus-within:ring-brand-500/40 ${
                                 errors[`otherCertFile_${other.id}`]
                                   ? 'border-red-500 bg-red-50 hover:bg-red-100'
                                   : 'border-slate-300 hover:border-brand-500/40 hover:bg-brand-50/20'

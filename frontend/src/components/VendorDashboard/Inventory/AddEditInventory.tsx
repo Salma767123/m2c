@@ -322,7 +322,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
     setFormData(prev => {
       const next = {
         ...prev,
-        [name]: type === 'number' ? parseFloat(value) || 0 :
+        [name]: type === 'number' ? (value === '' ? 0 : parseFloat(value)) :
           type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
       }
       // Changing the manufacturing date can invalidate an already-picked
@@ -352,9 +352,6 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
     if (!data.category?.trim()) e.category = 'Category is required'
     if (data.lowStockAlert === undefined || data.lowStockAlert === null || isNaN(data.lowStockAlert) || data.lowStockAlert < 5) {
       e.lowStockAlert = 'Enter a valid low stock alert (5 or more)'
-    }
-    if (data.sourceType === 'supplier' && !data.supplier?.trim()) {
-      e.supplier = 'Supplier name is required when supplier is selected'
     }
     if (
       data.sourceType === 'manufacture' &&
@@ -731,7 +728,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                     id="vf-lowStockAlert"
                     type="number"
                     name="lowStockAlert"
-                    value={formData.lowStockAlert}
+                    value={formData.lowStockAlert || ''}
                     onFocus={(e) => e.currentTarget.select()}
                     onChange={handleInputChange}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
@@ -828,27 +825,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                       <span className="w-2 h-2 bg-brand-600 rounded-full mr-2"></span>
                       Trader Information
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Trader Name *
-                        </label>
-                        <input
-                          id="vf-supplier"
-                          type="text"
-                          name="supplier"
-                          value={formData.supplier}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.supplier
-                            ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
-                            : 'border-slate-200 focus:ring-brand-500/40 focus:border-slate-500'
-                            }`}
-                          placeholder="Enter trader name"
-                        />
-                        {errors.supplier && (
-                          <p className="text-xs text-red-600 mt-1">{errors.supplier}</p>
-                        )}
-                      </div>
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Last Restocked
@@ -859,8 +836,23 @@ export default function AddEditInventory({ inventoryId, isEdit = false, fromProd
                           value={formData.lastRestocked}
                           onChange={handleInputChange}
                           max={todayStr}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-slate-500 transition-colors"
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.lastRestocked
+                            ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                            : 'border-slate-200 focus:ring-brand-500/40 focus:border-slate-500'
+                          }`}
                         />
+                        {errors.lastRestocked && (
+                          <p className="text-xs text-red-600 mt-1">{errors.lastRestocked}</p>
+                        )}
+                        {formData.lastRestocked && !errors.lastRestocked && (() => {
+                          const age = calcDateRangeDuration(formData.lastRestocked!, todayStr)
+                          return age ? (
+                            <div className="mt-2 flex min-h-[36px] w-full items-center rounded-lg border border-slate-200 bg-white px-4 py-2">
+                              <span className="text-xs text-slate-500 mr-2">Time Since Last Restock:</span>
+                              <span className="text-sm font-bold tracking-tight text-brand-500">{age}</span>
+                            </div>
+                          ) : null
+                        })()}
                       </div>
                     </div>
                   </div>

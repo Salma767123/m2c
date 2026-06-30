@@ -2,6 +2,7 @@
 
 import { Camera, Upload, X, Image as ImageIcon } from "lucide-react"
 import { useRef, useState } from "react"
+import ImageCropModal from "@/components/UI/ImageCropModal"
 
 // Compress image before storing to keep payload manageable
 const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
@@ -78,6 +79,39 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
   const wrongPhotoRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
   const generalTestingPhotoInputRef = useRef<HTMLInputElement | null>(null)
 
+  const [cropQueue, setCropQueue] = useState<File[]>([])
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [cropFileName, setCropFileName] = useState('')
+  const cropTargetRef = useRef<{ type: 'general' | 'right' | 'wrong'; testId?: string } | null>(null)
+
+  const readAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.readAsDataURL(file)
+    })
+
+  const startCropQueue = (files: File[], target: { type: 'general' | 'right' | 'wrong'; testId?: string }) => {
+    if (files.length === 0) return
+    cropTargetRef.current = target
+    setCropQueue(files.slice(1))
+    setCropFileName(files[0].name)
+    setCropSrc(URL.createObjectURL(files[0]))
+  }
+
+  const advanceCropQueue = (cur: string | null) => {
+    if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
+    if (cropQueue.length > 0) {
+      const [next, ...rest] = cropQueue
+      setCropQueue(rest)
+      setCropFileName(next.name)
+      setCropSrc(URL.createObjectURL(next))
+    } else {
+      setCropSrc(null)
+      setCropFileName('')
+    }
+  }
+
   // Helper function to create timestamp data
   const createTimestamp = () => {
     const now = new Date()
@@ -97,29 +131,10 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
     }
   }
 
-  const handleGeneralTestingPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGeneralTestingPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-
-    // Create preview URLs for the new files with timestamp
-    const newImages = await Promise.all(
-      files.map(async (file) => {
-        const data = await compressImage(file)
-        return {
-          file,
-          name: file.name,
-          url: data,
-          data: data,
-          id: Date.now() + Math.random(),
-          ...createTimestamp()
-        }
-      })
-    )
-
-    setFormData({
-      ...formData,
-      testingPhotos: [...(formData.testingPhotos || []), ...newImages]
-    })
     if (e.target) e.target.value = ""
+    startCropQueue(files, { type: 'general' })
   }
 
   const removeGeneralTestingPhoto = (imageId: string | number) => {
@@ -177,54 +192,47 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
     setFormData({ ...formData, tests: updatedTests })
   }
 
-  const handleRightPhotoUpload = async (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRightPhotoUpload = (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-
-    const newImages = await Promise.all(
-      files.map(async (file) => {
-        const data = await compressImage(file)
-        return {
-          file,
-          name: file.name,
-          url: data,
-          data: data,
-          id: Date.now() + Math.random(),
-          ...createTimestamp()
-        }
-      })
-    )
-
-    const test = tests.find(t => t.id === testId)
-    if (test) {
-      const updatedPhotos = [...(test.rightPhotos || []), ...newImages]
-      updateTest(testId, 'rightPhotos', updatedPhotos)
-    }
     if (e.target) e.target.value = ""
+    startCropQueue(files, { type: 'right', testId })
   }
 
-  const handleWrongPhotoUpload = async (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWrongPhotoUpload = (testId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-
-    const newImages = await Promise.all(
-      files.map(async (file) => {
-        const data = await compressImage(file)
-        return {
-          file,
-          name: file.name,
-          url: data,
-          data: data,
-          id: Date.now() + Math.random(),
-          ...createTimestamp()
-        }
-      })
-    )
-
-    const test = tests.find(t => t.id === testId)
-    if (test) {
-      const updatedPhotos = [...(test.wrongPhotos || []), ...newImages]
-      updateTest(testId, 'wrongPhotos', updatedPhotos)
-    }
     if (e.target) e.target.value = ""
+    startCropQueue(files, { type: 'wrong', testId })
+  }
+
+  const onTestingCropped = async (croppedFile: File) => {
+    const dataUrl = await readAsDataUrl(croppedFile)
+    const newPhoto = {
+      file: croppedFile,
+      name: cropFileName,
+      url: dataUrl,
+      data: dataUrl,
+      id: Date.now() + Math.random(),
+      ...createTimestamp(),
+    }
+    const target = cropTargetRef.current
+    if (target?.type === 'general') {
+      setFormData({ ...formData, testingPhotos: [...(formData.testingPhotos || []), newPhoto] })
+    } else if (target?.type === 'right' && target.testId) {
+      const updatedTests = tests.map(t =>
+        t.id === target.testId
+          ? { ...t, rightPhotos: [...(t.rightPhotos || []), newPhoto] }
+          : t
+      )
+      setFormData({ ...formData, tests: updatedTests })
+    } else if (target?.type === 'wrong' && target.testId) {
+      const updatedTests = tests.map(t =>
+        t.id === target.testId
+          ? { ...t, wrongPhotos: [...(t.wrongPhotos || []), newPhoto] }
+          : t
+      )
+      setFormData({ ...formData, tests: updatedTests })
+    }
+    advanceCropQueue(cropSrc)
   }
 
   const removeRightPhoto = (testId: string, imageId: string | number) => {
@@ -328,7 +336,7 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
                       type="button"
                       disabled={!test.pass}
                       onClick={() => test.pass && rightPhotoRefs.current[test.id]?.click()}
-                      className="flex flex-col items-center justify-center w-full disabled:cursor-not-allowed"
+                      className="flex flex-col items-center justify-center w-full disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-green-400/60 rounded-md"
                     >
                       <Upload className={`w-6 h-6 mb-2 ${test.pass ? "text-green-400" : "text-slate-300"}`} />
                       <p className={`text-sm font-medium ${test.pass ? "text-slate-600" : "text-slate-400"}`}>
@@ -380,7 +388,7 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
                       type="button"
                       disabled={!test.fail}
                       onClick={() => test.fail && wrongPhotoRefs.current[test.id]?.click()}
-                      className="flex flex-col items-center justify-center w-full disabled:cursor-not-allowed"
+                      className="flex flex-col items-center justify-center w-full disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 rounded-md"
                     >
                       <Upload className={`w-6 h-6 mb-2 ${test.fail ? "text-red-400" : "text-slate-300"}`} />
                       <p className={`text-sm font-medium ${test.fail ? "text-slate-600" : "text-slate-400"}`}>
@@ -428,8 +436,9 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
             className="hidden"
           />
           <button
+            type="button"
             onClick={() => generalTestingPhotoInputRef.current?.click()}
-            className="flex flex-col items-center justify-center w-full"
+            className="flex flex-col items-center justify-center w-full outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-xl"
           >
             <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
             <p className="text-slate-700 font-medium">Upload test photos</p>
@@ -457,6 +466,21 @@ export default function Testing({ formData, setFormData, errors = {} }: TestingP
           </div>
         )}
       </div>
+      <ImageCropModal
+        src={cropSrc}
+        fileName={cropFileName}
+        title="Crop Test Photo"
+        cropShape="rect"
+        showGrid={true}
+        onCancel={() => {
+          if (cropSrc?.startsWith('blob:')) URL.revokeObjectURL(cropSrc)
+          setCropQueue([])
+          setCropSrc(null)
+          setCropFileName('')
+          cropTargetRef.current = null
+        }}
+        onCropped={onTestingCropped}
+      />
     </div>
   )
 }

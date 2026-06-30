@@ -120,6 +120,22 @@ const markAsRead = async (req, res) => {
   }
 };
 
+// PUT /api/notifications/:id/unread — mark one notification as unread
+const markAsUnread = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id || req.user.checkerId;
+    await prisma.notification.updateMany({
+      where: { id, userId },
+      data: { isRead: false }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Mark unread error:', error);
+    res.status(500).json({ success: false, error: 'Failed to mark notification as unread' });
+  }
+};
+
 // PUT /api/notifications/read-all — mark all notifications as read for current user
 const markAllAsRead = async (req, res) => {
   try {
@@ -152,6 +168,7 @@ module.exports = {
   createNotificationForRole,
   getNotifications,
   markAsRead,
+  markAsUnread,
   markAllAsRead,
   getUnreadCount,
 };

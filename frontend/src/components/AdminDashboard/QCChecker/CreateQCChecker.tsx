@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, User, Mail, Phone, MapPin, Shield, Camera, FileText, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "../../UI/Card";
@@ -46,6 +47,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 export default function CreateQCChecker() {
+  const router = useRouter()
   const [formData, setFormData] = useState({ ...EMPTY_FORM });
   const [idProofName, setIdProofName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,8 +135,7 @@ export default function CreateQCChecker() {
         result.message || "The QC checker has been successfully added. Login credentials have been sent to their email."
       );
 
-      setFormData({ ...EMPTY_FORM });
-      setIdProofName("");
+      router.push("/admin/dashboard/qc-checker");
     } catch (error: any) {
       showErrorToast("Creation Failed", error.message || "Failed to create QC checker. Please try again.");
     } finally {
@@ -285,6 +286,7 @@ export default function CreateQCChecker() {
                   name="dateOfBirth"
                   value={formData.dateOfBirth}
                   onChange={handleInputChange}
+                  max={new Date().toISOString().split("T")[0]}
                   className={INPUT_CLASS}
                 />
               </div>
@@ -518,7 +520,7 @@ export default function CreateQCChecker() {
                 <input
                   type="number"
                   name="experience"
-                  value={formData.experience}
+                  value={formData.experience || ''}
                   onChange={handleInputChange}
                   placeholder="Enter years"
                   className={INPUT_CLASS}

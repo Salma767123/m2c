@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
 import { Badge } from '@/components/UI/Badge'
 import NotificationDropdown from '@/components/Shared/NotificationDropdown'
+import { QC_CATEGORIES } from '@/components/Shared/NotificationModal'
 import {
   Bell,
   User,
@@ -121,7 +122,7 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
         {/* Right Section */}
         <div className="flex items-center space-x-4">
           {/* Notifications */}
-          <NotificationDropdown />
+          <NotificationDropdown categories={QC_CATEGORIES} colorScheme="brand" />
 
           {/* User Menu */}
           <div className="relative" ref={userMenuRef}>

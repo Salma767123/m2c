@@ -253,7 +253,7 @@ export default function InvoiceSettings() {
                             <input
                                 type="number"
                                 name="sequenceLength"
-                                value={settings.sequenceLength}
+                                value={settings.sequenceLength || ''}
                                 onChange={handleInput}
                                 min="3"
                                 max="10"
@@ -270,7 +270,7 @@ export default function InvoiceSettings() {
                         <input
                             type="number"
                             name="currentSequence"
-                            value={settings.currentSequence}
+                            value={settings.currentSequence || ''}
                             onChange={handleInput}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
                         />
@@ -355,7 +355,7 @@ export default function InvoiceSettings() {
                                         type="number"
                                         min={1}
                                         max={31}
-                                        value={fyDay}
+                                        value={fyDay || ''}
                                         onChange={e => setFyDay(Number(e.target.value))}
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#222222]"
                                     />

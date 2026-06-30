@@ -602,7 +602,7 @@ export default function ProductsTable() {
                 </div>
                 <input
                   type="number"
-                  value={adminPrice}
+                  value={adminPrice || ''}
                   onChange={(e) => setAdminPrice(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                   placeholder="Enter selling price"
@@ -620,7 +620,7 @@ export default function ProductsTable() {
                 </div>
                 <input
                   type="number"
-                  value={originalPrice}
+                  value={originalPrice || ''}
                   onChange={(e) => setOriginalPrice(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                   placeholder="Enter original price"

@@ -47,10 +47,12 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const [checkerName, setCheckerName] = useState('Quality Inspector')
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null)
 
   useEffect(() => {
     const data = qcCheckerService.getCheckerData()
     if (data?.name) setCheckerName(data.name)
+    if (data?.profilePhoto) setProfilePhoto(data.profilePhoto)
   }, [])
 
   const handleLogout = () => {
@@ -101,11 +103,19 @@ export default function Sidebar() {
       <div className="border-t border-slate-200 p-4 bg-slate-50/50">
         <div className="flex items-center">
           <div className="shrink-0">
-            <div className="h-9 w-9 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center">
-              <span className="text-xs font-bold text-brand-600">
-                {checkerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'QC'}
-              </span>
-            </div>
+            {profilePhoto ? (
+              <img
+                src={profilePhoto}
+                alt={checkerName}
+                className="h-9 w-9 rounded-full object-cover border border-brand-100 shadow-sm"
+              />
+            ) : (
+              <div className="h-9 w-9 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center">
+                <span className="text-xs font-bold text-brand-600">
+                  {checkerName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'QC'}
+                </span>
+              </div>
+            )}
           </div>
           <div className="ml-3 text-left min-w-0">
             <p className="text-sm font-bold text-slate-900 truncate w-36">{checkerName}</p>

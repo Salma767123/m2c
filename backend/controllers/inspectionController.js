@@ -80,7 +80,7 @@ const createInspection = async (req, res) => {
         // Also update the vendor's assignedQcId (legacy fallback / dashboard viewing ease)
         await prisma.vendor.update({
             where: { id: vendorId },
-            data: { assignedQcId: checkerId, status: 'UNDER_REVIEW' }
+            data: { assignedQcId: checkerId, assignedQcAt: new Date(), status: 'UNDER_REVIEW' }
         });
 
         // Notify the QC checker — in-app feed + FCM push
@@ -241,10 +241,31 @@ const startInspection = async (req, res) => {
             }
         }
 
+        const wasScheduled = inspection.status === 'SCHEDULED';
+
         if (vendorLat == null || vendorLng == null) {
-            return res.status(400).json({
-                error: 'Vendor location not set',
-                message: 'The vendor\'s factory location (Map Embed Link) has not been configured. Please contact admin to set the vendor\'s map location before starting the inspection.',
+            // Vendor has no factory coordinates and no parseable mapLink.
+            // Skip the geofence check rather than blocking the inspection — admin
+            // can set the map location later; the inspector should not be blocked.
+            console.warn(
+                `[Geofence] startInspection ${id} — ${vendor?.companyName || 'vendor'} (${inspection.vendorId}) ` +
+                `has no factory coordinates and no parseable mapLink. Skipping geofence, allowing start.`
+            );
+            const updatedInspection = await prisma.inspection.update({
+                where: { id },
+                data: {
+                    checkerLatitude: parseFloat(checkerLatitude),
+                    checkerLongitude: parseFloat(checkerLongitude),
+                    locationVerified: false,
+                    ...(wasScheduled ? { status: 'IN_PROGRESS', startedAt: new Date() } : {}),
+                },
+                include: { vendor: true },
+            });
+            return res.json({
+                success: true,
+                message: 'Inspection started (vendor location not configured — geofence skipped)',
+                inspection: updatedInspection,
+                locationVerification: { verified: false, reason: 'Vendor location not configured' },
             });
         }
 
@@ -270,7 +291,6 @@ const startInspection = async (req, res) => {
         }
 
         // ── All checks passed — start (or refresh) the inspection ───────
-        const wasScheduled = inspection.status === 'SCHEDULED';
         const updatedInspection = await prisma.inspection.update({
             where: { id },
             data: {

@@ -1,7 +1,8 @@
 "use client"
 
 import { Camera, Upload, X, Image as ImageIcon } from "lucide-react"
-import { useRef } from "react"
+import { useRef, useState } from "react"
+import ImageCropModal from "@/components/UI/ImageCropModal"
 
 // Compress image before storing to keep payload manageable
 const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
@@ -48,23 +49,43 @@ interface PackagingProps {
 
 export default function Packaging({ formData, setFormData, errors = {} }: PackagingProps) {
   const packagingPhotoInputRef = useRef<HTMLInputElement | null>(null)
+  const [cropQueue, setCropQueue] = useState<File[]>([])
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [cropFileName, setCropFileName] = useState('')
 
-  const handlePackagingPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      const newEntries = await Promise.all(
-        Array.from(files).map(async (file) => {
-          const data = await compressImage(file)
-          return { name: file.name, data, url: data }
-        })
-      )
-      setFormData({
-        ...formData,
-        packagingPhotos: [...(formData.packagingPhotos || []), ...newEntries]
-      })
-    }
-    // Reset input
+  const readAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.readAsDataURL(file)
+    })
+
+  const handlePackagingPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
     if (e.target) e.target.value = ""
+    if (files.length === 0) return
+    setCropQueue(files.slice(1))
+    setCropFileName(files[0].name)
+    setCropSrc(URL.createObjectURL(files[0]))
+  }
+
+  const onPackagingCropped = async (croppedFile: File) => {
+    const dataUrl = await readAsDataUrl(croppedFile)
+    setFormData({
+      ...formData,
+      packagingPhotos: [...(formData.packagingPhotos || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
+    })
+    const cur = cropSrc
+    if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
+    if (cropQueue.length > 0) {
+      const [next, ...rest] = cropQueue
+      setCropQueue(rest)
+      setCropFileName(next.name)
+      setCropSrc(URL.createObjectURL(next))
+    } else {
+      setCropSrc(null)
+      setCropFileName('')
+    }
   }
 
   const removePackagingPhoto = (photoIndex: number) => {
@@ -213,8 +234,9 @@ export default function Packaging({ formData, setFormData, errors = {} }: Packag
             className="hidden"
           />
           <button
+            type="button"
             onClick={() => packagingPhotoInputRef.current?.click()}
-            className="flex flex-col items-center justify-center w-full"
+            className="flex flex-col items-center justify-center w-full outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-xl"
           >
             <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
             <p className="text-slate-700 font-medium">Upload packaging photos</p>
@@ -255,6 +277,20 @@ export default function Packaging({ formData, setFormData, errors = {} }: Packag
           </div>
         )}
       </div>
+      <ImageCropModal
+        src={cropSrc}
+        fileName={cropFileName}
+        title="Crop Packaging Photo"
+        cropShape="rect"
+        showGrid={true}
+        onCancel={() => {
+          if (cropSrc?.startsWith('blob:')) URL.revokeObjectURL(cropSrc)
+          setCropQueue([])
+          setCropSrc(null)
+          setCropFileName('')
+        }}
+        onCropped={onPackagingCropped}
+      />
     </div>
   )
 }

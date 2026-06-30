@@ -300,9 +300,12 @@ export default function SEOSettingsTab() {
                                     
                                     {/* Upload Area */}
                                     {!imagePreview && (
-                                        <div 
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
+                                            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:border-blue-500"
                                         >
                                             <Image className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                                             <p className="text-gray-600 font-medium">Click to upload Open Graph image</p>

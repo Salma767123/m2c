@@ -11,6 +11,7 @@ const {
     getAssignedVendors,
     getVendorDetails,
     getActiveInspectionForVendor,
+    beginVendorInspection,
     approveVendorByQc,
     rejectVendorByQc,
     getAssignedProducts,
@@ -39,6 +40,7 @@ router.put('/me', authenticateToken, updateCheckerProfile);
 router.get('/vendors', authenticateToken, getAssignedVendors);
 router.get('/vendors/:vendorId/details', authenticateToken, getVendorDetails);
 router.get('/vendors/:vendorId/active-inspection', authenticateToken, getActiveInspectionForVendor);
+router.post('/vendors/:vendorId/begin-inspection', authenticateToken, beginVendorInspection);
 router.post('/vendors/:vendorId/approve', authenticateToken, approveVendorByQc);
 router.post('/vendors/:vendorId/reject', authenticateToken, rejectVendorByQc);
 

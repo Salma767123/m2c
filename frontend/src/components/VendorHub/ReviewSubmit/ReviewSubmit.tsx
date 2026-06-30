@@ -22,7 +22,7 @@ const STEP_LABELS: Record<number, string> = {
   2: 'Owner Profile',
   3: 'Vendor Type & Products',
   4: 'Manufacturing Facilities',
-  5: 'Certifications & Logistics',
+  5: 'Certifications & Quality Control',
   6: 'Contact & Trade Info',
 };
 

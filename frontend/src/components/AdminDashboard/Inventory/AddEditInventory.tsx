@@ -320,7 +320,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
 
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 :
+      [name]: type === 'number' ? (value === '' ? '' as unknown as number : parseFloat(value) || 0) :
         type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }))
   }
@@ -707,7 +707,7 @@ export default function AddEditInventory({ inventoryId, isEdit = false }: AddEdi
                   <input
                     type="number"
                     name="lowStockAlert"
-                    value={formData.lowStockAlert}
+                    value={formData.lowStockAlert || ''}
                     onChange={handleInputChange}
                     required
                     min="5"

@@ -556,7 +556,7 @@ export default function WarehouseDetails({
                     id="warehousingCapacity"
                     type="number"
                     name="warehousingCapacity"
-                    value={formData.warehousingCapacity}
+                    value={formData.warehousingCapacity || ''}
                     onChange={(e) => handleInputChange('warehousingCapacity', e.target.value)}
                     onBlur={() => handleBlur('warehousingCapacity')}
                     className="flex-1 min-w-0 text-sm font-medium pl-4 pr-2 py-2.5 border-0 outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

@@ -32,6 +32,7 @@ import VendorService, { VendorProfile } from "@/services/vendorService";
 import { buildFullName } from "@/lib/utils";
 import ResultModal from "@/components/UI/ResultModal";
 import { PhoneInput, LocalLandlineInput, getLandlineDisplay } from "@/components/VendorHub/FormUI";
+import { openDoc, isDocImageUrl } from "@/lib/docDownload";
 
 // A certificate may only be edited/replaced when it is expired or within this
 // many days of expiring. Valid certs (and certs with no expiry) stay locked.
@@ -46,8 +47,7 @@ const isCertificateEditable = (expiryDate?: string | null): boolean => {
   return daysUntilExpiry <= CERT_EXPIRY_THRESHOLD_DAYS;
 };
 
-const isImageUrl = (url?: string) =>
-  !!url && /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url);
+const isImageUrl = isDocImageUrl;
 
 // Only allow http(s) URLs to prevent javascript:/data: XSS injection via vendor-supplied links.
 function safeExternalUrl(url?: string | null): string | null {
@@ -348,7 +348,7 @@ function DocsGrid({ heading, docs }: { heading: string; docs: any[] }) {
           const uploaded = formatDate(doc.uploadedAt || doc.createdAt);
           return (
             <div key={doc.id || idx} className="bg-white border border-slate-200/80 rounded-lg p-2 space-y-2 shadow-xs hover:shadow-sm hover:border-brand-200 transition-all">
-              {isImageUrl(doc.documentUrl) ? (
+              {isImageUrl(doc.documentUrl, doc.name) ? (
                 <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer">
                   <img src={doc.documentUrl} alt={doc.name} className="w-full h-20 object-cover rounded-md border border-slate-200" />
                 </a>
@@ -367,9 +367,9 @@ function DocsGrid({ heading, docs }: { heading: string; docs: any[] }) {
                     <span className="text-[10px] text-slate-400 truncate">{uploaded}</span>
                   ) : <span />}
                   {doc.documentUrl && (
-                    <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-brand-600 hover:text-brand-700" title="View / Download">
+                    <button type="button" onClick={() => openDoc(doc.documentUrl)} className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-brand-600 hover:text-brand-700" title="View / Download">
                       <Download className="w-3 h-3" /> View
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>
@@ -643,7 +643,18 @@ function CertForm({
           <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
             {requireFile ? "Certificate File" : "Replace File"}{requireFile && <span className="text-red-500">*</span>}
           </label>
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-600 border border-dashed border-slate-300 rounded-lg px-3 py-1.5 cursor-pointer hover:border-brand-400 hover:bg-brand-50/40 transition-colors">
+          <label
+            tabIndex={0}
+            role="button"
+            aria-label="Choose certificate file"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.currentTarget.click();
+              }
+            }}
+            className="flex items-center gap-2 text-sm font-medium text-slate-600 border border-dashed border-slate-300 rounded-lg px-3 py-1.5 cursor-pointer hover:border-brand-400 hover:bg-brand-50/40 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:border-brand-500"
+          >
             <Upload className="w-4 h-4 text-slate-400 shrink-0" />
             <span className="truncate">{file ? file.name : "Choose file…"}</span>
             <input
@@ -815,9 +826,9 @@ function CertificationsSection({
                 ) : (
                   <>
                     {cert.documentUrl && (
-                      <a href={cert.documentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1">
+                      <button type="button" onClick={() => openDoc(cert.documentUrl)} className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1">
                         <FileText className="w-3.5 h-3.5" /> View File
-                      </a>
+                      </button>
                     )}
                     {cert.issuedBy && <Field label="Issued By" value={cert.issuedBy} />}
                     {cert.certificateNumber && <Field label="Certificate #" value={cert.certificateNumber} />}
@@ -1137,7 +1148,7 @@ export default function VendorSettings() {
     { id: "owner", title: "Owner Profile", icon: UserCircle, available: !!showOwner },
     { id: "products", title: "Vendor Type & Products", icon: Package, available: !!showProducts },
     { id: "facilities", title: "Manufacturing Facilities", icon: Factory, available: !!showFacilities },
-    { id: "certs", title: "Certifications & Logistics", icon: Award, available: true },
+    { id: "certs", title: "Certifications & Quality Control", icon: Award, available: true },
     { id: "contact", title: "Contact & Trade Information", icon: Phone, available: !!showContact },
   ].filter((t) => t.available);
 

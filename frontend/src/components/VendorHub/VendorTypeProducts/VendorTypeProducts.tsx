@@ -1034,6 +1034,7 @@ export default function VendorTypeProducts({
                                         />
                                         <button
                                           type="button"
+                                          aria-label={`Remove photo ${photoIndex + 1}`}
                                           onClick={() =>
                                             removeProductPhoto(
                                               category.id,
@@ -1041,7 +1042,7 @@ export default function VendorTypeProducts({
                                               photoIndex,
                                             )
                                           }
-                                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-opacity"
                                         >
                                           <X className="w-3 h-3" />
                                         </button>
@@ -1049,7 +1050,18 @@ export default function VendorTypeProducts({
                                     ))}
 
                                     {product.photos.length < 5 && (
-                                      <label className="w-20 h-20 rounded-md border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors bg-white">
+                                      <label
+                                        tabIndex={0}
+                                        role="button"
+                                        aria-label="Upload product photos"
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            e.currentTarget.click();
+                                          }
+                                        }}
+                                        className="w-20 h-20 rounded-md border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors bg-white outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:border-brand-500"
+                                      >
                                         <Upload className="w-5 h-5 text-slate-400 mb-1" />
                                         <input
                                           type="file"
@@ -1203,6 +1215,7 @@ export default function VendorTypeProducts({
                                   />
                                   <button
                                     type="button"
+                                    aria-label={`Remove photo ${photoIndex + 1}`}
                                     onClick={() =>
                                       removeAdditionalProductPhoto(
                                         category.id,
@@ -1210,7 +1223,7 @@ export default function VendorTypeProducts({
                                         photoIndex,
                                       )
                                     }
-                                    className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                    className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-opacity shadow-sm"
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
@@ -1218,7 +1231,18 @@ export default function VendorTypeProducts({
                               ))}
 
                               {product.photos.length < 5 && (
-                                <label className="w-20 h-20 rounded-md border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors bg-white">
+                                <label
+                                  tabIndex={0}
+                                  role="button"
+                                  aria-label="Upload product photos"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      e.currentTarget.click();
+                                    }
+                                  }}
+                                  className="w-20 h-20 rounded-md border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors bg-white outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:border-brand-500"
+                                >
                                   <Upload className="w-5 h-5 text-slate-400 mb-1" />
                                   <input
                                     type="file"

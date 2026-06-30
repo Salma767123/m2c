@@ -32,6 +32,7 @@ import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
 import { buildFullName } from "@/lib/utils"
+import { openDoc, isDocImageUrl } from "@/lib/docDownload"
 const MAIN_STATUS_COLORS: Record<string, string> = {
   "New Assignment": "bg-blue-50 text-blue-700 border-blue-200/85",
   "Under Review by Admin": "bg-orange-50 text-orange-700 border-orange-200/85",
@@ -234,10 +235,8 @@ export default function VendorDetail({
   const location = fullVendor
     ? formatAddress(fullVendor.factoryCity, fullVendor.factoryState) || vendor.location
     : vendor.location
-  const specializations: string[] = fullVendor?.specializations || []
   const productCategories: string[] = fullVendor?.productCategories || []
   const certifications: any[] = fullVendor?.certifications || []
-  const paymentTerms: string[] = fullVendor?.paymentTerms || []
 
   const renderOverviewTab = () => {
     if (!fullVendor) return null
@@ -288,7 +287,6 @@ export default function VendorDetail({
           { key: "businessType", label: "Business Type", transform: (val: string) => getBusinessTypeLabel(val) },
           { key: "factoryOwnershipType", label: "Factory Ownership", transform: (val: string) => getOwnershipTypeLabel(val) },
           { key: "establishedYear", label: "Year Established" },
-          { key: "annualTurnover", label: "Annual Turnover" },
           { key: "gstNumber", label: "GST Number", condition: fullVendor.gstNumber },
           { key: "_unregistered", label: "Vendor Type", valueOverride: !fullVendor.gstNumber ? "Unregistered — identified by email" : undefined, condition: !fullVendor.gstNumber },
           { key: "companyIdNumber", label: getCompanyIdLabel(fullVendor.businessType), condition: fullVendor.companyIdNumber },
@@ -296,7 +294,6 @@ export default function VendorDetail({
           { key: "panNumber", label: fullVendor.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number' },
           { key: "aadhaarNumber", label: "Aadhaar Number", condition: fullVendor.aadhaarNumber },
           { key: "website", label: "Website", type: "url" },
-          { key: "companyDescription", label: "Company Description" }
         ]
       },
       {
@@ -313,9 +310,7 @@ export default function VendorDetail({
           { key: "warehouseState", label: "State", condition: fullVendor.warehouseState },
           { key: "warehouseZipCode", label: "ZIP / Postal Code", condition: fullVendor.warehouseZipCode },
           { key: "warehouseCountry", label: "Country", condition: fullVendor.warehouseCountry },
-          { key: "warehouseSize", label: "Warehouse Size" },
-          { key: "storageCapacity", label: "Storage Capacity" },
-          { key: "factorySize", label: "Factory Size" },
+          { key: "warehouseSize", label: "Warehousing Capacity" },
         ]
       },
       {
@@ -331,11 +326,6 @@ export default function VendorDetail({
           { key: "ownerEmail2", label: "Secondary Email" },
           { key: "ownerLandline", label: "Local Landline", valueOverride: formatLocalLandline({ countryCode: '+91', std: fullVendor.ownerLocalLandlineStd as any, number: fullVendor.ownerLandline as any }) || undefined },
           { key: "ownerIntlLandline", label: "International Landline", valueOverride: formatIntlLandline(fullVendor.ownerIntlLandline as any) || undefined },
-          { key: "ownerAddress", label: "Owner Address", condition: fullVendor.ownerAddress },
-          { key: "ownerCity", label: "City", condition: fullVendor.ownerCity },
-          { key: "ownerState", label: "State", condition: fullVendor.ownerState },
-          { key: "ownerZipCode", label: "ZIP / Postal Code", condition: fullVendor.ownerZipCode },
-          { key: "ownerCountry", label: "Country", condition: fullVendor.ownerCountry },
           { key: "businessStartDate", label: "Business Start Date", type: "date" },
           { key: "employeeCount", label: "Number of Employees", transform: (val: string) => getEmployeeCountLabel(val) }
         ]
@@ -345,17 +335,9 @@ export default function VendorDetail({
         title: "Vendor Type & Products",
         icon: <Package className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "vendorType", label: "Vendor Role Type", type: "badge" },
-          { key: "vendorTypes", label: "Vendor Types", type: "list" },
+          { key: "vendorTypes", label: "Vendor Type", type: "list" },
           { key: "productCategories", label: "Product Categories", type: "list" },
-          { key: "productTypes", label: "Product Types", type: "list" },
-          { key: "specializations", label: "Specializations", type: "list" },
-          { key: "productionCapacity", label: "Production Capacity" },
-          { key: "minimumOrderQuantity", label: "Minimum Order Quantity" },
-          { key: "deliveryTime", label: "Delivery Time" },
-          { key: "paymentTerms", label: "Payment Terms", type: "list" },
-          { key: "qualityControl", label: "Quality Control Measures" },
-          { key: "categoryRemarks", label: "Category Remarks" }
+          { key: "categoryRemarks", label: "General Remarks" }
         ]
       },
       {
@@ -366,7 +348,7 @@ export default function VendorDetail({
       },
       {
         id: "certifications",
-        title: "Certifications & Logistics",
+        title: "Certifications & Quality Control",
         icon: <Award className="w-5 h-5 text-brand-600" />,
         fields: [
           { key: "complianceStandards", label: "Compliance Standards" },
@@ -398,17 +380,13 @@ export default function VendorDetail({
       },
       {
         id: "trade",
-        title: "Trade & Regulatory Details",
+        title: "Contact & Trade Information",
         icon: <FileText className="w-5 h-5 text-brand-600" />,
         fields: [
-          { key: "tradeLicenseNumber", label: "Trade License Number" },
-          { key: "businessRegistrationNumber", label: "Business Registration Number" },
-          { key: "taxIdentificationNumber", label: "Tax Identification Number" },
           { key: "importExperience", label: "Import Experience", transform: (val: any) => val ? "Yes" : "No", condition: fullVendor.importExperience !== undefined && fullVendor.importExperience !== null },
           { key: "exportExperience", label: "Export Experience", transform: (val: any) => val ? "Yes" : "No", condition: fullVendor.exportExperience !== undefined && fullVendor.exportExperience !== null },
           { key: "importCountries", label: "Import Countries", type: "list" },
           { key: "exportCountries", label: "Export Countries", type: "list" },
-          { key: "primaryMarkets", label: "Primary Markets", type: "list" },
         ]
       },
       {
@@ -421,8 +399,7 @@ export default function VendorDetail({
 
     // ── Media / documents grouped by the registration step that collected
     //    them, so each appears inside its own section below. ──────────────
-    const isImageUrl = (url?: string) =>
-      !!url && /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url)
+    const isImageUrl = isDocImageUrl
 
     const allDocs: any[] = Array.isArray(fullVendor.documents) ? fullVendor.documents : []
     const COMPANY_DOC_TYPES = ["GST_CERTIFICATE", "PAN_CARD", "COMPANY_REGISTRATION", "AADHAAR_CARD"]
@@ -479,7 +456,7 @@ export default function VendorDetail({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {docs.map((doc: any, idx: number) => (
             <div key={doc.id || idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-3 space-y-2">
-              {isImageUrl(doc.documentUrl) ? (
+              {isImageUrl(doc.documentUrl, doc.name) ? (
                 <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer">
                   <img src={doc.documentUrl} alt={doc.name} className="w-full h-32 object-cover rounded-lg border border-slate-200" />
                 </a>
@@ -491,9 +468,9 @@ export default function VendorDetail({
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</p>
                 {doc.documentUrl && (
-                  <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-brand-600 hover:text-brand-700" title="View / Download">
+                  <button type="button" onClick={() => openDoc(doc.documentUrl)} className="shrink-0 text-brand-600 hover:text-brand-700" title="View / Download">
                     <Download className="w-4 h-4" />
-                  </a>
+                  </button>
                 )}
               </div>
             </div>
@@ -507,7 +484,9 @@ export default function VendorDetail({
         {sections.map((section) => {
           // 1. Collect standard fields that have data
           const activeFields = section.fields.map(field => {
-            const rawVal = field.valueOverride !== undefined ? field.valueOverride : fullVendor[field.key]
+            // Use 'in' check so valueOverride:undefined (format fn returned empty) hides the
+            // field rather than falling back to the raw DB value (e.g. "+91" with no number).
+            const rawVal = 'valueOverride' in field ? field.valueOverride : fullVendor[field.key]
             if (!hasData(rawVal)) return null
             if (field.condition === false) return null
             const finalVal = field.transform ? field.transform(rawVal) : rawVal
@@ -681,14 +660,13 @@ export default function VendorDetail({
                               {cert.name}
                             </span>
                             {cert.documentUrl && (
-                              <a
-                                href={cert.documentUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                type="button"
+                                onClick={() => openDoc(cert.documentUrl)}
                                 className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1"
                               >
                                 <FileText className="w-3.5 h-3.5" /> View File
-                              </a>
+                              </button>
                             )}
                           </div>
                           {cert.issuedBy && <Field label="Issued By" value={cert.issuedBy} />}
@@ -922,7 +900,9 @@ export default function VendorDetail({
             {firstUpcoming && onStartInspection && (
               <button
                 onClick={handleOpenInspection}
-                className="flex items-center gap-2 px-6 py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
+                disabled={isCompleted}
+                title={isCompleted ? "Verification has already been completed. This vendor has been approved by the Admin." : undefined}
+                className="flex items-center gap-2 px-6 py-3 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
               >
                 <Play className="w-4 h-4" />
                 {isContinuing ? 'Continue' : 'Start Now'}
@@ -1176,7 +1156,9 @@ export default function VendorDetail({
         <div className="mt-8 flex justify-center">
           <button
             onClick={handleOpenInspection}
-            className="flex items-center gap-3 px-8 py-4 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-base rounded-2xl transition-all duration-200 shadow-lg hover:shadow-xl shadow-brand-500/25"
+            disabled={isCompleted}
+            title={isCompleted ? "Verification has already been completed. This vendor has been approved by the Admin." : undefined}
+            className="flex items-center gap-3 px-8 py-4 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-bold text-base rounded-2xl transition-all duration-200 shadow-lg hover:shadow-xl shadow-brand-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
           >
             <Play className="w-5 h-5" />
             {isContinuing ? 'Continue Inspection' : 'Start Factory Inspection'}

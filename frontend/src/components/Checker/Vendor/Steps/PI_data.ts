@@ -1,0 +1,144 @@
+// Shared data definitions for the Product Inspection Form redesign.
+// Imported by step components and the orchestrator for consistent defaults.
+
+export const PACKAGING_ITEM_DEFS = [
+  { id: 'shipperCarton',    label: 'Shipper Carton Packaging',     detail: 'Front, side, top views — carton condition and markings' },
+  { id: 'innerCarton',      label: 'Inner Carton Packaging',        detail: 'Inner packaging structure and protection condition' },
+  { id: 'retailPackaging',  label: 'Retail Packaging',              detail: 'Brand sticker, warning labels, retail presentation' },
+  { id: 'productType',      label: 'Product Type — style, size, color, construction, material, marking, labeling', detail: 'Matches approved specifications and purchase order' },
+] as const
+
+export const TEST_GROUP_DEFS = [
+  {
+    id: 'packagingVerification',
+    label: 'Packaging Verification',
+    tests: [
+      { id: 'pvFrontView',              label: 'Front View Photo' },
+      { id: 'pvSideView',               label: 'Side View Photo' },
+      { id: 'pvTopView',                label: 'Top View Photo' },
+      { id: 'pvShipperCartonCheck',     label: 'Shipper Carton Check' },
+      { id: 'pvInnerPackagingCheck',    label: 'Inner Packaging Check' },
+      { id: 'pvRetailPackagingCheck',   label: 'Retail Packaging Check' },
+      { id: 'pvShippingMarkVerification', label: 'Shipping Mark Verification' },
+      { id: 'pvLabelVerification',      label: 'Label Verification' },
+      { id: 'pvBrandStickerVerification', label: 'Brand Sticker Verification' },
+      { id: 'pvWarningLabelVerification', label: 'Warning Label Verification' },
+      { id: 'pvPolybagAirHoleCheck',    label: 'Polybag & Air Hole Check' },
+      { id: 'pvSilicaGelCheck',         label: 'Silica Gel Check' },
+    ],
+  },
+  {
+    id: 'productVerification',
+    label: 'Product Verification',
+    tests: [
+      { id: 'prMaterialVerification',   label: 'Material Verification' },
+      { id: 'prConstructionVerification', label: 'Construction Verification' },
+      { id: 'prColorCheck',             label: 'Color Check' },
+      { id: 'prWashCareLabelCheck',     label: 'Wash Care Label Check' },
+      { id: 'prProductAppearanceCheck', label: 'Product Appearance Check' },
+      { id: 'prSampleVsBulkComparison', label: 'Sample vs Bulk Comparison' },
+    ],
+  },
+  {
+    id: 'measurementInspection',
+    label: 'Measurement Inspection',
+    tests: [
+      { id: 'miCartonDimensions',       label: 'Carton Dimensions' },
+      { id: 'miCartonGrossWeight',      label: 'Carton Gross Weight' },
+      { id: 'miRetailPackageDimensions',label: 'Retail Package Dimensions' },
+      { id: 'miProductDimensions',      label: 'Product Dimensions (Length & Width)' },
+      { id: 'miProductWeight',          label: 'Product Weight' },
+      { id: 'miBrandStickerDimensions', label: 'Brand Sticker Dimensions' },
+      { id: 'miWarningLabelDimensions', label: 'Warning Label Dimensions' },
+    ],
+  },
+  {
+    id: 'functionalTests',
+    label: 'Functional Tests',
+    tests: [
+      { id: 'ftCartonDropTest',         label: 'Carton Drop Test' },
+      { id: 'ftStitchPerInch',          label: 'Stitch Per Inch (SPI) Check' },
+      { id: 'ftDryCrocking',            label: 'Dry Crocking (Dry Rub Test)' },
+      { id: 'ftWetCrocking',            label: 'Wet Crocking (Wet Rub Test)' },
+      { id: 'ftSeamStrengthTest',       label: 'Seam Strength Test' },
+      { id: 'ftOdorCheck',              label: 'Odor (Smell) Check' },
+      { id: 'ftFunctionCheck',          label: 'Function Check' },
+      { id: 'ftBarcodeCheck',           label: 'Barcode Check' },
+      { id: 'ftPrintingAdhesionTest',   label: 'Printing Adhesion Test' },
+      { id: 'ftHandWashTest',           label: 'Hand Wash Test' },
+      { id: 'ftDishwasherTest',         label: 'Dishwasher Test' },
+      { id: 'ftFastenerVelcroFatigue',  label: 'Fastener / Velcro Fatigue Test' },
+      { id: 'ftGsmTest',                label: 'GSM Test' },
+      { id: 'ftMetalDetectorTest',      label: 'Metal Detector Test' },
+    ],
+  },
+] as const
+
+export const ADDITIONAL_EVIDENCE_DEFS = [
+  { id: 'majorDefectiveSamples', label: 'Major Defective Samples (Sealed View)' },
+  { id: 'minorDefectiveSamples', label: 'Minor Defective Samples (Sealed View)' },
+  { id: 'factoryFrontView',      label: 'Factory Front View' },
+  { id: 'factoryNameBoard',      label: 'Factory Name Board' },
+] as const
+
+// ── Default state builders ──────────────────────────────────────────────────
+
+export type PackagingItem = {
+  id: string
+  label: string
+  detail: string
+  verified: boolean | null
+  remarkCode: number | null
+  remarks: string
+}
+
+export type TestItem = {
+  id: string
+  label: string
+  pass: boolean | null
+  fail: boolean | null
+  remarks: string
+  rightPhotos: any[]
+  wrongPhotos: any[]
+}
+
+export type TestGroup = {
+  id: string
+  label: string
+  collapsed: boolean
+  tests: TestItem[]
+}
+
+export function makeDefaultPackagingItems(): PackagingItem[] {
+  return PACKAGING_ITEM_DEFS.map(d => ({
+    id: d.id,
+    label: d.label,
+    detail: d.detail,
+    verified: null,
+    remarkCode: null,
+    remarks: '',
+  }))
+}
+
+export function makeDefaultTestGroups(): TestGroup[] {
+  return TEST_GROUP_DEFS.map(g => ({
+    id: g.id,
+    label: g.label,
+    collapsed: false,
+    tests: g.tests.map(t => ({
+      id: t.id,
+      label: t.label,
+      pass: null,
+      fail: null,
+      remarks: '',
+      rightPhotos: [],
+      wrongPhotos: [],
+    })),
+  }))
+}
+
+export function makeDefaultAdditionalEvidence(): Record<string, any[]> {
+  const out: Record<string, any[]> = {}
+  ADDITIONAL_EVIDENCE_DEFS.forEach(d => { out[d.id] = [] })
+  return out
+}

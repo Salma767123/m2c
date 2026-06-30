@@ -32,6 +32,10 @@ export const notificationService = {
     await axios.put(`/notifications/${id}/read`);
   },
 
+  markAsUnread: async (id: string): Promise<void> => {
+    await axios.put(`/notifications/${id}/unread`);
+  },
+
   markAllAsRead: async (): Promise<void> => {
     await axios.put('/notifications/read-all');
   },

@@ -1,7 +1,8 @@
 "use client"
 
-import { Upload, X, FileText, Download, PenLine, CheckCircle2, Loader2, IdCard, RotateCcw } from "lucide-react"
+import { Upload, X, FileText, Download, PenLine, CheckCircle2, Loader2, RotateCcw, User, ChevronDown } from "lucide-react"
 import { useRef, useState, useEffect, useCallback } from "react"
+import { createPortal } from "react-dom"
 import SignatureCanvas from "react-signature-canvas"
 import type SignatureCanvasType from "react-signature-canvas"
 import { qcCheckerService } from "@/services/qcCheckerService"
@@ -54,14 +55,49 @@ interface DocumentationProps {
 }
 
 export default function Documentation({ formData, setFormData, errors = {} }: DocumentationProps) {
-  const companyIdInputRef = useRef<HTMLInputElement | null>(null)
   const signedDocInputRef = useRef<HTMLInputElement | null>(null)
   const sigPadRef = useRef<SignatureCanvasType | null>(null)
   const sigCanvasContainerRef = useRef<HTMLDivElement | null>(null)
 
   const [showDocModal, setShowDocModal] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const statusButtonRef = useRef<HTMLButtonElement | null>(null)
+  const statusMenuRef = useRef<HTMLDivElement | null>(null)
+
+  const checker = qcCheckerService.getCheckerData?.() || null
+  const inspectorName = checker?.name || formData.inspectorSignature || ''
+
+  const INSPECTION_STATUS_OPTIONS = ['Approved', 'Rejected', 'On Hold', 'Re-Inspection']
+
+  // Outside-click: close if click is outside both the trigger button and the portal menu
+  useEffect(() => {
+    if (!showStatusDropdown) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node
+      const inButton = statusButtonRef.current?.contains(target)
+      const inMenu = statusMenuRef.current?.contains(target)
+      if (!inButton && !inMenu) setShowStatusDropdown(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showStatusDropdown])
+
+  // Compute portal position when dropdown opens; close on scroll/resize
+  useEffect(() => {
+    if (!showStatusDropdown || !statusButtonRef.current) return
+    const rect = statusButtonRef.current.getBoundingClientRect()
+    setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    const close = () => setShowStatusDropdown(false)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [showStatusDropdown])
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null)
   const [sigCanvasSize, setSigCanvasSize] = useState({ width: 460, height: 200 })
 
@@ -176,31 +212,8 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
     setFormData({ ...formData, clientSignature: "", signedReport: [] })
   }
 
-  const handleCompanyIdUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    const newImages = await Promise.all(
-      files.map(async (file) => {
-        const data = await compressImage(file)
-        return { file, name: file.name, url: data, data, id: Date.now() + Math.random() }
-      })
-    )
-    setFormData({
-      ...formData,
-      companyIdCards: [...(formData.companyIdCards || []), ...newImages],
-    })
-    if (e.target) e.target.value = ""
-  }
-
-  const removeCompanyIdCard = (id: number | string) => {
-    setFormData({
-      ...formData,
-      companyIdCards: (formData.companyIdCards || []).filter((d: any) => d.id !== id),
-    })
-  }
-
   const signedDocs = formData.signedDocuments || []
   const signedReport = formData.signedReport || []
-  const companyIds = formData.companyIdCards || []
   const hasSignedDoc = signedDocs.length > 0
   const hasSignedReport = signedReport.length > 0
 
@@ -278,52 +291,80 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
           : errors.signedDocuments || "At least one signed document is required — upload a signed copy or generate the digitally-signed report."}
       </div>
 
-      {/* Company ID Card */}
-      <div>
-        <label className="flex items-center gap-2 text-slate-700 font-semibold mb-3 text-sm">
-          <IdCard className="w-4 h-4 text-brand-600" />
-          Company ID Card <span className="text-red-500">*</span>
-        </label>
-        <p className="text-slate-600 text-xs mb-3">Required: identification card of the person met on-site</p>
-        <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer max-w-md ${errors.companyIdCards ? 'border-red-400 bg-red-50/40' : 'border-slate-300 hover:border-brand-400 bg-slate-50/50'}`}>
-          <input
-            ref={companyIdInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleCompanyIdUpload}
-            className="hidden"
-          />
-          <button
-            type="button"
-            onClick={() => companyIdInputRef.current?.click()}
-            className="flex flex-col items-center justify-center w-full"
-          >
-            <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-slate-700 font-medium text-sm">Upload ID card</p>
-          </button>
+      {/* ── Inspector Details ─────────────────────────────────────────────── */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center gap-2">
+          <User className="w-4 h-4 text-brand-600" />
+          <h3 className="text-sm font-bold text-slate-800">Inspector Details</h3>
         </div>
-        {errors.companyIdCards && (
-          <p className="mt-1.5 text-xs text-red-600">{errors.companyIdCards}</p>
-        )}
-        {companyIds.length > 0 && (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-4 max-w-2xl">
-            {companyIds.map((image: any, index: number) => (
-              <div key={image.id || index} className="relative group">
-                <div className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
-                  <img src={image.url || image.data} alt={`ID ${index + 1}`} className="w-full h-full object-cover" />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeCompanyIdCard(image.id)}
-                  className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="w-3 h-3" />
-                </button>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
+            {/* Inspector Name — auto-filled */}
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Inspector Name</p>
+              <div className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-sm">
+                {inspectorName || '—'}
               </div>
-            ))}
+            </div>
+            {/* Inspection Date — auto-filled */}
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Inspection Date</p>
+              <div className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-sm">
+                {formData.serviceStartDate || new Date().toISOString().split('T')[0]}
+              </div>
+            </div>
+            {/* Inspection Status — required dropdown (portal-rendered to escape overflow:hidden) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                Inspection Status <span className="text-red-500">*</span>
+              </label>
+              <button
+                ref={statusButtonRef}
+                type="button"
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                className={`w-full px-4 py-3 border rounded-xl bg-white text-left flex items-center justify-between text-sm transition-all duration-200 ${
+                  errors.inspectionStatus
+                    ? 'border-red-500 bg-red-50/40'
+                    : 'border-slate-300 hover:border-slate-400'
+                }`}
+              >
+                <span className={formData.inspectionStatus ? 'text-slate-900' : 'text-slate-400'}>
+                  {formData.inspectionStatus || 'Select status…'}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${showStatusDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {errors.inspectionStatus && (
+                <p className="mt-1.5 text-xs text-red-600">{errors.inspectionStatus}</p>
+              )}
+              {showStatusDropdown && dropdownPos && typeof document !== 'undefined' && createPortal(
+                <div
+                  ref={statusMenuRef}
+                  style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }}
+                  className="bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden"
+                >
+                  {INSPECTION_STATUS_OPTIONS.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, inspectionStatus: status })
+                        setShowStatusDropdown(false)
+                      }}
+                      className={`block w-full px-4 py-2.5 text-sm text-left transition-colors ${
+                        formData.inspectionStatus === status
+                          ? 'bg-brand-50 text-brand-600 font-semibold border-l-2 border-brand-500'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>,
+                document.body
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* ── Document Center modal ─────────────────────────────────────────────── */}
@@ -373,7 +414,7 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
                   <button
                     type="button"
                     onClick={() => signedDocInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center w-full"
+                    className="flex flex-col items-center justify-center w-full outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-xl"
                   >
                     <Upload className="w-7 h-7 text-slate-400 mb-2" />
                     <p className="text-slate-700 font-medium text-sm">Upload signed copy</p>

@@ -465,7 +465,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                       <input
                         type="number"
                         name="sortOrder"
-                        value={categoryData.sortOrder}
+                        value={categoryData.sortOrder || ''}
                         onChange={handleCategoryChange}
                         min="0"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
@@ -594,7 +594,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                             className="hidden"
                             id="new-subcategory-image-upload"
                           />
-                          <label htmlFor="new-subcategory-image-upload" className="cursor-pointer">
+                          <label htmlFor="new-subcategory-image-upload" tabIndex={0} aria-label="Upload subcategory image" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }} className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 rounded block">
                             <Upload className="mx-auto h-8 w-8 text-gray-400" />
                             <p className="mt-1 text-xs text-gray-600">Click to upload image</p>
                           </label>
@@ -683,7 +683,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                                   className="hidden"
                                   id={`subcategory-image-upload-${subcategory.id}`}
                                 />
-                                <label htmlFor={`subcategory-image-upload-${subcategory.id}`} className="cursor-pointer">
+                                <label htmlFor={`subcategory-image-upload-${subcategory.id}`} tabIndex={0} aria-label="Upload subcategory image" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }} className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 rounded block">
                                   <Upload className="mx-auto h-6 w-6 text-gray-400" />
                                   <p className="mt-1 text-xs text-gray-600">Click to upload</p>
                                 </label>
@@ -707,7 +707,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                                 <label className="block text-xs text-gray-500 mb-1">Sort Order</label>
                                 <input
                                   type="number"
-                                  value={subcategory.sortOrder}
+                                  value={subcategory.sortOrder || ''}
                                   onChange={(e) => updateSubcategory(subcategory.id!, 'sortOrder', parseInt(e.target.value) || 0)}
                                   min="0"
                                   className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
@@ -789,7 +789,7 @@ export default function AddEditCategory({ categoryId, isEdit = false }: AddEditC
                         className="hidden"
                         id="category-image-upload"
                       />
-                      <label htmlFor="category-image-upload" className="cursor-pointer">
+                      <label htmlFor="category-image-upload" tabIndex={0} aria-label="Upload category image" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }} className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 rounded block">
                         <Upload className="mx-auto h-12 w-12 text-gray-400" />
                         <p className="mt-2 text-sm text-gray-600">
                           Click to upload category image

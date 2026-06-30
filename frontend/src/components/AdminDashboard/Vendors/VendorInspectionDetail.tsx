@@ -118,6 +118,11 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
     ? inspection.itemsToInspect
     : {};
 
+  // Detect new 9-step form format
+  const isNewFormat = typeof (formData as any).verifications === 'object' && (formData as any).verifications !== null;
+  const vf: Record<string, { ok: boolean | null; remarks: string }> = isNewFormat ? (formData as any).verifications : {};
+  const v = inspection?.vendor || {};
+
   const factoryPhotos = Array.isArray(formData.factoryPhotos) ? formData.factoryPhotos : [];
 
   const getResultBadge = (result: string | null) => {
@@ -230,14 +235,18 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-gray-600">Inspector</div>
-            <div className="text-lg font-bold text-gray-900 mt-1">{formData.inspectorName || "N/A"}</div>
+            <div className="text-lg font-bold text-gray-900 mt-1">
+              {(isNewFormat ? (formData as any).inspectorName : formData.inspectorName) || "N/A"}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-gray-600">Inspection Date</div>
             <div className="text-lg font-bold text-gray-900 mt-1">
-              {inspection.completedAt ? new Date(inspection.completedAt).toLocaleDateString() : formData.inspectionDate || "N/A"}
+              {inspection.completedAt
+                ? new Date(inspection.completedAt).toLocaleDateString()
+                : (isNewFormat ? (formData as any).inspectionDate : formData.inspectionDate) || "N/A"}
             </div>
           </CardContent>
         </Card>
@@ -255,118 +264,219 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       </div>
 
       {/* Inspector Remarks */}
-      {formData.inspectorRemarks && (
+      {((isNewFormat ? (formData as any).inspectorRemarks : formData.inspectorRemarks) || inspection.notes) && (
         <Card className="mb-6">
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <FileText className="h-5 w-5 text-blue-600" /> Inspector Remarks
             </h3>
-            <p className="text-gray-700 bg-gray-50 p-4 rounded-lg border">{formData.inspectorRemarks}</p>
+            <p className="text-gray-700 bg-gray-50 p-4 rounded-lg border">
+              {(isNewFormat ? (formData as any).inspectorRemarks : formData.inspectorRemarks) || inspection.notes}
+            </p>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Factory Details */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Factory className="h-5 w-5 text-blue-600" /> Factory Details
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between"><span className="text-gray-600">Factory Name</span><span className="font-medium">{formData.factoryName || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Address</span><span className="font-medium">{formData.factoryAddress || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Contact Person Name</span><span className="font-medium">{formData.contactPersonName || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Contact Phone Number</span><span className="font-medium">{formData.contactPhoneNumber || "N/A"}</span></div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Legal & Registration */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Shield className="h-5 w-5 text-blue-600" /> Legal & Registration
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between"><span className="text-gray-600">GST Number</span><span className="font-medium">{formData.gstTaxId || "N/A"}</span></div>
-              {formData.panNumber && <div className="flex justify-between"><span className="text-gray-600">PAN Number</span><span className="font-medium font-mono">{formData.panNumber}</span></div>}
-              {formData.iecCode && <div className="flex justify-between"><span className="text-gray-600">IEC Code</span><span className="font-medium font-mono">{formData.iecCode}</span></div>}
-              {formData.companyIdNumber && <div className="flex justify-between"><span className="text-gray-600">Company ID / CIN</span><span className="font-medium font-mono">{formData.companyIdNumber}</span></div>}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Production Info */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Wrench className="h-5 w-5 text-blue-600" /> Production Info
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between"><span className="text-gray-600">Products Manufactured</span><span className="font-medium">{formData.productsManufactured || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Monthly Production Capacity</span><span className="font-medium">{formData.monthlyProductionCapacity || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Number of Production Workers</span><span className="font-medium">{formData.numberOfProductionWorkers || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Category to Inspect</span><span className="font-medium">{formData.categoryToInspect || "N/A"}</span></div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Infrastructure Check */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-blue-600" /> Infrastructure Check
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center"><span className="text-gray-600">Machinery Available</span>{getYesNoBadge(formData.machineryAvailable)}</div>
-              <div className="flex justify-between items-center"><span className="text-gray-600">Electricity Available</span>{getYesNoBadge(formData.electricityAvailable)}</div>
-              <div className="flex justify-between items-center"><span className="text-gray-600">Water Available</span>{getYesNoBadge(formData.waterAvailable)}</div>
-              <div className="flex justify-between items-center"><span className="text-gray-600">Storage Area Available</span>{getYesNoBadge(formData.storageAreaAvailable)}</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quality & Safety */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Shield className="h-5 w-5 text-emerald-600" /> Quality & Safety
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><span className="text-gray-600">Quality Check Process</span>{getYesNoBadge(formData.qualityCheckProcess)}</div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><span className="text-gray-600">Safety Equipment</span>{getYesNoBadge(formData.safetyEquipment)}</div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><span className="text-gray-600">Clean Environment</span>{getYesNoBadge(formData.cleanWorkingEnvironment)}</div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Factory Photos */}
-      {factoryPhotos.length > 0 && (
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Camera className="h-5 w-5 text-blue-600" /> Factory Photos
-            </h3>
+      {/* ── NEW FORMAT: 9-step inspection summary ── */}
+      {isNewFormat && (() => {
+        const allEntries = Object.entries(vf);
+        const ok = allEntries.filter(([, val]) => val.ok === true).length;
+        const fail = allEntries.filter(([, val]) => val.ok === false).length;
+        const pending = allEntries.filter(([, val]) => val.ok === null).length;
+        const total = allEntries.length;
+        const issues = allEntries.filter(([, val]) => val.ok === false);
+        return (
+          <div className="space-y-6 mb-6">
+            {/* Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {factoryPhotos.map((photo, idx) => {
-                const src = photo.data || photo.url || null;
-                const caption = photo.label || photo.name || `Photo ${idx + 1}`;
-                return (
-                  <div key={idx} className="border rounded-lg overflow-hidden">
-                    {src ? (
-                      <img src={src} alt={caption} className="w-full h-40 object-cover" />
-                    ) : (
-                      <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">{caption}</div>
-                    )}
-                    <div className="p-2 text-xs font-semibold text-gray-700 truncate" title={caption}>{caption}</div>
-                  </div>
-                );
-              })}
+              <Card><CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-gray-900">{total}</div>
+                <div className="text-sm text-gray-500">Total Fields</div>
+              </CardContent></Card>
+              <Card><CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-emerald-600">{ok}</div>
+                <div className="text-sm text-gray-500">Verified OK</div>
+              </CardContent></Card>
+              <Card><CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-red-600">{fail}</div>
+                <div className="text-sm text-gray-500">Issues Found</div>
+              </CardContent></Card>
+              <Card><CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-amber-500">{pending}</div>
+                <div className="text-sm text-gray-500">Pending</div>
+              </CardContent></Card>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Vendor Info */}
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-blue-600" /> Company Info
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between"><span className="text-gray-600">Company Name</span><span className="font-medium">{v.companyName || "N/A"}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-600">GST Number</span><span className="font-medium font-mono">{v.gstNumber || (v.businessType === 'unregistered' ? 'Unregistered' : 'N/A')}</span></div>
+                    {v.panNumber && <div className="flex justify-between"><span className="text-gray-600">PAN Number</span><span className="font-medium font-mono">{v.panNumber}</span></div>}
+                    {v.iecCode && <div className="flex justify-between"><span className="text-gray-600">IEC Code</span><span className="font-medium font-mono">{v.iecCode}</span></div>}
+                    {v.website && <div className="flex justify-between"><span className="text-gray-600">Website</span><span className="font-medium">{v.website}</span></div>}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Owner / Contact */}
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <User className="h-5 w-5 text-blue-600" /> Owner / Contact
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between"><span className="text-gray-600">Owner Name</span><span className="font-medium">{v.ownerName || [v.ownerFirstName, v.ownerLastName].filter(Boolean).join(' ') || "N/A"}</span></div>
+                    {v.designation && <div className="flex justify-between"><span className="text-gray-600">Designation</span><span className="font-medium">{v.designation}</span></div>}
+                    <div className="flex justify-between"><span className="text-gray-600">Phone</span><span className="font-medium">{v.ownerPhone || v.businessPhone || "N/A"}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-600">Email</span><span className="font-medium">{v.ownerEmail || v.businessEmail || "N/A"}</span></div>
+                    {(v.warehouseCity || v.warehouseState) && (
+                      <div className="flex justify-between"><span className="text-gray-600">Location</span><span className="font-medium">{[v.warehouseCity, v.warehouseState].filter(Boolean).join(', ')}</span></div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Issues */}
+            {issues.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-500" /> Issues Found ({issues.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {issues.map(([key, val]) => (
+                      <div key={key} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                        <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-bold text-red-700 font-mono">{key}</p>
+                          {val.remarks
+                            ? <p className="text-sm text-red-800 mt-0.5">{val.remarks}</p>
+                            : <p className="text-sm text-red-500 italic mt-0.5">No remarks.</p>
+                          }
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ── OLD FORMAT: legacy form sections ── */}
+      {!isNewFormat && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Factory Details */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Factory className="h-5 w-5 text-blue-600" /> Factory Details
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between"><span className="text-gray-600">Factory Name</span><span className="font-medium">{formData.factoryName || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Address</span><span className="font-medium">{formData.factoryAddress || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Contact Person Name</span><span className="font-medium">{formData.contactPersonName || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Contact Phone Number</span><span className="font-medium">{formData.contactPhoneNumber || "N/A"}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Legal & Registration */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-blue-600" /> Legal & Registration
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between"><span className="text-gray-600">GST Number</span><span className="font-medium">{formData.gstTaxId || "N/A"}</span></div>
+                  {formData.panNumber && <div className="flex justify-between"><span className="text-gray-600">PAN Number</span><span className="font-medium font-mono">{formData.panNumber}</span></div>}
+                  {formData.iecCode && <div className="flex justify-between"><span className="text-gray-600">IEC Code</span><span className="font-medium font-mono">{formData.iecCode}</span></div>}
+                  {formData.companyIdNumber && <div className="flex justify-between"><span className="text-gray-600">Company ID / CIN</span><span className="font-medium font-mono">{formData.companyIdNumber}</span></div>}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Production Info */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-blue-600" /> Production Info
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between"><span className="text-gray-600">Products Manufactured</span><span className="font-medium">{formData.productsManufactured || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Monthly Production Capacity</span><span className="font-medium">{formData.monthlyProductionCapacity || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Number of Production Workers</span><span className="font-medium">{formData.numberOfProductionWorkers || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Category to Inspect</span><span className="font-medium">{formData.categoryToInspect || "N/A"}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Infrastructure Check */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-blue-600" /> Infrastructure Check
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center"><span className="text-gray-600">Machinery Available</span>{getYesNoBadge(formData.machineryAvailable)}</div>
+                  <div className="flex justify-between items-center"><span className="text-gray-600">Electricity Available</span>{getYesNoBadge(formData.electricityAvailable)}</div>
+                  <div className="flex justify-between items-center"><span className="text-gray-600">Water Available</span>{getYesNoBadge(formData.waterAvailable)}</div>
+                  <div className="flex justify-between items-center"><span className="text-gray-600">Storage Area Available</span>{getYesNoBadge(formData.storageAreaAvailable)}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Quality & Safety */}
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Shield className="h-5 w-5 text-emerald-600" /> Quality & Safety
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><span className="text-gray-600">Quality Check Process</span>{getYesNoBadge(formData.qualityCheckProcess)}</div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><span className="text-gray-600">Safety Equipment</span>{getYesNoBadge(formData.safetyEquipment)}</div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><span className="text-gray-600">Clean Environment</span>{getYesNoBadge(formData.cleanWorkingEnvironment)}</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Factory Photos */}
+          {factoryPhotos.length > 0 && (
+            <Card className="mb-6">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-blue-600" /> Factory Photos
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {factoryPhotos.map((photo, idx) => {
+                    const src = photo.data || photo.url || null;
+                    const caption = photo.label || photo.name || `Photo ${idx + 1}`;
+                    return (
+                      <div key={idx} className="border rounded-lg overflow-hidden">
+                        {src ? (
+                          <img src={src} alt={caption} className="w-full h-40 object-cover" />
+                        ) : (
+                          <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">{caption}</div>
+                        )}
+                        <div className="p-2 text-xs font-semibold text-gray-700 truncate" title={caption}>{caption}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* Audit Trail */}

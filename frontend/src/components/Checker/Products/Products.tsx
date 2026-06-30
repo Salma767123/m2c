@@ -553,7 +553,7 @@ export default function Products() {
                                                     className="flex items-center gap-1 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs shadow-brand-500/10 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                                                 >
                                                     <FileText className="w-3.5 h-3.5" />
-                                                    Inspect
+                                                    Stock Inspect
                                                 </button>
                                             )}
                                         </div>

@@ -1,15 +1,20 @@
 // Client-side generator for the Product Inspection report PDF.
 //
-// Produces a full overview of every inspection step (general info, items,
-// measurements, packaging remarks + score, defects/AQL, on-site tests, overall
-// result), the quality-checker's details, the capture location + timestamp,
-// thumbnails of the attached documents, and a client signature block at the
-// bottom of the last page.
+// Produces a structured report aligned with the 7-step Product Inspection Form:
+//   A. General Information
+//   B. Main Contact Person
+//   C. Product Being Inspected
+//   D. Product Verification
+//   E. Packaging Inspection
+//   F. Defects (AQL)
+//   G. Testing
+//   H. Final Decision
+//   I. Inspector Details
+//   Signature block (manual or digital)
 //
-// When `clientSignatureDataUrl` is supplied the signature image is embedded in
-// the signature block — that "merged" document is the digitally-signed report.
-// Without it, a blank signature line is drawn so the client can sign a printed
-// copy.
+// All data is read dynamically from `formData`. Blank values render as "—".
+// When `clientSignatureDataUrl` is supplied the signature image is embedded
+// (digitally-signed report). Without it a blank line is drawn for manual signing.
 
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -33,48 +38,46 @@ export interface ReportOptions {
     clientSignatureDataUrl?: string | null
 }
 
-const BRAND: [number, number, number] = [224, 26, 27] // brand-500 #e01a1b
-const SLATE: [number, number, number] = [51, 65, 85] // slate-700
+const BRAND: [number, number, number] = [224, 26, 27]   // #e01a1b
+const SLATE: [number, number, number] = [51, 65, 85]    // slate-700
 const MUTED: [number, number, number] = [100, 116, 139] // slate-500
 
-// ── Remark scoring (mirrors Review.tsx) ──────────────────────────────────────
-function computeOverallResult(formData: any) {
-    const categories = [
-        "shipperCartonRemark",
-        "innerCartonRemark",
-        "retailPackagingRemark",
-        "productTypeRemark",
-        "aqlWorkmanshipRemark",
-        "onSiteTestsRemark",
-    ]
-    const codes: number[] = []
-    categories.forEach((key) => {
-        const raw = formData?.[key]
-        if (raw != null && String(raw).trim() !== "") {
-            const code = parseInt(String(raw).trim(), 10)
-            if (!isNaN(code) && code >= 1 && code <= 10) codes.push(code)
-        }
-    })
-    const average = codes.length > 0 ? codes.reduce((s, c) => s + c, 0) / codes.length : 10
-    let status = "REJECTED"
-    if (average >= 8) status = "PASS"
-    else if (average >= 6) status = "RE-INSPECTION"
-    return { average, status, count: codes.length }
+const REMARK_LABELS: Record<number, string> = {
+    1: "Critical Defect", 2: "Major Defect", 3: "Functional Fail",
+    4: "Safety Issue", 5: "Non-Conformance", 6: "Minor Issue",
+    7: "Re-inspection", 8: "Acceptable", 9: "Good", 10: "Excellent",
 }
 
 function fmtDateTime(d: Date) {
     return d.toLocaleString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
+        year: "numeric", month: "short", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hour12: true,
     })
 }
 
+function blank(v: unknown): boolean {
+    return v === null || v === undefined || (typeof v === "string" && v.trim() === "")
+}
+
+function val(v: unknown): string {
+    if (blank(v)) return "—"
+    return String(v).trim()
+}
+
+// Resolve main contact name from the mainContact object or owner fields.
+function resolveContactName(v: any): string {
+    if (!v) return "—"
+    const mc = v.mainContact && typeof v.mainContact === "object" ? v.mainContact : null
+    if (mc) {
+        const parts = [mc.title, mc.firstName, mc.middleName, mc.lastName].filter(Boolean)
+        return parts.length ? parts.join(" ") : mc.name || "—"
+    }
+    const ownerParts = [v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName].filter(Boolean)
+    return ownerParts.length ? ownerParts.join(" ") : v.ownerName || "—"
+}
+
 /**
- * Build the full Product Inspection report and return the jsPDF document.
+ * Build the full Product Inspection PDF and return the jsPDF document.
  */
 export function generateProductInspectionPdf(
     formData: any,
@@ -87,8 +90,8 @@ export function generateProductInspectionPdf(
     const margin = 40
     const contentW = pageW - margin * 2
     const generatedAt = meta.generatedAt || new Date()
+    const checker = meta.checker || {}
 
-    // Track the current vertical cursor across mixed content (tables + images).
     let y = margin
 
     const ensureSpace = (needed: number) => {
@@ -99,14 +102,14 @@ export function generateProductInspectionPdf(
     }
 
     const sectionTitle = (text: string) => {
-        ensureSpace(28)
+        ensureSpace(32)
         doc.setFont("helvetica", "bold")
-        doc.setFontSize(12)
+        doc.setFontSize(11)
         doc.setTextColor(...BRAND)
         doc.text(text, margin, y)
         y += 6
         doc.setDrawColor(...BRAND)
-        doc.setLineWidth(1)
+        doc.setLineWidth(0.8)
         doc.line(margin, y, margin + contentW, y)
         y += 14
         doc.setTextColor(...SLATE)
@@ -125,217 +128,285 @@ export function generateProductInspectionPdf(
             styles: { cellPadding: 5, lineColor: [226, 232, 240], lineWidth: 0.5 },
         })
         // @ts-expect-error lastAutoTable is attached by the plugin at runtime
-        y = (doc.lastAutoTable?.finalY ?? y) + 18
+        y = (doc.lastAutoTable?.finalY ?? y) + 16
     }
 
-    // ── Header ────────────────────────────────────────────────────────────────
+    // ── Cover header ────────────────────────────────────────────────────────────
     doc.setFillColor(...BRAND)
-    doc.rect(0, 0, pageW, 70, "F")
+    doc.rect(0, 0, pageW, 72, "F")
     doc.setTextColor(255, 255, 255)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(18)
     doc.text("Product Inspection Report", margin, 34)
     doc.setFont("helvetica", "normal")
     doc.setFontSize(10)
-    doc.text(
-        `${meta.productName || "Product"}${meta.vendorName ? "  •  " + meta.vendorName : ""}`,
-        margin,
-        52
-    )
+    const subtitle = [meta.productName || "Product", meta.vendorName].filter(Boolean).join("  ·  ")
+    doc.text(subtitle, margin, 52)
     doc.setFontSize(8)
     doc.text(`Generated: ${fmtDateTime(generatedAt)}`, pageW - margin, 34, { align: "right" })
-    y = 92
+    y = 96
     doc.setTextColor(...SLATE)
 
-    // ── General Information ─────────────────────────────────────────────────────
+    // ── A. General Information ─────────────────────────────────────────────────
+    const v = formData.vendorData || {}
     sectionTitle("A. General Information")
     runTable(
         [["Field", "Value"]],
         [
-            ["Client", formData.client || "—"],
-            ["Vendor", formData.vendor || meta.vendorName || "—"],
-            ["Factory", formData.factory || "—"],
-            ["Service Location", formData.serviceLocation || "—"],
-            ["Service Start Date", formData.serviceStartDate || "—"],
-            ["Service Type", formData.serviceType || "—"],
+            ["Client", val(formData.client) === "—" ? "M2C" : val(formData.client)],
+            ["Vendor", val(formData.vendor || v.companyName || meta.vendorName)],
+            ["Company Name", val(v.companyName)],
+            ["Business Type", val(v.businessType)],
+            ["Primary Phone", val(v.businessPhone)],
+            ["Secondary Phone", val(v.phoneNumber2)],
+            ["Primary Email", val(v.businessEmail)],
+            ["Inspection Date", val(formData.serviceStartDate)],
+            ["Service Type", val(formData.serviceType)],
         ]
     )
 
-    // ── Inspection Items ────────────────────────────────────────────────────────
-    const items: any[] = Array.isArray(formData.items) ? formData.items : []
-    if (items.length > 0) {
-        sectionTitle("B. Inspection Items")
+    // ── B. Main Contact Person ─────────────────────────────────────────────────
+    const mc = v.mainContact && typeof v.mainContact === "object" ? v.mainContact : null
+    const contactRows: [string, string][] = [
+        ["Full Name", resolveContactName(v)],
+        ["Designation", val(mc ? mc.customDesignation || mc.designation : v.designation)],
+        ["Department", val(mc ? mc.customDepartment || mc.department : undefined)],
+        ["Primary Phone", val(mc ? mc.phone1 || mc.phone : v.ownerPhone)],
+        ["Secondary Phone", val(mc ? mc.phone2 : v.ownerPhone2)],
+        ["Primary Email", val(mc ? mc.email1 || mc.email : v.ownerEmail)],
+        ["Secondary Email", val(mc ? mc.email2 : v.ownerEmail2)],
+    ]
+    const hasContactData = contactRows.some(([, v]) => v !== "—")
+    if (hasContactData) {
+        sectionTitle("B. Main Contact Person")
+        runTable([["Field", "Value"]], contactRows)
+    }
+
+    // ── C. Product Being Inspected ─────────────────────────────────────────────
+    const p = formData.productData || {}
+    if (p.name || p.category) {
+        sectionTitle("C. Product Being Inspected")
         runTable(
-            [["Item", "Description", "Total Qty", "Inspection Qty"]],
-            items.map((it) => [
-                it.itemName || "—",
-                it.itemDescription || "—",
-                it.totalQuantity ?? 0,
-                it.inspectionQuantity ?? 0,
-            ])
+            [["Field", "Value"]],
+            [
+                ["Product Name", val(p.name)],
+                ["Category", val(p.category)],
+                ["Sub-Category", val(p.subCategory)],
+            ]
         )
     }
 
-    // ── Measurements ────────────────────────────────────────────────────────────
-    const measurements: any[] = Array.isArray(formData.measurements) ? formData.measurements : []
-    if (measurements.length > 0) {
-        sectionTitle("Measurements")
-        // Collect a stable set of dimension keys present on the samples.
-        const dimKeys = Array.from(
-            measurements.reduce((set: Set<string>, m: any) => {
-                Object.keys(m || {}).forEach((k) => {
-                    if (!["id", "name", "label", "sample"].includes(k)) set.add(k)
-                })
-                return set
-            }, new Set<string>())
-        )
-        const head = [["#", ...(dimKeys.length ? dimKeys : ["Value"])]]
-        const body = measurements.map((m: any, i: number) => [
-            m.name || m.label || `Sample ${i + 1}`,
-            ...(dimKeys.length ? dimKeys.map((k) => (m?.[k] ?? "—")) : [JSON.stringify(m)]),
+    // ── D. Product Verification ────────────────────────────────────────────────
+    sectionTitle("D. Product Verification")
+    const verEntries = Object.entries(formData.productVerifications || {})
+    if (verEntries.length === 0) {
+        doc.setFont("helvetica", "italic")
+        doc.setFontSize(9)
+        doc.setTextColor(...MUTED)
+        doc.text("No product fields were verified.", margin, y)
+        y += 20
+        doc.setTextColor(...SLATE)
+    } else {
+        const verBody = verEntries.map(([key, entry]: [string, any]) => [
+            key.replace(/^pv_/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            entry.ok === true ? "Verified" : entry.ok === false ? "Not Verified" : "Not Checked",
+            val(entry.remarks),
         ])
-        runTable(head, body)
+        runTable([["Field", "Status", "Remarks"]], verBody)
+    }
+    const evidencePhotos = (formData.productEvidencePhotos || []).length
+    if (evidencePhotos > 0) {
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(9)
+        doc.setTextColor(...MUTED)
+        doc.text(`Photo Evidence: ${evidencePhotos} photo(s) attached`, margin, y)
+        y += 18
+        doc.setTextColor(...SLATE)
     }
 
-    // ── Packaging / Appearance Remarks ──────────────────────────────────────────
-    sectionTitle("C. Inspection Result Summary (Remark Codes)")
-    runTable(
-        [["Category", "Remark Code (1-10)"]],
-        [
-            ["Shipper Carton Packaging", formData.shipperCartonRemark || "—"],
-            ["Inner Carton Packaging", formData.innerCartonRemark || "—"],
-            ["Retail Packaging", formData.retailPackagingRemark || "—"],
-            ["Product Type (style, size, color, etc.)", formData.productTypeRemark || "—"],
-            ["AQL (Workmanship / Appearance / Function)", formData.aqlWorkmanshipRemark || "—"],
-            ["On-site Tests", formData.onSiteTestsRemark || "—"],
-        ]
-    )
-
-    // ── Defects (AQL) ───────────────────────────────────────────────────────────
-    sectionTitle("Defects (AQL Summary)")
-    runTable(
-        [["Severity", "Found", "Max Allowed", "Details"]],
-        [
-            [
-                "Critical",
-                formData.criticalDefects ?? 0,
-                formData.maxAllowedCritical ?? 0,
-                formData.criticalDefectDetails || "—",
-            ],
-            [
-                "Major",
-                formData.majorDefects ?? 0,
-                formData.maxAllowedMajor ?? 0,
-                formData.majorDefectDetails || "—",
-            ],
-            [
-                "Minor",
-                formData.minorDefects ?? 0,
-                formData.maxAllowedMinor ?? 0,
-                formData.minorDefectDetails || "—",
-            ],
-        ]
-    )
-
-    // ── On-site Tests ───────────────────────────────────────────────────────────
-    const tests: any[] = Array.isArray(formData.tests) ? formData.tests : []
-    if (tests.length > 0) {
-        sectionTitle("On-site Tests")
-        runTable(
-            [["Test", "Result", "Right Photos", "Wrong Photos"]],
-            tests.map((t) => [
-                t.label || "—",
-                t.pass ? "PASS" : t.fail ? "FAIL" : "—",
-                Array.isArray(t.rightPhotos) ? t.rightPhotos.length : 0,
-                Array.isArray(t.wrongPhotos) ? t.wrongPhotos.length : 0,
-            ])
-        )
+    // ── E. Packaging Inspection ────────────────────────────────────────────────
+    sectionTitle("E. Packaging Inspection")
+    const pkgItems: any[] = Array.isArray(formData.packagingItems) ? formData.packagingItems : []
+    if (pkgItems.length === 0) {
+        doc.setFont("helvetica", "italic")
+        doc.setFontSize(9)
+        doc.setTextColor(...MUTED)
+        doc.text("No packaging items recorded.", margin, y)
+        y += 20
+        doc.setTextColor(...SLATE)
+    } else {
+        const pkgBody = pkgItems.map((item: any) => {
+            const code = item.remarkCode != null ? `${item.remarkCode} — ${REMARK_LABELS[item.remarkCode] || ""}` : "—"
+            return [
+                (item.label || "").split("—")[0].trim(),
+                item.verified === true ? "Yes" : item.verified === false ? "No" : "—",
+                code,
+                val(item.remarks),
+            ]
+        })
+        runTable([["Item", "Inspected", "Remark Code", "Remarks"]], pkgBody)
+    }
+    const pkgPhotos = (formData.packagingPhotos || []).length
+    if (pkgPhotos > 0) {
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(9)
+        doc.setTextColor(...MUTED)
+        doc.text(`Packaging Photos: ${pkgPhotos} photo(s) attached`, margin, y)
+        y += 18
+        doc.setTextColor(...SLATE)
     }
 
-    // ── Overall Result ──────────────────────────────────────────────────────────
-    const result = computeOverallResult(formData)
-    sectionTitle("Overall Result")
-    runTable(
-        [["Metric", "Value"]],
-        [
-            ["Average Score", `${result.average.toFixed(1)} / 10`],
-            ["Result", result.status],
-            ["Final Decision", formData.finalDecision || "—"],
-            ["Reviewer Remarks", formData.reviewerRemarks || "—"],
-        ]
-    )
-
-    // ── Quality Checker + capture context ───────────────────────────────────────
-    const checker = meta.checker || {}
-    const loc = meta.location
-    sectionTitle("Inspection Conducted By")
+    // ── F. Defects (AQL) ──────────────────────────────────────────────────────
+    sectionTitle("F. Defects — AQL Summary")
     runTable(
         [["Field", "Value"]],
         [
-            ["Quality Checker", checker.name || formData.inspectorSignature || "—"],
-            ["Checker ID", checker.checkerId || "—"],
-            ["Email", checker.email || "—"],
-            ["Phone", checker.phone || "—"],
+            ["Inspection Level", val(formData.inspectionLevel)],
+            ["Sample Size", val(formData.sampleSize)],
+            ["AQL Critical", val(formData.aqlCritical)],
+            ["AQL Major", val(formData.aqlMajor)],
+            ["AQL Minor", val(formData.aqlMinor)],
+        ]
+    )
+    runTable(
+        [["Severity", "Found", "Max Allowed", "Details"]],
+        [
+            ["Critical", String(formData.criticalDefects ?? 0), String(formData.maxAllowedCritical ?? 0), val(formData.criticalDefectDetails)],
+            ["Major", String(formData.majorDefects ?? 0), String(formData.maxAllowedMajor ?? 0), val(formData.majorDefectDetails)],
+            ["Minor", String(formData.minorDefects ?? 0), String(formData.maxAllowedMinor ?? 0), val(formData.minorDefectDetails)],
+        ]
+    )
+    const defectPhotos = (formData.defectPhotos || []).length
+    if (defectPhotos > 0) {
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(9)
+        doc.setTextColor(...MUTED)
+        doc.text(`Defect Photos: ${defectPhotos} photo(s) attached`, margin, y)
+        y += 18
+        doc.setTextColor(...SLATE)
+    }
+
+    // ── G. Testing ────────────────────────────────────────────────────────────
+    const testGroups: any[] = Array.isArray(formData.testGroups) ? formData.testGroups : []
+    if (testGroups.length > 0) {
+        sectionTitle("G. Testing")
+        for (const group of testGroups) {
+            const tests: any[] = Array.isArray(group.tests) ? group.tests : []
+            const gPass = tests.filter((t) => t.pass).length
+            const gFail = tests.filter((t) => t.fail).length
+            const groupLabel = `${group.label || "Group"}  (${gPass} passed, ${gFail} failed)`
+            ensureSpace(28)
+            doc.setFont("helvetica", "bold")
+            doc.setFontSize(9)
+            doc.setTextColor(...SLATE)
+            doc.text(groupLabel, margin, y)
+            y += 14
+
+            const testBody = tests.map((t: any) => [
+                val(t.label),
+                t.pass === true ? "Pass" : t.fail === true ? "Fail" : "—",
+                val(t.remarks),
+                String((t.rightPhotos || []).length),
+                String((t.wrongPhotos || []).length),
+            ])
+            runTable([["Test", "Result", "Remarks", "Pass Photos", "Fail Photos"]], testBody)
+        }
+
+        // Additional evidence summary
+        const additionalEvidence: Record<string, any[]> = formData.additionalEvidence || {}
+        const evidenceRows = Object.entries(additionalEvidence)
+            .filter(([, photos]) => Array.isArray(photos) && photos.length > 0)
+            .map(([key, photos]) => [key.replace(/_/g, " "), String(photos.length) + " photo(s)"])
+        if (evidenceRows.length > 0) {
+            ensureSpace(20)
+            doc.setFont("helvetica", "bold")
+            doc.setFontSize(9)
+            doc.text("Additional Evidence", margin, y)
+            y += 14
+            runTable([["Category", "Photos"]], evidenceRows)
+        }
+    }
+
+    // ── H. Final Decision ─────────────────────────────────────────────────────
+    sectionTitle("H. Final Decision")
+    runTable(
+        [["Field", "Value"]],
+        [
+            ["Decision", val(formData.finalDecision)],
+            ["Reviewer Remarks", val(formData.reviewerRemarks)],
+        ]
+    )
+
+    // ── I. Inspector Details ──────────────────────────────────────────────────
+    const loc = meta.location
+    sectionTitle("I. Inspector Details")
+    runTable(
+        [["Field", "Value"]],
+        [
+            ["Inspector Name", val(checker.name || formData.inspectorSignature)],
+            ["Checker ID", val(checker.checkerId)],
+            ["Email", val(checker.email)],
+            ["Phone", val(checker.phone)],
+            ["Inspection Date", val(formData.serviceStartDate)],
+            ["Inspection Status", val(formData.inspectionStatus)],
             [
                 "GPS Location",
                 loc ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : "Not available",
             ],
-            ["Date & Time", fmtDateTime(generatedAt)],
+            ["Report Generated", fmtDateTime(generatedAt)],
         ]
     )
 
-    // ── Attached documents (thumbnails) ─────────────────────────────────────────
+    // ── Attached documents (thumbnails) ───────────────────────────────────────
     const docImages: any[] = [
         ...(Array.isArray(formData.documentationPhotos) ? formData.documentationPhotos : []),
         ...(Array.isArray(formData.signedDocuments) ? formData.signedDocuments : []),
-        ...(Array.isArray(formData.companyIdCards) ? formData.companyIdCards : []),
-    ].filter((p) => p && (p.data || p.url))
+    ].filter((d) => d && (d.data || d.url) && !d.isPdf)
 
     if (docImages.length > 0) {
-        sectionTitle("Attached Documents")
+        sectionTitle("J. Attached Documents")
         const cols = 3
         const gap = 12
         const thumbW = (contentW - gap * (cols - 1)) / cols
         const thumbH = thumbW * 0.72
         let col = 0
         docImages.forEach((img) => {
-            if (col === 0) ensureSpace(thumbH + 16)
+            if (col === 0) ensureSpace(thumbH + 24)
             const x = margin + col * (thumbW + gap)
             try {
                 doc.addImage(img.data || img.url, "JPEG", x, y, thumbW, thumbH, undefined, "FAST")
             } catch {
-                doc.setDrawColor?.(226, 232, 240)
+                doc.setDrawColor(226, 232, 240)
                 doc.rect(x, y, thumbW, thumbH)
             }
             doc.setFontSize(7)
             doc.setTextColor(...MUTED)
-            doc.text(String(img.name || "document").slice(0, 28), x, y + thumbH + 9)
+            doc.text(String(img.name || "document").slice(0, 30), x, y + thumbH + 9)
             col++
-            if (col === cols) {
-                col = 0
-                y += thumbH + 22
-            }
+            if (col === cols) { col = 0; y += thumbH + 24 }
         })
-        if (col !== 0) y += thumbH + 22
+        if (col !== 0) y += thumbH + 24
         doc.setTextColor(...SLATE)
     }
 
-    // ── Client signature block (always on a fresh stretch at the bottom) ─────────
-    ensureSpace(120)
-    y = Math.max(y, pageH - margin - 110)
+    // ── Signature block ────────────────────────────────────────────────────────
+    ensureSpace(130)
+    y = Math.max(y, pageH - margin - 120)
+
     doc.setDrawColor(...BRAND)
     doc.setLineWidth(0.5)
     doc.line(margin, y, margin + contentW, y)
-    y += 18
+    y += 20
 
+    // Left: Inspector
     doc.setFont("helvetica", "bold")
     doc.setFontSize(10)
     doc.setTextColor(...SLATE)
     doc.text("Inspector:", margin, y)
     doc.setFont("helvetica", "normal")
-    doc.text(checker.name || formData.inspectorSignature || "—", margin + 60, y)
+    doc.text(val(checker.name || formData.inspectorSignature), margin + 65, y)
 
-    // Right-hand client signature area.
+    // Right: Client Signature
     const sigX = margin + contentW / 2
     doc.setFont("helvetica", "bold")
     doc.text("Client Signature:", sigX, y)
@@ -345,29 +416,44 @@ export function generateProductInspectionPdf(
         const sigFmt = /^data:image\/png/i.test(sig) ? "PNG" : "JPEG"
         try {
             doc.addImage(sig, sigFmt, sigX, y + 8, 150, 50, undefined, "FAST")
-        } catch {
-            /* ignore malformed signature image */
-        }
+        } catch { /* ignore malformed */ }
         doc.setFont("helvetica", "italic")
         doc.setFontSize(8)
         doc.setTextColor(...MUTED)
-        doc.text(`Digitally signed • ${fmtDateTime(generatedAt)}`, sigX, y + 70)
+        doc.text(`Digitally signed  ·  ${fmtDateTime(generatedAt)}`, sigX, y + 74)
     } else {
         doc.setDrawColor(...MUTED)
-        doc.line(sigX, y + 48, sigX + 180, y + 48)
+        doc.line(sigX, y + 50, sigX + 180, y + 50)
         doc.setFont("helvetica", "italic")
         doc.setFontSize(8)
         doc.setTextColor(...MUTED)
-        doc.text("Signature / Date", sigX, y + 60)
+        doc.text("Signature / Date", sigX, y + 62)
     }
 
-    // ── Page footer numbers ─────────────────────────────────────────────────────
+    // Inspection Status stamp (bottom-left of signature block)
+    const status = formData.inspectionStatus
+    if (status) {
+        const statusColors: Record<string, [number, number, number]> = {
+            Approved: [22, 163, 74],
+            Rejected: [220, 38, 38],
+            "On Hold": [202, 138, 4],
+            "Re-Inspection": [37, 99, 235],
+        }
+        const color: [number, number, number] = statusColors[status] || SLATE
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(9)
+        doc.setTextColor(...color)
+        doc.text(`Status: ${status}`, margin, y + 50)
+        doc.setTextColor(...SLATE)
+    }
+
+    // ── Page footers ──────────────────────────────────────────────────────────
     const pageCount = (doc as any).getNumberOfPages?.() ?? doc.internal.pages.length - 1
-    for (let p = 1; p <= pageCount; p++) {
-        doc.setPage(p)
+    for (let pg = 1; pg <= pageCount; pg++) {
+        doc.setPage(pg)
         doc.setFontSize(8)
         doc.setTextColor(...MUTED)
-        doc.text(`Page ${p} of ${pageCount}`, pageW - margin, pageH - 18, { align: "right" })
+        doc.text(`Page ${pg} of ${pageCount}`, pageW - margin, pageH - 18, { align: "right" })
         doc.text("M2C — Confidential Inspection Report", margin, pageH - 18)
     }
 

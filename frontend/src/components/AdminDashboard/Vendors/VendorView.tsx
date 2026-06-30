@@ -47,6 +47,7 @@ import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { hasPermission } from '@/lib/auth'
 import { getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
 import { buildFullName } from '@/lib/utils'
+import { openDoc, downloadDoc } from '@/lib/docDownload'
 
 interface VendorViewProps {
   vendorId: string
@@ -255,7 +256,6 @@ export default function VendorView({ vendorId }: VendorViewProps) {
     { id: 'facilities', label: 'Facilities', icon: Factory },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'bank-details', label: 'Bank Details', icon: CreditCard },
-    { id: 'performance', label: 'Performance', icon: Star },
     { id: 'reviews', label: 'Reviews', icon: MessageSquare }
   ]
 
@@ -490,7 +490,6 @@ export default function VendorView({ vendorId }: VendorViewProps) {
         {activeTab === 'products' && <ProductsTab vendor={vendor} />}
         {activeTab === 'facilities' && <FacilitiesTab vendor={vendor} />}
         {activeTab === 'documents' && <DocumentsTab vendor={vendor} />}
-        {activeTab === 'performance' && <PerformanceTab vendor={vendor} />}
         {activeTab === 'bank-details' && <BankDetailsTab vendor={vendor} onVerify={handleVerifyBankDetails} loading={actionLoading === 'verify-bank'} />}
         {activeTab === 'reviews' && <ReviewsTab vendor={vendor} />}
       </div>
@@ -780,14 +779,6 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{(vendor as any).employeeCount}</p>
                   </div>
                 )}
-                <div>
-                  <p className="text-sm text-gray-600">Vendor Type</p>
-                  <p className="font-medium capitalize">
-                    {Array.isArray((vendor as any).vendorTypes) && (vendor as any).vendorTypes.length > 0
-                      ? (vendor as any).vendorTypes.join(', ')
-                      : vendor.vendorType.replace(/_/g, ' ').toLowerCase()}
-                  </p>
-                </div>
               </div>
             </div>
 
@@ -881,10 +872,6 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Product Categories</span>
               <span className="font-semibold">{vendor.productCategories?.length || 0}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Specializations</span>
-              <span className="font-semibold">{vendor.specializations?.length || 0}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Certifications</span>
@@ -1078,12 +1065,6 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{vendor.warehouseSize}</p>
                   </div>
                 )}
-                {vendor.storageCapacity && (
-                  <div>
-                    <p className="text-sm text-gray-600">Warehousing Capacity</p>
-                    <p className="font-medium">{vendor.storageCapacity}</p>
-                  </div>
-                )}
               </div>
 
             </div>
@@ -1148,45 +1129,11 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
         </Card>
       )}
 
-      {vendor.specializations && vendor.specializations.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Specializations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {vendor.specializations.map((spec, index) => (
-                <Badge key={index} className="bg-purple-100 text-purple-800">
-                  {spec}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {vendor.productTypes && vendor.productTypes.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Types</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {Array.from(new Set(vendor.productTypes)).map((type, index) => (
-                <Badge key={`${type}-${index}`} className="bg-indigo-100 text-indigo-800">
-                  {type}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Category Remarks */}
+      {/* General Remarks */}
       {(vendor as any).categoryRemarks && (
         <Card>
           <CardHeader>
-            <CardTitle>Category Remarks</CardTitle>
+            <CardTitle>General Remarks</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 whitespace-pre-wrap">{(vendor as any).categoryRemarks}</p>
@@ -1302,21 +1249,9 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                 <p className="font-medium">{vendor.factoryAddress}</p>
                 <p className="font-medium">{vendor.factoryCity}, {vendor.factoryState}</p>
               </div>
-              {vendor.factorySize && (
-                <div>
-                  <p className="text-sm text-gray-600">Factory Size</p>
-                  <p className="font-medium">{vendor.factorySize}</p>
-                </div>
-              )}
-              {vendor.productionCapacity && (
-                <div>
-                  <p className="text-sm text-gray-600">Production Capacity</p>
-                  <p className="font-medium">{vendor.productionCapacity}</p>
-                </div>
-              )}
               {vendor.qualityControl && (
                 <div>
-                  <p className="text-sm text-gray-600">Quality Control</p>
+                  <p className="text-sm text-gray-600">Quality Control Process</p>
                   <p className="font-medium">{vendor.qualityControl}</p>
                 </div>
               )}
@@ -1397,17 +1332,13 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                   </div>
                   {cert.documentUrl && (
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={cert.documentUrl} target="_blank" rel="noopener noreferrer">
-                          <Eye className="h-4 w-4 mr-2" />
-                          View
-                        </a>
+                      <Button variant="outline" size="sm" onClick={() => openDoc(cert.documentUrl!)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
                       </Button>
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={cert.documentUrl} download>
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </a>
+                      <Button variant="outline" size="sm" onClick={() => downloadDoc(cert.documentUrl!, cert.name || 'Certificate')}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
                       </Button>
                     </div>
                   )}
@@ -1419,12 +1350,9 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
       )}
 
       {((vendor.shippingMethods && vendor.shippingMethods.length > 0) ||
-        vendor.deliveryTime ||
-        vendor.minimumOrderQuantity ||
         (vendor as any).packagingCapabilities ||
         (vendor as any).logisticsPartners ||
-        (vendor as any).complianceStandards ||
-        ((vendor as any).paymentTerms?.length > 0)) && (
+        (vendor as any).complianceStandards) && (
         <Card>
           <CardHeader>
             <CardTitle>Logistics &amp; Compliance</CardTitle>
@@ -1440,31 +1368,6 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                 </div>
               </div>
             )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {vendor.deliveryTime && (
-                <div>
-                  <p className="text-sm text-gray-600">Delivery Time</p>
-                  <p className="font-medium">{vendor.deliveryTime}</p>
-                </div>
-              )}
-              {vendor.minimumOrderQuantity && (
-                <div>
-                  <p className="text-sm text-gray-600">Minimum Order Quantity</p>
-                  <p className="font-medium">{vendor.minimumOrderQuantity}</p>
-                </div>
-              )}
-              {Array.isArray((vendor as any).paymentTerms) && (vendor as any).paymentTerms.length > 0 && (
-                <div className="md:col-span-2">
-                  <p className="text-sm text-gray-600 mb-1.5">Payment Terms</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(vendor as any).paymentTerms.map((t: string) => (
-                      <Badge key={t} className="bg-slate-100 text-slate-700">{t}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
 
             {(vendor as any).packagingCapabilities && (
               <div>
@@ -1512,17 +1415,13 @@ function DocumentsTab({ vendor }: { vendor: VendorProfile }) {
                 </div>
                 {doc.documentUrl && (
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer">
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </a>
+                    <Button variant="outline" size="sm" onClick={() => openDoc(doc.documentUrl!)}>
+                      <Eye className="h-4 w-4 mr-2" />
+                      View
                     </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={doc.documentUrl} target="_blank" rel="noopener noreferrer" download>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </a>
+                    <Button variant="outline" size="sm" onClick={() => downloadDoc(doc.documentUrl!, doc.name || doc.type || 'Document')}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
                     </Button>
                   </div>
                 )}
@@ -1840,41 +1739,6 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
         </Card>
       )}
 
-      {/* Trade Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Globe className="h-5 w-5" />
-            <span>Trade Information</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {vendor.tradeLicenseNumber && (
-              <div>
-                <p className="text-sm text-gray-600">Trade License Number</p>
-                <p className="font-medium">{vendor.tradeLicenseNumber}</p>
-              </div>
-            )}
-            {vendor.businessRegistrationNumber && (
-              <div>
-                <p className="text-sm text-gray-600">Business Registration Number</p>
-                <p className="font-medium">{vendor.businessRegistrationNumber}</p>
-              </div>
-            )}
-            {vendor.taxIdentificationNumber && (
-              <div>
-                <p className="text-sm text-gray-600">Tax Identification Number</p>
-                <p className="font-medium">{vendor.taxIdentificationNumber}</p>
-              </div>
-            )}
-          </div>
-          {!vendor.tradeLicenseNumber && !vendor.businessRegistrationNumber && !vendor.taxIdentificationNumber && (
-            <p className="text-gray-500 text-center py-4">No trade information available</p>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Import / Export — split flags + country lists */}
       {((vendor as any).importExperience ||
         (vendor as any).exportExperience ||
@@ -1921,83 +1785,6 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
           </CardContent>
         </Card>
       )}
-    </div>
-  )
-}
-
-function PerformanceTab({ vendor }: { vendor: VendorProfile }) {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Performance Metrics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {vendor.annualTurnover && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Annual Turnover</span>
-                <span className="font-semibold">{vendor.annualTurnover}</span>
-              </div>
-            )}
-
-            {vendor.exportExperience !== undefined && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Export Experience</span>
-                <span className="font-semibold">{vendor.exportExperience ? 'Yes' : 'No'}</span>
-              </div>
-            )}
-
-            {vendor.paymentTerms && vendor.paymentTerms.length > 0 && (
-              <div>
-                <span className="text-sm text-gray-600">Payment Terms</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {vendor.paymentTerms.map((term, index) => (
-                    <Badge key={index} className="bg-gray-100 text-gray-800">
-                      {term}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Market Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {vendor.primaryMarkets && vendor.primaryMarkets.length > 0 && (
-              <div>
-                <p className="text-sm text-gray-600">Primary Markets</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {vendor.primaryMarkets.map((market, index) => (
-                    <Badge key={index} className="bg-blue-100 text-blue-800">
-                      {market}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {vendor.exportCountries && vendor.exportCountries.length > 0 && (
-              <div>
-                <p className="text-sm text-gray-600">Export Countries</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {vendor.exportCountries.map((country, index) => (
-                    <Badge key={index} className="bg-green-100 text-green-800">
-                      {country}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

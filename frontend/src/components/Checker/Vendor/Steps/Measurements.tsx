@@ -1,7 +1,8 @@
 "use client"
 
 import { Camera, Plus, Trash2, Upload, X, Image as ImageIcon } from "lucide-react"
-import { useRef } from "react"
+import { useRef, useState } from "react"
+import ImageCropModal from "@/components/UI/ImageCropModal"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/UI/Table"
 
 // Compress image before storing to keep payload manageable
@@ -54,23 +55,43 @@ interface MeasurementsProps {
 
 export default function Measurements({ formData, setFormData, errors = {} }: MeasurementsProps) {
   const measurementPhotoInputRef = useRef<HTMLInputElement | null>(null)
+  const [cropQueue, setCropQueue] = useState<File[]>([])
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [cropFileName, setCropFileName] = useState('')
 
-  const handleMeasurementPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      const newEntries = await Promise.all(
-        Array.from(files).map(async (file) => {
-          const data = await compressImage(file)
-          return { name: file.name, data, url: data }
-        })
-      )
-      setFormData({
-        ...formData,
-        measurementPhotos: [...(formData.measurementPhotos || []), ...newEntries]
-      })
-    }
-    // Reset input
+  const readAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.readAsDataURL(file)
+    })
+
+  const handleMeasurementPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
     if (e.target) e.target.value = ""
+    if (files.length === 0) return
+    setCropQueue(files.slice(1))
+    setCropFileName(files[0].name)
+    setCropSrc(URL.createObjectURL(files[0]))
+  }
+
+  const onMeasurementCropped = async (croppedFile: File) => {
+    const dataUrl = await readAsDataUrl(croppedFile)
+    setFormData({
+      ...formData,
+      measurementPhotos: [...(formData.measurementPhotos || []), { name: cropFileName, data: dataUrl, url: dataUrl }]
+    })
+    const cur = cropSrc
+    if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
+    if (cropQueue.length > 0) {
+      const [next, ...rest] = cropQueue
+      setCropQueue(rest)
+      setCropFileName(next.name)
+      setCropSrc(URL.createObjectURL(next))
+    } else {
+      setCropSrc(null)
+      setCropFileName('')
+    }
   }
 
   const removeMeasurementPhoto = (photoIndex: number) => {
@@ -155,22 +176,22 @@ export default function Measurements({ formData, setFormData, errors = {} }: Mea
                       <input
                         type="number"
                         step="0.1"
-                        value={m.cartonLength}
-                        onChange={(e) => updateMeasurement(m.id, 'cartonLength', parseFloat(e.target.value) || 0)}
+                        value={m.cartonLength || ''}
+                        onChange={(e) => updateMeasurement(m.id, 'cartonLength', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                         className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
                       />
                       <input
                         type="number"
                         step="0.1"
-                        value={m.cartonWidth}
-                        onChange={(e) => updateMeasurement(m.id, 'cartonWidth', parseFloat(e.target.value) || 0)}
+                        value={m.cartonWidth || ''}
+                        onChange={(e) => updateMeasurement(m.id, 'cartonWidth', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                         className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
                       />
                       <input
                         type="number"
                         step="0.1"
-                        value={m.cartonHeight}
-                        onChange={(e) => updateMeasurement(m.id, 'cartonHeight', parseFloat(e.target.value) || 0)}
+                        value={m.cartonHeight || ''}
+                        onChange={(e) => updateMeasurement(m.id, 'cartonHeight', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                         className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
                       />
                     </div>
@@ -180,15 +201,15 @@ export default function Measurements({ formData, setFormData, errors = {} }: Mea
                       <input
                         type="number"
                         step="0.1"
-                        value={m.productLength}
-                        onChange={(e) => updateMeasurement(m.id, 'productLength', parseFloat(e.target.value) || 0)}
+                        value={m.productLength || ''}
+                        onChange={(e) => updateMeasurement(m.id, 'productLength', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                         className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
                       />
                       <input
                         type="number"
                         step="0.1"
-                        value={m.productWidth}
-                        onChange={(e) => updateMeasurement(m.id, 'productWidth', parseFloat(e.target.value) || 0)}
+                        value={m.productWidth || ''}
+                        onChange={(e) => updateMeasurement(m.id, 'productWidth', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                         className="w-16 px-2 py-1 border border-slate-300 rounded text-xs"
                       />
                     </div>
@@ -197,8 +218,8 @@ export default function Measurements({ formData, setFormData, errors = {} }: Mea
                     <input
                       type="number"
                       step="0.01"
-                      value={m.retailWeight}
-                      onChange={(e) => updateMeasurement(m.id, 'retailWeight', parseFloat(e.target.value) || 0)}
+                      value={m.retailWeight || ''}
+                      onChange={(e) => updateMeasurement(m.id, 'retailWeight', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                       className="w-20 px-2 py-1 border border-slate-300 rounded text-xs"
                     />
                   </TableCell>
@@ -206,8 +227,8 @@ export default function Measurements({ formData, setFormData, errors = {} }: Mea
                     <input
                       type="number"
                       step="0.1"
-                      value={m.cartonGrossWeight}
-                      onChange={(e) => updateMeasurement(m.id, 'cartonGrossWeight', parseFloat(e.target.value) || 0)}
+                      value={m.cartonGrossWeight || ''}
+                      onChange={(e) => updateMeasurement(m.id, 'cartonGrossWeight', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                       className="w-20 px-2 py-1 border border-slate-300 rounded text-xs"
                     />
                   </TableCell>
@@ -241,8 +262,9 @@ export default function Measurements({ formData, setFormData, errors = {} }: Mea
             className="hidden"
           />
           <button
+            type="button"
             onClick={() => measurementPhotoInputRef.current?.click()}
-            className="flex flex-col items-center justify-center w-full"
+            className="flex flex-col items-center justify-center w-full outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-xl"
           >
             <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
             <p className="text-slate-700 font-medium">Upload measurement photos</p>
@@ -283,6 +305,20 @@ export default function Measurements({ formData, setFormData, errors = {} }: Mea
           </div>
         )}
       </div>
+      <ImageCropModal
+        src={cropSrc}
+        fileName={cropFileName}
+        title="Crop Measurement Photo"
+        cropShape="rect"
+        showGrid={true}
+        onCancel={() => {
+          if (cropSrc?.startsWith('blob:')) URL.revokeObjectURL(cropSrc)
+          setCropQueue([])
+          setCropSrc(null)
+          setCropFileName('')
+        }}
+        onCropped={onMeasurementCropped}
+      />
     </div>
   )
 }

@@ -562,7 +562,7 @@ export default function VendorDataSummary({
         </AccordionSection>
       )}
 
-      <AccordionSection {...sectionProps('certifications', 'Certifications & Logistics', 'Quality standards and shipping', <ShieldCheck className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('certifications'))}>
+      <AccordionSection {...sectionProps('certifications', 'Certifications & Quality Control', 'Quality standards and certifications', <ShieldCheck className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('certifications'))}>
         <div className="flex flex-col">
           <InfoRow
             label="Certifications"

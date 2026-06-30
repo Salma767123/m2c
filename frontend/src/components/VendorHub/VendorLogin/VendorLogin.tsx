@@ -19,7 +19,7 @@ import {
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { useVendorAuth } from '@/hooks/useVendorAuth'
 import { dispatchAuthChange } from '@/lib/authEvents'
-import { isVendorLoggedIn } from '@/lib/vendorAuth'
+import { isVendorLoggedIn, isVendorApproved } from '@/lib/vendorAuth'
 
 interface LoginFormData {
   email: string
@@ -43,9 +43,9 @@ export default function VendorLogin() {
     rememberMe: false
   })
 
-  // Redirect if already logged in as vendor
+  // Redirect if already logged in as an approved vendor
   useEffect(() => {
-    if (isVendorLoggedIn()) {
+    if (isVendorLoggedIn() && isVendorApproved()) {
       router.replace('/vendor/dashboard')
     } else {
       setAuthChecked(true)

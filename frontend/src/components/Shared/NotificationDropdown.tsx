@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bell, Check, CheckCheck, Package, CreditCard, Star, AlertCircle, ShoppingCart, X } from 'lucide-react';
+import { Bell, Check, CheckCheck, Package, CreditCard, Star, AlertCircle, ShoppingCart, X, ChevronRight, Calendar, Factory } from 'lucide-react';
 import { notificationService, AppNotification } from '@/services/notificationService';
 import { onForegroundMessage } from '@/services/webNotificationService';
+import NotificationModal, { CategoryDef } from './NotificationModal';
 
 const POLL_INTERVAL = 5000; // 5 seconds — fast polling for near-real-time feel
 
@@ -37,6 +38,13 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   ORDER_VENDOR_PROCESSING: <Package className="h-4 w-4 text-blue-600" />,
   ORDER_APPROVED_BY_ADMIN_HUB: <Check className="h-4 w-4 text-green-600" />,
   PAYMENT_OVERDUE: <AlertCircle className="h-4 w-4 text-red-600" />,
+  VENDOR_ASSIGNED: <Factory className="h-4 w-4 text-brand-600" />,
+  PRODUCT_ASSIGNED: <Package className="h-4 w-4 text-brand-600" />,
+  INSPECTION_SCHEDULED: <Calendar className="h-4 w-4 text-blue-600" />,
+  REINSPECTION_RAISED: <AlertCircle className="h-4 w-4 text-orange-600" />,
+  INSPECTION_SUBMITTED: <Check className="h-4 w-4 text-teal-600" />,
+  REINSPECTION_COMPLETED: <Check className="h-4 w-4 text-green-600" />,
+  INSPECTION_FINAL_REJECTED: <AlertCircle className="h-4 w-4 text-red-600" />,
 };
 
 const BG_MAP: Record<string, string> = {
@@ -69,6 +77,13 @@ const BG_MAP: Record<string, string> = {
   ORDER_VENDOR_PROCESSING: 'bg-blue-50',
   ORDER_APPROVED_BY_ADMIN_HUB: 'bg-green-50',
   PAYMENT_OVERDUE: 'bg-red-50',
+  VENDOR_ASSIGNED: 'bg-brand-50',
+  PRODUCT_ASSIGNED: 'bg-brand-50',
+  INSPECTION_SCHEDULED: 'bg-blue-50',
+  REINSPECTION_RAISED: 'bg-orange-50',
+  INSPECTION_SUBMITTED: 'bg-teal-50',
+  REINSPECTION_COMPLETED: 'bg-green-50',
+  INSPECTION_FINAL_REJECTED: 'bg-red-50',
 };
 
 function timeAgo(dateStr: string): string {
@@ -89,8 +104,14 @@ interface IncomingToast {
   type: string;
 }
 
-export default function NotificationDropdown() {
+interface NotificationDropdownProps {
+  categories?: CategoryDef[]
+  colorScheme?: 'blue' | 'brand'
+}
+
+export default function NotificationDropdown({ categories, colorScheme }: NotificationDropdownProps = {}) {
   const [open, setOpen] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -275,9 +296,30 @@ export default function NotificationDropdown() {
                 ))
               )}
             </div>
+
+            {/* View All footer */}
+            <div className="shrink-0 border-t border-gray-100">
+              <button
+                onClick={() => { setOpen(false); setShowModal(true); }}
+                className="w-full flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-brand-600 hover:bg-gray-50 transition-colors rounded-b-xl"
+              >
+                View all notifications
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Full notification modal */}
+      {showModal && (
+        <NotificationModal
+          onClose={() => setShowModal(false)}
+          onUnreadCountChange={setUnreadCount}
+          categories={categories}
+          colorScheme={colorScheme}
+        />
+      )}
     </>
   );
 }

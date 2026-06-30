@@ -1940,7 +1940,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                 <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm font-medium">₹</span>
                                 <input
                                   type="number"
-                                  value={newVariant.price}
+                                  value={newVariant.price || ''}
                                   onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                                   placeholder="0.00"
                                   step="0.01"
@@ -1953,7 +1953,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               <label className="block text-sm font-medium text-gray-700">Stock Quantity *</label>
                               <input
                                 type="number"
-                                value={newVariant.stock}
+                                value={newVariant.stock || ''}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                                 placeholder="0"
                                 min="0"
@@ -2138,7 +2138,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                         <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">₹</span>
                                         <input
                                           type="number"
-                                          value={variant.price}
+                                          value={variant.price || ''}
                                           onChange={(e) => updateVariant(variant.id, 'price', parseFloat(e.target.value) || 0)}
                                           className="w-full pl-5 pr-2 py-1.5 border border-gray-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white"
                                           step="0.01"
@@ -2149,7 +2149,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                     <TableCell>
                                       <input
                                         type="number"
-                                        value={variant.stock}
+                                        value={variant.stock || ''}
                                         onChange={(e) => updateVariant(variant.id, 'stock', parseInt(e.target.value) || 0)}
                                         className={`w-20 px-2 py-1.5 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-gray-700 bg-white ${variant.stock > 20 ? 'border-green-300 text-green-800' :
                                           variant.stock > 5 ? 'border-yellow-300 text-yellow-800' :
@@ -2225,7 +2225,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           <input
                             type="number"
                             name="basePrice"
-                            value={formData.basePrice}
+                            value={formData.basePrice || ''}
                             onChange={handleInputChange}
                             required
                             min="0"
@@ -2242,7 +2242,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                         <input
                           type="number"
                           name="totalStock"
-                          value={formData.totalStock}
+                          value={formData.totalStock || ''}
                           onChange={handleInputChange}
                           required
                           readOnly={isEdit}
@@ -2373,7 +2373,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           <input
                             type="number"
                             name="basePrice"
-                            value={formData.basePrice}
+                            value={formData.basePrice || ''}
                             onChange={handleInputChange}
                             required
                             className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
@@ -2502,7 +2502,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                                   <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">₹</span>
                                   <input
                                     type="number"
-                                    value={variant.price}
+                                    value={variant.price || ''}
                                     onChange={(e) => updateVariant(variant.id, 'price', parseFloat(e.target.value) || 0)}
                                     className="w-full pl-6 pr-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                                     step="0.01"
@@ -2626,10 +2626,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           <input
                             type="number"
                             name="totalStock"
-                            value={formData.hasVariants
+                            value={(formData.hasVariants
                               ? formData.totalStock + formData.variants.reduce((sum, v) => sum + v.stock, 0)
                               : formData.totalStock
-                            }
+                            ) || ''}
                             onChange={handleInputChange}
                             required={!isEdit}
                             readOnly={isEdit || formData.hasVariants}
@@ -2659,7 +2659,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                           <input
                             type="number"
                             name="lowStockThreshold"
-                            value={formData.lowStockThreshold}
+                            value={formData.lowStockThreshold || ''}
                             onChange={handleInputChange}
                             min={5}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
@@ -2688,7 +2688,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       <input
                         type="number"
                         name="dispatchTimeline.processingDays"
-                        value={formData.dispatchTimeline.processingDays}
+                        value={formData.dispatchTimeline.processingDays || ''}
                         onChange={handleInputChange}
                         required
                         min="0"
@@ -2703,7 +2703,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       <input
                         type="number"
                         name="dispatchTimeline.shippingDays"
-                        value={formData.dispatchTimeline.shippingDays}
+                        value={formData.dispatchTimeline.shippingDays || ''}
                         onChange={handleInputChange}
                         required
                         min="0"
@@ -2717,7 +2717,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                       </label>
                       <input
                         type="number"
-                        value={formData.dispatchTimeline.totalDays}
+                        value={formData.dispatchTimeline.totalDays || ''}
                         disabled
                         className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
                       />
@@ -2996,7 +2996,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               type="number"
                               step="0.1"
                               min="0"
-                              value={range.minWeight}
+                              value={range.minWeight || ''}
                               onChange={(e) => {
                                 setFormData(prev => {
                                   const ranges = [...(prev.logisticsConfig?.weightRanges || [])];
@@ -3014,7 +3014,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                               type="number"
                               step="0.1"
                               min="0"
-                              value={range.maxWeight}
+                              value={range.maxWeight || ''}
                               onChange={(e) => {
                                 setFormData(prev => {
                                   const ranges = [...(prev.logisticsConfig?.weightRanges || [])];
@@ -3137,8 +3137,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   <div>
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Cover Image (1 image only)</h4>
                     <div
-                      className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer bg-blue-50"
+                      role="button"
+                      tabIndex={0}
+                      className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer bg-blue-50 outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:border-blue-500"
                       onClick={() => document.getElementById('cover-image-upload')?.click()}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
                     >
                       <Upload className="mx-auto h-8 w-8 text-blue-400" />
                       <p className="mt-1 text-sm text-blue-600">Upload Cover Image</p>
@@ -3157,8 +3160,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId,
                   <div>
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Gallery Images (Max 3 images)</h4>
                     <div
-                      className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-400 transition-colors cursor-pointer bg-green-50"
+                      role="button"
+                      tabIndex={0}
+                      className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-400 transition-colors cursor-pointer bg-green-50 outline-none focus-visible:ring-2 focus-visible:ring-green-400/40 focus-visible:border-green-500"
                       onClick={() => document.getElementById('gallery-image-upload')?.click()}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
                     >
                       <Upload className="mx-auto h-8 w-8 text-green-400" />
                       <p className="mt-1 text-sm text-green-600">Upload Gallery Images</p>

@@ -457,6 +457,7 @@ model Vendor {
   // Quality Checker Assignment
   assignedQcId String?      @db.ObjectId
   assignedQc   QCChecker?   @relation("VendorQCChecker", fields: [assignedQcId], references: [id])
+  assignedQcAt DateTime?
   inspections  Inspection[]
   settlements  Settlement[]
 
@@ -478,6 +479,7 @@ model Vendor {
 
   @@index([assignedQcId, status])
   @@index([assignedQcId, submittedAt])
+  @@index([assignedQcId, assignedQcAt])
   @@index([status])
   @@map("vendors")
 }

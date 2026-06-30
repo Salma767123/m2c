@@ -520,7 +520,7 @@ export default function EditQCChecker() {
                 <input
                   type="number"
                   name="experience"
-                  value={formData.experience}
+                  value={formData.experience || ''}
                   onChange={handleInputChange}
                   placeholder="Enter years"
                   className={INPUT_CLASS}

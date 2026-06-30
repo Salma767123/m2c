@@ -78,8 +78,8 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState<{ newStock?: string; reason?: string }>({})
 
-  // Variant stock updates
-  const [variantStocks, setVariantStocks] = useState<Record<string, number>>({})
+  // Variant stock updates (stored as strings to allow empty input while editing)
+  const [variantStocks, setVariantStocks] = useState<Record<string, string>>({})
 
   useEffect(() => {
     fetchInventoryData()
@@ -109,10 +109,10 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
 
             // Initialize variant stocks
             if (productData.hasVariants && productData.variants) {
-              const initialStocks: Record<string, number> = {}
+              const initialStocks: Record<string, string> = {}
               let variantSum = 0
               productData.variants.forEach((variant: ProductVariant) => {
-                initialStocks[variant.id] = variant.stock
+                initialStocks[variant.id] = variant.stock.toString()
                 variantSum += variant.stock
               })
               setVariantStocks(initialStocks)
@@ -180,7 +180,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
         await axiosInstance.put(`/products/admin/${product.id}/variants/stock`, {
           variants: Object.entries(variantStocks).map(([variantId, stock]) => ({
             variantId,
-            stock
+            stock: parseInt(stock) || 0
           })),
           reason: reason.trim(),
           notes: notes.trim() || undefined
@@ -221,15 +221,16 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
   }
 
   const handleVariantStockChange = (variantId: string, value: string) => {
-    const numValue = parseInt(value) || 0
+    // Allow empty string while typing; clamp negatives only when a number is present
+    const clamped = value !== '' && parseInt(value) < 0 ? '0' : value
     setVariantStocks(prev => ({
       ...prev,
-      [variantId]: numValue < 0 ? 0 : numValue
+      [variantId]: clamped
     }))
   }
 
   const calculateTotalVariantStock = () => {
-    return Object.values(variantStocks).reduce((sum, stock) => sum + stock, 0)
+    return Object.values(variantStocks).reduce((sum, stock) => sum + (parseInt(stock) || 0), 0)
   }
 
   const getAggregateStock = () => {
@@ -441,7 +442,7 @@ export default function UpdateStockPage({ inventoryId }: UpdateStockPageProps) {
                         <div className="w-32">
                           <input
                             type="number"
-                            value={variantStocks[variant.id] || 0}
+                            value={variantStocks[variant.id] ?? ''}
                             onChange={(e) => handleVariantStockChange(variant.id, e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             min="0"

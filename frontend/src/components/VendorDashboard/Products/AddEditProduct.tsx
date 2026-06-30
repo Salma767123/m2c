@@ -68,9 +68,10 @@ const mockInventoryItems = [
   }
 ]
 
-const fabricTypes = [
-  'Cotton', 'Linen', 'Silk', 'Polyester', 'Microfiber', 'Bamboo', 'Modal', 'Tencel', 'Wool', 'Cashmere'
+const predefinedFabricTypes = [
+  'Cotton', 'Linen', 'Silk', 'Polyester', 'Microfiber', 'Bamboo', 'Modal', 'Tencel', 'Wool', 'Cashmere',
 ]
+const fabricTypes = [...predefinedFabricTypes, 'Others']
 
 const standardSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'King', 'Queen', 'Full', 'Twin', 'Custom']
 const standardColors = ['White', 'Black', 'Gray', 'Navy', 'Beige', 'Brown', 'Red', 'Blue', 'Green', 'Yellow', 'Pink', 'Purple']
@@ -306,6 +307,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [activeTab, setActiveTab] = useState('basic')
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [shippingConfirmed, setShippingConfirmed] = useState(false)
   const [uploadResult, setUploadResult] = useState<{ show: boolean; type: 'success' | 'error'; text: string }>({
     show: false,
     type: 'success',
@@ -321,6 +323,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     subCategory: 'basic',
     coverImage: 'basic',
     fabricType: 'fabric',
+    otherFabricType: 'fabric',
     careInstructions: 'fabric',
     variants: 'variants',
     basePrice: 'pricing',
@@ -328,6 +331,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     shippingDays: 'shipping',
     weight: 'shipping',
     weightUnit: 'shipping',
+    shippingConfirmed: 'shipping',
   }
 
   const clearError = (name: string) => {
@@ -390,6 +394,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
   const [isLoadingGst, setIsLoadingGst] = useState(false)
   // True when the vendor chose "Others" to enter a custom tax rate.
   const [gstOthers, setGstOthers] = useState(false)
+  const [otherFabricType, setOtherFabricType] = useState('')
 
   // Categories State
   const [categories, setCategories] = useState<string[]>([])
@@ -553,7 +558,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               rating: product.rating,
               reviews: product.reviews,
 
-              fabricType: product.fabricType || '',
+              fabricType: predefinedFabricTypes.includes(product.fabricType ?? '')
+                ? (product.fabricType ?? '')
+                : product.fabricType ? 'Others' : '',
               material: product.material || '',
               fabricSpecifications: (() => {
                 const fs = (product.fabricSpecifications as any) || {}
@@ -601,6 +608,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
               approvedBy: product.approvedBy,
               rejectionReason: product.rejectionReason
             })
+
+            // Restore custom fabric type if stored value wasn't a predefined option
+            if (product.fabricType && !predefinedFabricTypes.includes(product.fabricType)) {
+              setOtherFabricType(product.fabricType)
+            }
 
             // Set selected inventory item if connected
             if (product.inventory) {
@@ -677,7 +689,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     } else {
       setFormData(prev => ({
         ...prev,
-        [name]: type === 'number' ? parseFloat(value) || 0 :
+        [name]: type === 'number' ? (value === '' ? 0 : parseFloat(value)) :
           type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
       }))
     }
@@ -1004,8 +1016,12 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (!formData.category) newErrors.category = 'Please select a category.'
     if (!formData.subCategory) newErrors.subCategory = 'Please select a sub-category.'
     if (!formData.fabricType) newErrors.fabricType = 'Please select a fabric type.'
+    if (formData.fabricType === 'Others' && !otherFabricType.trim()) newErrors.otherFabricType = 'Please enter a custom fabric type.'
     if (formData.fabricSpecifications.careInstructions.length === 0) {
       newErrors.careInstructions = 'Please add at least one care instruction.'
+    }
+    if (formData.fabricSpecifications.weightValue && !formData.fabricSpecifications.weightUnit) {
+      newErrors.fabricWeightUnit = 'Please select a unit of measurement.'
     }
     if (formData.hasVariants && formData.variants.length === 0) {
       newErrors.variants = 'Please add at least one variant or disable variants.'
@@ -1046,6 +1062,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
     if (formData.dispatchTimeline.shippingDays <= 0) newErrors.shippingDays = 'Enter the shipping days (at least 1).'
     if (!formData.weight || formData.weight.trim() === '') newErrors.weight = 'Shipping weight is required.'
     if (!formData.weightUnit) newErrors.weightUnit = 'Please select a weight unit.'
+    if (!isEdit && !shippingConfirmed) newErrors.shippingConfirmed = 'Please confirm the shipping timeline before creating the product.'
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
@@ -1073,6 +1090,8 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
       const submitData: any = {
         ...formData,
         dimensions: combineDimensions(formData.dimensions, formData.dimensionUnit),
+        // Send the custom text as the actual fabricType, not the sentinel 'Others'
+        fabricType: formData.fabricType === 'Others' ? otherFabricType : formData.fabricType,
       }
       delete submitData.dimensionUnit
 
@@ -1598,48 +1617,81 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <CardTitle>Fabric Type & Specifications</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div id="vf-fabricType">
-                    <div className={errors.fabricType ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
-                      <Dropdown
-                        label="Fabric Type *"
-                        value={formData.fabricType}
-                        options={fabricTypes}
-                        placeholder="Select Fabric Type"
-                        onChange={(value) => { clearError('fabricType'); setFormData(prev => ({ ...prev, fabricType: value as string })) }}
+                  {/* Row 1: Fabric Type | Material Description */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="vf-fabricType">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Fabric Type <span className="text-red-500">*</span>
+                      </label>
+                      <div className={errors.fabricType ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
+                        <Dropdown
+                          value={formData.fabricType}
+                          options={fabricTypes}
+                          placeholder="Select Fabric Type"
+                          onChange={(value) => {
+                            clearError('fabricType')
+                            clearError('otherFabricType')
+                            if (value !== 'Others') setOtherFabricType('')
+                            setFormData(prev => ({ ...prev, fabricType: value as string }))
+                          }}
+                          buttonClassName="py-2.5 rounded-lg"
+                        />
+                      </div>
+                      {errors.fabricType && <p className="text-xs text-red-600 mt-1">{errors.fabricType}</p>}
+
+                      {/* Custom fabric type field — only visible when Others is selected */}
+                      {formData.fabricType === 'Others' && (
+                        <div id="vf-otherFabricType" className="mt-3 animate-in slide-in-from-top-2 duration-200">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            Other Fabric Type <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={otherFabricType}
+                            onChange={e => { setOtherFabricType(e.target.value); clearError('otherFabricType') }}
+                            placeholder="Enter Fabric Type"
+                            className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors ${
+                              errors.otherFabricType ? 'border-red-400 ring-2 ring-red-500/40' : 'border-slate-300'
+                            }`}
+                          />
+                          {errors.otherFabricType && (
+                            <p className="text-xs text-red-600 mt-1">{errors.otherFabricType}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Material Description
+                      </label>
+                      <input
+                        type="text"
+                        name="material"
+                        value={formData.material}
+                        onChange={handleInputChange}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                        placeholder="e.g., 100% Organic Cotton"
                       />
                     </div>
-                    {errors.fabricType && <p className="text-xs text-red-600 mt-1">{errors.fabricType}</p>}
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Material Description
-                    </label>
-                    <input
-                      type="text"
-                      name="material"
-                      value={formData.material}
-                      onChange={handleInputChange}
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                      placeholder="e.g., 100% Organic Cotton"
-                    />
-                  </div>
+                  {/* Row 2: Composition | Weight | Unit of Measurement */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Composition
+                      </label>
+                      <input
+                        type="text"
+                        name="fabricSpecifications.composition"
+                        value={formData.fabricSpecifications.composition}
+                        onChange={handleInputChange}
+                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
+                        placeholder="e.g., 100% Cotton"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                      Composition
-                    </label>
-                    <input
-                      type="text"
-                      name="fabricSpecifications.composition"
-                      value={formData.fabricSpecifications.composition}
-                      onChange={handleInputChange}
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                      placeholder="e.g., 100% Cotton"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Weight
@@ -1647,7 +1699,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       <input
                         type="number"
                         name="fabricSpecifications.weightValue"
-                        value={formData.fabricSpecifications.weightValue}
+                        value={formData.fabricSpecifications.weightValue || ''}
                         onFocus={(e) => e.currentTarget.select()}
                         onChange={handleInputChange}
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
@@ -1655,21 +1707,39 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         min="0"
                       />
                     </div>
+
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        GSM
+                        Unit of Measurement
                       </label>
-                      <input
-                        type="text"
-                        name="fabricSpecifications.weightUnit"
-                        value={formData.fabricSpecifications.weightUnit}
-                        onChange={handleInputChange}
-                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors"
-                        placeholder="e.g., GSM, Oz"
-                      />
+                      <div className={errors.fabricWeightUnit ? 'rounded-lg ring-2 ring-red-500/40' : ''}>
+                        <Dropdown
+                          value={formData.fabricSpecifications.weightUnit}
+                          options={[
+                            { value: 'GSM', label: 'GSM' },
+                            { value: 'kg', label: 'kg' },
+                            { value: 'g', label: 'g (Grams)' },
+                            { value: 'lb', label: 'lb (Pounds)' },
+                            { value: 'oz', label: 'oz (Ounces)' },
+                          ]}
+                          placeholder="Select Unit"
+                          onChange={(value) => {
+                            clearError('fabricWeightUnit');
+                            setFormData(prev => ({
+                              ...prev,
+                              fabricSpecifications: { ...prev.fabricSpecifications, weightUnit: value as string }
+                            }));
+                          }}
+                          buttonClassName="py-2.5 rounded-lg"
+                        />
+                      </div>
+                      {errors.fabricWeightUnit && (
+                        <p className="mt-1 text-xs text-red-600">{errors.fabricWeightUnit}</p>
+                      )}
                     </div>
                   </div>
 
+                  {/* Row 3: Type of Weave */}
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Type of Weave
@@ -1856,7 +1926,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                 <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 text-sm font-medium">₹</span>
                                 <input
                                   type="number"
-                                  value={newVariant.price}
+                                  value={newVariant.price || ''}
                                   onFocus={(e) => e.currentTarget.select()}
                                   onChange={(e) => setNewVariant(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                                   placeholder="0.00"
@@ -1870,7 +1940,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               <label className="block text-sm font-semibold text-slate-700">Stock Quantity *</label>
                               <input
                                 type="number"
-                                value={newVariant.stock}
+                                value={newVariant.stock || ''}
                                 onFocus={(e) => e.currentTarget.select()}
                                 onChange={(e) => setNewVariant(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
                                 placeholder="0"
@@ -1994,7 +2064,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                         <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-slate-500 text-xs">₹</span>
                                         <input
                                           type="number"
-                                          value={variant.price}
+                                          value={variant.price || ''}
                                           onFocus={(e) => e.currentTarget.select()}
                                           onChange={(e) => updateVariant(variant.id, 'price', parseFloat(e.target.value) || 0)}
                                           className="w-full pl-5 pr-2 py-1.5 border border-slate-300 rounded-md text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white"
@@ -2006,7 +2076,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                                     <TableCell>
                                       <input
                                         type="number"
-                                        value={variant.stock}
+                                        value={variant.stock || ''}
                                         onFocus={(e) => e.currentTarget.select()}
                                         onChange={(e) => updateVariant(variant.id, 'stock', parseInt(e.target.value) || 0)}
                                         className={`w-20 px-2 py-1.5 border rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-brand-500/40 bg-white ${variant.stock > 20 ? 'border-green-300 text-green-800' :
@@ -2110,7 +2180,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                             id="vf-basePrice"
                             type="number"
                             name="basePrice"
-                            value={formData.basePrice}
+                            value={formData.basePrice || ''}
                             onFocus={(e) => e.currentTarget.select()}
                             onChange={handleInputChange}
                             required
@@ -2129,7 +2199,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         <input
                           type="number"
                           name="totalStock"
-                          value={formData.totalStock}
+                          value={formData.totalStock || ''}
                           onFocus={(e) => e.currentTarget.select()}
                           onChange={handleInputChange}
                           required
@@ -2184,68 +2254,76 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   {/* GST Selection */}
                   <div className="bg-white border border-slate-200 rounded-lg p-4">
                     <h4 className="font-medium text-slate-900 mb-3">Tax Configuration</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Dropdown
-                          label="GST Rate"
-                          value={(() => {
-                            if (gstOthers) return 'others'
-                            if (formData.gstPercentage == null) return ''
-                            const inList = gstRates.some(r => r.isActive && r.percentage === formData.gstPercentage)
-                            return inList ? String(formData.gstPercentage) : 'others'
-                          })()}
-                          options={[
-                            { value: '', label: 'Select GST Rate' },
-                            ...gstRates.filter(r => r.isActive).map(r => ({
-                              value: r.percentage.toString(),
-                              label: `${r.percentage}% - ${r.description || 'GST'}`,
-                            })),
-                            { value: 'others', label: 'Others (custom tax)' },
-                          ]}
-                          onChange={(value) => {
-                            if (value === 'others') {
-                              setGstOthers(true)
-                              setFormData(prev => {
-                                const inList = gstRates.some(r => r.isActive && r.percentage === prev.gstPercentage)
-                                return { ...prev, gstPercentage: inList ? undefined : prev.gstPercentage }
-                              })
-                            } else {
-                              setGstOthers(false)
-                              setFormData(prev => ({ ...prev, gstPercentage: value ? parseFloat(value as string) : undefined }))
-                            }
-                          }}
-                          placeholder={isLoadingGst ? 'Loading rates...' : 'Select GST Rate'}
-                          disabled={isLoadingGst}
-                        />
-                        <p className="text-xs text-slate-500 mt-1">Select the applicable tax rate for this product</p>
-                        {!formData.gstPercentage && (
-                          <p className="text-xs text-red-500 mt-1">Tax rate is required</p>
-                        )}
-                      </div>
-                      {(gstOthers || (formData.gstPercentage != null && !gstRates.some(r => r.isActive && r.percentage === formData.gstPercentage))) && (
-                        <div className="flex flex-col justify-end">
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">Custom Tax Rate</label>
-                          <div className="relative w-36">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={formData.gstPercentage ?? ''}
-                              onFocus={(e) => e.currentTarget.select()}
-                              onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                gstPercentage: e.target.value === '' ? undefined : parseFloat(e.target.value)
-                              }))}
-                              placeholder="e.g., 12"
-                              className="w-full h-10 pr-8 pl-3 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
+                    {(() => {
+                      const showCustom = gstOthers || (formData.gstPercentage != null && !gstRates.some(r => r.isActive && r.percentage === formData.gstPercentage))
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* GST Rate dropdown */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">GST Rate</label>
+                            <Dropdown
+                              value={(() => {
+                                if (gstOthers) return 'others'
+                                if (formData.gstPercentage == null) return ''
+                                const inList = gstRates.some(r => r.isActive && r.percentage === formData.gstPercentage)
+                                return inList ? String(formData.gstPercentage) : 'others'
+                              })()}
+                              options={[
+                                { value: '', label: 'Select GST Rate' },
+                                ...gstRates.filter(r => r.isActive).map(r => ({
+                                  value: r.percentage.toString(),
+                                  label: `${r.percentage}% - ${r.description || 'GST'}`,
+                                })),
+                                { value: 'others', label: 'Others (custom tax)' },
+                              ]}
+                              onChange={(value) => {
+                                if (value === 'others') {
+                                  setGstOthers(true)
+                                  setFormData(prev => {
+                                    const inList = gstRates.some(r => r.isActive && r.percentage === prev.gstPercentage)
+                                    return { ...prev, gstPercentage: inList ? undefined : prev.gstPercentage }
+                                  })
+                                } else {
+                                  setGstOthers(false)
+                                  setFormData(prev => ({ ...prev, gstPercentage: value ? parseFloat(value as string) : undefined }))
+                                }
+                              }}
+                              placeholder={isLoadingGst ? 'Loading rates...' : 'Select GST Rate'}
+                              disabled={isLoadingGst}
+                              buttonClassName="py-2.5 rounded-lg"
                             />
-                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-800 pointer-events-none select-none">%</span>
+                            <p className="text-xs text-slate-500 mt-1">Select the applicable tax rate for this product</p>
+                            {!formData.gstPercentage && (
+                              <p className="text-xs text-red-500 mt-1">Tax rate is required</p>
+                            )}
                           </div>
-                          <p className="text-xs text-slate-500 mt-1.5">Enter a custom tax percentage</p>
+
+                          {/* Custom Tax Rate — always rendered to prevent layout shift; hidden when not applicable */}
+                          <div className={showCustom ? '' : 'invisible pointer-events-none'}>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Custom Tax Rate</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={formData.gstPercentage ?? ''}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => setFormData(prev => ({
+                                  ...prev,
+                                  gstPercentage: e.target.value === '' ? undefined : parseFloat(e.target.value)
+                                }))}
+                                placeholder="e.g., 12"
+                                tabIndex={showCustom ? undefined : -1}
+                                className="w-full pr-8 pl-3 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-colors bg-white"
+                              />
+                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-800 pointer-events-none select-none">%</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">Enter a custom tax percentage</p>
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Single Unit Pricing Section */}
@@ -2255,53 +2333,85 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       Product Pricing
                     </h4>
 
-                    {/* Pricing Configuration */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                          Base Price *
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-slate-500">₹</span>
-                          <input
-                            id="vf-basePrice"
-                            type="number"
-                            name="basePrice"
-                            value={formData.basePrice}
-                            onFocus={(e) => e.currentTarget.select()}
-                            onChange={handleInputChange}
-                            className={`w-full pl-7 pr-3.5 py-2.5 border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-colors ${
-                              errors.basePrice
-                                ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
-                                : 'border-slate-300 focus:ring-brand-500/40 focus:border-brand-500'
-                            }`}
-                            placeholder="0"
-                          />
-                        </div>
-                        {errors.basePrice ? (
-                          <p className="text-xs text-red-600 mt-1">{errors.basePrice}</p>
-                        ) : (
-                          <p className="text-xs text-slate-600 mt-1">Price for single unit</p>
-                        )}
-                      </div>
-
-                      {/* Total Amount (auto-calculated) */}
-                      {formData.basePrice > 0 && formData.gstPercentage != null && formData.gstPercentage > 0 && (
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            Total Amount <span className="text-xs font-normal text-slate-500">(incl. tax)</span>
-                          </label>
-                          <div className="flex min-h-[42px] w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
-                            <span className="text-sm font-bold tracking-tight text-brand-500">
-                              ₹{(formData.basePrice * (1 + formData.gstPercentage / 100)).toFixed(2)}
-                            </span>
+                    {/* Pricing Configuration — 4-column breakdown */}
+                    {(() => {
+                      const gst = formData.gstPercentage ?? 0;
+                      const taxAmt = formData.basePrice > 0 ? formData.basePrice * gst / 100 : 0;
+                      const total = formData.basePrice > 0 ? formData.basePrice + taxAmt : 0;
+                      const sellingPrice = total;
+                      const readOnlyClass = 'flex min-h-[42px] w-full items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5';
+                      const rupeeMark = <span className="text-sm text-slate-400 shrink-0">₹</span>;
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                          {/* 1. Base Price */}
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                              Base Price *
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">₹</span>
+                              <input
+                                id="vf-basePrice"
+                                type="number"
+                                name="basePrice"
+                                value={formData.basePrice || ''}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={handleInputChange}
+                                className={`w-full pl-7 pr-3.5 py-2.5 border rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-colors ${
+                                  errors.basePrice
+                                    ? 'border-red-500 bg-red-50/40 focus:ring-red-500/40 focus:border-red-500'
+                                    : 'border-slate-300 focus:ring-brand-500/40 focus:border-brand-500'
+                                }`}
+                                placeholder="0.00"
+                              />
+                            </div>
+                            {errors.basePrice ? (
+                              <p className="text-xs text-red-600 mt-1">{errors.basePrice}</p>
+                            ) : (
+                              <p className="text-xs text-slate-500 mt-1">Price per single unit</p>
+                            )}
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            ₹{formData.basePrice.toFixed(2)} + {formData.gstPercentage}% tax
-                          </p>
+
+                          {/* 2. Tax Amount (read-only) */}
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                              Tax Amount
+                            </label>
+                            <div className={readOnlyClass}>
+                              {rupeeMark}
+                              <span className="text-sm font-semibold text-slate-700">{taxAmt.toFixed(2)}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {gst > 0 ? `${gst}% GST on base price` : 'No GST applied'}
+                            </p>
+                          </div>
+
+                          {/* 3. Total Amount (read-only) */}
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                              Total Amount
+                            </label>
+                            <div className={readOnlyClass}>
+                              {rupeeMark}
+                              <span className="text-sm font-bold tracking-tight text-brand-500">{total.toFixed(2)}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">Base price + tax</p>
+                          </div>
+
+                          {/* 4. Selling Price (read-only, equals Total for now) */}
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                              Selling Price
+                            </label>
+                            <div className={readOnlyClass}>
+                              {rupeeMark}
+                              <span className="text-sm font-bold tracking-tight text-brand-500">{sellingPrice.toFixed(2)}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">Final price for buyers</p>
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      );
+                    })()}
                   </div>
                 </CardContent>
               </Card>
@@ -2337,10 +2447,10 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                           <input
                             type="number"
                             name="totalStock"
-                            value={formData.hasVariants
+                            value={(formData.hasVariants
                               ? formData.totalStock + formData.variants.reduce((sum, v) => sum + v.stock, 0)
                               : formData.totalStock
-                            }
+                            ) || ''}
                             onFocus={(e) => e.currentTarget.select()}
                             onChange={handleInputChange}
                             required={!isEdit}
@@ -2384,7 +2494,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                               <input
                                 type="number"
                                 name="lowStockThreshold"
-                                value={formData.lowStockThreshold}
+                                value={formData.lowStockThreshold || ''}
                                 onFocus={(e) => e.currentTarget.select()}
                                 onChange={handleInputChange}
                                 min={5}
@@ -2420,7 +2530,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         type="number"
                         id="vf-processingDays"
                         name="dispatchTimeline.processingDays"
-                        value={formData.dispatchTimeline.processingDays}
+                        value={formData.dispatchTimeline.processingDays || ''}
                         onFocus={(e) => e.currentTarget.select()}
                         onChange={handleInputChange}
                         required
@@ -2436,7 +2546,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                         type="number"
                         id="vf-shippingDays"
                         name="dispatchTimeline.shippingDays"
-                        value={formData.dispatchTimeline.shippingDays}
+                        value={formData.dispatchTimeline.shippingDays || ''}
                         onFocus={(e) => e.currentTarget.select()}
                         onChange={handleInputChange}
                         required
@@ -2450,7 +2560,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       </label>
                       <input
                         type="number"
-                        value={formData.dispatchTimeline.totalDays}
+                        value={formData.dispatchTimeline.totalDays || ''}
                         disabled
                         className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm bg-slate-100 text-slate-600"
                       />
@@ -2461,7 +2571,7 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                     <div className="flex flex-col">
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Shipping Weight *
+                        Shipping Weight (Per Piece) *
                       </label>
                       <input
                         type="text"
@@ -2507,6 +2617,34 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                       delivered within <strong>{formData.dispatchTimeline.totalDays} day(s)</strong> from order confirmation.
                     </p>
                   </div>
+
+                  {!isEdit && (
+                    <div id="vf-shippingConfirmed">
+                      <label className={`flex items-start gap-3 cursor-pointer rounded-lg border p-4 transition-colors ${
+                        shippingConfirmed
+                          ? 'bg-emerald-50 border-emerald-300'
+                          : errors.shippingConfirmed
+                            ? 'bg-red-50 border-red-300'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}>
+                        <input
+                          type="checkbox"
+                          checked={shippingConfirmed}
+                          onChange={e => {
+                            setShippingConfirmed(e.target.checked)
+                            if (e.target.checked) clearError('shippingConfirmed')
+                          }}
+                          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-brand-500 cursor-pointer flex-shrink-0"
+                        />
+                        <span className="text-sm font-medium text-slate-700 leading-snug">
+                          I confirm that the above shipping timeline, processing days, shipping days, and shipping information are correct.
+                        </span>
+                      </label>
+                      {errors.shippingConfirmed && (
+                        <p className="text-xs text-red-500 mt-1.5">{errors.shippingConfirmed}</p>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -2535,8 +2673,9 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                 <Button
                   type="submit"
                   form="product-form"
-                  disabled={isLoading}
-                  className="bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20"
+                  disabled={isLoading || (!isEdit && !shippingConfirmed)}
+                  title={!isEdit && !shippingConfirmed ? 'Please confirm the shipping timeline before creating the product.' : undefined}
+                  className="bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {isLoading ? 'Saving...' : (isEdit ? 'Update Product' : 'Create Product')}
@@ -2668,8 +2807,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     {/* Cover Image Upload */}
                     {formData.images.filter(img => img.imageType === 'cover').length === 0 ? (
                       <div
-                        className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-slate-400 transition-colors cursor-pointer bg-slate-50"
+                        role="button"
+                        tabIndex={0}
+                        className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-slate-400 transition-colors cursor-pointer bg-slate-50 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
                         onClick={() => document.getElementById('cover-image-upload')?.click()}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
                       >
                         <Upload className="mx-auto h-8 w-8 text-slate-400" />
                         <p className="mt-1 text-sm text-slate-600">Upload Cover Image</p>
@@ -2731,8 +2873,11 @@ export default function AddEditProduct({ productId, isEdit = false, inventoryId 
                     {/* Gallery Images Upload */}
                     {formData.images.filter(img => img.imageType === 'gallery').length < 3 ? (
                       <div
-                        className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-slate-400 transition-colors cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                        className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-slate-400 transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500"
                         onClick={() => document.getElementById('gallery-images-upload')?.click()}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
                       >
                         <Upload className="mx-auto h-8 w-8 text-slate-400" />
                         <p className="mt-1 text-sm text-slate-600">Upload Gallery Images</p>

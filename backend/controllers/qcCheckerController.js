@@ -714,7 +714,7 @@ const updateCheckerProfile = async (req, res) => {
 // QC Checker: Get assigned vendors
 // ============================
 const ALLOWED_VENDOR_STATUSES = ['PENDING', 'UNDER_REVIEW', 'REINSPECTION', 'APPROVED', 'REJECTED', 'SUSPENDED'];
-const ALLOWED_VENDOR_SORT_FIELDS = ['submittedAt', 'status'];
+const ALLOWED_VENDOR_SORT_FIELDS = ['assignedQcAt', 'submittedAt', 'status'];
 
 const getAssignedVendors = async (req, res) => {
     try {
@@ -728,7 +728,7 @@ const getAssignedVendors = async (req, res) => {
         const status = req.query.status ? req.query.status.toString().toUpperCase() : null;
         const sortBy = ALLOWED_VENDOR_SORT_FIELDS.includes(req.query.sortBy)
             ? req.query.sortBy
-            : 'submittedAt';
+            : 'assignedQcAt';
         const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
 
         if (status && !ALLOWED_VENDOR_STATUSES.includes(status)) {
@@ -761,6 +761,7 @@ const getAssignedVendors = async (req, res) => {
                     status: true,
                     createdAt: true,
                     submittedAt: true,
+                    assignedQcAt: true,
                     factoryAddress: true,
                     factoryCity: true,
                     factoryState: true,
@@ -770,7 +771,9 @@ const getAssignedVendors = async (req, res) => {
                         take: 5,
                     },
                 },
-                orderBy: { [sortBy]: sortOrder },
+                orderBy: sortBy === 'assignedQcAt'
+                    ? [{ assignedQcAt: sortOrder }, { createdAt: sortOrder }]
+                    : { [sortBy]: sortOrder },
                 skip: (page - 1) * limit,
                 take: limit,
             }),
@@ -1088,6 +1091,77 @@ const getActiveInspectionForVendor = async (req, res) => {
             success: false,
             error: 'Failed to fetch active inspection',
         });
+    }
+};
+
+// ============================
+// QC Checker: Begin Vendor Inspection
+// Returns an existing SCHEDULED/IN_PROGRESS inspection, or auto-creates one.
+// Called when the checker clicks "Start Inspection" and no inspection exists.
+// ============================
+const beginVendorInspection = async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+        const checkerId = req.user?.checkerId || req.userId;
+
+        // 1. Verify vendor is assigned to this checker
+        const vendor = await prisma.vendor.findFirst({
+            where: { id: vendorId, assignedQcId: checkerId },
+            select: { id: true, companyName: true },
+        });
+        if (!vendor) {
+            return res.status(403).json({
+                success: false,
+                error: 'Vendor not assigned to you',
+                message: 'This vendor has not been assigned to you. Please contact your administrator.',
+            });
+        }
+
+        // 2. Return existing active inspection if one exists
+        const active = await prisma.inspection.findFirst({
+            where: { vendorId, checkerId, status: { in: ['SCHEDULED', 'IN_PROGRESS'] } },
+            orderBy: { scheduledDate: 'asc' },
+        });
+        if (active) {
+            return res.json({ success: true, inspection: active, created: false });
+        }
+
+        // 3. Block if inspection is already submitted/under review
+        const submitted = await prisma.inspection.findFirst({
+            where: { vendorId, checkerId, status: { in: ['SUBMITTED', 'UNDER_ADMIN_REVIEW'] } },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (submitted) {
+            return res.status(409).json({
+                success: false,
+                error: 'inspection_submitted',
+                message: 'The vendor inspection has already been submitted and is currently under admin review. No changes can be made until admin completes the review.',
+                inspection: { id: submitted.id, status: submitted.status },
+            });
+        }
+
+        // 4. Auto-create a new SCHEDULED inspection
+        const today = new Date().toISOString().split('T')[0];
+        const newInspection = await prisma.inspection.create({
+            data: {
+                vendorId,
+                checkerId,
+                poNumber: '',
+                clientName: vendor.companyName,
+                scheduledDate: today,
+                scheduledTime: '09:00 AM',
+                priority: 'medium',
+                estimatedDuration: '1 Hour',
+                itemsToInspect: [],
+                status: 'SCHEDULED',
+                cycleNumber: 1,
+            },
+        });
+
+        return res.status(201).json({ success: true, inspection: newInspection, created: true });
+    } catch (error) {
+        console.error('Begin vendor inspection error:', error);
+        res.status(500).json({ success: false, error: 'Failed to begin inspection. Please try again.' });
     }
 };
 
@@ -1853,6 +1927,7 @@ module.exports = {
     getAssignedVendors,
     getVendorDetails,
     getActiveInspectionForVendor,
+    beginVendorInspection,
     approveVendorByQc,
     rejectVendorByQc,
     getAssignedProducts,

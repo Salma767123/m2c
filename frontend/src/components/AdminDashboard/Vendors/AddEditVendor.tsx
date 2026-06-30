@@ -346,7 +346,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     { title: "Owner Profile", icon: User }, // 2
     { title: "Vendor Type & Products", icon: Package }, // 3
     { title: "Manufacturing Facilities", icon: Factory }, // 4 — skipped when non-manufacturer
-    { title: "Certifications & Logistics", icon: Award }, // 5
+    { title: "Certifications & Quality Control", icon: Award }, // 5
     { title: "Contact & Trade Info", icon: Phone }, // 6
     { title: "Review & Submit", icon: CheckCircle }, // 7
   ];

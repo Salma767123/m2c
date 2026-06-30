@@ -1097,7 +1097,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 </div>
                 <input
                   type="number"
-                  value={adminPrice}
+                  value={adminPrice || ''}
                   onChange={(e) => setAdminPrice(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                   placeholder="Enter selling price"
@@ -1118,7 +1118,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                 </div>
                 <input
                   type="number"
-                  value={originalPrice}
+                  value={originalPrice || ''}
                   onChange={(e) => setOriginalPrice(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent"
                   placeholder="Enter original price"
@@ -1157,7 +1157,7 @@ export default function VendorProductRequestView({ requestId }: VendorProductReq
                   <input
                     id="view-original-inr"
                     type="number"
-                    value={originalPriceINR}
+                    value={originalPriceINR || ''}
                     onChange={(e) => setOriginalPriceINR(e.target.value)}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 text-sm"
                     placeholder="MRP for .in domain"

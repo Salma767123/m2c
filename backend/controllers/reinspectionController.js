@@ -446,7 +446,7 @@ const adminReviewFactoryInspection = async (req, res) => {
             // Update vendor status
             await prisma.vendor.update({
                 where: { id: inspection.vendorId },
-                data: { status: 'REINSPECTION', assignedQcId: reCheckerId },
+                data: { status: 'REINSPECTION', assignedQcId: reCheckerId, assignedQcAt: new Date() },
             });
 
             // Write audit log for the re-inspection raise

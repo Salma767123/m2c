@@ -324,7 +324,7 @@ function Row({ icon, label, value }: { icon: React.ReactNode; label: string; val
             <div className="mt-0.5 text-slate-400">{icon}</div>
             <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
-                <p className="text-sm text-slate-900 break-words">{value || "—"}</p>
+                <div className="text-sm text-slate-900 break-words">{value || "—"}</div>
             </div>
         </div>
     )
@@ -447,9 +447,9 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                                 {lc.dimensions && (
                                     <Row icon={<Layers className="w-4 h-4" />} label="Shipping Dimensions" value={`${lc.dimensions.length} × ${lc.dimensions.width} × ${lc.dimensions.height} ${lc.dimensions.unit}`} />
                                 )}
-                                {lc.transportTypes.length > 0 && <Row icon={<Package className="w-4 h-4" />} label="Transport Types" value={lc.transportTypes.join(', ')} />}
-                                {lc.transportTypes.includes('AIR') && lc.airDeliveryDays > 0 && <Row icon={<Clock className="w-4 h-4" />} label="Air Delivery Days" value={`${lc.airDeliveryDays} days`} />}
-                                {lc.transportTypes.includes('SHIP') && lc.shipDeliveryDays > 0 && <Row icon={<Clock className="w-4 h-4" />} label="Ship Delivery Days" value={`${lc.shipDeliveryDays} days`} />}
+                                {(lc.transportTypes?.length > 0) && <Row icon={<Package className="w-4 h-4" />} label="Transport Types" value={lc.transportTypes.join(', ')} />}
+                                {lc.transportTypes?.includes('AIR') && lc.airDeliveryDays > 0 && <Row icon={<Clock className="w-4 h-4" />} label="Air Delivery Days" value={`${lc.airDeliveryDays} days`} />}
+                                {lc.transportTypes?.includes('SHIP') && lc.shipDeliveryDays > 0 && <Row icon={<Clock className="w-4 h-4" />} label="Ship Delivery Days" value={`${lc.shipDeliveryDays} days`} />}
                                 {lc.airCostPerKg > 0 && <Row icon={<IndianRupee className="w-4 h-4" />} label="Air Cost per KG" value={formatCurrency(lc.airCostPerKg)} />}
                                 {lc.shipCostPerKg > 0 && <Row icon={<IndianRupee className="w-4 h-4" />} label="Ship Cost per KG" value={formatCurrency(lc.shipCostPerKg)} />}
                                 {lc.notes && <Row icon={<FileText className="w-4 h-4" />} label="Logistics Notes" value={lc.notes} />}

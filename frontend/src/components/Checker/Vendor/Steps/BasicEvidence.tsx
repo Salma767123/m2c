@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Upload, X, FileText, AlertCircle } from "lucide-react"
 import type { StepErrors } from "../validation"
 import { ErrorText } from "./fieldHelpers"
@@ -10,6 +11,7 @@ import {
     type FactoryImageSlotId,
     type FactoryPhoto,
 } from "./factoryImageSlots"
+import ImageCropModal from "@/components/UI/ImageCropModal"
 
 interface StepProps {
     formData: any
@@ -50,13 +52,34 @@ const ALLOWED_IMAGE_TYPES = "image/png,image/jpeg,image/webp,image/gif"
 export default function BasicEvidence({ formData, setFormData, errors = {} }: StepProps) {
     const photos: FactoryPhoto[] = Array.isArray(formData.factoryPhotos) ? formData.factoryPhotos : []
 
-    // Upload (or replace) the single image for a named slot.
-    const handleSlotUpload = async (slotId: FactoryImageSlotId, label: string, file: File) => {
+    const [cropInfo, setCropInfo] = useState<{
+        slotId: FactoryImageSlotId
+        label: string
+        src: string
+        fileName: string
+    } | null>(null)
+
+    const readAsDataUrl = (file: File): Promise<string> =>
+        new Promise((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(file)
+        })
+
+    // Upload (or replace) the single image for a named slot — opens crop first.
+    const handleSlotUpload = (slotId: FactoryImageSlotId, label: string, file: File) => {
         if (!file.type.startsWith("image/")) return
-        const data = await compressImage(file)
-        const entry: FactoryPhoto = { slotId, label, name: file.name, data, url: data }
-        const others = photos.filter((p) => p.slotId !== slotId)
+        setCropInfo({ slotId, label, src: URL.createObjectURL(file), fileName: file.name })
+    }
+
+    const onSlotCropped = async (croppedFile: File) => {
+        if (!cropInfo) return
+        const data = await readAsDataUrl(croppedFile)
+        const entry: FactoryPhoto = { slotId: cropInfo.slotId, label: cropInfo.label, name: cropInfo.fileName, data, url: data }
+        const others = photos.filter((p) => p.slotId !== cropInfo.slotId)
         setFormData({ ...formData, factoryPhotos: [...others, entry] })
+        if (cropInfo.src.startsWith('blob:')) URL.revokeObjectURL(cropInfo.src)
+        setCropInfo(null)
     }
 
     const handleSlotRemove = (slotId: FactoryImageSlotId) => {
@@ -258,6 +281,18 @@ export default function BasicEvidence({ formData, setFormData, errors = {} }: St
                     )}
                 </div>
             </div>
+            <ImageCropModal
+                src={cropInfo?.src ?? null}
+                fileName={cropInfo?.fileName}
+                title={`Crop ${cropInfo?.label ?? 'Photo'}`}
+                cropShape="rect"
+                showGrid={true}
+                onCancel={() => {
+                    if (cropInfo?.src.startsWith('blob:')) URL.revokeObjectURL(cropInfo.src)
+                    setCropInfo(null)
+                }}
+                onCropped={onSlotCropped}
+            />
         </div>
     )
 }

@@ -402,6 +402,10 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
   const getStepIndex = (step: Step) => steps.findIndex((s) => s.id === step)
   const currentStepIndex = getStepIndex(currentStep)
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }, [currentStep])
+
   const validateCurrentStep = (): StepErrors => {
     const stepErrors = validateStep(currentStep, formData)
     setErrors(prev => ({ ...prev, [currentStep]: stepErrors }))

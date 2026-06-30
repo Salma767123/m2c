@@ -275,8 +275,11 @@ export default function BannerSettingsTab() {
 
                             <div className="flex items-start gap-4">
                                 <div
-                                    className="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-gray-400 transition-colors"
+                                    role="button"
+                                    tabIndex={0}
+                                    className="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-gray-400 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 focus-visible:border-gray-500"
                                     onClick={() => fileInputRef.current?.click()}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
                                 >
                                     {filePreview ? (
                                         <div className="relative">
@@ -383,8 +386,11 @@ export default function BannerSettingsTab() {
                                         <div className="space-y-3">
                                             <div className="flex items-start gap-4">
                                                 <div
-                                                    className="w-48 h-28 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer border-2 border-dashed border-gray-300 hover:border-gray-400"
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    className="w-48 h-28 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer border-2 border-dashed border-gray-300 hover:border-gray-400 outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 focus-visible:border-gray-500"
                                                     onClick={() => editFileInputRef.current?.click()}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
                                                 >
                                                     <img
                                                         src={editFilePreview || banner.imageUrl}

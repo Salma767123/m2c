@@ -16,7 +16,7 @@ import {
   X,
   Clock,
 } from "lucide-react"
-import InspectionForm from "@/components/Checker/Vendor/InspectionForm"
+import VendorInspectionForm from "@/components/Checker/Vendor/VendorInspectionForm"
 import VendorDetail from "@/components/Checker/Vendor/VendorDetail"
 import Dropdown from "@/components/UI/Dropdown"
 import { State } from "country-state-city"
@@ -43,8 +43,10 @@ const STATUS_TABS = [
 ]
 
 const SORT_OPTIONS = [
-  { value: "submittedAt:desc", label: "Newest first" },
-  { value: "submittedAt:asc", label: "Oldest first" },
+  { value: "assignedQcAt:desc", label: "Newest assignment" },
+  { value: "assignedQcAt:asc", label: "Oldest assignment" },
+  { value: "submittedAt:desc", label: "Newest submission" },
+  { value: "submittedAt:asc", label: "Oldest submission" },
 ]
 
 const MAIN_STATUS_COLORS: Record<string, string> = {
@@ -173,17 +175,24 @@ interface RawVendor {
   factoryState?: string | null
   submittedAt?: string | null
   createdAt?: string | null
+  assignedQcAt?: string | null
   status: string
   inspections?: Array<{ status?: string | null; result?: string | null; cycleNumber?: number | null }>
 }
 
 function transformVendor(v: RawVendor): Vendor {
-  const dateObj = v.createdAt ? new Date(v.createdAt) : null
-  const assignedDate = dateObj
-    ? dateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  // Use assignedQcAt as the "Assigned Date"; fall back to createdAt for older records
+  const assignedDateObj = v.assignedQcAt
+    ? new Date(v.assignedQcAt)
+    : v.createdAt
+    ? new Date(v.createdAt)
+    : null
+  const assignedDate = assignedDateObj
+    ? assignedDateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
     : undefined
 
-  // YYYY-MM-DD formatted string in local time
+  // YYYY-MM-DD for date filter matching (still based on assignedQcAt / createdAt)
+  const dateObj = assignedDateObj
   const year = dateObj ? dateObj.getFullYear() : ""
   const month = dateObj ? String(dateObj.getMonth() + 1).padStart(2, '0') : ""
   const day = dateObj ? String(dateObj.getDate()).padStart(2, '0') : ""
@@ -219,7 +228,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
 
   const initialSearch = searchParams.get("search") ?? ""
   const initialStatus = searchParams.get("status") ?? ""
-  const initialSort = searchParams.get("sort") ?? "submittedAt:desc"
+  const initialSort = searchParams.get("sort") ?? "assignedQcAt:desc"
   const initialPage = Math.max(parseInt(searchParams.get("page") || "1", 10) || 1, 1)
   const initialDate = searchParams.get("date") ?? ""
   const initialInspectionStatus = searchParams.get("inspectionStatus") ?? ""
@@ -227,7 +236,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
 
   const [searchInput, setSearchInput] = useState(initialSearch)
   const [status, setStatus] = useState(initialStatus)
-  const [sort, setSort] = useState(initialSort)
+  const [sort, setSort] = useState<string>(initialSort)
   const [dateFilter, setDateFilter] = useState(initialDate)
   const [inspectionStatus, setInspectionStatus] = useState(initialInspectionStatus)
   const [selectedState, setSelectedState] = useState(initialState)
@@ -317,7 +326,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
     if (status) params.set("status", status)
     else params.delete("status")
     
-    if (sort !== "submittedAt:desc") params.set("sort", sort)
+    if (sort !== "assignedQcAt:desc") params.set("sort", sort)
     else params.delete("sort")
 
     if (dateFilter) params.set("date", dateFilter)
@@ -338,9 +347,8 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
   }, [debouncedSearch, status, sort, dateFilter, inspectionStatus, selectedState, page, router])
 
   const [sortBy, sortOrder] = useMemo(() => {
-    const isBackendSort = sort === "submittedAt:desc" || sort === "submittedAt:asc"
-    const [by, ord] = isBackendSort ? sort.split(":") : ["submittedAt", "desc"]
-    return [by, ord as "asc" | "desc"]
+    const parts = sort.split(":")
+    return [parts[0], (parts[1] ?? "desc") as "asc" | "desc"]
   }, [sort])
 
   // Monotonic counter to ignore stale in-flight responses when filters change rapidly.
@@ -439,22 +447,25 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
   const handleClearFilters = () => {
     setSearchInput("")
     setStatus("")
-    setSort("submittedAt:desc")
+    setSort("assignedQcAt:desc")
     setDateFilter("")
     setInspectionStatus("")
     setSelectedState("")
     setPage(1)
   }
 
-  const hasActiveFilters = Boolean(debouncedSearch || status || sort !== "submittedAt:desc" || dateFilter || inspectionStatus || selectedState || page !== 1)
+  const hasActiveFilters = Boolean(debouncedSearch || status || sort !== "assignedQcAt:desc" || dateFilter || inspectionStatus || selectedState || page !== 1)
   const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
   const rangeEnd = Math.min(rangeStart + filteredVendors.length - 1, pagination.total)
 
-  if (inProgressInspection && selectedVendorData) {
+  // Render the inspection form as soon as we have a vendorId in the URL — don't
+  // wait for selectedVendorData, which requires the vendor list to have loaded first.
+  // VendorInspectionForm fetches its own vendor data internally.
+  if (inProgressInspection && vendorIdParam) {
     return (
-      <InspectionForm
-        vendorId={selectedVendorData.id}
-        vendorName={selectedVendorData.name}
+      <VendorInspectionForm
+        vendorId={vendorIdParam}
+        vendorName={selectedVendorData?.name ?? ''}
         onComplete={handleCompleteInspection}
       />
     )
@@ -726,6 +737,11 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
             <TableBody>
               {filteredVendors.map((vendor) => {
                 const isSelected = selectedVendor === vendor.id
+                const isInspectionDone =
+                  vendor.inspectionStatus === 'Completed' ||
+                  vendor.inspectionStatus === 'Submitted' ||
+                  vendor.status === 'Approved' ||
+                  vendor.status === 'Rejected'
                 return (
                   <TableRow
                     key={vendor.id}
@@ -801,17 +817,17 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        {vendor.inspectionStatus !== "COMPLETED" && vendor.inspectionStatus !== "CANCELLED" && vendor.status !== "APPROVED" && vendor.status !== "REJECTED" && (
-                          <button
-                            type="button"
-                            onClick={() => handleStartInspection(vendor)}
-                            aria-label={`${vendor.inspectionStatus === "IN_PROGRESS" ? "Continue" : "Start"} inspection for ${vendor.name}`}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs shadow-brand-500/10 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
-                          >
-                            <ArrowRight className="w-3.5 h-3.5" />
-                            {vendor.inspectionStatus === "IN_PROGRESS" ? "Continue" : "Start"}
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleStartInspection(vendor)}
+                          disabled={isInspectionDone}
+                          aria-label={`Start inspection for ${vendor.name}`}
+                          title={isInspectionDone ? "Inspection has already been completed for this vendor." : undefined}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs shadow-brand-500/10 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                          Start Inspect
+                        </button>
                       </div>
                     </TableCell>
                   </TableRow>

@@ -64,7 +64,7 @@ export default function StockUpdateModal({
     }
 
     try {
-      await onConfirm(parseInt(newStock), reason.trim(), notes.trim() || undefined)
+      await onConfirm(newStock === '' ? 0 : parseInt(newStock), reason.trim(), notes.trim() || undefined)
 
       // Reset form
       setNewStock(currentStock.toString())
@@ -146,9 +146,9 @@ export default function StockUpdateModal({
             </label>
             <input
               type="number"
-              value={newStock}
+              value={newStock || ''}
               onChange={(e) => {
-                setNewStock(e.target.value)
+                setNewStock(e.target.value === '' ? '' : e.target.value)
                 setErrors({ ...errors, newStock: undefined })
               }}
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.newStock ? 'border-red-500' : 'border-gray-300'

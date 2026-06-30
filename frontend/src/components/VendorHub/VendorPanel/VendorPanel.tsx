@@ -18,7 +18,7 @@ const steps = [
   "Owner Profile",              // 2
   "Vendor Type & Products",     // 3
   "Manufacturing Facilities",   // 4 — skipped at nav-time when non-manufacturer
-  "Certifications & Logistics", // 5
+  "Certifications & Quality Control", // 5
   "Contact & Trade Info",       // 6
   "Review & Submit",            // 7
 ];

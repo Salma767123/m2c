@@ -229,7 +229,34 @@ class QCCheckerService {
             );
             return response.data;
         } catch (error: any) {
-            throw new Error(error?.message || 'Failed to fetch active inspection');
+            const msg = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to fetch active inspection';
+            const err = new Error(msg) as Error & { status?: number };
+            err.status = error?.response?.status;
+            throw err;
+        }
+    }
+
+    // Ensure an inspection exists for the vendor — creates one if none is active.
+    // Returns the existing or newly-created inspection. Throws with status 409 if
+    // already submitted/under review, or 403 if vendor is not assigned.
+    async beginVendorInspection(
+        vendorId: string
+    ): Promise<{ success: boolean; inspection: any; created: boolean }> {
+        try {
+            const token = this.getCheckerToken();
+            if (!token) throw new Error('Not authenticated as checker');
+            const response = await axios.post(
+                `/qc-checkers/vendors/${vendorId}/begin-inspection`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            return response.data;
+        } catch (error: any) {
+            const msg = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to begin inspection';
+            const err = new Error(msg) as Error & { status?: number; data?: any };
+            err.status = error?.response?.status;
+            err.data = error?.response?.data;
+            throw err;
         }
     }
 
@@ -256,7 +283,10 @@ class QCCheckerService {
             });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.message || 'Failed to fetch vendor details');
+            const msg = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to fetch vendor details';
+            const err = new Error(msg) as Error & { status?: number };
+            err.status = error?.response?.status;
+            throw err;
         }
     }
 
