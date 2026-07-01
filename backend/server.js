@@ -221,28 +221,74 @@ app.get("/api/document-proxy", async (req, res) => {
     return res.status(400).json({ error: "Only Cloudinary URLs are supported" });
   }
 
-  try {
-    const upstream = await fetch(url);
-    if (!upstream.ok) {
-      return res.status(upstream.status).json({ error: "Document not found" });
-    }
+  // Parse Cloudinary URL segments:
+  // /{cloudName}/{resourceType}/{deliveryType}[/v{version}]/{publicId}.{ext}
+  const segments = parsed.pathname.replace(/^\//, "").split("/");
+  const resourceType = segments[1] || "image";
+  let idParts = segments.slice(3);
+  if (idParts[0] && /^v\d+$/.test(idParts[0])) idParts = idParts.slice(1);
+  let publicId = idParts.join("/");
+  const extMatch = publicId.match(/\.([a-z0-9]+)$/i);
+  const format = extMatch ? extMatch[1] : "";
+  if (extMatch) publicId = publicId.slice(0, publicId.lastIndexOf("."));
 
-    const contentType = upstream.headers.get("content-type") || "application/octet-stream";
-    const buffer = Buffer.from(await upstream.arrayBuffer());
+  const filename =
+    typeof name === "string" && name
+      ? name
+      : decodeURIComponent(parsed.pathname.split("/").pop() || "document");
+  const mimeMap = {
+    pdf: "application/pdf", doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp",
+  };
 
+  // Helper to send a buffer response
+  const sendBuffer = (buffer, contentType) => {
     res.set("Content-Type", contentType);
     if (download === "true") {
-      const filename =
-        typeof name === "string" && name
-          ? name
-          : decodeURIComponent(parsed.pathname.split("/").pop() || "document");
       res.set("Content-Disposition", `attachment; filename="${filename}"`);
     } else {
       res.set("Content-Disposition", "inline");
     }
-
     res.send(buffer);
-  } catch {
+  };
+
+  try {
+    // First try: direct CDN fetch (works for public resources)
+    const upstream = await fetch(url);
+    if (upstream.ok) {
+      const ct = upstream.headers.get("content-type") || mimeMap[format] || "application/octet-stream";
+      return sendBuffer(Buffer.from(await upstream.arrayBuffer()), ct);
+    }
+
+    // Fallback: Cloudinary's generate_archive API uses API credentials and
+    // bypasses CDN-level ACL restrictions that block direct resource access.
+    const { cloudinary } = require("./config/cloudinary");
+    const archiveUrl = cloudinary.utils.download_archive_url({
+      public_ids: [publicId],
+      resource_type: resourceType,
+      target_format: "zip",
+    });
+
+    const archiveResp = await fetch(archiveUrl);
+    if (!archiveResp.ok) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    const AdmZip = require("adm-zip");
+    const zipBuffer = Buffer.from(await archiveResp.arrayBuffer());
+    const zip = new AdmZip(zipBuffer);
+    const entries = zip.getEntries();
+    if (!entries.length) {
+      return res.status(404).json({ error: "Document not found in archive" });
+    }
+
+    const fileBuffer = entries[0].getData();
+    const ct = mimeMap[format] || "application/octet-stream";
+    return sendBuffer(fileBuffer, ct);
+  } catch (err) {
+    console.error("document-proxy error:", err?.message || err);
     if (!res.headersSent) res.status(500).json({ error: "Failed to fetch document" });
   }
 });
