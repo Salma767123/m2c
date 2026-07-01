@@ -1053,10 +1053,14 @@ const getActiveInspectionForVendor = async (req, res) => {
 
             const catProducts = v.categoryProducts && typeof v.categoryProducts === 'object' ? v.categoryProducts : {};
             const catIds = Object.keys(catProducts);
+            // categoryProducts keys must be MongoDB ObjectIds (24 hex chars) for the
+            // Category lookup to succeed. Seed/legacy data sometimes uses human-readable
+            // names as keys; filter those out to prevent PrismaClientValidationError.
+            const validObjectIdCatIds = catIds.filter(id => /^[0-9a-f]{24}$/.test(id));
             let nameById = {};
-            if (catIds.length > 0) {
+            if (validObjectIdCatIds.length > 0) {
                 const cats = await prisma.category.findMany({
-                    where: { id: { in: catIds } },
+                    where: { id: { in: validObjectIdCatIds } },
                     select: { id: true, name: true },
                 });
                 nameById = Object.fromEntries(cats.map((c) => [c.id, c.name]));

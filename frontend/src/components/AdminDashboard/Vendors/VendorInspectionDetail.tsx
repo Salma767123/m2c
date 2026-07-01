@@ -132,22 +132,22 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       case 'FAILED':
         return <Badge className="bg-red-100 text-red-800 border-red-200 text-base px-4 py-2"><XCircle className="w-4 h-4 mr-2" />Failed</Badge>;
       default:
-        return <Badge className="bg-gray-100 text-gray-800 text-base px-4 py-2"><Clock className="w-4 h-4 mr-2" />Pending</Badge>;
+        return <Badge className="bg-slate-100 text-slate-800 text-base px-4 py-2"><Clock className="w-4 h-4 mr-2" />Pending</Badge>;
     }
   };
 
   const getYesNoBadge = (value: string | undefined) => {
     if (value === "Yes") return <span className="flex items-center gap-1 text-emerald-700 font-medium"><CheckCircle className="w-4 h-4" /> Yes</span>;
     if (value === "No") return <span className="flex items-center gap-1 text-red-700 font-medium"><XCircle className="w-4 h-4" /> No</span>;
-    return <span className="text-gray-500">N/A</span>;
+    return <span className="text-slate-500">N/A</span>;
   };
 
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-96">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading inspection report...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500 mx-auto mb-4"></div>
+          <p className="text-slate-500">Loading inspection report...</p>
         </div>
       </div>
     );
@@ -158,14 +158,14 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       <div className="p-6">
         <Breadcrumb />
         <div className="flex items-center gap-4 mb-6">
-          <Link href="/admin/dashboard/vendors/assign-qc" className="text-gray-600 hover:text-gray-900"><ArrowLeft className="h-6 w-6" /></Link>
-          <h1 className="text-2xl font-bold text-gray-900">Vendor Inspection Details</h1>
+          <Link href="/admin/dashboard/vendors/assign-qc" className="text-slate-500 hover:text-slate-900"><ArrowLeft className="h-6 w-6" /></Link>
+          <h1 className="text-2xl font-bold text-slate-900">Vendor Inspection Details</h1>
         </div>
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-12 text-center">
             <AlertTriangle className="h-16 w-16 text-red-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load</h3>
-            <p className="text-gray-500">{fetchError}</p>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Failed to Load</h3>
+            <p className="text-slate-500">{fetchError}</p>
           </CardContent>
         </Card>
       </div>
@@ -177,14 +177,14 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       <div className="p-6">
         <Breadcrumb />
         <div className="flex items-center gap-4 mb-6">
-          <Link href="/admin/dashboard/vendors/assign-qc" className="text-gray-600 hover:text-gray-900"><ArrowLeft className="h-6 w-6" /></Link>
-          <h1 className="text-2xl font-bold text-gray-900">Vendor Inspection Details</h1>
+          <Link href="/admin/dashboard/vendors/assign-qc" className="text-slate-500 hover:text-slate-900"><ArrowLeft className="h-6 w-6" /></Link>
+          <h1 className="text-2xl font-bold text-slate-900">Vendor Inspection Details</h1>
         </div>
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-12 text-center">
             <ClipboardCheck className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Inspection Found</h3>
-            <p className="text-gray-500">No inspection has been assigned or completed for this vendor yet.</p>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">No Inspection Found</h3>
+            <p className="text-slate-500">No inspection has been assigned or completed for this vendor yet.</p>
           </CardContent>
         </Card>
       </div>
@@ -201,17 +201,17 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Link href="/admin/dashboard/vendors/assign-qc" className="text-gray-600 hover:text-gray-900"><ArrowLeft className="h-6 w-6" /></Link>
+          <Link href="/admin/dashboard/vendors/assign-qc" className="text-slate-500 hover:text-slate-900"><ArrowLeft className="h-6 w-6" /></Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Inspection Report</h1>
-            <p className="text-gray-600 mt-1">{vendor?.companyName || formData.vendorName || "Vendor"}</p>
+            <h1 className="text-2xl font-bold text-slate-900">Inspection Report</h1>
+            <p className="text-slate-500 mt-1">{vendor?.companyName || formData.vendorName || "Vendor"}</p>
           </div>
         </div>
         {isCompleted && vendorStatus === 'UNDER_REVIEW' && hasPermission('edit_vendors') && (
           <button
             onClick={handleApprove}
             disabled={approving}
-            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
           >
             <CheckCircle className="h-5 w-5" />
             {approving ? "Approving..." : "Approve Vendor"}
@@ -226,38 +226,38 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
 
       {/* Inspection Status Card */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Inspection Status</div>
+            <div className="text-sm text-slate-500">Inspection Status</div>
             <div className="mt-1">{getResultBadge(inspection.result)}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Inspector</div>
-            <div className="text-lg font-bold text-gray-900 mt-1">
+            <div className="text-sm text-slate-500">Inspector</div>
+            <div className="text-lg font-bold text-slate-900 mt-1">
               {(isNewFormat ? (formData as any).inspectorName : formData.inspectorName) || "N/A"}
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Inspection Date</div>
-            <div className="text-lg font-bold text-gray-900 mt-1">
+            <div className="text-sm text-slate-500">Inspection Date</div>
+            <div className="text-lg font-bold text-slate-900 mt-1">
               {inspection.completedAt
                 ? new Date(inspection.completedAt).toLocaleDateString()
                 : (isNewFormat ? (formData as any).inspectionDate : formData.inspectionDate) || "N/A"}
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Vendor Status</div>
+            <div className="text-sm text-slate-500">Vendor Status</div>
             <div className="text-lg font-bold mt-1">
               {vendorStatus === 'APPROVED' ? <span className="text-emerald-600">Approved</span> :
                vendorStatus === 'UNDER_REVIEW' ? <span className="text-blue-600">Under Review</span> :
                vendorStatus === 'REJECTED' ? <span className="text-red-600">Rejected</span> :
-               <span className="text-gray-600">{vendorStatus || "N/A"}</span>}
+               <span className="text-slate-500">{vendorStatus || "N/A"}</span>}
             </div>
           </CardContent>
         </Card>
@@ -267,10 +267,10 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
       {((isNewFormat ? (formData as any).inspectorRemarks : formData.inspectorRemarks) || inspection.notes) && (
         <Card className="mb-6">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
               <FileText className="h-5 w-5 text-blue-600" /> Inspector Remarks
             </h3>
-            <p className="text-gray-700 bg-gray-50 p-4 rounded-lg border">
+            <p className="text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-200">
               {(isNewFormat ? (formData as any).inspectorRemarks : formData.inspectorRemarks) || inspection.notes}
             </p>
           </CardContent>
@@ -289,54 +289,54 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
           <div className="space-y-6 mb-6">
             {/* Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card><CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-gray-900">{total}</div>
-                <div className="text-sm text-gray-500">Total Fields</div>
+              <Card className="border border-slate-200/80 rounded-2xl shadow-xs"><CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-slate-900">{total}</div>
+                <div className="text-sm text-slate-500">Total Fields</div>
               </CardContent></Card>
-              <Card><CardContent className="p-4 text-center">
+              <Card className="border border-slate-200/80 rounded-2xl shadow-xs"><CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-emerald-600">{ok}</div>
-                <div className="text-sm text-gray-500">Verified OK</div>
+                <div className="text-sm text-slate-500">Verified OK</div>
               </CardContent></Card>
-              <Card><CardContent className="p-4 text-center">
+              <Card className="border border-slate-200/80 rounded-2xl shadow-xs"><CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-red-600">{fail}</div>
-                <div className="text-sm text-gray-500">Issues Found</div>
+                <div className="text-sm text-slate-500">Issues Found</div>
               </CardContent></Card>
-              <Card><CardContent className="p-4 text-center">
+              <Card className="border border-slate-200/80 rounded-2xl shadow-xs"><CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-amber-500">{pending}</div>
-                <div className="text-sm text-gray-500">Pending</div>
+                <div className="text-sm text-slate-500">Pending</div>
               </CardContent></Card>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Vendor Info */}
-              <Card>
+              <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
                 <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                     <Building2 className="h-5 w-5 text-blue-600" /> Company Info
                   </h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between"><span className="text-gray-600">Company Name</span><span className="font-medium">{v.companyName || "N/A"}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">GST Number</span><span className="font-medium font-mono">{v.gstNumber || (v.businessType === 'unregistered' ? 'Unregistered' : 'N/A')}</span></div>
-                    {v.panNumber && <div className="flex justify-between"><span className="text-gray-600">PAN Number</span><span className="font-medium font-mono">{v.panNumber}</span></div>}
-                    {v.iecCode && <div className="flex justify-between"><span className="text-gray-600">IEC Code</span><span className="font-medium font-mono">{v.iecCode}</span></div>}
-                    {v.website && <div className="flex justify-between"><span className="text-gray-600">Website</span><span className="font-medium">{v.website}</span></div>}
+                    <div className="flex justify-between"><span className="text-slate-500">Company Name</span><span className="font-medium text-slate-900">{v.companyName || "N/A"}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">GST Number</span><span className="font-medium font-mono text-slate-900">{v.gstNumber || (v.businessType === 'unregistered' ? 'Unregistered' : 'N/A')}</span></div>
+                    {v.panNumber && <div className="flex justify-between"><span className="text-slate-500">PAN Number</span><span className="font-medium font-mono text-slate-900">{v.panNumber}</span></div>}
+                    {v.iecCode && <div className="flex justify-between"><span className="text-slate-500">IEC Code</span><span className="font-medium font-mono text-slate-900">{v.iecCode}</span></div>}
+                    {v.website && <div className="flex justify-between"><span className="text-slate-500">Website</span><span className="font-medium text-slate-900">{v.website}</span></div>}
                   </div>
                 </CardContent>
               </Card>
 
               {/* Owner / Contact */}
-              <Card>
+              <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
                 <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                     <User className="h-5 w-5 text-blue-600" /> Owner / Contact
                   </h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between"><span className="text-gray-600">Owner Name</span><span className="font-medium">{v.ownerName || [v.ownerFirstName, v.ownerLastName].filter(Boolean).join(' ') || "N/A"}</span></div>
-                    {v.designation && <div className="flex justify-between"><span className="text-gray-600">Designation</span><span className="font-medium">{v.designation}</span></div>}
-                    <div className="flex justify-between"><span className="text-gray-600">Phone</span><span className="font-medium">{v.ownerPhone || v.businessPhone || "N/A"}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">Email</span><span className="font-medium">{v.ownerEmail || v.businessEmail || "N/A"}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Owner Name</span><span className="font-medium text-slate-900">{v.ownerName || [v.ownerFirstName, v.ownerLastName].filter(Boolean).join(' ') || "N/A"}</span></div>
+                    {v.designation && <div className="flex justify-between"><span className="text-slate-500">Designation</span><span className="font-medium text-slate-900">{v.designation}</span></div>}
+                    <div className="flex justify-between"><span className="text-slate-500">Phone</span><span className="font-medium text-slate-900">{v.ownerPhone || v.businessPhone || "N/A"}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Email</span><span className="font-medium text-slate-900">{v.ownerEmail || v.businessEmail || "N/A"}</span></div>
                     {(v.warehouseCity || v.warehouseState) && (
-                      <div className="flex justify-between"><span className="text-gray-600">Location</span><span className="font-medium">{[v.warehouseCity, v.warehouseState].filter(Boolean).join(', ')}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Location</span><span className="font-medium text-slate-900">{[v.warehouseCity, v.warehouseState].filter(Boolean).join(', ')}</span></div>
                     )}
                   </div>
                 </CardContent>
@@ -345,9 +345,9 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
 
             {/* Issues */}
             {issues.length > 0 && (
-              <Card>
+              <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
                 <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-red-500" /> Issues Found ({issues.length})
                   </h3>
                   <div className="space-y-2">
@@ -376,85 +376,85 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Factory Details */}
-            <Card>
+            <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
               <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Factory className="h-5 w-5 text-blue-600" /> Factory Details
                 </h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between"><span className="text-gray-600">Factory Name</span><span className="font-medium">{formData.factoryName || "N/A"}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-600">Address</span><span className="font-medium">{formData.factoryAddress || "N/A"}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-600">Contact Person Name</span><span className="font-medium">{formData.contactPersonName || "N/A"}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-600">Contact Phone Number</span><span className="font-medium">{formData.contactPhoneNumber || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Factory Name</span><span className="font-medium text-slate-900">{formData.factoryName || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Address</span><span className="font-medium text-slate-900">{formData.factoryAddress || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Contact Person Name</span><span className="font-medium text-slate-900">{formData.contactPersonName || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Contact Phone Number</span><span className="font-medium text-slate-900">{formData.contactPhoneNumber || "N/A"}</span></div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Legal & Registration */}
-            <Card>
+            <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
               <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Shield className="h-5 w-5 text-blue-600" /> Legal & Registration
                 </h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between"><span className="text-gray-600">GST Number</span><span className="font-medium">{formData.gstTaxId || "N/A"}</span></div>
-                  {formData.panNumber && <div className="flex justify-between"><span className="text-gray-600">PAN Number</span><span className="font-medium font-mono">{formData.panNumber}</span></div>}
-                  {formData.iecCode && <div className="flex justify-between"><span className="text-gray-600">IEC Code</span><span className="font-medium font-mono">{formData.iecCode}</span></div>}
-                  {formData.companyIdNumber && <div className="flex justify-between"><span className="text-gray-600">Company ID / CIN</span><span className="font-medium font-mono">{formData.companyIdNumber}</span></div>}
+                  <div className="flex justify-between"><span className="text-slate-500">GST Number</span><span className="font-medium text-slate-900">{formData.gstTaxId || "N/A"}</span></div>
+                  {formData.panNumber && <div className="flex justify-between"><span className="text-slate-500">PAN Number</span><span className="font-medium font-mono text-slate-900">{formData.panNumber}</span></div>}
+                  {formData.iecCode && <div className="flex justify-between"><span className="text-slate-500">IEC Code</span><span className="font-medium font-mono text-slate-900">{formData.iecCode}</span></div>}
+                  {formData.companyIdNumber && <div className="flex justify-between"><span className="text-slate-500">Company ID / CIN</span><span className="font-medium font-mono text-slate-900">{formData.companyIdNumber}</span></div>}
                 </div>
               </CardContent>
             </Card>
 
             {/* Production Info */}
-            <Card>
+            <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
               <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Wrench className="h-5 w-5 text-blue-600" /> Production Info
                 </h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between"><span className="text-gray-600">Products Manufactured</span><span className="font-medium">{formData.productsManufactured || "N/A"}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-600">Monthly Production Capacity</span><span className="font-medium">{formData.monthlyProductionCapacity || "N/A"}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-600">Number of Production Workers</span><span className="font-medium">{formData.numberOfProductionWorkers || "N/A"}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-600">Category to Inspect</span><span className="font-medium">{formData.categoryToInspect || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Products Manufactured</span><span className="font-medium text-slate-900">{formData.productsManufactured || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Monthly Production Capacity</span><span className="font-medium text-slate-900">{formData.monthlyProductionCapacity || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Number of Production Workers</span><span className="font-medium text-slate-900">{formData.numberOfProductionWorkers || "N/A"}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Category to Inspect</span><span className="font-medium text-slate-900">{formData.categoryToInspect || "N/A"}</span></div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Infrastructure Check */}
-            <Card>
+            <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
               <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Building2 className="h-5 w-5 text-blue-600" /> Infrastructure Check
                 </h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center"><span className="text-gray-600">Machinery Available</span>{getYesNoBadge(formData.machineryAvailable)}</div>
-                  <div className="flex justify-between items-center"><span className="text-gray-600">Electricity Available</span>{getYesNoBadge(formData.electricityAvailable)}</div>
-                  <div className="flex justify-between items-center"><span className="text-gray-600">Water Available</span>{getYesNoBadge(formData.waterAvailable)}</div>
-                  <div className="flex justify-between items-center"><span className="text-gray-600">Storage Area Available</span>{getYesNoBadge(formData.storageAreaAvailable)}</div>
+                  <div className="flex justify-between items-center"><span className="text-slate-500">Machinery Available</span>{getYesNoBadge(formData.machineryAvailable)}</div>
+                  <div className="flex justify-between items-center"><span className="text-slate-500">Electricity Available</span>{getYesNoBadge(formData.electricityAvailable)}</div>
+                  <div className="flex justify-between items-center"><span className="text-slate-500">Water Available</span>{getYesNoBadge(formData.waterAvailable)}</div>
+                  <div className="flex justify-between items-center"><span className="text-slate-500">Storage Area Available</span>{getYesNoBadge(formData.storageAreaAvailable)}</div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Quality & Safety */}
-          <Card className="mb-6">
+          <Card className="mb-6 border border-slate-200/80 rounded-2xl shadow-xs">
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <Shield className="h-5 w-5 text-emerald-600" /> Quality & Safety
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><span className="text-gray-600">Quality Check Process</span>{getYesNoBadge(formData.qualityCheckProcess)}</div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><span className="text-gray-600">Safety Equipment</span>{getYesNoBadge(formData.safetyEquipment)}</div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><span className="text-gray-600">Clean Environment</span>{getYesNoBadge(formData.cleanWorkingEnvironment)}</div>
+                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-200"><span className="text-slate-500">Quality Check Process</span>{getYesNoBadge(formData.qualityCheckProcess)}</div>
+                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-200"><span className="text-slate-500">Safety Equipment</span>{getYesNoBadge(formData.safetyEquipment)}</div>
+                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-200"><span className="text-slate-500">Clean Environment</span>{getYesNoBadge(formData.cleanWorkingEnvironment)}</div>
               </div>
             </CardContent>
           </Card>
 
           {/* Factory Photos */}
           {factoryPhotos.length > 0 && (
-            <Card className="mb-6">
+            <Card className="mb-6 border border-slate-200/80 rounded-2xl shadow-xs">
               <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Camera className="h-5 w-5 text-blue-600" /> Factory Photos
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -462,13 +462,13 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
                     const src = photo.data || photo.url || null;
                     const caption = photo.label || photo.name || `Photo ${idx + 1}`;
                     return (
-                      <div key={idx} className="border rounded-lg overflow-hidden">
+                      <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden">
                         {src ? (
                           <img src={src} alt={caption} className="w-full h-40 object-cover" />
                         ) : (
-                          <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">{caption}</div>
+                          <div className="w-full h-40 bg-slate-100 flex items-center justify-center text-slate-400 text-sm">{caption}</div>
                         )}
-                        <div className="p-2 text-xs font-semibold text-gray-700 truncate" title={caption}>{caption}</div>
+                        <div className="p-2 text-xs font-semibold text-slate-700 truncate" title={caption}>{caption}</div>
                       </div>
                     );
                   })}
@@ -481,9 +481,9 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
 
       {/* Audit Trail */}
       {auditLogs.length > 0 && (
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <Clock className="h-5 w-5" /> Inspection Audit Trail
             </h2>
             <InspectionAuditTimeline logs={auditLogs} />
@@ -497,13 +497,13 @@ export default function VendorInspectionDetail({ vendorId }: { vendorId: string 
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Ready for Approval</h3>
-                <p className="text-gray-600 mt-1">QC inspection is complete. Review the report above and approve the vendor to send login credentials.</p>
+                <h3 className="text-lg font-semibold text-slate-900">Ready for Approval</h3>
+                <p className="text-slate-500 mt-1">QC inspection is complete. Review the report above and approve the vendor to send login credentials.</p>
               </div>
               <button
                 onClick={handleApprove}
                 disabled={approving}
-                className="flex items-center gap-2 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
               >
                 <CheckCircle className="h-5 w-5" />
                 {approving ? "Approving..." : "Approve Vendor"}

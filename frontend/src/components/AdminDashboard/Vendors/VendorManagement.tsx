@@ -63,22 +63,22 @@ export default function VendorManagement() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Vendor Management</h1>
-      
-      <div className="bg-white rounded-lg shadow">
+      <h1 className="text-2xl font-bold text-slate-900 mb-6">Vendor Management</h1>
+
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs">
         <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Pending Approvals</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Pending Approvals</h2>
           {vendors.length === 0 ? (
-            <p className="text-gray-500">No vendors found.</p>
+            <p className="text-slate-500">No vendors found.</p>
           ) : (
             <div className="space-y-4">
               {vendors.map((vendor) => (
-                <div key={vendor.id} className="border rounded-lg p-4">
+                <div key={vendor.id} className="border border-slate-200 rounded-xl p-4 hover:bg-slate-50/50 transition-colors">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-semibold">{vendor.companyName}</h3>
-                      <p className="text-sm text-gray-600">{vendor.ownerName}</p>
-                      <p className="text-sm text-gray-600">{vendor.email}</p>
+                      <h3 className="font-semibold text-slate-900">{vendor.companyName}</h3>
+                      <p className="text-sm text-slate-500">{vendor.ownerName}</p>
+                      <p className="text-sm text-slate-500">{vendor.email}</p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge variant={vendor.status === 'PENDING' ? 'default' : 'secondary'}>

@@ -209,7 +209,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <LoadingSpinner />
-          <p className="text-gray-600 mt-4">Loading vendor details...</p>
+          <p className="text-slate-500 mt-4">Loading vendor details...</p>
         </div>
       </div>
     )
@@ -220,8 +220,8 @@ export default function VendorView({ vendorId }: VendorViewProps) {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Vendor Not Found</h2>
-          <p className="text-gray-600 mb-4">The vendor you're looking for doesn't exist or has been removed.</p>
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">Vendor Not Found</h2>
+          <p className="text-slate-500 mb-4">The vendor you're looking for doesn't exist or has been removed.</p>
           <Button onClick={() => router.push('/admin/dashboard/vendors')}>
             Back to Vendors
           </Button>
@@ -233,19 +233,19 @@ export default function VendorView({ vendorId }: VendorViewProps) {
   const getStatusBadge = (status: string) => {
     switch (status.toUpperCase()) {
       case 'APPROVED':
-        return <Badge className="bg-green-100 text-green-800">Approved</Badge>
+        return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">Approved</Badge>
       case 'PENDING':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
+        return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 font-bold">Pending</Badge>
       case 'SUSPENDED':
-        return <Badge className="bg-red-100 text-red-800">Suspended</Badge>
+        return <Badge className="bg-red-50 text-red-700 border border-red-200 font-bold">Suspended</Badge>
       case 'REJECTED':
-        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
+        return <Badge className="bg-red-50 text-red-700 border border-red-200 font-bold">Rejected</Badge>
       case 'APPROVAL_PENDING':
-        return <Badge className="bg-cyan-100 text-cyan-800">Approval Pending</Badge>
+        return <Badge className="bg-cyan-50 text-cyan-700 border border-cyan-200 font-bold">Approval Pending</Badge>
       case 'REJECTION_PENDING':
-        return <Badge className="bg-orange-100 text-orange-800">Rejection Pending</Badge>
+        return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 font-bold">Rejection Pending</Badge>
       default:
-        return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>
+        return <Badge className="bg-slate-100 text-slate-600 border border-slate-200 font-bold">Unknown</Badge>
     }
   }
 
@@ -261,9 +261,9 @@ export default function VendorView({ vendorId }: VendorViewProps) {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50/50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white border-b border-slate-200">
         <div className="max-w-420 mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center space-x-4">
@@ -276,8 +276,8 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{vendor.companyName}</h1>
-                <p className="text-gray-600">
+                <h1 className="text-2xl font-bold text-slate-900">{vendor.companyName}</h1>
+                <p className="text-slate-500">
                   Vendor Code: <span className="font-mono">{vendor.vendorCode || vendor.id}</span>
                 </p>
               </div>
@@ -288,7 +288,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
 
               {/* Pending request info */}
               {vendor.status === 'APPROVAL_PENDING' && (vendor as any).approvalRequestedByName && (
-                <span className="text-sm text-cyan-700 bg-cyan-50 px-3 py-1 rounded-full">
+                <span className="text-sm text-cyan-700 bg-cyan-50 px-3 py-1 rounded-full font-medium">
                   Requested by <strong>{(vendor as any).approvalRequestedByName}</strong>
                   {(vendor as any).approvalRequestedAt && (
                     <> on {new Date((vendor as any).approvalRequestedAt).toLocaleDateString('en-IN')}</>
@@ -296,7 +296,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                 </span>
               )}
               {vendor.status === 'REJECTION_PENDING' && (vendor as any).rejectionRequestedByName && (
-                <span className="text-sm text-orange-700 bg-orange-50 px-3 py-1 rounded-full">
+                <span className="text-sm text-orange-700 bg-orange-50 px-3 py-1 rounded-full font-medium">
                   Requested by <strong>{(vendor as any).rejectionRequestedByName}</strong>
                   {(vendor as any).rejectionRequestedAt && (
                     <> on {new Date((vendor as any).rejectionRequestedAt).toLocaleDateString('en-IN')}</>
@@ -310,7 +310,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                   <Button
                     onClick={handleApprove}
                     disabled={actionLoading === 'approve'}
-                    className="bg-green-600 text-white hover:bg-green-700"
+                    className="bg-green-600 text-white hover:bg-green-700 rounded-xl"
                   >
                     {actionLoading === 'approve' ? (
                       <LoadingSpinner size="sm" />
@@ -452,7 +452,7 @@ export default function VendorView({ vendorId }: VendorViewProps) {
               {hasPermission('edit_vendors') && (
                 <Button
                   onClick={() => router.push(`/admin/dashboard/vendors/edit/${vendor.id}`)}
-                  className="bg-[#313131] text-white hover:bg-[#222222]"
+                  className="bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white rounded-xl"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Vendor
@@ -470,8 +470,8 @@ export default function VendorView({ vendorId }: VendorViewProps) {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                    ? 'border-[#313131] text-[#313131]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-brand-500 text-brand-700'
+                    : 'border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-300'
                     }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -575,54 +575,54 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
               <div className="space-y-4">
                 {(vendor as any).businessType && (
                   <div className="flex items-center space-x-3">
-                    <Building2 className="h-4 w-4 text-gray-400" />
+                    <Building2 className="h-4 w-4 text-slate-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Business Type</p>
+                      <p className="text-sm text-slate-500">Business Type</p>
                       <p className="font-medium">{businessTypeLabel((vendor as any).businessType)}</p>
                     </div>
                   </div>
                 )}
 
                 <div className="flex items-center space-x-3">
-                  <Mail className="h-4 w-4 text-gray-400" />
+                  <Mail className="h-4 w-4 text-slate-400" />
                   <div>
-                    <p className="text-sm text-gray-600">Business Email</p>
+                    <p className="text-sm text-slate-500">Business Email</p>
                     <p className="font-medium">{vendor.businessEmail || vendor.email}</p>
                   </div>
                 </div>
 
                 {(vendor as any).businessEmail2 && (
                   <div className="flex items-center space-x-3">
-                    <Mail className="h-4 w-4 text-gray-400" />
+                    <Mail className="h-4 w-4 text-slate-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Secondary Email</p>
+                      <p className="text-sm text-slate-500">Secondary Email</p>
                       <p className="font-medium">{(vendor as any).businessEmail2}</p>
                     </div>
                   </div>
                 )}
 
                 <div className="flex items-center space-x-3">
-                  <Phone className="h-4 w-4 text-gray-400" />
+                  <Phone className="h-4 w-4 text-slate-400" />
                   <div>
-                    <p className="text-sm text-gray-600">Primary Phone</p>
+                    <p className="text-sm text-slate-500">Primary Phone</p>
                     <p className="font-medium">{vendor.businessPhone}</p>
                   </div>
                 </div>
 
                 {vendor.landlineNumber && (
                   <div className="flex items-center space-x-3">
-                    <Phone className="h-4 w-4 text-gray-400" />
+                    <Phone className="h-4 w-4 text-slate-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Local Landline</p>
+                      <p className="text-sm text-slate-500">Local Landline</p>
                       <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: (vendor as any).localLandlineStd, number: vendor.landlineNumber })}</p>
                     </div>
                   </div>
                 )}
                 {(vendor as any).intlLandline && (
                   <div className="flex items-center space-x-3">
-                    <Phone className="h-4 w-4 text-gray-400" />
+                    <Phone className="h-4 w-4 text-slate-400" />
                     <div>
-                      <p className="text-sm text-gray-600">International Landline</p>
+                      <p className="text-sm text-slate-500">International Landline</p>
                       <p className="font-medium">{formatIntlLandline((vendor as any).intlLandline)}</p>
                     </div>
                   </div>
@@ -630,9 +630,9 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
 
                 {vendor.phoneNumber2 && (
                   <div className="flex items-center space-x-3">
-                    <Phone className="h-4 w-4 text-gray-400" />
+                    <Phone className="h-4 w-4 text-slate-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Secondary Phone</p>
+                      <p className="text-sm text-slate-500">Secondary Phone</p>
                       <p className="font-medium">{vendor.phoneNumber2}</p>
                     </div>
                   </div>
@@ -640,9 +640,9 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
 
                 {vendor.gstNumber ? (
                   <div className="flex items-center space-x-3">
-                    <FileText className="h-4 w-4 text-gray-400" />
+                    <FileText className="h-4 w-4 text-slate-400" />
                     <div>
-                      <p className="text-sm text-gray-600 flex items-center gap-1.5">
+                      <p className="text-sm text-slate-500 flex items-center gap-1.5">
                         GST Number
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-green-50 text-green-700 border border-green-200">Unique ID</span>
                       </p>
@@ -651,22 +651,22 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   </div>
                 ) : (
                   <div className="flex items-center space-x-3">
-                    <FileText className="h-4 w-4 text-gray-400" />
+                    <FileText className="h-4 w-4 text-slate-400" />
                     <div>
-                      <p className="text-sm text-gray-600 flex items-center gap-1.5">
+                      <p className="text-sm text-slate-500 flex items-center gap-1.5">
                         Vendor Type
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Unregistered</span>
                       </p>
-                      <p className="text-sm text-gray-500">No GST — identified by email</p>
+                      <p className="text-sm text-slate-500">No GST — identified by email</p>
                     </div>
                   </div>
                 )}
 
                 {vendor.website && (
                   <div className="flex items-center space-x-3">
-                    <Globe className="h-4 w-4 text-gray-400" />
+                    <Globe className="h-4 w-4 text-slate-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Website</p>
+                      <p className="text-sm text-slate-500">Website</p>
                       <a href={vendor.website} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">
                         {vendor.website}
                       </a>
@@ -677,26 +677,26 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
 
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
-                  <MapPin className="h-4 w-4 text-gray-400" />
+                  <MapPin className="h-4 w-4 text-slate-400" />
                   <div>
-                    <p className="text-sm text-gray-600">Location</p>
+                    <p className="text-sm text-slate-500">Location</p>
                     <p className="font-medium">{vendor.businessCity}, {vendor.businessState}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-3">
-                  <Calendar className="h-4 w-4 text-gray-400" />
+                  <Calendar className="h-4 w-4 text-slate-400" />
                   <div>
-                    <p className="text-sm text-gray-600">Join Date</p>
+                    <p className="text-sm text-slate-500">Join Date</p>
                     <p className="font-medium">{new Date(vendor.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
 
                 {vendor.establishedYear && (
                   <div className="flex items-center space-x-3">
-                    <Building2 className="h-4 w-4 text-gray-400" />
+                    <Building2 className="h-4 w-4 text-slate-400" />
                     <div>
-                      <p className="text-sm text-gray-600">Established</p>
+                      <p className="text-sm text-slate-500">Established</p>
                       <p className="font-medium">{vendor.establishedYear}</p>
                     </div>
                   </div>
@@ -721,62 +721,62 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                   <img
                     src={(vendor as any).ownerPhoto}
                     alt={vendor.ownerName}
-                    className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                    className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
                   />
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
                 <div>
-                  <p className="text-sm text-gray-600">Owner Full Name</p>
+                  <p className="text-sm text-slate-500">Owner Full Name</p>
                   <p className="font-medium">{buildFullName((vendor as any).ownerTitle, (vendor as any).ownerFirstName, (vendor as any).ownerMiddleName, (vendor as any).ownerLastName, vendor.ownerName)}</p>
                 </div>
                 {(vendor as any).designation && (
                   <div>
-                    <p className="text-sm text-gray-600">Designation</p>
+                    <p className="text-sm text-slate-500">Designation</p>
                     <p className="font-medium">{(vendor as any).designation}</p>
                   </div>
                 )}
                 <div>
-                  <p className="text-sm text-gray-600">Primary Email</p>
+                  <p className="text-sm text-slate-500">Primary Email</p>
                   <p className="font-medium">{vendor.ownerEmail}</p>
                 </div>
                 {(vendor as any).ownerEmail2 && (
                   <div>
-                    <p className="text-sm text-gray-600">Secondary Email</p>
+                    <p className="text-sm text-slate-500">Secondary Email</p>
                     <p className="font-medium">{(vendor as any).ownerEmail2}</p>
                   </div>
                 )}
                 <div>
-                  <p className="text-sm text-gray-600">Primary Phone</p>
+                  <p className="text-sm text-slate-500">Primary Phone</p>
                   <p className="font-medium">{vendor.ownerPhone}</p>
                 </div>
                 {(vendor as any).ownerPhone2 && (
                   <div>
-                    <p className="text-sm text-gray-600">Secondary Phone</p>
+                    <p className="text-sm text-slate-500">Secondary Phone</p>
                     <p className="font-medium">{(vendor as any).ownerPhone2}</p>
                   </div>
                 )}
                 {(vendor as any).ownerLandline && (
                   <div>
-                    <p className="text-sm text-gray-600">Local Landline</p>
+                    <p className="text-sm text-slate-500">Local Landline</p>
                     <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: (vendor as any).ownerLocalLandlineStd, number: (vendor as any).ownerLandline })}</p>
                   </div>
                 )}
                 {(vendor as any).ownerIntlLandline && (
                   <div>
-                    <p className="text-sm text-gray-600">International Landline</p>
+                    <p className="text-sm text-slate-500">International Landline</p>
                     <p className="font-medium">{formatIntlLandline((vendor as any).ownerIntlLandline)}</p>
                   </div>
                 )}
                 {(vendor as any).businessStartDate && (
                   <div>
-                    <p className="text-sm text-gray-600">Business Start Date</p>
+                    <p className="text-sm text-slate-500">Business Start Date</p>
                     <p className="font-medium">{new Date((vendor as any).businessStartDate).toLocaleDateString()}</p>
                   </div>
                 )}
                 {(vendor as any).employeeCount && (
                   <div>
-                    <p className="text-sm text-gray-600">Number of Employees</p>
+                    <p className="text-sm text-slate-500">Number of Employees</p>
                     <p className="font-medium">{(vendor as any).employeeCount}</p>
                   </div>
                 )}
@@ -788,48 +788,48 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
               const owners = vendor.additionalOwners;
               if (!owners || !Array.isArray(owners) || owners.length === 0) return null;
               return (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Additional Owners</h4>
+                <div className="mt-6 pt-6 border-t border-slate-200">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3">Additional Owners</h4>
                   <div className="space-y-3">
                     {owners.map((owner: any, index: number) => (
-                      <div key={index} className="flex items-start gap-4 p-3 bg-gray-50 rounded-lg">
+                      <div key={index} className="flex items-start gap-4 p-3 bg-slate-50 rounded-lg">
                         <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 mt-0.5">
                           {index + 2}
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 flex-1 text-sm">
                           <div>
-                            <p className="text-gray-500">Full Name</p>
+                            <p className="text-slate-500">Full Name</p>
                             <p className="font-medium">{buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)}</p>
                           </div>
                           {owner.designation && (
                             <div>
-                              <p className="text-gray-500">Designation</p>
+                              <p className="text-slate-500">Designation</p>
                               <p className="font-medium">{owner.designation}</p>
                             </div>
                           )}
                           <div>
-                            <p className="text-gray-500">Primary Email</p>
+                            <p className="text-slate-500">Primary Email</p>
                             <p className="font-medium">{owner.email}</p>
                           </div>
                           {owner.email2 && (
                             <div>
-                              <p className="text-gray-500">Secondary Email</p>
+                              <p className="text-slate-500">Secondary Email</p>
                               <p className="font-medium">{owner.email2}</p>
                             </div>
                           )}
                           <div>
-                            <p className="text-gray-500">Primary Phone</p>
+                            <p className="text-slate-500">Primary Phone</p>
                             <p className="font-medium">{owner.phone}</p>
                           </div>
                           {owner.phone2 && (
                             <div>
-                              <p className="text-gray-500">Secondary Phone</p>
+                              <p className="text-slate-500">Secondary Phone</p>
                               <p className="font-medium">{owner.phone2}</p>
                             </div>
                           )}
                           {owner.landline && (
                             <div>
-                              <p className="text-gray-500">Local Landline</p>
+                              <p className="text-slate-500">Local Landline</p>
                               <p className="font-medium">{owner.landline}</p>
                             </div>
                           )}
@@ -857,7 +857,7 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                 <img
                   src={vendor.companyLogo}
                   alt={`${vendor.companyName} Logo`}
-                  className="w-32 h-32 object-contain border border-gray-200 rounded-lg"
+                  className="w-32 h-32 object-contain border border-slate-200 rounded-lg"
                 />
               </div>
             </CardContent>
@@ -871,15 +871,15 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Product Categories</span>
+              <span className="text-sm text-slate-500">Product Categories</span>
               <span className="font-semibold">{vendor.productCategories?.length || 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Certifications</span>
+              <span className="text-sm text-slate-500">Certifications</span>
               <span className="font-semibold">{vendor._count?.certifications || 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Documents</span>
+              <span className="text-sm text-slate-500">Documents</span>
               <span className="font-semibold">{vendor._count?.documents || 0}</span>
             </div>
           </CardContent>
@@ -892,34 +892,34 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Current Status</span>
+              <span className="text-sm text-slate-500">Current Status</span>
               <span className="font-semibold capitalize">{vendor.status.toLowerCase()}</span>
             </div>
 
             {vendor.approvedAt && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Approved Date</span>
+                <span className="text-sm text-slate-500">Approved Date</span>
                 <span className="font-semibold">{new Date(vendor.approvedAt).toLocaleDateString()}</span>
               </div>
             )}
 
             {vendor.rejectedAt && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Rejected Date</span>
+                <span className="text-sm text-slate-500">Rejected Date</span>
                 <span className="font-semibold">{new Date(vendor.rejectedAt).toLocaleDateString()}</span>
               </div>
             )}
 
             {vendor.suspendedAt && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Suspended Date</span>
+                <span className="text-sm text-slate-500">Suspended Date</span>
                 <span className="font-semibold">{new Date(vendor.suspendedAt).toLocaleDateString()}</span>
               </div>
             )}
 
             {vendor.rejectionReason && (
               <div>
-                <p className="text-sm text-gray-600">Reason</p>
+                <p className="text-sm text-slate-500">Reason</p>
                 <p className="font-medium text-red-600">{vendor.rejectionReason}</p>
               </div>
             )}
@@ -963,31 +963,31 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
             <div className="space-y-4">
               {v.companyIdNumber && (
                 <div>
-                  <p className="text-sm text-gray-600">{companyIdLabel}</p>
+                  <p className="text-sm text-slate-500">{companyIdLabel}</p>
                   <p className="font-medium">{v.companyIdNumber}</p>
                 </div>
               )}
               {v.iecCode && (
                 <div>
-                  <p className="text-sm text-gray-600">IEC Code</p>
+                  <p className="text-sm text-slate-500">IEC Code</p>
                   <p className="font-medium">{v.iecCode}</p>
                 </div>
               )}
               {v.panNumber && (
                 <div>
-                  <p className="text-sm text-gray-600">{panLabel}</p>
+                  <p className="text-sm text-slate-500">{panLabel}</p>
                   <p className="font-medium">{v.panNumber}</p>
                 </div>
               )}
               {v.aadhaarNumber && (
                 <div>
-                  <p className="text-sm text-gray-600">Aadhaar Number</p>
+                  <p className="text-sm text-slate-500">Aadhaar Number</p>
                   <p className="font-medium">{v.aadhaarNumber}</p>
                 </div>
               )}
               {v.factoryOwnershipType && (
                 <div>
-                  <p className="text-sm text-gray-600">Ownership Type</p>
+                  <p className="text-sm text-slate-500">Ownership Type</p>
                   <p className="font-medium capitalize">{v.factoryOwnershipType}</p>
                 </div>
               )}
@@ -1006,7 +1006,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
             {v.addressLine2 && <p>{v.addressLine2}</p>}
             {v.addressLine3 && <p>{v.addressLine3}</p>}
             {v.landmark && (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-500">
                 <span className="font-semibold">Landmark:</span> {v.landmark}
               </p>
             )}
@@ -1029,13 +1029,13 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
             <div className="space-y-4">
               {(vendor as any).ownershipType && (
                 <div>
-                  <p className="text-sm text-gray-600 font-semibold mb-1">Facility Ownership</p>
+                  <p className="text-sm text-slate-500 font-semibold mb-1">Facility Ownership</p>
                   <p className="font-medium capitalize">{(vendor as any).ownershipType}</p>
                 </div>
               )}
               {vendor.warehouseAddress ? (
                 <div>
-                  <p className="text-sm text-gray-600 font-semibold mb-1">Warehouse Address</p>
+                  <p className="text-sm text-slate-500 font-semibold mb-1">Warehouse Address</p>
                   <p className="font-medium">{vendor.warehouseAddress}</p>
                   {(vendor as any).warehouseAddressLine2 && (
                     <p className="font-medium">{(vendor as any).warehouseAddressLine2}</p>
@@ -1044,7 +1044,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{(vendor as any).warehouseAddressLine3}</p>
                   )}
                   {(vendor as any).warehouseLandmark && (
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-slate-500">
                       <span className="font-semibold">Landmark:</span> {(vendor as any).warehouseLandmark}
                     </p>
                   )}
@@ -1062,7 +1062,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {vendor.warehouseSize && (
                   <div>
-                    <p className="text-sm text-gray-600">Warehousing Capacity</p>
+                    <p className="text-sm text-slate-500">Warehousing Capacity</p>
                     <p className="font-medium">{vendor.warehouseSize}</p>
                   </div>
                 )}
@@ -1137,7 +1137,7 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
             <CardTitle>General Remarks</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-700 whitespace-pre-wrap">{(vendor as any).categoryRemarks}</p>
+            <p className="text-slate-700 whitespace-pre-wrap">{(vendor as any).categoryRemarks}</p>
           </CardContent>
         </Card>
       )}
@@ -1157,11 +1157,11 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
                 if (list.length === 0) return null;
                 return (
                   <div key={catId}>
-                    <p className="text-sm font-semibold text-gray-700 mb-2">{catId}</p>
+                    <p className="text-sm font-semibold text-slate-700 mb-2">{catId}</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {list.map((p: any, i: number) => (
-                        <div key={p.id || i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                          <p className="font-medium text-gray-900 truncate">{p.name || `Product ${i + 1}`}</p>
+                        <div key={p.id || i} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                          <p className="font-medium text-slate-900 truncate">{p.name || `Product ${i + 1}`}</p>
                           {Array.isArray(p.photos) && p.photos.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mt-2">
                               {p.photos.slice(0, 5).map((photo: any, j: number) => (
@@ -1169,7 +1169,7 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
                                   key={j}
                                   src={photo.preview || photo.url}
                                   alt={`${p.name || 'Product'} photo ${j + 1}`}
-                                  className="w-12 h-12 object-cover rounded border border-gray-200"
+                                  className="w-12 h-12 object-cover rounded border border-slate-200"
                                 />
                               ))}
                             </div>
@@ -1197,15 +1197,15 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
             <div className="space-y-5">
               {v.additionalCategories.map((cat: any) => (
                 <div key={cat.id}>
-                  <div className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                  <div className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                     <span>{cat.name || 'Unnamed Category'}</span>
                     <Badge className="bg-orange-50 text-orange-700 border border-orange-200">Custom</Badge>
                   </div>
                   {Array.isArray(cat.products) && cat.products.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {cat.products.map((p: any, i: number) => (
-                        <div key={p.id || i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                          <p className="font-medium text-gray-900 truncate">{p.name || `Product ${i + 1}`}</p>
+                        <div key={p.id || i} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                          <p className="font-medium text-slate-900 truncate">{p.name || `Product ${i + 1}`}</p>
                           {Array.isArray(p.photos) && p.photos.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mt-2">
                               {p.photos.slice(0, 5).map((photo: any, j: number) => (
@@ -1213,7 +1213,7 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
                                   key={j}
                                   src={photo.preview || photo.url}
                                   alt={`${p.name || 'Product'} photo ${j + 1}`}
-                                  className="w-12 h-12 object-cover rounded border border-gray-200"
+                                  className="w-12 h-12 object-cover rounded border border-slate-200"
                                 />
                               ))}
                             </div>
@@ -1246,13 +1246,13 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-gray-600">Factory Address</p>
+                <p className="text-sm text-slate-500">Factory Address</p>
                 <p className="font-medium">{vendor.factoryAddress}</p>
                 <p className="font-medium">{vendor.factoryCity}, {vendor.factoryState}</p>
               </div>
               {vendor.qualityControl && (
                 <div>
-                  <p className="text-sm text-gray-600">Quality Control Process</p>
+                  <p className="text-sm text-slate-500">Quality Control Process</p>
                   <p className="font-medium">{vendor.qualityControl}</p>
                 </div>
               )}
@@ -1273,19 +1273,19 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
               if (activeFacilities.length === 0) return null;
 
               return (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Active Facility Stages</h4>
+                <div className="mt-6 pt-6 border-t border-slate-200">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3">Active Facility Stages</h4>
                   <div className="space-y-3">
                     {activeFacilities.map(([id]) => {
                       const fd = details?.[id];
                       return (
-                        <div key={id} className="p-3 bg-gray-50 rounded-lg">
-                          <p className="font-medium text-gray-900 mb-2">{facilityLabels[id] || id}</p>
+                        <div key={id} className="p-3 bg-slate-50 rounded-lg">
+                          <p className="font-medium text-slate-900 mb-2">{facilityLabels[id] || id}</p>
                           {fd && (
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                               {Object.entries(fd).filter(([, v]) => v).map(([key, val]) => (
                                 <div key={key}>
-                                  <p className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                                  <p className="text-slate-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
                                   <p className="font-medium">{String(val)}</p>
                                 </div>
                               ))}
@@ -1310,7 +1310,7 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
           <CardContent>
             <div className="space-y-4">
               {vendor.certifications.map((cert, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div key={index} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <Award className="h-8 w-8 text-yellow-500" />
                     <div>
@@ -1321,13 +1321,13 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                         )}
                       </div>
                       {cert.issuedBy && (
-                        <p className="text-sm text-gray-600">Issued by: {cert.issuedBy}</p>
+                        <p className="text-sm text-slate-500">Issued by: {cert.issuedBy}</p>
                       )}
                       {(cert as any).description && (
-                        <p className="text-sm text-gray-700 mt-1">{(cert as any).description}</p>
+                        <p className="text-sm text-slate-700 mt-1">{(cert as any).description}</p>
                       )}
                       {cert.expiryDate && (
-                        <p className="text-xs text-gray-500">Expires: {new Date(cert.expiryDate).toLocaleDateString()}</p>
+                        <p className="text-xs text-slate-500">Expires: {new Date(cert.expiryDate).toLocaleDateString()}</p>
                       )}
                     </div>
                   </div>
@@ -1355,7 +1355,7 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
           <CardContent className="space-y-4">
             {vendor.shippingMethods && vendor.shippingMethods.length > 0 && (
               <div>
-                <p className="text-sm text-gray-600 mb-2">Shipping Methods</p>
+                <p className="text-sm text-slate-500 mb-2">Shipping Methods</p>
                 <div className="flex flex-wrap gap-2">
                   {vendor.shippingMethods.map((method, index) => (
                     <Badge key={index} className="bg-indigo-100 text-indigo-800 capitalize">{method}</Badge>
@@ -1366,19 +1366,19 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
 
             {(vendor as any).packagingCapabilities && (
               <div>
-                <p className="text-sm text-gray-600">Packaging Capabilities</p>
+                <p className="text-sm text-slate-500">Packaging Capabilities</p>
                 <p className="font-medium whitespace-pre-wrap">{(vendor as any).packagingCapabilities}</p>
               </div>
             )}
             {(vendor as any).logisticsPartners && (
               <div>
-                <p className="text-sm text-gray-600">Logistics Partners</p>
+                <p className="text-sm text-slate-500">Logistics Partners</p>
                 <p className="font-medium whitespace-pre-wrap">{(vendor as any).logisticsPartners}</p>
               </div>
             )}
             {(vendor as any).complianceStandards && (
               <div>
-                <p className="text-sm text-gray-600">Compliance Standards</p>
+                <p className="text-sm text-slate-500">Compliance Standards</p>
                 <p className="font-medium whitespace-pre-wrap">{(vendor as any).complianceStandards}</p>
               </div>
             )}
@@ -1445,13 +1445,13 @@ function DocFileCard({ doc }: { doc: any }) {
   const date     = doc.createdAt || doc.uploadDate
 
   return (
-    <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors">
+    <div className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition-colors">
       <DocFileIcon name={fileName} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 truncate">{label}</p>
-        <p className="text-xs text-gray-500 truncate">{fileName}</p>
+        <p className="text-sm font-semibold text-slate-900 truncate">{label}</p>
+        <p className="text-xs text-slate-500 truncate">{fileName}</p>
         {date && (
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-slate-400">
             {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
           </p>
         )}
@@ -1461,7 +1461,7 @@ function DocFileCard({ doc }: { doc: any }) {
           variant="ghost"
           size="sm"
           onClick={() => downloadDoc(doc.documentUrl, fileName)}
-          className="h-7 px-2.5 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 shrink-0"
+          className="h-7 px-2.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 shrink-0"
         >
           <Download className="w-3 h-3 mr-1" />
           Download
@@ -1476,10 +1476,10 @@ function DocSection({ title, docs, icon }: { title: string; docs: any[]; icon: R
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-bold text-gray-900">
+        <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-900">
           {icon}
           {title}
-          <Badge className="ml-auto bg-gray-100 text-gray-600 border-0 font-medium text-xs">{docs.length}</Badge>
+          <Badge className="ml-auto bg-slate-100 text-slate-500 border-0 font-medium text-xs">{docs.length}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -1496,10 +1496,10 @@ function ImageSection({ images }: { images: any[] }) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-bold text-gray-900">
+        <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-900">
           <Camera className="w-4 h-4 text-brand-500" />
           Factory &amp; Warehouse Images
-          <Badge className="ml-auto bg-gray-100 text-gray-600 border-0 font-medium text-xs">{images.length}</Badge>
+          <Badge className="ml-auto bg-slate-100 text-slate-500 border-0 font-medium text-xs">{images.length}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -1509,13 +1509,13 @@ function ImageSection({ images }: { images: any[] }) {
             const date = img.createdAt || img.uploadDate
             return (
               <div key={img.id || i} className="space-y-1.5">
-                <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50 aspect-square">
+                <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 aspect-square">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.documentUrl} alt={name} className="w-full h-full object-cover" />
                 </div>
-                <p className="text-xs font-semibold text-gray-700 truncate" title={name}>{name}</p>
+                <p className="text-xs font-semibold text-slate-700 truncate" title={name}>{name}</p>
                 {date && (
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-[10px] text-slate-400">
                     {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </p>
                 )}
@@ -1552,8 +1552,8 @@ function DocumentsTab({ vendor }: { vendor: VendorProfile }) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
-          <FileText className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">No documents uploaded yet.</p>
+          <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">No documents uploaded yet.</p>
         </CardContent>
       </Card>
     )
@@ -1586,7 +1586,7 @@ function DocumentsTab({ vendor }: { vendor: VendorProfile }) {
         <DocSection
           title="Other Documents"
           docs={unknownDocs}
-          icon={<FileText className="w-4 h-4 text-gray-400" />}
+          icon={<FileText className="w-4 h-4 text-slate-400" />}
         />
       )}
     </div>
@@ -1610,8 +1610,8 @@ function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-gray-500">
-            <CreditCard className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+          <div className="text-center py-8 text-slate-500">
+            <CreditCard className="h-12 w-12 mx-auto mb-3 text-slate-300" />
             <p>No bank details available for this vendor.</p>
           </div>
         </CardContent>
@@ -1631,17 +1631,17 @@ function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
-              <p className="text-sm text-gray-600">Account Holder Name</p>
+              <p className="text-sm text-slate-500">Account Holder Name</p>
               <p className="font-medium text-lg">{bankDetails.accountHolderName || 'N/A'}</p>
             </div>
 
             <div>
-              <p className="text-sm text-gray-600">Bank Name</p>
+              <p className="text-sm text-slate-500">Bank Name</p>
               <p className="font-medium">{bankDetails.bankName || 'N/A'}</p>
             </div>
 
             <div>
-              <p className="text-sm text-gray-600">Account Number</p>
+              <p className="text-sm text-slate-500">Account Number</p>
               <p className="font-medium font-mono">{bankDetails.accountNumber || 'N/A'}</p>
             </div>
           </div>
@@ -1649,53 +1649,53 @@ function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, 
           <div className="space-y-4">
             {bankDetails.swiftCode && (
               <div>
-                <p className="text-sm text-gray-600">SWIFT / BIC Code</p>
+                <p className="text-sm text-slate-500">SWIFT / BIC Code</p>
                 <p className="font-medium font-mono">{bankDetails.swiftCode}</p>
               </div>
             )}
 
             {bankDetails.iban && (
               <div>
-                <p className="text-sm text-gray-600">IBAN</p>
+                <p className="text-sm text-slate-500">IBAN</p>
                 <p className="font-medium font-mono break-all">{bankDetails.iban}</p>
               </div>
             )}
 
             {bankDetails.ifscCode && (
               <div>
-                <p className="text-sm text-gray-600">IFSC Code</p>
+                <p className="text-sm text-slate-500">IFSC Code</p>
                 <p className="font-medium font-mono">{bankDetails.ifscCode}</p>
               </div>
             )}
 
             {!bankDetails.swiftCode && !bankDetails.iban && !bankDetails.ifscCode && (
               <div>
-                <p className="text-sm text-gray-600">Routing Code</p>
-                <p className="font-medium text-gray-400">Not provided</p>
+                <p className="text-sm text-slate-500">Routing Code</p>
+                <p className="font-medium text-slate-400">Not provided</p>
               </div>
             )}
 
             {bankDetails.accountType && (
               <div>
-                <p className="text-sm text-gray-600">Account Type</p>
+                <p className="text-sm text-slate-500">Account Type</p>
                 <p className="font-medium capitalize">{bankDetails.accountType}</p>
               </div>
             )}
 
             {(bankDetails.branchName || bankDetails.branchAddress) && (
               <div>
-                <p className="text-sm text-gray-600">Branch Details</p>
+                <p className="text-sm text-slate-500">Branch Details</p>
                 {bankDetails.branchName && <p className="font-medium">{bankDetails.branchName}</p>}
-                {bankDetails.branchAddress && <p className="text-sm text-gray-800">{bankDetails.branchAddress}</p>}
+                {bankDetails.branchAddress && <p className="text-sm text-slate-800">{bankDetails.branchAddress}</p>}
               </div>
             )}
           </div>
         </div>
 
         {bankDetails.isVerified !== undefined && (
-          <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between">
+          <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Verification Status:</span>
+              <span className="text-sm text-slate-500">Verification Status:</span>
               {bankDetails.isVerified ? (
                 <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
                   <CheckCircle className="h-3 w-3" /> Verified
@@ -1717,7 +1717,7 @@ function BankDetailsTab({ vendor, onVerify, loading }: { vendor: VendorProfile, 
               )}
             </div>
             {bankDetails.verifiedAt && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-slate-500">
                 Verified on {new Date(bankDetails.verifiedAt).toLocaleDateString()}
               </p>
             )}
@@ -1748,38 +1748,38 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                   <img
                     src={vendor.mainContact.photo}
                     alt={vendor.mainContact.name || 'Contact'}
-                    className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                    className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
                   />
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
               <div>
-                <p className="text-sm text-gray-600">Full Name</p>
+                <p className="text-sm text-slate-500">Full Name</p>
                 <p className="font-medium">{buildFullName((vendor.mainContact as any).title, (vendor.mainContact as any).firstName, (vendor.mainContact as any).middleName, (vendor.mainContact as any).lastName, vendor.mainContact.name) || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Designation</p>
+                <p className="text-sm text-slate-500">Designation</p>
                 <p className="font-medium">
                   {(vendor.mainContact as any).customDesignation || vendor.mainContact.designation || 'N/A'}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Primary Email</p>
+                <p className="text-sm text-slate-500">Primary Email</p>
                 <p className="font-medium">{vendor.mainContact.email1 || vendor.mainContact.email || 'N/A'}</p>
               </div>
               {vendor.mainContact.email2 && (
                 <div>
-                  <p className="text-sm text-gray-600">Secondary Email</p>
+                  <p className="text-sm text-slate-500">Secondary Email</p>
                   <p className="font-medium">{vendor.mainContact.email2}</p>
                 </div>
               )}
               <div>
-                <p className="text-sm text-gray-600">Primary Phone</p>
+                <p className="text-sm text-slate-500">Primary Phone</p>
                 <p className="font-medium">{vendor.mainContact.phone1 || vendor.mainContact.phone || 'N/A'}</p>
               </div>
               {vendor.mainContact.phone2 && (
                 <div>
-                  <p className="text-sm text-gray-600">Secondary Phone</p>
+                  <p className="text-sm text-slate-500">Secondary Phone</p>
                   <p className="font-medium">{vendor.mainContact.phone2}</p>
                 </div>
               )}
@@ -1789,19 +1789,19 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                   <>
                     {ll.local && (
                       <div>
-                        <p className="text-sm text-gray-600">Local Landline Number</p>
+                        <p className="text-sm text-slate-500">Local Landline Number</p>
                         <p className="font-medium">{ll.local}</p>
                       </div>
                     )}
                     {ll.intl && (
                       <div>
-                        <p className="text-sm text-gray-600">International Landline Number</p>
+                        <p className="text-sm text-slate-500">International Landline Number</p>
                         <p className="font-medium">{ll.intl}</p>
                       </div>
                     )}
                     {!ll.hasNew && ll.legacy && (
                       <div>
-                        <p className="text-sm text-gray-600">Local Landline Number</p>
+                        <p className="text-sm text-slate-500">Local Landline Number</p>
                         <p className="font-medium">{ll.legacy}</p>
                       </div>
                     )}
@@ -1809,7 +1809,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                 );
               })()}
               <div>
-                <p className="text-sm text-gray-600">Department</p>
+                <p className="text-sm text-slate-500">Department</p>
                 <p className="font-medium capitalize">
                   {(vendor.mainContact as any).customDepartment || vendor.mainContact.department || 'N/A'}
                 </p>
@@ -1832,58 +1832,58 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
           <CardContent>
             <div className="space-y-6">
               {vendor.alternateContacts.map((contact: any, index: number) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                <div key={index} className="border border-slate-200 rounded-lg p-4">
                   <div className="flex items-center gap-3 mb-4">
                     {contact.photo && (
                       <Image src={contact.photo} alt={contact.name || 'Contact'} width={40} height={40} className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" />
                     )}
-                    <h4 className="font-medium text-gray-900">Contact Person {index + 2}</h4>
+                    <h4 className="font-medium text-slate-900">Contact Person {index + 2}</h4>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600">Full Name</p>
+                      <p className="text-sm text-slate-500">Full Name</p>
                       <p className="font-medium">{buildFullName(contact.title, contact.firstName, contact.middleName, contact.lastName, contact.name) || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Designation</p>
+                      <p className="text-sm text-slate-500">Designation</p>
                       <p className="font-medium">
                         {contact.customDesignation || contact.designation || 'N/A'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Primary Email</p>
+                      <p className="text-sm text-slate-500">Primary Email</p>
                       <p className="font-medium">{contact.email1 || contact.email || 'N/A'}</p>
                     </div>
                     {contact.email2 && (
                       <div>
-                        <p className="text-sm text-gray-600">Secondary Email</p>
+                        <p className="text-sm text-slate-500">Secondary Email</p>
                         <p className="font-medium">{contact.email2}</p>
                       </div>
                     )}
                     <div>
-                      <p className="text-sm text-gray-600">Primary Phone</p>
+                      <p className="text-sm text-slate-500">Primary Phone</p>
                       <p className="font-medium">{contact.phone1 || contact.phone || 'N/A'}</p>
                     </div>
                     {contact.phone2 && (
                       <div>
-                        <p className="text-sm text-gray-600">Secondary Phone</p>
+                        <p className="text-sm text-slate-500">Secondary Phone</p>
                         <p className="font-medium">{contact.phone2}</p>
                       </div>
                     )}
                     {(contact.localLandline || contact.landline) && (
                       <div>
-                        <p className="text-sm text-gray-600">Local Landline Number</p>
+                        <p className="text-sm text-slate-500">Local Landline Number</p>
                         <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: contact.localLandlineStd, number: contact.localLandline || contact.landline })}</p>
                       </div>
                     )}
                     {contact.intlLandline && (
                       <div>
-                        <p className="text-sm text-gray-600">International Landline Number</p>
+                        <p className="text-sm text-slate-500">International Landline Number</p>
                         <p className="font-medium">{formatIntlLandline(contact.intlLandline)}</p>
                       </div>
                     )}
                     <div>
-                      <p className="text-sm text-gray-600">Department</p>
+                      <p className="text-sm text-slate-500">Department</p>
                       <p className="font-medium capitalize">
                         {contact.customDepartment || contact.department || 'N/A'}
                       </p>
@@ -1911,11 +1911,11 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Import Countries</p>
+                <p className="text-sm text-slate-500 mb-1">Import Countries</p>
                 <p className="font-medium">{(vendor as any).importExperience ? 'Yes' : 'No'}</p>
                 {Array.isArray((vendor as any).importCountries) && (vendor as any).importCountries.length > 0 && (
                   <div className="mt-2">
-                    <p className="text-xs text-gray-500 mb-1">Import Countries</p>
+                    <p className="text-xs text-slate-500 mb-1">Import Countries</p>
                     <div className="flex flex-wrap gap-1.5">
                       {(vendor as any).importCountries.map((c: string) => (
                         <Badge key={c} className="bg-blue-50 text-blue-700 border border-blue-200">{c}</Badge>
@@ -1925,11 +1925,11 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                 )}
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-1">Export Countries</p>
+                <p className="text-sm text-slate-500 mb-1">Export Countries</p>
                 <p className="font-medium">{(vendor as any).exportExperience ? 'Yes' : 'No'}</p>
                 {Array.isArray((vendor as any).exportCountries) && (vendor as any).exportCountries.length > 0 && (
                   <div className="mt-2">
-                    <p className="text-xs text-gray-500 mb-1">Export Countries</p>
+                    <p className="text-xs text-slate-500 mb-1">Export Countries</p>
                     <div className="flex flex-wrap gap-1.5">
                       {(vendor as any).exportCountries.map((c: string) => (
                         <Badge key={c} className="bg-emerald-50 text-emerald-700 border border-emerald-200">{c}</Badge>
@@ -2060,7 +2060,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
       {[1, 2, 3, 4, 5].map((star) => (
         <Star
           key={star}
-          className={`h-4 w-4 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+          className={`h-4 w-4 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'}`}
         />
       ))}
     </div>
@@ -2079,11 +2079,11 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                 <Star className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Overall Rating</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-slate-500">Overall Rating</p>
+                <p className="text-2xl font-bold text-slate-900">
                   {vendor.rating != null ? vendor.rating.toFixed(1) : 'N/A'}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-500">
                   Based on {vendor.ratingCount ?? 0} review{(vendor.ratingCount ?? 0) !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -2097,8 +2097,8 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                 <MessageSquare className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Total Reviews</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-sm text-slate-500">Total Reviews</p>
+                <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -2110,7 +2110,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Approved</p>
+                <p className="text-sm text-slate-500">Approved</p>
                 <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
               </div>
             </div>
@@ -2123,7 +2123,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                 <XCircle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Rejected</p>
+                <p className="text-sm text-slate-500">Rejected</p>
                 <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
               </div>
             </div>
@@ -2144,14 +2144,14 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                 const pct = maxDistCount > 0 ? (count / maxDistCount) * 100 : 0
                 return (
                   <div key={star} className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600 w-12">{star} star</span>
-                    <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <span className="text-sm text-slate-500 w-12">{star} star</span>
+                    <div className="flex-1 h-3 bg-slate-200 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-yellow-400 rounded-full transition-all"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <span className="text-sm text-gray-600 w-8 text-right">{count}</span>
+                    <span className="text-sm text-slate-500 w-8 text-right">{count}</span>
                   </div>
                 )
               })}
@@ -2163,18 +2163,18 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
           <input
             type="text"
             placeholder="Search by order ID, product name, or comments..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-900 bg-white transition-colors"
+            className="w-full pl-10 pr-9 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900 bg-white transition-colors"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-500"
             >
               <XCircle className="h-4 w-4" />
             </button>
@@ -2206,30 +2206,30 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
         {initialLoading ? (
           <div className="p-4 space-y-4">
             {/* Skeleton table header */}
-            <div className="grid grid-cols-7 gap-4 pb-3 border-b border-gray-200">
+            <div className="grid grid-cols-7 gap-4 pb-3 border-b border-slate-200">
               {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="h-4 bg-gray-200 rounded animate-pulse" />
+                <div key={i} className="h-4 bg-slate-200 rounded animate-pulse" />
               ))}
             </div>
             {/* Skeleton table rows */}
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="grid grid-cols-7 gap-4 items-center py-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-200 rounded animate-pulse" />
+                  <div className="w-10 h-10 bg-slate-200 rounded animate-pulse" />
                   <div className="space-y-1.5 flex-1">
-                    <div className="h-3.5 bg-gray-200 rounded animate-pulse w-3/4" />
-                    <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2" />
+                    <div className="h-3.5 bg-slate-200 rounded animate-pulse w-3/4" />
+                    <div className="h-3 bg-slate-100 rounded animate-pulse w-1/2" />
                   </div>
                 </div>
-                <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                <div className="h-4 bg-gray-200 rounded animate-pulse w-20" />
-                <div className="h-5 bg-gray-200 rounded-full animate-pulse w-16" />
+                <div className="h-4 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 bg-slate-200 rounded animate-pulse w-20" />
+                <div className="h-5 bg-slate-200 rounded-full animate-pulse w-16" />
                 <div className="space-y-1.5">
-                  <div className="h-3.5 bg-gray-200 rounded animate-pulse" />
-                  <div className="h-3 bg-gray-100 rounded animate-pulse w-2/3" />
+                  <div className="h-3.5 bg-slate-200 rounded animate-pulse" />
+                  <div className="h-3 bg-slate-100 rounded animate-pulse w-2/3" />
                 </div>
-                <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                <div className="h-4 bg-gray-200 rounded animate-pulse w-12" />
+                <div className="h-4 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 bg-slate-200 rounded animate-pulse w-12" />
               </div>
             ))}
           </div>
@@ -2257,27 +2257,27 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                           <img
                             src={review.productImage}
                             alt={review.productName}
-                            className="w-10 h-10 object-cover rounded border border-gray-200"
+                            className="w-10 h-10 object-cover rounded border border-slate-200"
                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           />
                         ) : (
-                          <div className="w-10 h-10 bg-gray-100 rounded border border-gray-200 flex items-center justify-center">
-                            <Package className="w-5 h-5 text-gray-400" />
+                          <div className="w-10 h-10 bg-slate-100 rounded border border-slate-200 flex items-center justify-center">
+                            <Package className="w-5 h-5 text-slate-400" />
                           </div>
                         )}
                         <div>
-                          <div className="font-medium text-gray-900 text-sm">{review.productName}</div>
-                          <div className="text-xs text-gray-500">SKU: {review.productSKU}</div>
+                          <div className="font-medium text-slate-900 text-sm">{review.productName}</div>
+                          <div className="text-xs text-slate-500">SKU: {review.productSKU}</div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm font-mono text-gray-900">{review.orderId}</span>
+                      <span className="text-sm font-mono text-slate-900">{review.orderId}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {renderStars(review.rating)}
-                        <span className="text-sm text-gray-600">({review.rating})</span>
+                        <span className="text-sm text-slate-500">({review.rating})</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -2286,11 +2286,11 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-900">{new Date(review.reviewedDate).toLocaleDateString()}</div>
-                      <div className="text-xs text-gray-500">{new Date(review.reviewedDate).toLocaleTimeString()}</div>
+                      <div className="text-sm text-slate-900">{new Date(review.reviewedDate).toLocaleDateString()}</div>
+                      <div className="text-xs text-slate-500">{new Date(review.reviewedDate).toLocaleTimeString()}</div>
                     </TableCell>
                     <TableCell>
-                      <p className="text-sm text-gray-700 max-w-[180px] truncate">
+                      <p className="text-sm text-slate-700 max-w-[180px] truncate">
                         {review.reviewComments || 'No comments'}
                       </p>
                     </TableCell>
@@ -2309,9 +2309,9 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                 <TableRow>
                   <TableCell colSpan={7}>
                     <div className="p-12 text-center">
-                      <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500 text-lg font-medium mb-2">No reviews found</p>
-                      <p className="text-gray-400 text-sm">
+                      <AlertCircle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                      <p className="text-slate-500 text-lg font-medium mb-2">No reviews found</p>
+                      <p className="text-slate-400 text-sm">
                         {searchTerm || statusFilter !== 'all'
                           ? 'Try adjusting your search or filter criteria.'
                           : 'Admin reviews will appear here after quality checks are completed.'}
@@ -2331,7 +2331,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
         <div className="flex items-center justify-end gap-3 text-sm">
           <div className="flex items-center gap-1">
             <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-            {getPageRange(pagination.page, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === pagination.page ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.page ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
+            {getPageRange(pagination.page, pagination.totalPages).map((p, i) => p === '…' ? (<span key={`e-${i}`} className="px-2 text-slate-400">…</span>) : (<button key={`p-${p}`} onClick={() => setCurrentPage(p as number)} aria-current={p === pagination.page ? 'page' : undefined} className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === pagination.page ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{p}</button>))}
             <button onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))} disabled={currentPage === pagination.totalPages} className="p-2 text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
           </div>
         </div>
@@ -2341,25 +2341,25 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
       {selectedReview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
+            <div className="p-6 border-b border-slate-200">
               <div className="flex justify-between items-start">
                 <div className="flex items-start gap-4">
                   {selectedReview.productImage ? (
                     <img
                       src={selectedReview.productImage}
                       alt={selectedReview.productName}
-                      className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                      className="w-20 h-20 object-cover rounded-lg border border-slate-200"
                       onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   ) : (
-                    <div className="w-20 h-20 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-                      <Package className="w-8 h-8 text-gray-400" />
+                    <div className="w-20 h-20 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center">
+                      <Package className="w-8 h-8 text-slate-400" />
                     </div>
                   )}
                   <div>
-                    <h2 className="text-lg font-bold text-gray-900">{selectedReview.productName}</h2>
-                    <p className="text-sm text-gray-500 mt-1">SKU: {selectedReview.productSKU}</p>
-                    <p className="text-sm text-gray-500">Order ID: {selectedReview.orderId}</p>
+                    <h2 className="text-lg font-bold text-slate-900">{selectedReview.productName}</h2>
+                    <p className="text-sm text-slate-500 mt-1">SKU: {selectedReview.productSKU}</p>
+                    <p className="text-sm text-slate-500">Order ID: {selectedReview.orderId}</p>
                     <div className="mt-2">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${selectedReview.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                         {selectedReview.status === 'approved' ? 'Approved' : 'Rejected'}
@@ -2367,7 +2367,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                     </div>
                   </div>
                 </div>
-                <button onClick={() => setSelectedReview(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none p-1">
+                <button onClick={() => setSelectedReview(null)} className="text-slate-400 hover:text-slate-500 text-xl leading-none p-1">
                   ✕
                 </button>
               </div>
@@ -2375,27 +2375,27 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
 
             <div className="p-6 space-y-6">
               {/* Rating */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Quality Rating</label>
+              <div className="bg-slate-50 p-4 rounded-xl">
+                <label className="text-sm font-semibold text-slate-700 block mb-2">Quality Rating</label>
                 <div className="flex items-center gap-3">
                   {renderStars(selectedReview.rating)}
-                  <span className="text-lg font-bold text-gray-900">{selectedReview.rating}/5</span>
+                  <span className="text-lg font-bold text-slate-900">{selectedReview.rating}/5</span>
                 </div>
               </div>
 
               {/* Review Comments */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Review Comments</label>
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <p className="text-gray-900">{selectedReview.reviewComments || 'No comments provided'}</p>
+                <label className="text-sm font-semibold text-slate-700 block mb-2">Review Comments</label>
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                  <p className="text-slate-900">{selectedReview.reviewComments || 'No comments provided'}</p>
                 </div>
               </div>
 
               {/* Quality Check Notes */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Quality Check Notes</label>
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <p className="text-gray-900">{selectedReview.qualityCheckNotes || 'No notes provided'}</p>
+                <label className="text-sm font-semibold text-slate-700 block mb-2">Quality Check Notes</label>
+                <div className="bg-green-50 p-4 rounded-xl border border-green-200">
+                  <p className="text-slate-900">{selectedReview.qualityCheckNotes || 'No notes provided'}</p>
                 </div>
               </div>
 
@@ -2403,7 +2403,7 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
               {selectedReview.rejectionReason && (
                 <div>
                   <label className="text-sm font-semibold text-red-700 block mb-2">Rejection Reason</label>
-                  <div className="bg-red-50 p-4 rounded-lg border border-red-300">
+                  <div className="bg-red-50 p-4 rounded-xl border border-red-300">
                     <p className="text-red-900 font-medium">{selectedReview.rejectionReason}</p>
                   </div>
                 </div>
@@ -2411,41 +2411,41 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
 
               {/* Return to Vendor */}
               {selectedReview.returnToVendor && (
-                <div className="flex items-center gap-2 bg-orange-50 p-3 rounded-lg border border-orange-200">
+                <div className="flex items-center gap-2 bg-orange-50 p-3 rounded-xl border border-orange-200">
                   <AlertTriangle className="h-5 w-5 text-orange-600" />
                   <span className="text-sm font-medium text-orange-800">Marked for return to vendor</span>
                 </div>
               )}
 
               {/* Order Details */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Customer</label>
-                  <p className="text-gray-900 font-medium">{selectedReview.customerName}</p>
+                  <label className="text-sm font-medium text-slate-500">Customer</label>
+                  <p className="text-slate-900 font-medium">{selectedReview.customerName}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Quantity</label>
-                  <p className="text-gray-900">{selectedReview.quantity} units</p>
+                  <label className="text-sm font-medium text-slate-500">Quantity</label>
+                  <p className="text-slate-900">{selectedReview.quantity} units</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Amount</label>
-                  <p className="text-gray-900 font-medium">&#8377;{selectedReview.totalAmount.toFixed(2)}</p>
+                  <label className="text-sm font-medium text-slate-500">Amount</label>
+                  <p className="text-slate-900 font-medium">&#8377;{selectedReview.totalAmount.toFixed(2)}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Order Date</label>
-                  <p className="text-gray-900">{new Date(selectedReview.orderDate).toLocaleDateString()}</p>
+                  <label className="text-sm font-medium text-slate-500">Order Date</label>
+                  <p className="text-slate-900">{new Date(selectedReview.orderDate).toLocaleDateString()}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Reviewed Date</label>
-                  <p className="text-gray-900">{new Date(selectedReview.reviewedDate).toLocaleString()}</p>
+                  <label className="text-sm font-medium text-slate-500">Reviewed Date</label>
+                  <p className="text-slate-900">{new Date(selectedReview.reviewedDate).toLocaleString()}</p>
                 </div>
               </div>
 
               {/* Close Button */}
-              <div className="flex justify-end pt-4 border-t border-gray-200">
+              <div className="flex justify-end pt-4 border-t border-slate-200">
                 <button
                   onClick={() => setSelectedReview(null)}
-                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  className="px-6 py-2 bg-slate-600 text-white rounded-xl hover:bg-slate-700 transition-colors"
                 >
                   Close
                 </button>

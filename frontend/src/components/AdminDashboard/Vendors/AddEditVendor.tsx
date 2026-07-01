@@ -1011,12 +1011,12 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
     // is actually harmful — when only one axis is explicitly `hidden`, the
     // browser implicitly switches the other axis to `auto`, which adds a
     // SECOND vertical scrollbar inside the already-scrolling admin <main>.
-    <div className="bg-gray-50">
+    <div className="bg-slate-50/50">
       {isLoadingVendorData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-(--z-modal-backdrop)">
           <div className="bg-white rounded-lg p-6 flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-700 mb-4"></div>
-            <p className="text-gray-700 font-medium">Loading vendor data...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mb-4"></div>
+            <p className="text-slate-700 font-medium">Loading vendor data...</p>
           </div>
         </div>
       )}
@@ -1051,11 +1051,11 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
             ),
           );
           return (
-            <aside className="hidden md:flex flex-col w-68 bg-white border-r border-gray-100 sticky top-0 self-start h-screen shrink-0 z-(--z-sticky) shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
+            <aside className="hidden md:flex flex-col w-68 bg-white border-r border-slate-100 sticky top-0 self-start h-screen shrink-0 z-(--z-sticky) shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
               {/* Header — admin-specific Back button + Add/Edit title.
               Sits above the steps in the same chrome as VendorPanel's
               "Registration Progress" header for visual parity. */}
-              <div className="px-6 py-6 border-b border-gray-100 shrink-0">
+              <div className="px-6 py-6 border-b border-slate-100 shrink-0">
                 <div className="flex items-center gap-2 mb-1.5">
                   <Button
                     variant="ghost"
@@ -1066,11 +1066,11 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </Button>
-                  <h2 className="text-xs font-bold text-gray-900 tracking-widest uppercase">
+                  <h2 className="text-xs font-bold text-slate-900 tracking-widest uppercase">
                     {mode === "add" ? "Add Vendor" : "Edit Vendor"}
                   </h2>
                 </div>
-                <p className="text-[11px] text-gray-400 font-medium">
+                <p className="text-[11px] text-slate-400 font-medium">
                   {mode === "add"
                     ? "Complete all steps to create a vendor"
                     : "Update any step and save"}
@@ -1123,7 +1123,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                             : isCurrent
                               ? "bg-brand-50/50"
                               : isAccessible && !isCompleted
-                                ? "hover:bg-gray-50/60 cursor-pointer"
+                                ? "hover:bg-slate-50/60 cursor-pointer"
                                 : isCompleted
                                   ? "hover:bg-success-50/30 cursor-pointer"
                                   : "opacity-60 cursor-not-allowed"
@@ -1132,7 +1132,7 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                           {/* Step Indicator Dot */}
                           <div className="relative shrink-0 z-10 flex items-center justify-center w-8 h-8">
                             {skipped ? (
-                              <div className="flex items-center justify-center w-8 h-8 rounded-full border border-dashed border-gray-300 bg-gray-50 text-gray-400 text-xs font-medium">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 text-xs font-medium">
                                 &mdash;
                               </div>
                             ) : isCompleted ? (
@@ -1155,11 +1155,11 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                                 <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse" />
                               </div>
                             ) : isAccessible ? (
-                              <div className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 bg-white text-gray-600 text-xs font-semibold group-hover:border-brand-400 group-hover:text-brand-500 transition-colors duration-150">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full border border-slate-300 bg-white text-slate-600 text-xs font-semibold group-hover:border-brand-400 group-hover:text-brand-500 transition-colors duration-150">
                                 {index + 1}
                               </div>
                             ) : (
-                              <div className="flex items-center justify-center w-8 h-8 rounded-full border border-gray-200 bg-gray-50 text-gray-400 text-xs font-medium">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full border border-slate-200 bg-slate-50 text-slate-400 text-xs font-medium">
                                 {index + 1}
                               </div>
                             )}
@@ -1170,18 +1170,18 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                             <p
                               className={`text-sm font-semibold leading-tight truncate transition-colors duration-150 ${
                                 skipped
-                                  ? "text-gray-400 line-through decoration-gray-300"
+                                  ? "text-slate-400 line-through decoration-slate-300"
                                   : isCurrent
                                     ? "text-brand-700 font-bold"
                                     : isCompleted
-                                      ? "text-gray-700 group-hover:text-success-700"
-                                      : "text-gray-500 group-hover:text-gray-900"
+                                      ? "text-slate-700 group-hover:text-success-700"
+                                      : "text-slate-500 group-hover:text-slate-900"
                               }`}
                             >
                               {step.title}
                             </p>
                             {skipped ? (
-                              <span className="text-[10px] text-gray-400 mt-0.5">
+                              <span className="text-[10px] text-slate-400 mt-0.5">
                                 Not applicable
                               </span>
                             ) : isCurrent ? (
@@ -1194,11 +1194,11 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
                                 Completed
                               </span>
                             ) : isAccessible ? (
-                              <span className="text-[10px] text-gray-400 mt-0.5">
+                              <span className="text-[10px] text-slate-400 mt-0.5">
                                 Available
                               </span>
                             ) : (
-                              <span className="text-[10px] text-gray-300 mt-0.5">
+                              <span className="text-[10px] text-slate-300 mt-0.5">
                                 Locked
                               </span>
                             )}
@@ -1211,23 +1211,23 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
               </nav>
 
               {/* Progress Summary Pinned to Bottom */}
-              <div className="p-5 border-t border-gray-100 shrink-0 bg-gray-50/50">
+              <div className="p-5 border-t border-slate-100 shrink-0 bg-slate-50/50">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                     Overall Progress
                   </span>
                   <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full tabular-nums">
                     {progressPercent}%
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                   <div
                     className="h-1.5 rounded-full bg-linear-to-r from-brand-500 to-brand-600 transition-[width] duration-500 ease-out shadow-[0_0_8px_rgba(224,26,27,0.15)]"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
                 <div className="flex justify-between items-center mt-2.5">
-                  <span className="text-[10px] text-gray-400 font-medium tabular-nums">
+                  <span className="text-[10px] text-slate-400 font-medium tabular-nums">
                     {completedVisibleCount} of {visibleStepCount} completed
                   </span>
                   {progressPercent === 100 && (

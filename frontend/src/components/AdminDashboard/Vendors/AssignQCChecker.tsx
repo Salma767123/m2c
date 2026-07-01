@@ -130,38 +130,38 @@ export default function AssignQCChecker() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      APPROVED: "bg-green-100 text-green-800",
-      PENDING: "bg-yellow-100 text-yellow-800",
-      UNDER_REVIEW: "bg-blue-100 text-blue-800",
-      REJECTED: "bg-red-100 text-red-800",
-      REINSPECTION: "bg-amber-100 text-amber-800",
-      SUSPENDED: "bg-gray-100 text-gray-800",
+      APPROVED: "bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold",
+      PENDING: "bg-amber-50 text-amber-700 border border-amber-200 font-bold",
+      UNDER_REVIEW: "bg-blue-50 text-blue-700 border border-blue-200 font-bold",
+      REJECTED: "bg-red-50 text-red-700 border border-red-200 font-bold",
+      REINSPECTION: "bg-purple-50 text-purple-700 border border-purple-200 font-bold",
+      SUSPENDED: "bg-slate-100 text-slate-600 border border-slate-200 font-bold",
     };
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles] || "bg-gray-100 text-gray-800"}`}>
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs ${styles[status as keyof typeof styles] || "bg-slate-100 text-slate-600 border border-slate-200 font-bold"}`}>
         {status}
       </span>
     );
   };
 
   const getInspectionStatusDisplay = (vendorStatus: string, status: string | null, result: string | null) => {
-    if (!status) return <span className="text-sm text-gray-400 italic">No Inspection</span>;
+    if (!status) return <span className="text-sm text-slate-400 italic">No Inspection</span>;
     // If vendor is already finalized but inspection is still SUBMITTED (stale data),
     // show the completed state instead of the misleading SUBMITTED label
     if (['APPROVED', 'REJECTED', 'SUSPENDED'].includes(vendorStatus) && (status === 'SUBMITTED' || status === 'UNDER_ADMIN_REVIEW')) {
       return <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Completed - {result === 'FAILED' ? 'Failed' : 'Passed'}</span>;
     }
     const configs: Record<string, { label: string; style: string }> = {
-      SCHEDULED: { label: "Scheduled", style: "bg-gray-100 text-gray-700" },
+      SCHEDULED: { label: "Scheduled", style: "bg-slate-100 text-slate-700" },
       IN_PROGRESS: { label: "In Progress", style: "bg-blue-100 text-blue-800" },
       SUBMITTED: { label: result === "FAILED" ? "Submitted - Failed" : "Submitted - Passed", style: result === "FAILED" ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800" },
       UNDER_ADMIN_REVIEW: { label: "Under Admin Review", style: "bg-purple-100 text-purple-800" },
       COMPLETED: { label: result === "FAILED" ? "Completed - Failed" : "Completed - Passed", style: result === "FAILED" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800" },
       REJECTED: { label: "Rejected", style: "bg-red-100 text-red-800" },
       REINSPECTION: { label: "Re-Inspection", style: "bg-amber-100 text-amber-800" },
-      CANCELLED: { label: "Cancelled", style: "bg-gray-100 text-gray-600" },
+      CANCELLED: { label: "Cancelled", style: "bg-slate-100 text-slate-600" },
     };
-    const config = configs[status] || { label: status, style: "bg-gray-100 text-gray-800" };
+    const config = configs[status] || { label: status, style: "bg-slate-100 text-slate-800" };
     return <span className={`px-3 py-1 rounded-full text-xs font-medium ${config.style}`}>{config.label}</span>;
   };
 
@@ -190,12 +190,12 @@ export default function AssignQCChecker() {
       <Breadcrumb />
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Assign QC Checker to Vendors</h1>
-          <p className="text-gray-600 mt-1">Manage QC checker assignments for vendor quality control</p>
+          <h1 className="text-2xl font-bold text-slate-900">Assign QC Checker to Vendors</h1>
+          <p className="text-slate-500 mt-1">Manage QC checker assignments for vendor quality control</p>
         </div>
         <Link
           href="/admin/dashboard/vendors/assign-qc-checker/add"
-          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2 px-6 rounded-xl transition-colors shadow-xs shadow-brand-500/10"
         >
           <Plus className="h-5 w-5" />
           Create Assignment
@@ -204,40 +204,40 @@ export default function AssignQCChecker() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Total Vendors</div>
-            <div className="text-2xl font-bold text-gray-900">{pagination.total}</div>
+            <div className="text-sm text-slate-500">Total Vendors</div>
+            <div className="text-2xl font-bold text-slate-900">{pagination.total}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Assigned</div>
+            <div className="text-sm text-slate-500">Assigned</div>
             <div className="text-2xl font-bold text-green-600">{totalAssigned}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Unassigned</div>
+            <div className="text-sm text-slate-500">Unassigned</div>
             <div className="text-2xl font-bold text-orange-600">{totalUnassigned}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Awaiting Review</div>
+            <div className="text-sm text-slate-500">Awaiting Review</div>
             <div className="text-2xl font-bold text-amber-600">{totalAwaitingReview}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border border-slate-200/80 rounded-2xl shadow-xs">
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Available Checkers</div>
+            <div className="text-sm text-slate-500">Available Checkers</div>
             <div className="text-2xl font-bold text-blue-600">{qcCheckers.length}</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
+      <Card className="mb-6 border border-slate-200/80 rounded-2xl shadow-xs">
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -248,7 +248,7 @@ export default function AssignQCChecker() {
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#222222] focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none bg-white transition-all"
               />
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -296,16 +296,16 @@ export default function AssignQCChecker() {
       </div>
 
       {/* Vendors Table */}
-      <Card>
+      <Card className="border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Vendor Details</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Inspection Status</TableHead>
-              <TableHead>Assigned QC Checker</TableHead>
-              <TableHead>Actions</TableHead>
+          <TableHeader className="!bg-slate-50/80 !border-slate-200/80 [&_tr]:border-b-0">
+            <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+              <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Vendor Details</TableHead>
+              <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Contact</TableHead>
+              <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Status</TableHead>
+              <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Inspection Status</TableHead>
+              <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Assigned QC Checker</TableHead>
+              <TableHead className="font-bold !text-slate-500 h-12 py-3 px-5 text-[10px] uppercase tracking-wider">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -322,26 +322,26 @@ export default function AssignQCChecker() {
                 <TableRow key={vendor.id}>
                   <TableCell>
                     <div className="flex items-start gap-3">
-                      <div className="p-2 bg-gray-100 rounded-lg">
-                        <Building2 className="h-5 w-5 text-gray-600" />
+                      <div className="p-2 bg-slate-100 rounded-xl">
+                        <Building2 className="h-5 w-5 text-slate-500" />
                       </div>
                       <div>
-                        <div className="font-medium text-gray-900">{vendor.companyName}</div>
-                        <div className="text-sm text-gray-500">{vendor.ownerName}</div>
+                        <div className="font-medium text-slate-900">{vendor.companyName}</div>
+                        <div className="text-sm text-slate-500">{vendor.ownerName}</div>
                         {vendor.vendorCode && (
-                          <div className="text-xs font-mono text-gray-400 mt-0.5">{vendor.vendorCode}</div>
+                          <div className="text-xs font-mono text-slate-400 mt-0.5">{vendor.vendorCode}</div>
                         )}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
-                      <div className="flex items-center text-sm text-gray-900">
-                        <Mail className="h-3 w-3 mr-1 text-gray-400" />
+                      <div className="flex items-center text-sm text-slate-900">
+                        <Mail className="h-3 w-3 mr-1 text-slate-400" />
                         {vendor.email}
                       </div>
-                      <div className="flex items-center text-sm text-gray-500">
-                        <Phone className="h-3 w-3 mr-1 text-gray-400" />
+                      <div className="flex items-center text-sm text-slate-500">
+                        <Phone className="h-3 w-3 mr-1 text-slate-400" />
                         {vendor.phone}
                       </div>
                     </div>
@@ -352,19 +352,19 @@ export default function AssignQCChecker() {
                     {vendor.assignedCheckerName ? (
                       <div className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium text-slate-900">
                           {vendor.assignedCheckerName}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-sm text-gray-500 italic">Not assigned</span>
+                      <span className="text-sm text-slate-500 italic">Not assigned</span>
                     )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-2 text-brand-500 hover:bg-brand-50 rounded-xl transition-colors"
                         title="View Inspection Details"
                       >
                         <Eye className="h-4 w-4" />
@@ -377,7 +377,7 @@ export default function AssignQCChecker() {
                           return (
                             <Link
                               href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
-                              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+                              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors"
                             >
                               <FileText className="h-4 w-4" />
                               View Report
@@ -388,7 +388,7 @@ export default function AssignQCChecker() {
                           return (
                             <Link
                               href={`/admin/dashboard/vendors/inspection/${vendor.id}`}
-                              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors"
+                              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-xl transition-colors"
                             >
                               <FileText className="h-4 w-4" />
                               Review Report
@@ -398,7 +398,7 @@ export default function AssignQCChecker() {
                         return (
                           <Link
                             href={`/admin/dashboard/vendors/assign-qc-checker/add?vendorId=${vendor.id}`}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium rounded-xl transition-colors"
                           >
                             <UserCheck className="h-4 w-4" />
                             {vendor.assignedChecker ? "Update" : "Assign"}
@@ -413,7 +413,7 @@ export default function AssignQCChecker() {
               <TableRow>
                 <TableCell colSpan={6}>
                   <div className="p-12 text-center">
-                    <p className="text-gray-500">No vendors found</p>
+                    <p className="text-slate-500">No vendors found</p>
                   </div>
                 </TableCell>
               </TableRow>
@@ -443,7 +443,7 @@ export default function AssignQCChecker() {
                   key={`p-${p}`}
                   onClick={() => setCurrentPage(p as number)}
                   aria-current={p === currentPage ? 'page' : undefined}
-                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-[#222222] text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                  className={`min-w-9 h-9 px-2 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                 >
                   {p}
                 </button>

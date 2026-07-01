@@ -263,13 +263,13 @@ export default function CreateAssignment() {
       <div className="flex items-center gap-4 mb-6">
         <Link
           href="/admin/dashboard/vendors/assign-qc"
-          className="text-gray-600 hover:text-gray-900 transition-colors"
+          className="text-slate-500 hover:text-slate-900 transition-colors"
         >
           <ArrowLeft className="h-6 w-6" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{isEditing ? "Update QC Assignment" : "Create QC Assignment"}</h1>
-          <p className="text-gray-600 mt-1">{isEditing ? "Modify an existing quality control inspection" : "Schedule a new quality control inspection"}</p>
+          <h1 className="text-2xl font-bold text-slate-900">{isEditing ? "Update QC Assignment" : "Create QC Assignment"}</h1>
+          <p className="text-slate-500 mt-1">{isEditing ? "Modify an existing quality control inspection" : "Schedule a new quality control inspection"}</p>
         </div>
       </div>
 
@@ -280,10 +280,10 @@ export default function CreateAssignment() {
             {/* Vendor & Checker Selection */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Vendor & Inspector Details</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Vendor & Inspector Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Select Vendor <span className="text-red-500">*</span>
                     </label>
                     <Dropdown
@@ -301,7 +301,7 @@ export default function CreateAssignment() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Select QC Checker <span className="text-red-500">*</span>
                     </label>
                     <Dropdown
@@ -324,10 +324,10 @@ export default function CreateAssignment() {
             {/* Inspection Details */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Inspection Details</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Inspection Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Client Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -335,12 +335,12 @@ export default function CreateAssignment() {
                       value={formData.client}
                       onChange={(e) => setFormData((prev) => ({ ...prev, client: e.target.value }))}
                       placeholder="e.g., Fashion Forward Inc."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Scheduled Date <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -348,24 +348,24 @@ export default function CreateAssignment() {
                       value={formData.scheduledDate}
                       min={todayStr}
                       onChange={(e) => setFormData((prev) => ({ ...prev, scheduledDate: e.target.value }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Scheduled Time <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="time"
                       value={formData.scheduledTime}
                       onChange={(e) => setFormData((prev) => ({ ...prev, scheduledTime: e.target.value }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Priority <span className="text-red-500">*</span>
                     </label>
                     <Dropdown
@@ -382,7 +382,7 @@ export default function CreateAssignment() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
                       Estimated Duration <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -390,7 +390,7 @@ export default function CreateAssignment() {
                       value={formData.estimatedDuration}
                       onChange={(e) => setFormData((prev) => ({ ...prev, estimatedDuration: e.target.value }))}
                       placeholder="e.g., 4 hours"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none transition-all"
                     />
                   </div>
                 </div>
@@ -400,15 +400,15 @@ export default function CreateAssignment() {
             {/* Items to Inspect */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">
                   Category to Inspect <span className="text-red-500">*</span>
                 </h3>
-                <p className="text-sm text-gray-600 mb-4">Select the categories that will be inspected</p>
+                <p className="text-sm text-slate-500 mb-4">Select the categories that will be inspected</p>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {formData.vendorId && displayItems.length === 0 && (
-                    <div className="p-6 text-center border border-dashed border-gray-300 rounded-lg">
-                      <p className="text-sm text-gray-600">
+                    <div className="p-6 text-center border border-dashed border-slate-300 rounded-xl">
+                      <p className="text-sm text-slate-500">
                         This vendor has no product categories on record. Ask them to update their
                         registration before scheduling an inspection.
                       </p>
@@ -417,35 +417,35 @@ export default function CreateAssignment() {
                   {displayItems.map((item) => (
                     <label
                       key={item.id}
-                      className="flex items-start p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="flex items-start p-4 border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors"
                     >
                       <input
                         type="checkbox"
                         checked={formData.selectedItems.includes(item.id)}
                         onChange={() => handleItemToggle(item.id)}
-                        className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 mt-1"
+                        className="h-4 w-4 accent-brand-500 border-slate-200 rounded mt-1"
                       />
                       <div className="ml-3 flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <Package className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm font-semibold text-gray-900">{item.itemName}</span>
+                          <Package className="h-4 w-4 text-slate-400" />
+                          <span className="text-sm font-semibold text-slate-900">{item.itemName}</span>
                         </div>
-                        <p className="text-xs text-gray-600 mb-2">{item.description}</p>
+                        <p className="text-xs text-slate-500 mb-2">{item.description}</p>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div>
-                            <span className="text-gray-500">Quantity:</span>{" "}
-                            <span className="font-medium text-gray-900">{item.quantity.toLocaleString()}</span>
+                            <span className="text-slate-500">Quantity:</span>{" "}
+                            <span className="font-medium text-slate-900">{item.quantity.toLocaleString()}</span>
                           </div>
                           <div>
-                            <span className="text-gray-500">Inspection Qty:</span>{" "}
-                            <span className="font-medium text-gray-900">{item.inspectionQuantity}</span>
+                            <span className="text-slate-500">Inspection Qty:</span>{" "}
+                            <span className="font-medium text-slate-900">{item.inspectionQuantity}</span>
                           </div>
                           <div className="col-span-2">
-                            <span className="text-gray-500">Specifications:</span>{" "}
-                            <span className="text-gray-700">{item.specifications}</span>
+                            <span className="text-slate-500">Specifications:</span>{" "}
+                            <span className="text-slate-700">{item.specifications}</span>
                           </div>
                           <div>
-                            <span className="text-gray-500">AQL Level:</span>{" "}
+                            <span className="text-slate-500">AQL Level:</span>{" "}
                             <span className="font-medium text-blue-600">{item.aqlLevel}</span>
                           </div>
                         </div>
@@ -455,7 +455,7 @@ export default function CreateAssignment() {
                 </div>
 
                 {formData.selectedItems.length > 0 && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
                     <p className="text-sm text-blue-800">
                       <span className="font-semibold">{formData.selectedItems.length}</span> category(ies) selected for inspection
                     </p>
@@ -472,25 +472,25 @@ export default function CreateAssignment() {
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-blue-100 rounded-lg">
+                    <div className="p-2 bg-blue-100 rounded-xl">
                       <Factory className="w-5 h-5 text-blue-600" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900">Vendor Information</h3>
+                    <h3 className="text-lg font-semibold text-slate-900">Vendor Information</h3>
                   </div>
                   <div className="space-y-3 text-sm">
                     <div>
-                      <p className="text-gray-600">Company</p>
-                      <p className="font-medium text-gray-900">{selectedVendor.companyName}</p>
+                      <p className="text-slate-500">Company</p>
+                      <p className="font-medium text-slate-900">{selectedVendor.companyName}</p>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <MapPin className="h-4 w-4 text-gray-400" />
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <MapPin className="h-4 w-4 text-slate-400" />
                       <span>{selectedVendor.location}</span>
                     </div>
                     <div>
-                      <p className="text-gray-600">Contact Person</p>
-                      <p className="font-medium text-gray-900">{selectedVendor.contactPerson}</p>
-                      <p className="text-gray-600 text-xs mt-1">{selectedVendor.phone}</p>
-                      <p className="text-gray-600 text-xs">{selectedVendor.email}</p>
+                      <p className="text-slate-500">Contact Person</p>
+                      <p className="font-medium text-slate-900">{selectedVendor.contactPerson}</p>
+                      <p className="text-slate-500 text-xs mt-1">{selectedVendor.phone}</p>
+                      <p className="text-slate-500 text-xs">{selectedVendor.email}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -502,15 +502,15 @@ export default function CreateAssignment() {
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-green-100 rounded-lg">
+                    <div className="p-2 bg-green-100 rounded-xl">
                       <Calendar className="w-5 h-5 text-green-600" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900">Schedule</h3>
+                    <h3 className="text-lg font-semibold text-slate-900">Schedule</h3>
                   </div>
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium text-gray-900">
+                      <Calendar className="h-4 w-4 text-slate-400" />
+                      <span className="font-medium text-slate-900">
                         {new Date(formData.scheduledDate).toLocaleDateString("en-US", {
                           weekday: "long",
                           year: "numeric",
@@ -520,13 +520,13 @@ export default function CreateAssignment() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium text-gray-900">{formData.scheduledTime}</span>
+                      <Clock className="h-4 w-4 text-slate-400" />
+                      <span className="font-medium text-slate-900">{formData.scheduledTime}</span>
                     </div>
                     {formData.estimatedDuration && (
                       <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-700">Duration: {formData.estimatedDuration}</span>
+                        <Clock className="h-4 w-4 text-slate-400" />
+                        <span className="text-slate-600">Duration: {formData.estimatedDuration}</span>
                       </div>
                     )}
                     {formData.priority && (
@@ -552,14 +552,14 @@ export default function CreateAssignment() {
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-purple-100 rounded-lg">
+                  <div className="p-2 bg-purple-100 rounded-xl">
                     <FileText className="w-5 h-5 text-purple-600" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Summary</h3>
+                  <h3 className="text-lg font-semibold text-slate-900">Summary</h3>
                 </div>
                 <div className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Vendor Selected</span>
+                    <span className="text-slate-500">Vendor Selected</span>
                     {formData.vendorId ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
@@ -567,7 +567,7 @@ export default function CreateAssignment() {
                     )}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">QC Checker Assigned</span>
+                    <span className="text-slate-500">QC Checker Assigned</span>
                     {formData.checkerId ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
@@ -575,7 +575,7 @@ export default function CreateAssignment() {
                     )}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Schedule Set</span>
+                    <span className="text-slate-500">Schedule Set</span>
                     {formData.scheduledDate && formData.scheduledTime ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
@@ -583,10 +583,10 @@ export default function CreateAssignment() {
                     )}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Categories Selected</span>
+                    <span className="text-slate-500">Categories Selected</span>
                     {formData.selectedItems.length > 0 ? (
                       <span className="flex items-center gap-1">
-                        <span className="font-semibold text-gray-900">{formData.selectedItems.length}</span>
+                        <span className="font-semibold text-slate-900">{formData.selectedItems.length}</span>
                         <CheckCircle className="h-5 w-5 text-green-600" />
                       </span>
                     ) : (
@@ -601,7 +601,7 @@ export default function CreateAssignment() {
             <div className="space-y-3">
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors"
                 disabled={loading}
               >
                 <CheckCircle className="h-5 w-5" />
@@ -609,7 +609,7 @@ export default function CreateAssignment() {
               </button>
               <Link
                 href="/admin/dashboard/vendors/assign-qc"
-                className="w-full flex items-center justify-center gap-2 border border-gray-300 text-gray-700 font-medium py-3 px-6 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-center gap-2 border border-slate-200 text-slate-600 font-medium py-3 px-6 rounded-xl hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </Link>

@@ -1047,7 +1047,7 @@ const updateVendorProfile = async (req, res) => {
 // Get all vendors (Admin only)
 const getAllVendors = async (req, res) => {
   try {
-    const { status, page = 1, limit = 10, search } = req.query;
+    const { status, page = 1, limit = 10, search, dateFrom, dateTo } = req.query;
 
     const where = {};
 
@@ -1065,6 +1065,12 @@ const getAllVendors = async (req, res) => {
         // it in the search so admins can look up vendors directly by GST.
         { gstNumber: { contains: search, mode: 'insensitive' } },
       ];
+    }
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom + 'T00:00:00.000Z');
+      if (dateTo) where.createdAt.lte = new Date(dateTo + 'T23:59:59.999Z');
     }
 
     const vendors = await prisma.vendor.findMany({
