@@ -47,6 +47,7 @@ interface StepProps {
 
 export default function LegalRegistration({ formData, setFormData, errors = {}, autofillSnapshot = {} }: StepProps) {
     const gstLocked = !!autofillSnapshot.gstTaxId
+    const brnLocked = !!autofillSnapshot.businessRegistrationNumber
 
     // Legal docs for verification (factory images with type OTHER are on Step 1)
     const legalDocs = (Array.isArray(formData.vendorDocuments) ? formData.vendorDocuments : [])
@@ -104,6 +105,53 @@ export default function LegalRegistration({ formData, setFormData, errors = {}, 
                             <ErrorText msg={errors.gstTaxId} />
                         </>
                     )}
+                </div>
+
+                {/* Business Registration Number */}
+                <div>
+                    <label className="block text-slate-700 font-semibold mb-3 text-sm">
+                        Business Registration Number{!brnLocked && <RequiredMark />}
+                    </label>
+                    {brnLocked ? (
+                        <>
+                            <input
+                                type="text"
+                                value={formData.businessRegistrationNumber}
+                                readOnly
+                                aria-readonly="true"
+                                className={`${READONLY_CLS} font-mono tracking-wide`}
+                            />
+                            <p className="text-xs text-slate-400 mt-1">From vendor registration — read only</p>
+                        </>
+                    ) : (
+                        <>
+                            <input
+                                type="text"
+                                value={formData.businessRegistrationNumber || ""}
+                                onChange={(e) => setFormData({ ...formData, businessRegistrationNumber: e.target.value })}
+                                placeholder="Enter business registration / Udyam / ROC number"
+                                aria-invalid={!!errors.businessRegistrationNumber}
+                                className={`${inputCls(!!errors.businessRegistrationNumber)} font-mono`}
+                            />
+                            <ErrorText msg={errors.businessRegistrationNumber} />
+                        </>
+                    )}
+                </div>
+
+                {/* Factory License Number */}
+                <div>
+                    <label className="block text-slate-700 font-semibold mb-3 text-sm">
+                        Factory License Number<RequiredMark />
+                    </label>
+                    <input
+                        type="text"
+                        value={formData.factoryLicenseNumber || ""}
+                        onChange={(e) => setFormData({ ...formData, factoryLicenseNumber: e.target.value })}
+                        placeholder="Enter factory operating license number"
+                        aria-invalid={!!errors.factoryLicenseNumber}
+                        className={`${inputCls(!!errors.factoryLicenseNumber)} font-mono`}
+                    />
+                    <ErrorText msg={errors.factoryLicenseNumber} />
                 </div>
 
                 {/* PAN — read-only from registration */}

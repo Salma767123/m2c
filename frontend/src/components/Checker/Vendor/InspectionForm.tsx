@@ -173,6 +173,8 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
 
     // 2. Legal & Registration
     gstTaxId: "",
+    businessRegistrationNumber: "",
+    factoryLicenseNumber: "",
     panNumber: "",
     iecCode: "",
     companyIdNumber: "",
@@ -316,6 +318,8 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
             vendorDocuments: prev.vendorDocuments.length ? prev.vendorDocuments : (Array.isArray(v.documents) ? v.documents : []),
             vendorProducts: prev.vendorProducts.length ? prev.vendorProducts : (Array.isArray(v.products) ? v.products : []),
             gstTaxId: prev.gstTaxId || (prevForm?.gstTaxId) || v.gstNumber || "",
+            businessRegistrationNumber: prev.businessRegistrationNumber || (prevForm?.businessRegistrationNumber) || v.businessRegistrationNumber || "",
+            factoryLicenseNumber: prev.factoryLicenseNumber || (prevForm?.factoryLicenseNumber) || "",
             panNumber: prev.panNumber || v.panNumber || "",
             iecCode: prev.iecCode || v.iecCode || "",
             companyIdNumber: prev.companyIdNumber || v.companyIdNumber || "",
@@ -349,6 +353,7 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
             contactPhoneNumber: isNonEmpty(prevForm?.contactPhoneNumber || v.businessPhone),
             factoryAddress: isNonEmpty(prevForm?.factoryAddress || factoryAddressFull),
             gstTaxId: isNonEmpty(prevForm?.gstTaxId || v.gstNumber),
+            businessRegistrationNumber: isNonEmpty(prevForm?.businessRegistrationNumber || v.businessRegistrationNumber),
             categoryToInspect: isNonEmpty(prevForm?.categoryToInspect || assignedCategories),
           })
 
