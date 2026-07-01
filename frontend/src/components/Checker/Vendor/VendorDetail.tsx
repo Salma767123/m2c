@@ -32,7 +32,7 @@ import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
 import { buildFullName } from "@/lib/utils"
-import { openDoc, isDocImageUrl } from "@/lib/docDownload"
+import { downloadDoc, isDocImageUrl } from "@/lib/docDownload"
 const MAIN_STATUS_COLORS: Record<string, string> = {
   "New Assignment": "bg-blue-50 text-blue-700 border-blue-200/85",
   "Under Review by Admin": "bg-orange-50 text-orange-700 border-orange-200/85",
@@ -468,7 +468,7 @@ export default function VendorDetail({
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</p>
                 {doc.documentUrl && (
-                  <button type="button" onClick={() => openDoc(doc.documentUrl, doc.name)} className="shrink-0 text-brand-600 hover:text-brand-700" title="View / Download">
+                  <button type="button" onClick={() => downloadDoc(doc.documentUrl, doc.name)} className="shrink-0 text-brand-600 hover:text-brand-700" title="Download">
                     <Download className="w-4 h-4" />
                   </button>
                 )}
@@ -662,10 +662,10 @@ export default function VendorDetail({
                             {cert.documentUrl && (
                               <button
                                 type="button"
-                                onClick={() => openDoc(cert.documentUrl, cert.name)}
+                                onClick={() => downloadDoc(cert.documentUrl, cert.name)}
                                 className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1"
                               >
-                                <FileText className="w-3.5 h-3.5" /> View File
+                                <Download className="w-3.5 h-3.5" /> Download
                               </button>
                             )}
                           </div>

@@ -243,53 +243,67 @@ app.get("/api/document-proxy", async (req, res) => {
     jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp",
   };
 
-  // Helper to send a buffer response
+  const isDownload = download === "true";
+
+  // Helper: send file buffer with correct headers
   const sendBuffer = (buffer, contentType) => {
     res.set("Content-Type", contentType);
-    if (download === "true") {
-      res.set("Content-Disposition", `attachment; filename="${filename}"`);
-    } else {
-      res.set("Content-Disposition", "inline");
-    }
+    res.set("Content-Disposition", isDownload
+      ? `attachment; filename="${filename}"`
+      : "inline"
+    );
     res.send(buffer);
   };
 
+  // Helper: send an error that the browser treats as a download (no navigation)
+  const sendError = (status, message) => {
+    if (isDownload) res.set("Content-Disposition", `attachment; filename="error.json"`);
+    res.status(status).json({ error: message });
+  };
+
+  // Helper: try Cloudinary archive API for a given resource type
+  const tryArchive = async (resType) => {
+    const { cloudinary } = require("./config/cloudinary");
+    const archiveUrl = cloudinary.utils.download_archive_url({
+      public_ids: [publicId],
+      resource_type: resType,
+      target_format: "zip",
+    });
+    const archiveResp = await fetch(archiveUrl);
+    if (!archiveResp.ok) return null;
+    const AdmZip = require("adm-zip");
+    const zip = new AdmZip(Buffer.from(await archiveResp.arrayBuffer()));
+    const entries = zip.getEntries();
+    if (!entries.length) return null;
+    return entries[0].getData();
+  };
+
   try {
-    // First try: direct CDN fetch (works for public resources)
+    // First try: direct CDN fetch (works for public/non-ACL resources)
     const upstream = await fetch(url);
     if (upstream.ok) {
       const ct = upstream.headers.get("content-type") || mimeMap[format] || "application/octet-stream";
       return sendBuffer(Buffer.from(await upstream.arrayBuffer()), ct);
     }
 
-    // Fallback: Cloudinary's generate_archive API uses API credentials and
-    // bypasses CDN-level ACL restrictions that block direct resource access.
-    const { cloudinary } = require("./config/cloudinary");
-    const archiveUrl = cloudinary.utils.download_archive_url({
-      public_ids: [publicId],
-      resource_type: resourceType,
-      target_format: "zip",
-    });
-
-    const archiveResp = await fetch(archiveUrl);
-    if (!archiveResp.ok) {
-      return res.status(404).json({ error: "Document not found" });
+    // Fallback: Cloudinary generate_archive API uses API credentials and bypasses
+    // CDN-level ACL restrictions. Try the detected resource type first, then others.
+    const typesToTry = [resourceType, ...["image", "raw", "video"].filter(t => t !== resourceType)];
+    let fileBuffer = null;
+    for (const resType of typesToTry) {
+      fileBuffer = await tryArchive(resType).catch(() => null);
+      if (fileBuffer) break;
     }
 
-    const AdmZip = require("adm-zip");
-    const zipBuffer = Buffer.from(await archiveResp.arrayBuffer());
-    const zip = new AdmZip(zipBuffer);
-    const entries = zip.getEntries();
-    if (!entries.length) {
-      return res.status(404).json({ error: "Document not found in archive" });
+    if (!fileBuffer) {
+      return sendError(404, "Document not found");
     }
 
-    const fileBuffer = entries[0].getData();
     const ct = mimeMap[format] || "application/octet-stream";
     return sendBuffer(fileBuffer, ct);
   } catch (err) {
     console.error("document-proxy error:", err?.message || err);
-    if (!res.headersSent) res.status(500).json({ error: "Failed to fetch document" });
+    if (!res.headersSent) sendError(500, "Failed to fetch document");
   }
 });
 

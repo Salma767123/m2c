@@ -2,7 +2,7 @@
 
 import React, { useContext, createContext } from 'react'
 import { FileText, ExternalLink, Download, Image as ImageIcon } from 'lucide-react'
-import { openDoc } from '@/lib/docDownload'
+import { downloadDoc } from '@/lib/docDownload'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type FieldVerification = { ok: boolean | null; remarks: string }
@@ -235,20 +235,20 @@ export function DocCard({ doc, index, fieldKey, verifications, onChange }: {
         isImg ? (
           <button
             type="button"
-            onClick={() => openDoc(url, name)}
+            onClick={() => downloadDoc(url, name)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors"
           >
-            <ExternalLink className="w-3 h-3" />
-            View Full Image
+            <Download className="w-3 h-3" />
+            Download Image
           </button>
         ) : (
           <button
             type="button"
-            onClick={() => openDoc(url, name)}
+            onClick={() => downloadDoc(url, name)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors"
           >
             <Download className="w-3 h-3" />
-            Open Document
+            Download
           </button>
         )
       )}

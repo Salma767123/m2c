@@ -1,4 +1,3 @@
-import { docViewerBus } from './docViewerBus'
 
 const MIME_TO_EXT: Record<string, string> = {
   'application/pdf': '.pdf',
@@ -102,16 +101,6 @@ function nameFromUrl(url: string): string {
 }
 
 /**
- * Open a document in the in-app viewer modal.
- * The optional `name` param is shown as the modal title and used as the
- * download filename — pass it whenever you have a human-readable filename.
- */
-export function openDoc(url: string, name?: string): void {
-  if (!url) return
-  docViewerBus.open(url, name || nameFromUrl(url))
-}
-
-/**
  * Trigger a file download with the correct filename and extension.
  *
  * Cloudinary raw resources are routed through the backend proxy which sets
@@ -121,15 +110,25 @@ export function openDoc(url: string, name?: string): void {
  * Non-Cloudinary URLs are fetched as blobs so the `download` attribute is
  * honoured by the browser (cross-origin links ignore it).
  */
+function iframeDownload(src: string): void {
+  // Downloads a URL via a hidden iframe: server's Content-Disposition:attachment
+  // triggers the download without opening a new tab or navigating the current page.
+  const iframe = document.createElement('iframe')
+  iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0;pointer-events:none'
+  iframe.src = src
+  document.body.appendChild(iframe)
+  setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe) }, 120_000)
+}
+
 export function downloadDoc(url: string, name: string): void {
   if (!url) return
 
   if (isCloudinaryUrl(url)) {
-    // Route through the backend proxy (avoids CORS on Cloudinary raw resources).
-    // Fetch as a blob so the download triggers silently — no new tab opened.
     const ext = extFromUrl(url)
     const filename = ext && !name.toLowerCase().endsWith(ext) ? `${name}${ext}` : name
     const proxyUrl = cloudinaryProxyUrl(url, { download: true, name: filename })
+
+    // Primary: fetch as blob so the <a download> works cross-origin with the right filename.
     safeFetch(proxyUrl)
       .then(blob => {
         const blobUrl = URL.createObjectURL(blob)
@@ -141,7 +140,10 @@ export function downloadDoc(url: string, name: string): void {
         document.body.removeChild(a)
         setTimeout(() => URL.revokeObjectURL(blobUrl), 1_000)
       })
-      .catch(() => window.open(proxyUrl, '_blank', 'noopener,noreferrer'))
+      // Fallback: if the AJAX fetch fails (CORS or proxy error), use a hidden iframe.
+      // The server responds with Content-Disposition:attachment so the browser downloads
+      // without opening a new tab or navigating away from the current page.
+      .catch(() => iframeDownload(proxyUrl))
     return
   }
 
@@ -159,7 +161,7 @@ export function downloadDoc(url: string, name: string): void {
       document.body.removeChild(a)
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1_000)
     })
-    .catch(() => window.open(url, '_blank', 'noopener,noreferrer'))
+    .catch(() => iframeDownload(url))
 }
 
 /**

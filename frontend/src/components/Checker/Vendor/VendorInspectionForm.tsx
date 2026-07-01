@@ -160,7 +160,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       if (!anchor) return
       if (rootRef.current && rootRef.current.contains(anchor)) return
       const href = anchor.getAttribute('href')
-      if (!href || href.startsWith('#') || anchor.target === '_blank') return
+      if (!href || href.startsWith('#') || href.startsWith('blob:') || anchor.target === '_blank' || anchor.hasAttribute('download')) return
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation()
       requestExit(() => { allowLeaveRef.current = true; window.location.href = href })
     }

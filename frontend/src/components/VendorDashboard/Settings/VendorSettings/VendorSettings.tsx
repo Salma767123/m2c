@@ -32,7 +32,7 @@ import VendorService, { VendorProfile } from "@/services/vendorService";
 import { buildFullName } from "@/lib/utils";
 import ResultModal from "@/components/UI/ResultModal";
 import { PhoneInput, LocalLandlineInput, getLandlineDisplay } from "@/components/VendorHub/FormUI";
-import { openDoc, isDocImageUrl } from "@/lib/docDownload";
+import { downloadDoc, isDocImageUrl } from "@/lib/docDownload";
 
 // A certificate may only be edited/replaced when it is expired or within this
 // many days of expiring. Valid certs (and certs with no expiry) stay locked.
@@ -367,8 +367,8 @@ function DocsGrid({ heading, docs }: { heading: string; docs: any[] }) {
                     <span className="text-[10px] text-slate-400 truncate">{uploaded}</span>
                   ) : <span />}
                   {doc.documentUrl && (
-                    <button type="button" onClick={() => openDoc(doc.documentUrl, doc.name)} className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-brand-600 hover:text-brand-700" title="View / Download">
-                      <Download className="w-3 h-3" /> View
+                    <button type="button" onClick={() => downloadDoc(doc.documentUrl, doc.name)} className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-brand-600 hover:text-brand-700" title="Download">
+                      <Download className="w-3 h-3" /> Download
                     </button>
                   )}
                 </div>
@@ -826,8 +826,8 @@ function CertificationsSection({
                 ) : (
                   <>
                     {cert.documentUrl && (
-                      <button type="button" onClick={() => openDoc(cert.documentUrl, cert.name)} className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1">
-                        <FileText className="w-3.5 h-3.5" /> View File
+                      <button type="button" onClick={() => downloadDoc(cert.documentUrl, cert.name)} className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1">
+                        <Download className="w-3.5 h-3.5" /> Download
                       </button>
                     )}
                     {cert.issuedBy && <Field label="Issued By" value={cert.issuedBy} />}

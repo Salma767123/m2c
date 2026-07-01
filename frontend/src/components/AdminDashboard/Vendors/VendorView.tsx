@@ -48,7 +48,7 @@ import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { hasPermission } from '@/lib/auth'
 import { getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
 import { buildFullName } from '@/lib/utils'
-import { openDoc, downloadDoc, isDocImageUrl } from '@/lib/docDownload'
+import { downloadDoc, isDocImageUrl } from '@/lib/docDownload'
 
 interface VendorViewProps {
   vendorId: string
@@ -1332,16 +1332,10 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                     </div>
                   </div>
                   {cert.documentUrl && (
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openDoc(cert.documentUrl!, cert.name || 'Certificate')}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => downloadDoc(cert.documentUrl!, cert.name || 'Certificate')}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={() => downloadDoc(cert.documentUrl!, cert.name || 'Certificate')}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </Button>
                   )}
                 </div>
               ))}
@@ -1463,26 +1457,15 @@ function DocFileCard({ doc }: { doc: any }) {
         )}
       </div>
       {doc.documentUrl && (
-        <div className="flex flex-col gap-1 shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => openDoc(doc.documentUrl, label)}
-            className="h-7 px-2.5 text-xs text-brand-600 hover:text-brand-700 hover:bg-brand-50"
-          >
-            <Eye className="w-3 h-3 mr-1" />
-            View
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => downloadDoc(doc.documentUrl, fileName)}
-            className="h-7 px-2.5 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-          >
-            <Download className="w-3 h-3 mr-1" />
-            Download
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => downloadDoc(doc.documentUrl, fileName)}
+          className="h-7 px-2.5 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 shrink-0"
+        >
+          <Download className="w-3 h-3 mr-1" />
+          Download
+        </Button>
       )}
     </div>
   )
@@ -1536,26 +1519,15 @@ function ImageSection({ images }: { images: any[] }) {
                     {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </p>
                 )}
-                <div className="flex gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openDoc(img.documentUrl, name)}
-                    className="flex-1 h-6 px-1.5 text-[10px] font-medium"
-                  >
-                    <Eye className="w-3 h-3 mr-0.5" />
-                    View
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadDoc(img.documentUrl, name)}
-                    className="flex-1 h-6 px-1.5 text-[10px] font-medium"
-                  >
-                    <Download className="w-3 h-3 mr-0.5" />
-                    Save
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadDoc(img.documentUrl, name)}
+                  className="w-full h-6 px-1.5 text-[10px] font-medium"
+                >
+                  <Download className="w-3 h-3 mr-0.5" />
+                  Download
+                </Button>
               </div>
             )
           })}
