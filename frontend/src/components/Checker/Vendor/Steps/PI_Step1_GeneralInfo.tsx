@@ -48,9 +48,11 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
 
   // Resolve the mainContact object (Step 7 of vendor registration)
   const mc = v.mainContact && typeof v.mainContact === 'object' ? v.mainContact : null
-  const contactFullName = mc
-    ? [mc.title, mc.firstName, mc.middleName, mc.lastName].filter(Boolean).join(' ') || mc.name || ''
-    : [v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName].filter(Boolean).join(' ') || v.ownerName || ''
+  const contactFullName =
+    [mc?.title, mc?.firstName, mc?.middleName, mc?.lastName].filter(Boolean).join(' ') ||
+    mc?.name ||
+    v.ownerName ||
+    ''
 
   const [showServiceTypeDropdown, setShowServiceTypeDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -134,12 +136,15 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
           </div>
           <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
             <InfoBlock label="Full Name" value={contactFullName} />
-            <InfoBlock label="Designation" value={mc ? mc.customDesignation || mc.designation : v.designation} />
-            <InfoBlock label="Department" value={mc ? mc.customDepartment || mc.department : undefined} />
-            <InfoBlock label="Primary Phone" value={mc ? mc.phone1 || mc.phone : v.ownerPhone} />
-            <InfoBlock label="Secondary Phone" value={mc ? mc.phone2 : v.ownerPhone2} />
-            <InfoBlock label="Primary Email" value={mc ? mc.email1 || mc.email : v.ownerEmail} />
-            <InfoBlock label="Secondary Email" value={mc ? mc.email2 : v.ownerEmail2} />
+            {/* Always chain through mc fields first, then fall back to top-level vendor
+                owner fields so vendors who only partially completed Step 7 still show
+                data that was captured in earlier registration steps. */}
+            <InfoBlock label="Designation" value={mc?.customDesignation || mc?.designation || v.designation} />
+            <InfoBlock label="Department" value={mc?.customDepartment || mc?.department} />
+            <InfoBlock label="Primary Phone" value={mc?.phone1 || mc?.phone || v.ownerPhone} />
+            <InfoBlock label="Secondary Phone" value={mc?.phone2 || v.ownerPhone2} />
+            <InfoBlock label="Primary Email" value={mc?.email1 || mc?.email || v.ownerEmail} />
+            <InfoBlock label="Secondary Email" value={mc?.email2 || v.ownerEmail2} />
           </div>
         </div>
       )}

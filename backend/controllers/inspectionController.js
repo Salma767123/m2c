@@ -444,7 +444,13 @@ const completeInspection = async (req, res) => {
             label: `completeInspection ${id}`,
         });
         if (!geo.ok) {
-            return res.status(geo.status).json(geo.body);
+            // When vendor has no location configured, skip the geofence — mirrors
+            // the silent skip already in startInspection (VendorInspectionForm.tsx:189).
+            if (geo.body?.error === 'Vendor location not set') {
+                console.log(`[Geofence] completeInspection ${id} — vendor has no location, skipping geofence`);
+            } else {
+                return res.status(geo.status).json(geo.body);
+            }
         }
 
         // Defence-in-depth: validate the payload server-side. The UI blocks this

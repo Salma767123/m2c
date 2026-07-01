@@ -2,8 +2,9 @@
 
 import { Package, Image as ImageIcon, Layers, Tag, Ruler, Upload, X } from 'lucide-react'
 import { useState } from 'react'
-import VerifyField, { SectionBlock, type Verifications } from './VI_VerifyField'
+import VerifyField, { SectionBlock, HighlightFieldsProvider, type Verifications } from './VI_VerifyField'
 import ImageCropModal from '@/components/UI/ImageCropModal'
+import { getExpectedProductVerificationKeys } from '@/components/Checker/Products/validation'
 
 // ── Image compressor (same quality settings as Testing.tsx) ─────────────────
 async function compressImage(file: File, maxWidth = 1200, quality = 0.7): Promise<string> {
@@ -53,6 +54,16 @@ interface Props {
 export default function PI_Step2_ProductVerification({ formData, setFormData, errors = {} }: Props) {
   const p = formData.productData || {}
   const verifications = formData.productVerifications || {}
+
+  // Compute keys that are missing a Yes/No decision — used by HighlightFieldsProvider
+  // so each VerifyField self-highlights when there are validation errors.
+  const unverifiedKeys: Set<string> = errors.productVerifications
+    ? new Set(
+        getExpectedProductVerificationKeys(p).filter(
+          (key) => !verifications[key] || verifications[key].ok === null
+        )
+      )
+    : new Set()
 
   const onVerify = (key: string, ok: boolean | null, remarks: string) => {
     setFormData({
@@ -111,6 +122,7 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
   const variants: any[] = Array.isArray(p.variants) ? p.variants : []
 
   return (
+    <HighlightFieldsProvider keys={unverifiedKeys}>
     <div className="space-y-10">
       <div className="border-b border-slate-200 pb-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-1">Product Information Verification</h2>
@@ -118,6 +130,18 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
           Verify each field against the physical product. Select Yes / No and add remarks when needed.
         </p>
       </div>
+
+      {errors.productVerifications && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <p className="text-sm font-semibold text-red-700">{errors.productVerifications}</p>
+          <p className="text-xs text-red-500 mt-0.5">Scroll down to complete all highlighted fields.</p>
+        </div>
+      )}
+      {errors.productEvidencePhotos && !errors.productVerifications && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <p className="text-sm font-semibold text-red-700">{errors.productEvidencePhotos}</p>
+        </div>
+      )}
 
       {/* ── 1. Basic Product Info ─────────────────────────────────────────── */}
       <SectionBlock title="Basic Product Information" icon={<Package className="w-4 h-4" />}>
@@ -368,5 +392,6 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
         onCropped={onEvidenceCropped}
       />
     </div>
+    </HighlightFieldsProvider>
   )
 }

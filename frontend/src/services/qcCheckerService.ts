@@ -414,7 +414,8 @@ class QCCheckerService {
             });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.message || 'Failed to approve product');
+            const msg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to approve product';
+            throw new Error(msg);
         }
     }
 
@@ -428,7 +429,8 @@ class QCCheckerService {
             });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.message || 'Failed to reject product');
+            const msg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to reject product';
+            throw new Error(msg);
         }
     }
 
@@ -491,7 +493,8 @@ class QCCheckerService {
             });
             return response.data;
         } catch (error: any) {
-            throw new Error(error.message || 'Failed to complete inspection');
+            const msg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to complete inspection';
+            throw new Error(msg);
         }
     }
 

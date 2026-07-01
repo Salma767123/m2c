@@ -65,6 +65,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<{ type: 'not_assigned' | 'submitted' | 'unknown'; message: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [checkerCoords, setCheckerCoords] = useState<{ checkerLatitude: number; checkerLongitude: number } | null>(null)
   const [vendor, setVendor] = useState<any>(null)
   const [inspection, setInspection] = useState<any>(null)
   const [cycleNumber, setCycleNumber] = useState(1)
@@ -81,6 +82,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     nameBoard: null,
     routeMap: null,
   })
+  const [evidenceError, setEvidenceError] = useState(false)
   const [docData, setDocData] = useState<VendorDocData>({
     signedDocuments: [],
     signedReport: [],
@@ -177,6 +179,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       try {
         const coords = await getCurrentCoords()
         if (cancelled) return
+        setCheckerCoords(coords)
         await qcCheckerService.startInspection(inspId, coords)
       } catch (err: any) {
         if (cancelled) return
@@ -265,6 +268,17 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   const goNext = () => {
+    if (step === 2) {
+      const hasEvidence = factoryEvidence.frontView || factoryEvidence.nameBoard || factoryEvidence.routeMap
+      if (!hasEvidence) {
+        setEvidenceError(true)
+        document.getElementById('inspector-evidence-photos')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        showErrorToast('Evidence photo required', 'Please upload at least one inspector evidence photo before continuing.')
+        return
+      }
+      setEvidenceError(false)
+    }
+
     if (step >= 1 && step <= 8) {
       const keys = registeredFieldsRef.current
       if (keys.length > 0) {
@@ -284,14 +298,12 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     setHighlightedKeys(new Set())
     if (step < STEPS.length) {
       setStep(s => s + 1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
   const goPrev = () => {
     if (step > 1) {
       setStep(s => s - 1)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
@@ -305,6 +317,15 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
     }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // Scroll the layout's overflow container to the top on every step change.
+  // window.scrollTo doesn't work here because the checker layout uses
+  // <main className="overflow-y-auto"> as the scroll container, not the window.
+  useEffect(() => {
+    if (!pendingScrollRef.current) {
+      document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [step])
 
   useEffect(() => {
     const key = pendingScrollRef.current
@@ -334,8 +355,29 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       return
     }
 
+    const hasSignOff = docData.signedDocuments.length > 0 || docData.signedReport.length > 0
+    if (!hasSignOff) {
+      setStep(9)
+      showErrorToast('Sign-off Required', 'Please upload a manually signed document or generate a digitally signed report before submitting the inspection.')
+      return
+    }
+
+    setSubmitting(true)
+
+    // Use GPS captured at inspection start; re-fetch only if not available.
+    let coords = checkerCoords
+    if (!coords) {
+      try {
+        coords = await getCurrentCoords()
+        setCheckerCoords(coords)
+      } catch (gpsErr: any) {
+        showErrorToast('Location Required', gpsErr?.message || 'Please enable location services and try again.')
+        setSubmitting(false)
+        return
+      }
+    }
+
     try {
-      setSubmitting(true)
       const payload = {
         verifications,
         inspectorName: meta.inspectorName,
@@ -343,6 +385,8 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
         inspectionStatus: meta.overallResult,
         inspectorRemarks: meta.inspectorRemarks,
         cycleNumber,
+        checkerLatitude: coords.checkerLatitude,
+        checkerLongitude: coords.checkerLongitude,
       }
       const res = await qcCheckerService.completeInspection(inspection.id, payload)
       if (res.success) {
@@ -377,7 +421,8 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
         <VI_Step2_WarehouseFactory
           {...commonProps}
           factoryEvidence={factoryEvidence}
-          onEvidenceChange={(slot, photo) => setFactoryEvidence(prev => ({ ...prev, [slot]: photo }))}
+          onEvidenceChange={(slot, photo) => { setFactoryEvidence(prev => ({ ...prev, [slot]: photo })); setEvidenceError(false) }}
+          evidenceError={evidenceError}
         />
       )
       case 3: return <VI_Step3_OwnerProfile {...commonProps} />
@@ -563,8 +608,9 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
           {step === STEPS.length ? (
             <button
               onClick={handleSubmit}
-              disabled={submitting}
-              className={`flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-xl transition-colors duration-200 shadow-sm shadow-emerald-600/10 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${submitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+              disabled={submitting || !(docData.signedDocuments.length > 0 || docData.signedReport.length > 0)}
+              title={!(docData.signedDocuments.length > 0 || docData.signedReport.length > 0) ? 'Upload a signed document or generate a digitally signed report first' : undefined}
+              className={`flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-xl transition-colors duration-200 shadow-sm shadow-emerald-600/10 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${submitting || !(docData.signedDocuments.length > 0 || docData.signedReport.length > 0) ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
               <Check className="w-5 h-5" />
               {submitting ? 'Submitting…' : 'Submit Inspection Report'}

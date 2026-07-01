@@ -10,8 +10,22 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import vendorService from '@/services/vendorService'
-import { downloadReportPdf } from '@/lib/reportPdfDownload'
-import { getStoredAuth } from '@/lib/auth'
+import { generateFactoryInspectionPdf } from '@/lib/factoryInspectionReportPdf'
+import type { FactoryImageEntry, FactoryReportMeta } from '@/lib/factoryInspectionReportPdf'
+
+async function fetchImgDataUrl(url: string): Promise<string | null> {
+    try {
+        const res = await fetch(url)
+        if (!res.ok) return null
+        const blob = await res.blob()
+        return await new Promise<string | null>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = () => resolve(null)
+            reader.readAsDataURL(blob)
+        })
+    } catch { return null }
+}
 
 interface Props {
     inspectionId: string
@@ -163,7 +177,6 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
     const [error, setError] = useState<string | null>(null)
     const [downloading, setDownloading] = useState(false)
     const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null)
-    const reportRef = useRef<HTMLDivElement>(null)
     const autoDownloadTriggered = useRef(false)
 
     useEffect(() => {
@@ -186,27 +199,41 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
 
     useEffect(() => {
         if (!autoDownload || autoDownloadTriggered.current || loading || !inspection || downloading) return
-        let cancelled = false
-        const tryDownload = () => {
-            if (cancelled) return
-            if (!reportRef.current) { setTimeout(tryDownload, 300); return }
-            autoDownloadTriggered.current = true
-            const vendorName = inspection.vendor?.companyName || 'Report'
-            const adminUser = getStoredAuth()?.user
-            const downloadedBy = adminUser ? `${adminUser.name || 'Admin'} <${adminUser.email}>` : undefined
-            downloadReportPdf({
-                element: reportRef.current,
-                title: 'Factory Inspection Report',
-                submittedDate: inspection.completedAt
-                    ? new Date(inspection.completedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
-                    : '—',
-                filename: `Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}_Internal.pdf`,
-                variant: 'internal',
-                downloadedBy,
-            }).catch(() => {})
+        autoDownloadTriggered.current = true
+        const buildAndSave = async () => {
+            const rawItems = inspection.itemsToInspect
+            const isFormData = rawItems && !Array.isArray(rawItems) && typeof rawItems === 'object'
+            const fd: Record<string, any> = isFormData ? (rawItems as Record<string, any>) : {}
+            const isNewFmt = isFormData && typeof fd.verifications === 'object' && fd.verifications !== null
+            const vendor: any = inspection.vendor || {}
+            const vendorDocs: any[] = Array.isArray(vendor.documents) ? vendor.documents : []
+            const imgResults = await Promise.all(
+                vendorDocs.filter((d: any) => d.type === 'OTHER' && d.documentUrl)
+                    .map(async (d: any): Promise<FactoryImageEntry | null> => {
+                        const dataUrl = await fetchImgDataUrl(d.documentUrl)
+                        return dataUrl ? { label: d.name || 'Factory Image', dataUrl } : null
+                    })
+            )
+            const vendorFactoryImages = imgResults.filter((x): x is FactoryImageEntry => x !== null)
+            const meta: FactoryReportMeta = {
+                inspectorName: fd.inspectorName || inspection.checker?.name,
+                inspectionDate: fd.inspectionDate,
+                overallResult: fd.inspectionStatus,
+                inspectorRemarks: fd.inspectorRemarks || inspection.notes,
+                checker: inspection.checker || null,
+                location: inspection.checkerLatitude != null
+                    ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude! }
+                    : null,
+                generatedAt: new Date(),
+            }
+            const pdf = generateFactoryInspectionPdf(vendor, isNewFmt ? fd.verifications : {}, meta, {
+                vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
+                inspectorEvidenceImages: null,
+            })
+            const vendorName = vendor.companyName || fd.vendorName || 'Report'
+            pdf.save(`Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}.pdf`)
         }
-        const timer = setTimeout(tryDownload, 500)
-        return () => { cancelled = true; clearTimeout(timer) }
+        buildAndSave().catch(() => {})
     }, [autoDownload, loading, inspection, downloading, inspectionId])
 
     if (loading) return (
@@ -227,22 +254,40 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
     const isCompleted = status === 'COMPLETED'
 
     const handleDownloadPdf = async () => {
-        if (!reportRef.current) return
+        if (!inspection) return
         setDownloading(true)
         try {
-            const vendorName = inspection.vendor?.companyName || 'Report'
-            const adminUser = getStoredAuth()?.user
-            const downloadedBy = adminUser ? `${adminUser.name || 'Admin'} <${adminUser.email}>` : undefined
-            await downloadReportPdf({
-                element: reportRef.current,
-                title: 'Factory Inspection Report',
-                submittedDate: inspection.completedAt
-                    ? new Date(inspection.completedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
-                    : '—',
-                filename: `Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}_Internal.pdf`,
-                variant: 'internal',
-                downloadedBy,
+            const rawItems = inspection.itemsToInspect
+            const isFormData = rawItems && !Array.isArray(rawItems) && typeof rawItems === 'object'
+            const fd: Record<string, any> = isFormData ? (rawItems as Record<string, any>) : {}
+            const isNewFmt = isFormData && typeof fd.verifications === 'object' && fd.verifications !== null
+            const vendor: any = inspection.vendor || {}
+            const vendorDocs: any[] = Array.isArray(vendor.documents) ? vendor.documents : []
+            const imgResults = await Promise.all(
+                vendorDocs.filter((d: any) => d.type === 'OTHER' && d.documentUrl)
+                    .map(async (d: any): Promise<FactoryImageEntry | null> => {
+                        const dataUrl = await fetchImgDataUrl(d.documentUrl)
+                        return dataUrl ? { label: d.name || 'Factory Image', dataUrl } : null
+                    })
+            )
+            const vendorFactoryImages = imgResults.filter((x): x is FactoryImageEntry => x !== null)
+            const meta: FactoryReportMeta = {
+                inspectorName: fd.inspectorName || inspection.checker?.name,
+                inspectionDate: fd.inspectionDate,
+                overallResult: fd.inspectionStatus,
+                inspectorRemarks: fd.inspectorRemarks || inspection.notes,
+                checker: inspection.checker || null,
+                location: inspection.checkerLatitude != null
+                    ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude! }
+                    : null,
+                generatedAt: new Date(),
+            }
+            const pdf = generateFactoryInspectionPdf(vendor, isNewFmt ? fd.verifications : {}, meta, {
+                vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
+                inspectorEvidenceImages: null,
             })
+            const vendorName = vendor.companyName || fd.vendorName || 'Report'
+            pdf.save(`Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}.pdf`)
         } catch {
             alert('Failed to generate PDF. Please try again.')
         } finally {
@@ -305,7 +350,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
             </div>
 
             {/* PDF capture area */}
-            <div ref={reportRef} className="space-y-6">
+            <div className="space-y-6">
 
             {/* Assignment Banner */}
             <div className="bg-gradient-to-r from-[#222222] to-[#333333] rounded-2xl p-6 text-white">
@@ -611,18 +656,6 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                                             })}
                                         </div>
                                     </>
-                                )}
-                                {Object.keys(FACILITY_LABELS).filter(f => !enabledFacilities[f]).length > 0 && (
-                                    <div className="mt-4 bg-slate-50/50 border border-slate-200 rounded-xl p-3">
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Facilities Not Declared</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {Object.keys(FACILITY_LABELS).filter(f => !enabledFacilities[f]).map(f => (
-                                                <span key={f} className="px-2.5 py-0.5 text-xs text-slate-500 bg-slate-100 border border-slate-200 rounded-full">
-                                                    {FACILITY_LABELS[f]}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
                                 )}
                             </Section>
                         )

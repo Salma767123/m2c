@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useContext, createContext, useState } from 'react'
+import React, { useContext, createContext } from 'react'
 import { FileText, ExternalLink, Download, Image as ImageIcon } from 'lucide-react'
+import { openDoc } from '@/lib/docDownload'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type FieldVerification = { ok: boolean | null; remarks: string }
@@ -15,26 +16,6 @@ export function HighlightFieldsProvider({ keys, children }: { keys: Set<string>;
 }
 
 // ── Value Renderer ────────────────────────────────────────────────────────────
-const MIME_TO_EXT: Record<string, string> = {
-  'application/pdf': '.pdf',
-  'application/msword': '.doc',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-  'image/svg+xml': '.svg',
-  'image/bmp': '.bmp',
-}
-
-function extFromUrl(url: string): string {
-  try {
-    const last = new URL(url).pathname.split('/').pop() || ''
-    const i = last.lastIndexOf('.')
-    return i >= 0 ? last.slice(i).toLowerCase() : ''
-  } catch { return '' }
-}
-
 const DOC_EXT = /\.(pdf|docx?|xlsx?|pptx?|txt|csv|rtf)(\?|$)/i
 
 function isImageUrl(url?: string, name?: string) {
@@ -239,31 +220,6 @@ export function DocCard({ doc, index, fieldKey, verifications, onChange }: {
   const url = doc.documentUrl || ''
   const name = doc.name || doc.type || `Document ${index + 1}`
   const isImg = isImageUrl(url, doc.name)
-  const [downloading, setDownloading] = useState(false)
-
-  const handleDownload = async () => {
-    if (!url || downloading) return
-    setDownloading(true)
-    try {
-      const res = await fetch(url)
-      const blob = await res.blob()
-      const ext = extFromUrl(url) || (MIME_TO_EXT[blob.type] ?? '')
-      const baseName = doc.name || name
-      const filename = ext && !baseName.toLowerCase().endsWith(ext) ? baseName + ext : baseName
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = filename
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
-    } catch {
-      // CORS or network failure — open in a new tab so at least the browser
-      // can display or download the file natively
-      window.open(url, '_blank', 'noopener,noreferrer')
-    } finally {
-      setDownloading(false)
-    }
-  }
 
   return (
     <div className="space-y-2">
@@ -277,24 +233,22 @@ export function DocCard({ doc, index, fieldKey, verifications, onChange }: {
       />
       {url && (
         isImg ? (
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => openDoc(url, name)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors"
           >
             <ExternalLink className="w-3 h-3" />
             View Full Image
-          </a>
+          </button>
         ) : (
           <button
             type="button"
-            onClick={handleDownload}
-            disabled={downloading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors disabled:opacity-60"
+            onClick={() => openDoc(url, name)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors"
           >
             <Download className="w-3 h-3" />
-            {downloading ? 'Downloading…' : 'Open Document'}
+            Open Document
           </button>
         )
       )}

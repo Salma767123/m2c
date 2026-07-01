@@ -202,6 +202,51 @@ app.use("/api/notifications", notificationRoutes);
 const exchangeRateRoutes = require("./routes/exchangeRateRoutes");
 app.use("/api/exchange-rate", exchangeRateRoutes);
 
+// Document proxy — fetches Cloudinary raw files server-side, bypassing browser CORS restrictions.
+// Accepts only Cloudinary hostnames to prevent open-proxy abuse.
+app.get("/api/document-proxy", async (req, res) => {
+  const { url, download, name } = req.query;
+  if (!url || typeof url !== "string") {
+    return res.status(400).json({ error: "url is required" });
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return res.status(400).json({ error: "Invalid URL" });
+  }
+
+  if (!/^res\.cloudinary\.com$/i.test(parsed.hostname)) {
+    return res.status(400).json({ error: "Only Cloudinary URLs are supported" });
+  }
+
+  try {
+    const upstream = await fetch(url);
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({ error: "Document not found" });
+    }
+
+    const contentType = upstream.headers.get("content-type") || "application/octet-stream";
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+
+    res.set("Content-Type", contentType);
+    if (download === "true") {
+      const filename =
+        typeof name === "string" && name
+          ? name
+          : decodeURIComponent(parsed.pathname.split("/").pop() || "document");
+      res.set("Content-Disposition", `attachment; filename="${filename}"`);
+    } else {
+      res.set("Content-Disposition", "inline");
+    }
+
+    res.send(buffer);
+  } catch {
+    if (!res.headersSent) res.status(500).json({ error: "Failed to fetch document" });
+  }
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

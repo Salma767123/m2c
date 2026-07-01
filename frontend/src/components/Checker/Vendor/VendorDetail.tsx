@@ -468,7 +468,7 @@ export default function VendorDetail({
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</p>
                 {doc.documentUrl && (
-                  <button type="button" onClick={() => openDoc(doc.documentUrl)} className="shrink-0 text-brand-600 hover:text-brand-700" title="View / Download">
+                  <button type="button" onClick={() => openDoc(doc.documentUrl, doc.name)} className="shrink-0 text-brand-600 hover:text-brand-700" title="View / Download">
                     <Download className="w-4 h-4" />
                   </button>
                 )}
@@ -662,7 +662,7 @@ export default function VendorDetail({
                             {cert.documentUrl && (
                               <button
                                 type="button"
-                                onClick={() => openDoc(cert.documentUrl)}
+                                onClick={() => openDoc(cert.documentUrl, cert.name)}
                                 className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1"
                               >
                                 <FileText className="w-3.5 h-3.5" /> View File

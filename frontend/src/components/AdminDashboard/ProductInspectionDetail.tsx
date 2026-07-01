@@ -9,8 +9,7 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/UI/Badge'
 import productService from '@/services/productService'
-import { downloadReportPdf } from '@/lib/reportPdfDownload'
-import { getStoredAuth } from '@/lib/auth'
+import { generateProductInspectionPdf } from '@/lib/productInspectionReportPdf'
 import reinspectionService, { AuditLogEntry } from '@/services/reinspectionService'
 import InspectionAuditTimeline from './ReInspection/InspectionAuditTimeline'
 
@@ -113,7 +112,6 @@ export default function ProductInspectionDetail({ productId }: Props) {
     const [downloading, setDownloading] = useState(false)
     const [selectedImage, setSelectedImage] = useState<{src: string, alt: string} | null>(null)
     const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([])
-    const reportRef = useRef<HTMLDivElement>(null)
     const autoDownloadTriggered = useRef(false)
 
     useEffect(() => {
@@ -139,22 +137,19 @@ export default function ProductInspectionDetail({ productId }: Props) {
     }, [productId])
 
     const handleDownloadPdf = async () => {
-        if (!reportRef.current) return
+        if (!product) return
         setDownloading(true)
         try {
-            const productName = (product as any)?.name || 'Report'
-            const adminUser = getStoredAuth()?.user
-            const downloadedBy = adminUser ? `${adminUser.name || 'Admin'} <${adminUser.email}>` : undefined
-            await downloadReportPdf({
-                element: reportRef.current,
-                title: 'Product Quality Report',
-                submittedDate: (product as any)?.updatedAt
-                    ? new Date((product as any).updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
-                    : '—',
-                filename: `Product_Report_${String(productName).replace(/\s+/g, '_')}_${productId.slice(-8).toUpperCase()}_Internal.pdf`,
-                variant: 'internal',
-                downloadedBy,
-            })
+            const fd = ((product as any).qcInspectionData || {}) as Record<string, any>
+            const productName = (product as any).name || 'Report'
+            const meta = {
+                productName: (product as any).name,
+                vendorName: (product as any).vendor?.companyName || fd.vendor,
+                checker: (product as any).assignedQc || null,
+                generatedAt: new Date(),
+            }
+            const pdf = generateProductInspectionPdf(fd, meta, {})
+            pdf.save(`Product_Report_${String(productName).replace(/\s+/g, '_')}_${productId.slice(-8).toUpperCase()}.pdf`)
         } catch {
             alert('Failed to generate PDF. Please try again.')
         } finally {
@@ -164,30 +159,19 @@ export default function ProductInspectionDetail({ productId }: Props) {
 
     useEffect(() => {
         if (!autoDownload || autoDownloadTriggered.current || loading || !product || downloading) return
-        let cancelled = false
-        const tryDownload = () => {
-            if (cancelled) return
-            if (!reportRef.current) {
-                setTimeout(tryDownload, 300)
-                return
-            }
-            autoDownloadTriggered.current = true
-            const productName = (product as any)?.name || 'Report'
-            const adminUser = getStoredAuth()?.user
-            const downloadedBy = adminUser ? `${adminUser.name || 'Admin'} <${adminUser.email}>` : undefined
-            downloadReportPdf({
-                element: reportRef.current,
-                title: 'Product Quality Report',
-                submittedDate: (product as any)?.updatedAt
-                    ? new Date((product as any).updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
-                    : '—',
-                filename: `Product_Report_${String(productName).replace(/\s+/g, '_')}_${productId.slice(-8).toUpperCase()}_Internal.pdf`,
-                variant: 'internal',
-                downloadedBy,
-            }).catch(() => { /* silent */ })
+        autoDownloadTriggered.current = true
+        const fd = ((product as any).qcInspectionData || {}) as Record<string, any>
+        const productName = (product as any).name || 'Report'
+        const meta = {
+            productName: (product as any).name,
+            vendorName: (product as any).vendor?.companyName || fd.vendor,
+            checker: (product as any).assignedQc || null,
+            generatedAt: new Date(),
         }
-        const timer = setTimeout(tryDownload, 500)
-        return () => { cancelled = true; clearTimeout(timer) }
+        try {
+            const pdf = generateProductInspectionPdf(fd, meta, {})
+            pdf.save(`Product_Report_${String(productName).replace(/\s+/g, '_')}_${productId.slice(-8).toUpperCase()}.pdf`)
+        } catch { /* silent */ }
     }, [autoDownload, loading, product, downloading, productId])
 
     if (loading) return (
@@ -245,7 +229,7 @@ export default function ProductInspectionDetail({ productId }: Props) {
             </div>
 
             {/* PDF capture area */}
-            <div ref={reportRef} className="space-y-6">
+            <div className="space-y-6">
 
             {/* General Info Banner */}
             <div className="bg-gradient-to-r from-[#222222] to-[#333333] rounded-2xl p-6 text-white">

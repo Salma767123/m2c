@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/UI/Badge"
 import qcCheckerService from "@/services/qcCheckerService"
-import { downloadReportPdf } from "@/lib/reportPdfDownload"
+import { generateProductInspectionPdf } from "@/lib/productInspectionReportPdf"
 
 interface ProductReportDetailProps {
   productId: string
@@ -158,7 +158,6 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
   const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [selectedImage, setSelectedImage] = useState<{src: string, alt: string} | null>(null)
-  const reportRef = useRef<HTMLDivElement>(null)
   const autoDownloadTriggered = useRef(false)
 
   useEffect(() => {
@@ -179,26 +178,19 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
   // Auto-trigger PDF download when navigated with ?download=true
   useEffect(() => {
     if (!autoDownload || autoDownloadTriggered.current || loading || !product || downloading) return
-    let cancelled = false
-    const tryDownload = () => {
-      if (cancelled) return
-      if (!reportRef.current) {
-        setTimeout(tryDownload, 300)
-        return
-      }
-      autoDownloadTriggered.current = true
-      downloadReportPdf({
-        element: reportRef.current,
-        title: "Product Inspection Report",
-        submittedDate: product.updatedAt
-          ? new Date(product.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
-          : "—",
-        filename: `Product_Report_${product.name.replace(/\s+/g, "_")}_${product.baseSku || productId}.pdf`,
-        inspectorName: (product as { assignedQc?: { name?: string } }).assignedQc?.name,
-      }).catch(() => { /* silent */ })
+    autoDownloadTriggered.current = true
+    const fd = (product.qcInspectionData || {}) as Record<string, any>
+    const assignedQc = (product as any).assignedQc
+    const meta = {
+      productName: product.name,
+      vendorName: product.vendor?.companyName || fd.vendor,
+      checker: assignedQc || null,
+      generatedAt: new Date(),
     }
-    const timer = setTimeout(tryDownload, 500)
-    return () => { cancelled = true; clearTimeout(timer) }
+    try {
+      const pdf = generateProductInspectionPdf(fd, meta, {})
+      pdf.save(`Product_Report_${product.name.replace(/\s+/g, "_")}_${product.baseSku || productId}.pdf`)
+    } catch { /* silent */ }
   }, [autoDownload, loading, product, downloading, productId])
 
   if (loading) return (
@@ -269,18 +261,18 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
         : "bg-red-50 border-red-200 text-red-800"
 
   const handleDownloadPdf = async () => {
-    if (!reportRef.current) return
     setDownloading(true)
     try {
-      await downloadReportPdf({
-        element: reportRef.current,
-        title: "Product Inspection Report",
-        submittedDate: product.updatedAt
-          ? new Date(product.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })
-          : "—",
-        filename: `Product_Report_${product.name.replace(/\s+/g, "_")}_${product.baseSku || productId}.pdf`,
-        inspectorName: (product as { assignedQc?: { name?: string } }).assignedQc?.name,
-      })
+      const fd = (product.qcInspectionData || {}) as Record<string, any>
+      const assignedQc = (product as any).assignedQc
+      const meta = {
+        productName: product.name,
+        vendorName: product.vendor?.companyName || fd.vendor,
+        checker: assignedQc || null,
+        generatedAt: new Date(),
+      }
+      const pdf = generateProductInspectionPdf(fd, meta, {})
+      pdf.save(`Product_Report_${product.name.replace(/\s+/g, "_")}_${product.baseSku || productId}.pdf`)
     } catch {
       alert("Failed to generate PDF. Please try again.")
     } finally {
@@ -319,7 +311,7 @@ export default function ProductReportDetail({ productId, onBack }: ProductReport
       </div>
 
       {/* PDF capture area */}
-      <div ref={reportRef} className="space-y-6">
+      <div className="space-y-6">
 
       {/* Summary Banner */}
       <div className="bg-linear-to-r from-brand-600 to-brand-700 rounded-2xl p-6 text-white grid grid-cols-2 md:grid-cols-4 gap-4">

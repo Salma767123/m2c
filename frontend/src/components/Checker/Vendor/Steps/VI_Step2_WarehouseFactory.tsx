@@ -28,6 +28,7 @@ interface Props {
   onRegisterFields: (keys: string[]) => void
   factoryEvidence: FactoryEvidenceState
   onEvidenceChange: (slot: keyof FactoryEvidenceState, photo: FactoryEvidencePhoto | null) => void
+  evidenceError?: boolean
 }
 
 function EvidenceUpload({
@@ -103,7 +104,7 @@ function EvidenceUpload({
   )
 }
 
-export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, onChange, onRegisterFields, factoryEvidence, onEvidenceChange }: Props) {
+export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, onChange, onRegisterFields, factoryEvidence, onEvidenceChange, evidenceError }: Props) {
   const vf = (key: string, label: string, value: any, type?: any) => (
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
   )
@@ -197,26 +198,33 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
       )}
 
       {/* Inspector Evidence Photos */}
-      <SectionBlock title="Inspector Evidence Photos" icon={<Camera className="w-4 h-4" />}>
-        <p className="text-xs text-slate-500 mb-4">Upload photos taken during the factory visit to serve as inspection evidence.</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <EvidenceUpload
-            label="Factory Front View"
-            value={factoryEvidence.frontView}
-            onChange={(photo) => onEvidenceChange('frontView', photo)}
-          />
-          <EvidenceUpload
-            label="Factory Name Board"
-            value={factoryEvidence.nameBoard}
-            onChange={(photo) => onEvidenceChange('nameBoard', photo)}
-          />
-          <EvidenceUpload
-            label="Route Map Photo"
-            value={factoryEvidence.routeMap}
-            onChange={(photo) => onEvidenceChange('routeMap', photo)}
-          />
-        </div>
-      </SectionBlock>
+      <div id="inspector-evidence-photos">
+        <SectionBlock title="Inspector Evidence Photos" icon={<Camera className="w-4 h-4" />}>
+          <p className="text-xs text-slate-500 mb-4">Upload photos taken during the factory visit to serve as inspection evidence.</p>
+          {evidenceError && (
+            <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+              At least one evidence photo is required before continuing.
+            </p>
+          )}
+          <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 ${evidenceError ? 'ring-2 ring-red-300 ring-offset-2 rounded-xl p-2' : ''}`}>
+            <EvidenceUpload
+              label="Factory Front View"
+              value={factoryEvidence.frontView}
+              onChange={(photo) => onEvidenceChange('frontView', photo)}
+            />
+            <EvidenceUpload
+              label="Factory Name Board"
+              value={factoryEvidence.nameBoard}
+              onChange={(photo) => onEvidenceChange('nameBoard', photo)}
+            />
+            <EvidenceUpload
+              label="Route Map Photo"
+              value={factoryEvidence.routeMap}
+              onChange={(photo) => onEvidenceChange('routeMap', photo)}
+            />
+          </div>
+        </SectionBlock>
+      </div>
     </div>
   )
 }

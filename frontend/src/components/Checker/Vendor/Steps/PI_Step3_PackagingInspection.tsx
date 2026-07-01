@@ -237,6 +237,12 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
         </p>
       </div>
 
+      {errors.packagingItems && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <p className="text-sm font-semibold text-red-700">{errors.packagingItems}</p>
+        </div>
+      )}
+
       {/* Remark code legend */}
       <div className="flex flex-wrap gap-3 text-xs">
         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-full">

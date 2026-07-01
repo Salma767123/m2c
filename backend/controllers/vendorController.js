@@ -1148,11 +1148,22 @@ const getAllVendors = async (req, res) => {
         const TOTAL_STEPS = 8;
         const visibleStepCount = Array.from({ length: TOTAL_STEPS }, (_, i) => i)
           .filter(i => !isStepSkipped(i)).length;
-        const completedVisibleCount = storedCompletedSteps.filter(i => !isStepSkipped(i)).length;
+
+        // "Review & Submit" (step 7, 0-indexed) is always treated as in-progress
+        // (0.4 partial credit) rather than fully complete. This ensures the admin
+        // list shows the same ~91–93% the vendor form displayed right before the
+        // checker clicked Submit, rather than jumping to 100% on registration alone.
+        const SUBMIT_STEP = 7;
+        const completedExcludingSubmit = storedCompletedSteps.filter(i => i !== SUBMIT_STEP);
+        const submitStepCredit = storedCompletedSteps.includes(SUBMIT_STEP) && !isStepSkipped(SUBMIT_STEP) ? 0.4 : 0;
+        const completedVisibleCount = completedExcludingSubmit.filter(i => !isStepSkipped(i)).length;
+        // inProgressCredit for intermediate steps (vendor hasn't reached submit yet)
         const inProgressCredit =
-          !isStepSkipped(currentStep) && !storedCompletedSteps.includes(currentStep) ? 0.4 : 0;
-        completionPercentage = Math.min(100, Math.round(
-          ((completedVisibleCount + inProgressCredit) / visibleStepCount) * 100
+          currentStep !== SUBMIT_STEP &&
+          !isStepSkipped(currentStep) &&
+          !completedExcludingSubmit.includes(currentStep) ? 0.4 : 0;
+        completionPercentage = Math.min(99, Math.round(
+          ((completedVisibleCount + submitStepCredit + inProgressCredit) / visibleStepCount) * 100
         ));
       } else {
         // Fallback: field-completeness for vendors without stored step data
@@ -1218,12 +1229,25 @@ const getAllVendors = async (req, res) => {
         completionPercentage = Math.round((sectionScores.reduce((sum, s) => sum + s, 0) / sections.length) * 100);
       }
 
+      // Workflow-stage overrides — 100% is reserved for admin approval only.
+      // QC milestones add increments above the registration submission baseline.
+      let finalCompletionPercentage;
+      if (vendor.status === 'APPROVED') {
+        finalCompletionPercentage = 100;
+      } else if (inspections?.[0]?.status === 'COMPLETED') {
+        finalCompletionPercentage = Math.max(completionPercentage, 98);
+      } else if (vendor.assignedQcId) {
+        finalCompletionPercentage = Math.max(completionPercentage, 95);
+      } else {
+        finalCompletionPercentage = completionPercentage;
+      }
+
       return {
         ...rest,
         productCategories: resolveAndClean(vendor.productCategories),
         productTypes: resolveAndClean(vendor.productTypes),
         latestInspection: inspections?.[0] || null,
-        completionPercentage: vendor.status === 'APPROVED' ? 100 : completionPercentage,
+        completionPercentage: finalCompletionPercentage,
         password: undefined,
       };
     });

@@ -52,6 +52,7 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
   const [currentStep, setCurrentStep] = useState<Step>("factoryDetails")
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [checkerCoords, setCheckerCoords] = useState<{ checkerLatitude: number; checkerLongitude: number } | null>(null)
   const [inspectionId, setInspectionId] = useState<string | null>(null)
   const [cycleNumber, setCycleNumber] = useState(1)
   const [previousRejectionReason, setPreviousRejectionReason] = useState<string | null>(null)
@@ -363,6 +364,7 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
             getCurrentCoords()
               .then((coords) => {
                 if (cancelled) return
+                setCheckerCoords(coords)
                 return qcCheckerService.startInspection(inspection.id, coords)
               })
               .catch((startErr: any) => {
@@ -403,7 +405,7 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
   const currentStepIndex = getStepIndex(currentStep)
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [currentStep])
 
   const validateCurrentStep = (): StepErrors => {
@@ -485,9 +487,22 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
       return
     }
 
-    try {
-      setSubmitting(true);
+    setSubmitting(true)
 
+    // Use GPS captured at inspection start; re-fetch only if not available.
+    let coords = checkerCoords
+    if (!coords) {
+      try {
+        coords = await getCurrentCoords()
+        setCheckerCoords(coords)
+      } catch (gpsErr: any) {
+        showErrorToast('Location Required', gpsErr?.message || 'Please enable location services and try again.')
+        setSubmitting(false)
+        return
+      }
+    }
+
+    try {
       // BasicEvidence already converts files to base64 on pick.
       // Here we just strip the raw File objects so the payload is clean JSON,
       // while preserving the named-slot metadata (slotId/label) so the admin
@@ -507,6 +522,8 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
         ...formData,
         factoryPhotos: cleanPhotos,
         documentsUpload: cleanDocs,
+        checkerLatitude: coords.checkerLatitude,
+        checkerLongitude: coords.checkerLongitude,
       }
 
       const res = await qcCheckerService.completeInspection(inspectionId, payload);

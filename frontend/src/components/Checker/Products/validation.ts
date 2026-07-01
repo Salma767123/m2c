@@ -17,9 +17,10 @@ export type AllErrors = Partial<Record<Step, StepErrors>>
 const isBlank = (v: unknown): boolean =>
     v === null || v === undefined || (typeof v === "string" && v.trim() === "")
 
+const notEmptyVal = (val: unknown): boolean =>
+    val !== null && val !== undefined && val !== "" && !(Array.isArray(val) && val.length === 0)
+
 // ── Step 1: General Information ──────────────────────────────────────────────
-// Service type must be selected. Inspection date is auto-populated so
-// it's always present. Client and vendor come from vendor registration data.
 function validateGeneralInformation(d: any): StepErrors {
     const e: StepErrors = {}
     if (isBlank(d.serviceType)) e.serviceType = "Service type is required"
@@ -27,27 +28,97 @@ function validateGeneralInformation(d: any): StepErrors {
 }
 
 // ── Step 2: Product Verification ─────────────────────────────────────────────
-// Verifications are optional — the checker may choose not to verify every
-// field. No required fields. This step never blocks Next.
-function validateProductVerification(_d: any): StepErrors {
-    return {}
+// Computes the set of verification keys that the step renders, so the
+// validator knows exactly which fields the inspector must mark Yes/No.
+export function getExpectedProductVerificationKeys(productData: any): string[] {
+    const p = productData || {}
+    const keys: string[] = []
+
+    if (notEmptyVal(p.name))        keys.push("pv_name")
+    if (notEmptyVal(p.category))    keys.push("pv_category")
+    if (notEmptyVal(p.subCategory)) keys.push("pv_subCategory")
+    if (notEmptyVal(p.baseSku))     keys.push("pv_baseSku")
+    if (notEmptyVal(p.brand))       keys.push("pv_brand")
+    if (notEmptyVal(p.description)) keys.push("pv_description")
+
+    if (Array.isArray(p.images)) {
+        p.images.forEach((_: unknown, i: number) => keys.push(`pv_img_${i}`))
+    }
+
+    if (notEmptyVal(p.fabricType))   keys.push("pv_fabricType")
+    if (notEmptyVal(p.material))     keys.push("pv_material")
+    if (notEmptyVal(p.construction)) keys.push("pv_construction")
+    if (notEmptyVal(p.weight))       keys.push("pv_weight")
+
+    if (Array.isArray(p.variants)) {
+        p.variants.forEach((v: any, vi: number) => {
+            if (notEmptyVal(v.color))       keys.push(`pv_var${vi}_color`)
+            if (notEmptyVal(v.size))        keys.push(`pv_var${vi}_size`)
+            if (notEmptyVal(v.material))    keys.push(`pv_var${vi}_material`)
+            if (notEmptyVal(v.sku))         keys.push(`pv_var${vi}_sku`)
+            if (notEmptyVal(v.variantName)) keys.push(`pv_var${vi}_variantName`)
+        })
+    }
+
+    if (notEmptyVal(p.dimensions)) keys.push("pv_dimensions")
+    if (p.fabricSpecifications && typeof p.fabricSpecifications === "object") {
+        Object.entries(p.fabricSpecifications).forEach(([key, val]) => {
+            if (notEmptyVal(val)) keys.push(`pv_spec_${key}`)
+        })
+    }
+
+    if (notEmptyVal(p.packagingType))     keys.push("pv_packagingType")
+    if (notEmptyVal(p.packagingMaterial)) keys.push("pv_packagingMaterial")
+    if (notEmptyVal(p.packagingDetails))  keys.push("pv_packagingDetails")
+    if (notEmptyVal(p.careLabel))         keys.push("pv_careLabel")
+    if (notEmptyVal(p.countryOfOrigin))   keys.push("pv_countryOfOrigin")
+    if (notEmptyVal(p.labelInfo))         keys.push("pv_labelInfo")
+
+    return keys
+}
+
+function validateProductVerification(d: any): StepErrors {
+    const e: StepErrors = {}
+    const verifications = d.productVerifications || {}
+    const expectedKeys = getExpectedProductVerificationKeys(d.productData)
+
+    const unverified = expectedKeys.find(
+        (key) => !verifications[key] || verifications[key].ok === null
+    )
+    if (unverified) {
+        e.productVerifications = "Please verify all product fields before continuing"
+    }
+
+    const photos = Array.isArray(d.productEvidencePhotos) ? d.productEvidencePhotos : []
+    if (photos.length === 0) {
+        e.productEvidencePhotos = "Upload at least one product evidence photo"
+    }
+
+    return e
 }
 
 // ── Step 3: Packaging Inspection ─────────────────────────────────────────────
-// For items that were inspected (verified=true) and have a remark code
-// in the 1–7 range, remarks are mandatory. At least one packaging photo.
 function validatePackagingInspection(d: any): StepErrors {
     const e: StepErrors = {}
     const items: any[] = Array.isArray(d.packagingItems) ? d.packagingItems : []
 
+    // Every item must have a Yes / No answer before proceeding
+    const unanswered = items.find(
+        (item) => item.verified === null || item.verified === undefined
+    )
+    if (unanswered) {
+        e.packagingItems = `Mark "${unanswered.label.split("—")[0].trim()}" as Yes or No before continuing`
+        return e
+    }
+
     for (const item of items) {
         if (item.verified !== true) continue
         if (item.remarkCode === null) {
-            e.packagingItems = `"${item.label.split('—')[0].trim()}" is marked as inspected — select a remark code`
+            e.packagingItems = `"${item.label.split("—")[0].trim()}" is marked as inspected — select a remark code`
             break
         }
         if (item.remarkCode <= 7 && isBlank(item.remarks)) {
-            e.packagingItems = `"${item.label.split('—')[0].trim()}" (code ${item.remarkCode}) requires remarks`
+            e.packagingItems = `"${item.label.split("—")[0].trim()}" (code ${item.remarkCode}) requires remarks`
             break
         }
     }
@@ -59,15 +130,15 @@ function validatePackagingInspection(d: any): StepErrors {
 }
 
 // ── Step 4: Defects ──────────────────────────────────────────────────────────
-// Intentionally lenient: zero-defect inspections are legitimate and the
-// counts default to 0, so this step never blocks Next.
+// All defect fields have sensible numeric defaults (zero defects is a valid
+// result), so this step never blocks Next.
 function validateDefects(_d: any): StepErrors {
     return {}
 }
 
 // ── Step 5: Testing ──────────────────────────────────────────────────────────
-// Light validation: if a test has been decided (pass or fail is set),
-// the corresponding photo is required. Un-decided tests are allowed.
+// Every test must have a Pass or Fail decision. Once decided, the
+// corresponding photo is required.
 function validateTesting(d: any): StepErrors {
     const e: StepErrors = {}
     const groups: any[] = Array.isArray(d.testGroups) ? d.testGroups : []
@@ -75,12 +146,16 @@ function validateTesting(d: any): StepErrors {
     for (const group of groups) {
         const tests: any[] = Array.isArray(group.tests) ? group.tests : []
         for (const t of tests) {
+            if (t.pass !== true && t.fail !== true) {
+                e.testGroups = `"${t.label}" — select Pass or Fail before continuing`
+                return e
+            }
             if (t.pass === true && (!Array.isArray(t.rightPhotos) || t.rightPhotos.length === 0)) {
-                e.testGroups = `"${t.label}" passed — upload at least one correct/right photo`
+                e.testGroups = `"${t.label}" passed — upload at least one correct photo`
                 return e
             }
             if (t.fail === true && (!Array.isArray(t.wrongPhotos) || t.wrongPhotos.length === 0)) {
-                e.testGroups = `"${t.label}" failed — upload at least one wrong/incorrect photo`
+                e.testGroups = `"${t.label}" failed — upload at least one wrong photo`
                 return e
             }
         }
@@ -90,7 +165,6 @@ function validateTesting(d: any): StepErrors {
 }
 
 // ── Step 6: Review ───────────────────────────────────────────────────────────
-// Final decision must be set; rejected inspections require remarks.
 function validateReview(d: any): StepErrors {
     const e: StepErrors = {}
     if (d.finalDecision !== "Approved" && d.finalDecision !== "Rejected") {
@@ -103,7 +177,6 @@ function validateReview(d: any): StepErrors {
 }
 
 // ── Step 7: Documentation ────────────────────────────────────────────────────
-// At least one signed document (scan or digital report) + inspection status.
 function validateDocumentation(d: any): StepErrors {
     const e: StepErrors = {}
     const signedScans = Array.isArray(d.signedDocuments) ? d.signedDocuments : []

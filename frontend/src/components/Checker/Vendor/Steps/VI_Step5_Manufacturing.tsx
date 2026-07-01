@@ -136,21 +136,7 @@ export default function VI_Step5_Manufacturing({ vendor: v, verifications, onCha
         )}
       </SectionBlock>
 
-      {/* Disabled Facilities (informational) */}
-      {Object.keys(FACILITY_META).filter(f => !enabledFacilities[f]).length > 0 && (
-        <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-4">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Facilities Not Declared</p>
-          <div className="flex flex-wrap gap-2">
-            {Object.keys(FACILITY_META)
-              .filter(f => !enabledFacilities[f])
-              .map(f => (
-                <span key={f} className="px-2.5 py-0.5 text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded-full">
-                  {FACILITY_META[f].label}
-                </span>
-              ))}
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

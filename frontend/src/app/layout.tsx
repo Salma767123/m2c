@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/UI/Toaster";
 import PageTracker from "@/components/Analytics/PageTracker";
 import { ExchangeRateLoader } from "@/components/Shared/ExchangeRateLoader";
+import DocViewerProvider from "@/components/Shared/DocViewerProvider";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -54,6 +55,7 @@ export default function RootLayout({
         <ExchangeRateLoader />
         {children}
         <Toaster />
+        <DocViewerProvider />
       </body>
     </html>
   );

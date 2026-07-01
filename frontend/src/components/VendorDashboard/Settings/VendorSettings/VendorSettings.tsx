@@ -367,7 +367,7 @@ function DocsGrid({ heading, docs }: { heading: string; docs: any[] }) {
                     <span className="text-[10px] text-slate-400 truncate">{uploaded}</span>
                   ) : <span />}
                   {doc.documentUrl && (
-                    <button type="button" onClick={() => openDoc(doc.documentUrl)} className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-brand-600 hover:text-brand-700" title="View / Download">
+                    <button type="button" onClick={() => openDoc(doc.documentUrl, doc.name)} className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-bold text-brand-600 hover:text-brand-700" title="View / Download">
                       <Download className="w-3 h-3" /> View
                     </button>
                   )}
@@ -826,7 +826,7 @@ function CertificationsSection({
                 ) : (
                   <>
                     {cert.documentUrl && (
-                      <button type="button" onClick={() => openDoc(cert.documentUrl)} className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1">
+                      <button type="button" onClick={() => openDoc(cert.documentUrl, cert.name)} className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1">
                         <FileText className="w-3.5 h-3.5" /> View File
                       </button>
                     )}

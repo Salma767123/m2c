@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/UI/Button'
@@ -34,7 +34,8 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  Camera,
 } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/UI/Table'
 import Dropdown from '@/components/UI/Dropdown'
@@ -47,7 +48,7 @@ import DeleteConfirmModal from '@/components/UI/DeleteConfirmModal'
 import { hasPermission } from '@/lib/auth'
 import { getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
 import { buildFullName } from '@/lib/utils'
-import { openDoc, downloadDoc } from '@/lib/docDownload'
+import { openDoc, downloadDoc, isDocImageUrl } from '@/lib/docDownload'
 
 interface VendorViewProps {
   vendorId: string
@@ -1332,7 +1333,7 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                   </div>
                   {cert.documentUrl && (
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openDoc(cert.documentUrl!)}>
+                      <Button variant="outline" size="sm" onClick={() => openDoc(cert.documentUrl!, cert.name || 'Certificate')}>
                         <Eye className="h-4 w-4 mr-2" />
                         View
                       </Button>
@@ -1394,45 +1395,229 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
   )
 }
 
-function DocumentsTab({ vendor }: { vendor: VendorProfile }) {
+// ── Document type metadata ────────────────────────────────────────────────────
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  GST_CERTIFICATE:      'GST Certificate',
+  PAN_CARD:             'PAN Card',
+  COMPANY_REGISTRATION: 'Company Registration Certificate',
+  AADHAAR_CARD:         'Aadhaar Card',
+  IEC_CERTIFICATE:      'IEC Certificate',
+  TRADE_LICENSE:        'Trade License',
+  EXPORT_LICENSE:       'Export License',
+  FACTORY_LICENSE:      'Factory License',
+  POLLUTION_CERTIFICATE:'Pollution Certificate',
+  FIRE_SAFETY_CERTIFICATE: 'Fire Safety Certificate',
+  BANK_STATEMENT:       'Bank Statement',
+  AUDITED_FINANCIALS:   'Audited Financials',
+}
+
+const COMPANY_DOC_TYPES   = ['GST_CERTIFICATE', 'PAN_CARD', 'COMPANY_REGISTRATION', 'AADHAAR_CARD', 'IEC_CERTIFICATE', 'TRADE_LICENSE']
+const COMPLIANCE_DOC_TYPES = ['EXPORT_LICENSE', 'FACTORY_LICENSE', 'POLLUTION_CERTIFICATE', 'FIRE_SAFETY_CERTIFICATE']
+const BANK_DOC_TYPES      = ['BANK_STATEMENT', 'AUDITED_FINANCIALS']
+const ALL_KNOWN_TYPES     = new Set([...COMPANY_DOC_TYPES, ...COMPLIANCE_DOC_TYPES, ...BANK_DOC_TYPES, 'OTHER'])
+
+function docTypeLabel(type: string): string {
+  return DOC_TYPE_LABELS[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function DocFileIcon({ name }: { name?: string }) {
+  const ext = (name || '').split('.').pop()?.toLowerCase() || ''
+  if (ext === 'pdf') return (
+    <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-red-50 border border-red-100">
+      <FileText className="w-5 h-5 text-red-500" />
+    </div>
+  )
+  if (['doc', 'docx'].includes(ext)) return (
+    <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-blue-50 border border-blue-100">
+      <FileText className="w-5 h-5 text-blue-500" />
+    </div>
+  )
+  if (['xls', 'xlsx'].includes(ext)) return (
+    <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-green-50 border border-green-100">
+      <FileText className="w-5 h-5 text-green-600" />
+    </div>
+  )
+  return (
+    <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-50 border border-slate-200">
+      <FileText className="w-5 h-5 text-slate-400" />
+    </div>
+  )
+}
+
+function DocFileCard({ doc }: { doc: any }) {
+  const label    = docTypeLabel(doc.type || '')
+  const fileName = doc.name || 'Document'
+  const date     = doc.createdAt || doc.uploadDate
+
+  return (
+    <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors">
+      <DocFileIcon name={fileName} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-900 truncate">{label}</p>
+        <p className="text-xs text-gray-500 truncate">{fileName}</p>
+        {date && (
+          <p className="text-xs text-gray-400">
+            {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </p>
+        )}
+      </div>
+      {doc.documentUrl && (
+        <div className="flex flex-col gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openDoc(doc.documentUrl, label)}
+            className="h-7 px-2.5 text-xs text-brand-600 hover:text-brand-700 hover:bg-brand-50"
+          >
+            <Eye className="w-3 h-3 mr-1" />
+            View
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => downloadDoc(doc.documentUrl, fileName)}
+            className="h-7 px-2.5 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+          >
+            <Download className="w-3 h-3 mr-1" />
+            Download
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DocSection({ title, docs, icon }: { title: string; docs: any[]; icon: ReactNode }) {
+  if (!docs.length) return null
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Uploaded Documents</CardTitle>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm font-bold text-gray-900">
+          {icon}
+          {title}
+          <Badge className="ml-auto bg-gray-100 text-gray-600 border-0 font-medium text-xs">{docs.length}</Badge>
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        {vendor.documents && vendor.documents.length > 0 ? (
-          <div className="space-y-4">
-            {vendor.documents.map((doc, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <FileText className="h-8 w-8 text-gray-400" />
-                  <div>
-                    <p className="font-medium">{doc.type}</p>
-                    <p className="text-sm text-gray-600">{doc.name}</p>
-                    <p className="text-xs text-gray-500">Uploaded: {new Date(doc.createdAt || doc.uploadDate).toLocaleDateString()}</p>
-                  </div>
-                </div>
-                {doc.documentUrl && (
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openDoc(doc.documentUrl!)}>
-                      <Eye className="h-4 w-4 mr-2" />
-                      View
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => downloadDoc(doc.documentUrl!, doc.name || doc.type || 'Document')}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 text-center py-8">No documents uploaded yet.</p>
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {docs.map((doc, i) => <DocFileCard key={doc.id || i} doc={doc} />)}
+        </div>
       </CardContent>
     </Card>
+  )
+}
+
+function ImageSection({ images }: { images: any[] }) {
+  if (!images.length) return null
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm font-bold text-gray-900">
+          <Camera className="w-4 h-4 text-brand-500" />
+          Factory &amp; Warehouse Images
+          <Badge className="ml-auto bg-gray-100 text-gray-600 border-0 font-medium text-xs">{images.length}</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {images.map((img, i) => {
+            const name = img.name || 'Factory Image'
+            const date = img.createdAt || img.uploadDate
+            return (
+              <div key={img.id || i} className="space-y-1.5">
+                <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50 aspect-square">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.documentUrl} alt={name} className="w-full h-full object-cover" />
+                </div>
+                <p className="text-xs font-semibold text-gray-700 truncate" title={name}>{name}</p>
+                {date && (
+                  <p className="text-[10px] text-gray-400">
+                    {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </p>
+                )}
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openDoc(img.documentUrl, name)}
+                    className="flex-1 h-6 px-1.5 text-[10px] font-medium"
+                  >
+                    <Eye className="w-3 h-3 mr-0.5" />
+                    View
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadDoc(img.documentUrl, name)}
+                    className="flex-1 h-6 px-1.5 text-[10px] font-medium"
+                  >
+                    <Download className="w-3 h-3 mr-0.5" />
+                    Save
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function DocumentsTab({ vendor }: { vendor: VendorProfile }) {
+  const docs: any[] = Array.isArray(vendor.documents) ? vendor.documents : []
+
+  const companyDocs    = docs.filter(d => COMPANY_DOC_TYPES.includes(d.type))
+  const complianceDocs = docs.filter(d => COMPLIANCE_DOC_TYPES.includes(d.type))
+  const bankDocs       = docs.filter(d => BANK_DOC_TYPES.includes(d.type))
+  const otherDocs      = docs.filter(d => d.type === 'OTHER')
+  const factoryImages  = otherDocs.filter(d => isDocImageUrl(d.documentUrl, d.name))
+  const factoryFiles   = otherDocs.filter(d => !isDocImageUrl(d.documentUrl, d.name))
+  const unknownDocs    = docs.filter(d => !ALL_KNOWN_TYPES.has(d.type))
+
+  if (!docs.length) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <FileText className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <p className="text-gray-500 font-medium">No documents uploaded yet.</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <DocSection
+        title="Company Documents"
+        docs={companyDocs}
+        icon={<Building2 className="w-4 h-4 text-brand-500" />}
+      />
+      <ImageSection images={factoryImages} />
+      <DocSection
+        title="Factory & Warehouse Files"
+        docs={factoryFiles}
+        icon={<Factory className="w-4 h-4 text-amber-500" />}
+      />
+      <DocSection
+        title="Compliance Certificates"
+        docs={complianceDocs}
+        icon={<Award className="w-4 h-4 text-purple-500" />}
+      />
+      <DocSection
+        title="Bank & Financial Documents"
+        docs={bankDocs}
+        icon={<CreditCard className="w-4 h-4 text-emerald-600" />}
+      />
+      {unknownDocs.length > 0 && (
+        <DocSection
+          title="Other Documents"
+          docs={unknownDocs}
+          icon={<FileText className="w-4 h-4 text-gray-400" />}
+        />
+      )}
+    </div>
   )
 }
 

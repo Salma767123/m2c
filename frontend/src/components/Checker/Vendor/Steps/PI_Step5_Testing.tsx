@@ -499,6 +499,12 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
         </p>
       </div>
 
+      {errors.testGroups && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <p className="text-sm font-semibold text-red-700">{errors.testGroups}</p>
+        </div>
+      )}
+
       {/* Summary strip */}
       {totalDone > 0 && (
         <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm">

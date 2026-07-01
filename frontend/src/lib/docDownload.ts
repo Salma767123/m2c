@@ -1,3 +1,5 @@
+import { docViewerBus } from './docViewerBus'
+
 const MIME_TO_EXT: Record<string, string> = {
   'application/pdf': '.pdf',
   'application/msword': '.doc',
@@ -12,8 +14,25 @@ const MIME_TO_EXT: Record<string, string> = {
   'image/bmp': '.bmp',
 }
 
+const EXT_TO_MIME: Record<string, string> = {
+  '.pdf':  'application/pdf',
+  '.doc':  'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls':  'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.ppt':  'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.png':  'image/png',
+  '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif':  'image/gif',
+  '.webp': 'image/webp',
+  '.bmp':  'image/bmp',
+  '.svg':  'image/svg+xml',
+}
+
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i
-const DOC_EXT   = /\.(pdf|docx?|xlsx?|pptx?|txt|csv|rtf)(\?|$)/i
+const DOC_EXT   = /\.(pdf|docx?|xlsx?|pptx?|txt|csv|rtf|zip)(\?|$)/i
 
 function extFromUrl(url: string): string {
   try {
@@ -23,46 +42,124 @@ function extFromUrl(url: string): string {
   } catch { return '' }
 }
 
-/**
- * Open a document inline in a new tab.
- * Fetches the file as a blob first so the browser always shows it inline,
- * bypassing any server-side Content-Disposition: attachment header (which
- * Cloudinary sets by default on raw resources, causing PDFs to download as
- * extensionless files that the OS cannot open).
- */
-export async function openDoc(url: string): Promise<void> {
-  try {
-    const res = await fetch(url)
-    const blob = await res.blob()
-    const blobUrl = URL.createObjectURL(blob)
-    window.open(blobUrl, '_blank', 'noopener,noreferrer')
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
-  } catch {
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
+function isCloudinaryUrl(url: string): boolean {
+  try { return /^res\.cloudinary\.com$/i.test(new URL(url).hostname) } catch { return false }
 }
 
 /**
- * Download a document with the correct filename and file extension.
- * Extension is inferred from the URL path first, then from the blob MIME type
- * as a fallback (handles Cloudinary URLs whose public_id has no extension).
- * Falls back to opening in a new tab on CORS / network failure.
+ * Returns the backend proxy URL for a Cloudinary document.
+ *
+ * The proxy fetches the file server-side (no CORS restriction) and re-serves
+ * it with the correct Content-Type and Content-Disposition header.
+ *
+ * query params:
+ *   url      – encoded Cloudinary URL
+ *   download – "true" to force attachment download
+ *   name     – suggested filename (including extension) for the download
  */
-export async function downloadDoc(url: string, name: string): Promise<void> {
-  try {
-    const res = await fetch(url)
-    const blob = await res.blob()
-    const ext = extFromUrl(url) || (MIME_TO_EXT[blob.type] ?? '')
-    const filename = ext && !name.toLowerCase().endsWith(ext) ? name + ext : name
-    const blobUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = blobUrl
-    a.download = filename
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
-  } catch {
-    window.open(url, '_blank', 'noopener,noreferrer')
+function cloudinaryProxyUrl(
+  url: string,
+  opts: { download?: boolean; name?: string } = {},
+): string {
+  const base = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api').replace(/\/+$/, '')
+  const params = new URLSearchParams({ url })
+  if (opts.download) params.set('download', 'true')
+  if (opts.name)     params.set('name', opts.name)
+  return `${base}/document-proxy?${params}`
+}
+
+/**
+ * Fetch a non-Cloudinary URL as a Blob.
+ * Throws on non-2xx so the HTML error page is never mistaken for file content.
+ * Re-types the blob when the server returns application/octet-stream.
+ */
+async function safeFetch(url: string): Promise<Blob> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const raw = await res.blob()
+  if (raw.type === 'application/octet-stream' || !raw.type) {
+    const mime = EXT_TO_MIME[extFromUrl(url)]
+    if (mime) return new Blob([raw], { type: mime })
   }
+  return raw
+}
+
+/**
+ * Open a document in a new browser tab.
+ *
+ * Cloudinary raw resources are routed through the backend proxy so the
+ * browser receives Content-Disposition: inline and can display PDFs natively.
+ * The proxy also bypasses any browser CORS restriction on raw Cloudinary URLs.
+ *
+ * Non-Cloudinary URLs are fetched directly as a blob (to override any
+ * server-side attachment disposition), with a direct-open fallback.
+ */
+function nameFromUrl(url: string): string {
+  try {
+    const raw = new URL(url).pathname.split('/').pop() || 'Document'
+    return decodeURIComponent(raw.split('?')[0])
+  } catch { return 'Document' }
+}
+
+/**
+ * Open a document in the in-app viewer modal.
+ * The optional `name` param is shown as the modal title and used as the
+ * download filename — pass it whenever you have a human-readable filename.
+ */
+export function openDoc(url: string, name?: string): void {
+  if (!url) return
+  docViewerBus.open(url, name || nameFromUrl(url))
+}
+
+/**
+ * Trigger a file download with the correct filename and extension.
+ *
+ * Cloudinary raw resources are routed through the backend proxy which sets
+ * Content-Disposition: attachment; filename="<name>" and streams the file.
+ * This avoids CORS issues and preserves the original filename and extension.
+ *
+ * Non-Cloudinary URLs are fetched as blobs so the `download` attribute is
+ * honoured by the browser (cross-origin links ignore it).
+ */
+export function downloadDoc(url: string, name: string): void {
+  if (!url) return
+
+  if (isCloudinaryUrl(url)) {
+    // Route through the backend proxy (avoids CORS on Cloudinary raw resources).
+    // Fetch as a blob so the download triggers silently — no new tab opened.
+    const ext = extFromUrl(url)
+    const filename = ext && !name.toLowerCase().endsWith(ext) ? `${name}${ext}` : name
+    const proxyUrl = cloudinaryProxyUrl(url, { download: true, name: filename })
+    safeFetch(proxyUrl)
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1_000)
+      })
+      .catch(() => window.open(proxyUrl, '_blank', 'noopener,noreferrer'))
+    return
+  }
+
+  // Non-Cloudinary: blob fetch preserves filename via the download attribute
+  safeFetch(url)
+    .then(blob => {
+      const ext = extFromUrl(url) || (MIME_TO_EXT[blob.type] ?? '')
+      const filename = ext && !name.toLowerCase().endsWith(ext) ? `${name}${ext}` : name
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1_000)
+    })
+    .catch(() => window.open(url, '_blank', 'noopener,noreferrer'))
 }
 
 /**
@@ -85,17 +182,14 @@ export async function downloadDoc(url: string, name: string): Promise<void> {
 export function isDocImageUrl(url?: string, name?: string): boolean {
   if (!url) return false
 
-  // 1–2. Filename check (most reliable — the vendor chose the original filename)
   if (name) {
     if (DOC_EXT.test(name)) return false
     if (IMAGE_EXT.test(name)) return true
   }
 
-  // 3–4. URL extension check
   if (DOC_EXT.test(url)) return false
   if (IMAGE_EXT.test(url)) return true
 
-  // 5–6. Cloudinary path type check (for extension-less public_ids)
   try {
     const pathname = new URL(url).pathname
     if (/\/raw\/upload\//.test(pathname)) return false
