@@ -236,6 +236,8 @@ app.get("/api/document-proxy", async (req, res) => {
     typeof name === "string" && name
       ? name
       : decodeURIComponent(parsed.pathname.split("/").pop() || "document");
+  // Content-Disposition filename must be ASCII printable (Node.js throws ERR_INVALID_CHAR otherwise)
+  const safeFilename = filename.replace(/[^\x20-\x7E]/g, '_');
   const mimeMap = {
     pdf: "application/pdf", doc: "application/msword",
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -249,7 +251,7 @@ app.get("/api/document-proxy", async (req, res) => {
   const sendBuffer = (buffer, contentType) => {
     res.set("Content-Type", contentType);
     res.set("Content-Disposition", isDownload
-      ? `attachment; filename="${filename}"`
+      ? `attachment; filename="${safeFilename}"`
       : "inline"
     );
     res.send(buffer);
