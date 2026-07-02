@@ -106,6 +106,7 @@ interface Props {
     testGroups: TestGroup[]
     additionalEvidence: Record<string, any[]>
     inspectionStatus: string
+    inspectorSignature?: string
   }
   setFormData: (d: any) => void
   onEditStep: (stepId: string) => void
