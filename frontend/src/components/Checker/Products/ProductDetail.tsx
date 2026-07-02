@@ -23,6 +23,7 @@ import {
     History,
 } from "lucide-react"
 import { qcCheckerService } from "@/services/qcCheckerService"
+import { CareIcon, CARE_INSTRUCTIONS, CATEGORY_COLORS, CATEGORY_BORDER } from "@/components/VendorDashboard/Products/CareInstructionModal"
 
 interface ProductDetailProps {
     productId: string
@@ -362,9 +363,16 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
             </div>
             <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <Section title="Product">
+                    <Row icon={<Package className="w-4 h-4" />} label="Product Name" value={product.name} />
+                    {product.description && (
+                        <Row
+                            icon={<FileText className="w-4 h-4" />}
+                            label="Description"
+                            value={<p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{product.description}</p>}
+                        />
+                    )}
                     <Row icon={<Package className="w-4 h-4" />} label="Category" value={product.category} />
                     <Row icon={<Layers className="w-4 h-4" />} label="Sub-category" value={product.subCategory} />
-                    <Row icon={<IndianRupee className="w-4 h-4" />} label="Base Price" value={formatCurrency(product.basePrice)} />
                     <Row icon={<Package className="w-4 h-4" />} label="Total Stock" value={String(product.totalStock ?? 0)} />
                     {product.uom && <Row icon={<Package className="w-4 h-4" />} label="Selling Unit (UOM)" value={product.uom} />}
                     {product.dimensions && <Row icon={<Layers className="w-4 h-4" />} label="Display Dimensions" value={product.dimensionUnit ? `${product.dimensions} ${product.dimensionUnit}` : product.dimensions} />}
@@ -403,20 +411,34 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                                 {product.material && <Row icon={<Layers className="w-4 h-4" />} label="Material Description" value={product.material} />}
                                 {fs?.composition != null && <Row icon={<Layers className="w-4 h-4" />} label="Composition" value={String(fs.composition)} />}
                                 {fs?.weight != null && <Row icon={<Layers className="w-4 h-4" />} label="Weight (GSM)" value={String(fs.weight)} />}
-                                {fs?.weave != null && <Row icon={<Layers className="w-4 h-4" />} label="Weave" value={String(fs.weave)} />}
+                                {fs?.weave != null && <Row icon={<Layers className="w-4 h-4" />} label="Type of Weave" value={String(fs.weave)} />}
                                 {fs?.finish != null && <Row icon={<Layers className="w-4 h-4" />} label="Finish" value={String(fs.finish)} />}
                                 {careInstructions.length > 0 && (
-                                    <Row
-                                        icon={<FileText className="w-4 h-4" />}
-                                        label="Care Instructions"
-                                        value={
-                                            <ul className="list-disc list-inside space-y-0.5 mt-0.5">
-                                                {careInstructions.map((inst, i) => (
-                                                    <li key={i} className="text-sm text-slate-700">{inst}</li>
-                                                ))}
-                                            </ul>
-                                        }
-                                    />
+                                    <div className="sm:col-span-2 py-2">
+                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Care Instructions</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {careInstructions.map((inst, i) => {
+                                                const item = CARE_INSTRUCTIONS.find(c => c.label === inst)
+                                                if (item) {
+                                                    const iconColor = CATEGORY_COLORS[item.category] || 'text-slate-500'
+                                                    const cardStyle = CATEGORY_BORDER[item.category] || 'border-slate-200 bg-slate-50 text-slate-700'
+                                                    return (
+                                                        <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 ${cardStyle}`}>
+                                                            <div className={`flex-shrink-0 ${iconColor}`}>
+                                                                <CareIcon paths={item.paths} className="w-6 h-6" />
+                                                            </div>
+                                                            <span className="text-xs font-medium leading-tight">{inst}</span>
+                                                        </div>
+                                                    )
+                                                }
+                                                return (
+                                                    <div key={i} className="flex items-center px-3 py-2 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-700">
+                                                        <span className="text-xs font-medium leading-tight">{inst}</span>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </Section>
@@ -466,13 +488,6 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                     </div>
                 )}
 
-                {product.description && (
-                    <div className="sm:col-span-2">
-                        <Section title="Description">
-                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{product.description}</p>
-                        </Section>
-                    </div>
-                )}
                 {product.rejectionReason && (
                     <div className="sm:col-span-2">
                         <Section title="Rejection Reason">
@@ -553,18 +568,15 @@ function ImagesTab({
                                 <tr className="bg-slate-50 text-left text-xs text-slate-600 uppercase tracking-wide">
                                     <th className="px-3 py-2 rounded-l-lg w-16">Image</th>
                                     <th className="px-3 py-2">Variant</th>
-                                    <th className="px-3 py-2">SKU</th>
                                     <th className="px-3 py-2">Size</th>
                                     <th className="px-3 py-2">Color</th>
-                                    <th className="px-3 py-2">Price</th>
-                                    <th className="px-3 py-2">Stock</th>
-                                    <th className="px-3 py-2 rounded-r-lg">Low Stock Alert</th>
+                                    <th className="px-3 py-2 rounded-r-lg">Stock</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {variants.map((v) => {
                                     const thumb = variantThumb(v)
-                                    const caption = `${v.sku} — ${[v.variantName, v.size, v.color].filter(Boolean).join(' / ') || 'Variant'}`
+                                    const caption = [v.variantName, v.size, v.color].filter(Boolean).join(' / ') || 'Variant'
                                     return (
                                         <tr key={v.id} className="border-b border-slate-100 last:border-0 align-middle">
                                             <td className="px-3 py-2">
@@ -591,7 +603,6 @@ function ImagesTab({
                                                 )}
                                             </td>
                                             <td className="px-3 py-2 font-medium text-slate-700">{v.variantName?.trim() || '—'}</td>
-                                            <td className="px-3 py-2 font-mono text-xs">{v.sku}</td>
                                             <td className="px-3 py-2">{v.size || '—'}</td>
                                             <td className="px-3 py-2">
                                                 <span className="inline-flex items-center gap-1.5">
@@ -604,11 +615,7 @@ function ImagesTab({
                                                     {v.color}
                                                 </span>
                                             </td>
-                                            <td className="px-3 py-2">{formatCurrency(v.price)}</td>
                                             <td className="px-3 py-2">{v.stock}</td>
-                                            <td className="px-3 py-2">
-                                                {v.lowStockThreshold != null ? v.lowStockThreshold : '—'}
-                                            </td>
                                         </tr>
                                     )
                                 })}
