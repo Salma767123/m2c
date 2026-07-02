@@ -18,6 +18,7 @@ import VendorDocumentation from './VendorDocumentation'
 import type { VendorDocData } from './VendorDocumentation'
 
 import qcCheckerService from '@/services/qcCheckerService'
+import { formatCheckerName } from '@/lib/checkerUtils'
 import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 
 interface Props {
@@ -30,7 +31,7 @@ const STEPS = [
   { id: 1, label: 'Company Info',    short: '1' },
   { id: 2, label: 'Warehouse',       short: '2' },
   { id: 3, label: 'Owner',           short: '3' },
-  { id: 4, label: 'Vendor & Prods',  short: '4' },
+  { id: 4, label: 'Vendor & Products', short: '4' },
   { id: 5, label: 'Manufacturing',   short: '5' },
   { id: 6, label: 'Certifications',  short: '6' },
   { id: 7, label: 'Contact & Trade', short: '7' },
@@ -197,7 +198,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
       try {
         const cached = qcCheckerService.getCheckerData?.()
         if (cached?.name && !cancelled) {
-          setMeta(prev => ({ ...prev, inspectorName: prev.inspectorName || cached.name }))
+          setMeta(prev => ({ ...prev, inspectorName: prev.inspectorName || formatCheckerName(cached) }))
         }
 
         const [vendorRes, inspRes] = await Promise.all([
@@ -206,7 +207,14 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
         ])
         if (cancelled) return
 
-        if (vendorRes.success) setVendor(vendorRes.data.vendor)
+        if (vendorRes.success) {
+          setVendor(vendorRes.data.vendor)
+          // Overwrite inspectorName with the current name from DB (picks up admin edits)
+          const liveQc = vendorRes.data.vendor?.assignedQc
+          if (liveQc) {
+            setMeta(prev => ({ ...prev, inspectorName: formatCheckerName(liveQc) }))
+          }
+        }
 
         let insp = inspRes?.inspection
 
@@ -387,6 +395,7 @@ export default function VendorInspectionForm({ vendorId, vendorName, onComplete 
         cycleNumber,
         checkerLatitude: coords.checkerLatitude,
         checkerLongitude: coords.checkerLongitude,
+        clientSignature: docData.clientSignature || null,
       }
       const res = await qcCheckerService.completeInspection(inspection.id, payload)
       if (res.success) {

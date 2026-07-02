@@ -51,7 +51,7 @@ const getStatusBadge = (status: string) => {
     case 'REJECTION_PENDING':
       return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 font-bold">Rejection Pending</Badge>
     case 'REINSPECTION':
-      return <Badge className="bg-purple-50 text-purple-700 border border-purple-200 font-bold">Re-Inspection</Badge>
+      return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 font-bold">Re-Inspection</Badge>
     case 'SUBMITTED':
       return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-bold">Submitted</Badge>
     default:
@@ -371,9 +371,19 @@ export default function VendorsTable() {
     <div className="space-y-6">
 
       {/* ── 1. Page Header ── */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Vendors Management</h1>
-        <p className="text-slate-500 mt-0.5">Manage registered vendors and their approval workflow.</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Vendors Management</h1>
+          <p className="text-slate-500 mt-0.5">Manage registered vendors and their approval workflow.</p>
+        </div>
+        {hasPermission('create_vendors') && (
+          <Link href="/admin/dashboard/vendors/add" className="shrink-0">
+            <button className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2 px-4 rounded-xl transition-colors shadow-xs shadow-brand-500/10 text-sm whitespace-nowrap">
+              <Plus className="h-4 w-4" />
+              Add Vendor
+            </button>
+          </Link>
+        )}
       </div>
 
       {/* ── 2. Metric Cards ── */}
@@ -410,8 +420,8 @@ export default function VendorsTable() {
 
       {/* ── 3. Filter Toolbar ── */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-[160px] max-w-[260px] flex-1 relative">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 relative min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 pointer-events-none" />
             <input
               type="text"
@@ -422,38 +432,32 @@ export default function VendorsTable() {
               className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 focus:outline-none w-full transition-all bg-white text-sm"
             />
           </div>
-          <div className="w-44 shrink-0">
-            <Dropdown
-              value={statusFilter}
-              options={[
-                { value: '', label: 'All Status' },
-                { value: 'PENDING', label: 'Pending' },
-                { value: 'UNDER_REVIEW', label: 'Under Review' },
-                { value: 'APPROVED', label: 'Approved' },
-                { value: 'REJECTED', label: 'Rejected' },
-                { value: 'APPROVAL_PENDING', label: 'Approval Pending' },
-                { value: 'REJECTION_PENDING', label: 'Rejection Pending' },
-                { value: 'REINSPECTION', label: 'Re-Inspection' },
-                { value: 'SUSPENDED', label: 'Suspended' },
-              ]}
-              placeholder="All Status"
-              onChange={(value) => handleStatusFilter(value as string)}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-44">
+              <Dropdown
+                value={statusFilter}
+                options={[
+                  { value: '', label: 'All Status' },
+                  { value: 'PENDING', label: 'Pending' },
+                  { value: 'UNDER_REVIEW', label: 'Under Review' },
+                  { value: 'APPROVED', label: 'Approved' },
+                  { value: 'REJECTED', label: 'Rejected' },
+                  { value: 'APPROVAL_PENDING', label: 'Approval Pending' },
+                  { value: 'REJECTION_PENDING', label: 'Rejection Pending' },
+                  { value: 'REINSPECTION', label: 'Re-Inspection' },
+                  { value: 'SUSPENDED', label: 'Suspended' },
+                ]}
+                placeholder="All Status"
+                onChange={(value) => handleStatusFilter(value as string)}
+              />
+            </div>
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              onChange={handleDateChange}
+              placeholder="Join Date"
             />
           </div>
-          <DateRangeCalendar
-            from={dateFrom}
-            to={dateTo}
-            onChange={handleDateChange}
-            placeholder="Join Date"
-          />
-          {hasPermission('create_vendors') && (
-            <Link href="/admin/dashboard/vendors/add" className="shrink-0 ml-auto">
-              <button className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2 px-4 rounded-xl transition-colors shadow-xs shadow-brand-500/10 text-sm whitespace-nowrap">
-                <Plus className="h-4 w-4" />
-                Add Vendor
-              </button>
-            </Link>
-          )}
         </div>
       </div>
 
@@ -481,8 +485,8 @@ export default function VendorsTable() {
           <>
             <div className="overflow-x-auto scrollbar-none">
               <Table>
-                <TableHeader className="!bg-slate-50/80 [&_tr]:border-b [&_tr]:border-slate-100">
-                  <TableRow className="!bg-slate-50/80 hover:!bg-slate-50/80">
+                <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
+                  <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
                     <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap">Vendor</TableHead>
                     <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap">Location</TableHead>
                     <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap">Status</TableHead>

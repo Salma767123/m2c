@@ -13,6 +13,7 @@ import { showSuccessToast, showErrorToast } from '@/lib/toast-utils'
 import { adminProductService } from '@/services/adminProductService'
 import qcCheckerService from '@/services/qcCheckerService'
 import { hasPermission } from '@/lib/auth'
+import { formatCheckerName } from '@/lib/checkerUtils'
 
 interface VendorProductRequest {
   id: string
@@ -955,7 +956,7 @@ export default function VendorProductRequests() {
                 >
                   <option value="">Select a QC Checker</option>
                   {qcCheckers.map(qc => (
-                    <option key={qc.id} value={qc.id}>{qc.name}</option>
+                    <option key={qc.id} value={qc.id}>{formatCheckerName(qc)}</option>
                   ))}
                 </select>
               </div>

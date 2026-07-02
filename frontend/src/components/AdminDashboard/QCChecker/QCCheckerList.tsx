@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import Dropdown from "../../UI/Dropdown";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
+import { formatCheckerName } from "@/lib/checkerUtils";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import { hasPermission } from "@/lib/auth";
 import DeleteConfirmModal from "../../UI/DeleteConfirmModal";
@@ -249,7 +250,7 @@ export default function QCCheckerList() {
                   <TableRow key={checker.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium text-gray-900">{checker.name}</div>
+                        <div className="font-medium text-gray-900">{formatCheckerName(checker)}</div>
                         <div className="text-sm text-blue-600 font-mono">{checker.checkerId}</div>
                       </div>
                     </TableCell>
@@ -317,7 +318,7 @@ export default function QCCheckerList() {
                         )}
                         {hasPermission('delete_qc_checkers') && (
                           <button
-                            onClick={() => handleDeleteClick(checker.id, checker.name)}
+                            onClick={() => handleDeleteClick(checker.id, formatCheckerName(checker))}
                             disabled={deletingId === checker.id}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete Checker"

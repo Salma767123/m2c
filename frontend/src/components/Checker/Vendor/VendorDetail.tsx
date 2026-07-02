@@ -26,17 +26,18 @@ import {
   Building2,
   ShieldCheck,
   Image as ImageIcon,
-  Download,
+  Eye,
 } from "lucide-react"
 import { Vendor } from "@/types/inspection"
 import qcCheckerService from "@/services/qcCheckerService"
 import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/FormUI"
 import { buildFullName } from "@/lib/utils"
-import { downloadDoc, isDocImageUrl } from "@/lib/docDownload"
+import { isDocImageUrl } from "@/lib/docDownload"
+import DocViewerModal from "@/components/UI/DocViewerModal"
 const MAIN_STATUS_COLORS: Record<string, string> = {
   "New Assignment": "bg-blue-50 text-blue-700 border-blue-200/85",
   "Under Review by Admin": "bg-orange-50 text-orange-700 border-orange-200/85",
-  "Re-Inspection": "bg-purple-50 text-purple-700 border-purple-200/85",
+  "Re-Inspection": "bg-orange-50 text-orange-700 border-orange-200/85",
   "Re-Inspection Under Review by Admin": "bg-amber-50 text-amber-700 border-amber-200/85",
   "Re-Inspection Under Review": "bg-amber-50 text-amber-700 border-amber-200/85",
   "Approved": "bg-emerald-50 text-emerald-700 border-emerald-200/85",
@@ -142,6 +143,7 @@ export default function VendorDetail({
   const [historyLimit, setHistoryLimit] = useState(10)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string } | null>(null)
 
   const loadAll = useCallback(async (limitOverride?: number) => {
     setLoading(true)
@@ -298,7 +300,7 @@ export default function VendorDetail({
       },
       {
         id: "warehouse",
-        title: "Warehouse / Factory Address",
+        title: "Legal Address & Factory Site",
         icon: <Warehouse className="w-5 h-5 text-brand-600" />,
         fields: [
           { key: "ownershipType", label: "Ownership Type", transform: (val: string) => getOwnershipTypeLabel(val) },
@@ -468,8 +470,13 @@ export default function VendorDetail({
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</p>
                 {doc.documentUrl && (
-                  <button type="button" onClick={() => downloadDoc(doc.documentUrl, doc.name)} className="shrink-0 text-brand-600 hover:text-brand-700" title="Download">
-                    <Download className="w-4 h-4" />
+                  <button
+                    type="button"
+                    onClick={() => setViewerDoc({ url: doc.documentUrl, name: doc.name || 'Document' })}
+                    className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors"
+                    title="View"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> View
                   </button>
                 )}
               </div>
@@ -516,14 +523,119 @@ export default function VendorDetail({
               )
             }
           } else if (section.id === "warehouse") {
-            if (factoryImages.length > 0) {
+            // Warehouse Address section (factoryAddress fields — separate from legal address)
+            const vd = fullVendor
+            const vdEq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
+            const vdSameAsLegal = (
+              !vd.factoryAddress && !vd.factoryCity
+            ) || (
+              vdEq(vd.factoryAddress, vd.warehouseAddress) &&
+              vdEq(vd.factoryCity, vd.warehouseCity) &&
+              vdEq(vd.factoryState, vd.warehouseState) &&
+              vdEq(vd.factoryZipCode, vd.warehouseZipCode) &&
+              vdEq(vd.factoryCountry, vd.warehouseCountry)
+            )
+            // Show warehouse sub-section only when legal address data exists
+            const hasWarehouseSection = !!(vd.warehouseAddress || vd.warehouseCity || vd.factoryAddress || vd.factoryCity)
+            const hasFactoryImgs = factoryImages.length > 0
+            if (hasWarehouseSection || hasFactoryImgs) {
               hasCustomData = true
               customContent = (
-                <div className="col-span-full border-t border-slate-100 pt-6 mt-4">
-                  {renderImageStrip(
-                    `Factory Images (${factoryImages.length})`,
-                    <ImageIcon className="w-4.5 h-4.5 text-slate-400" />,
-                    factoryImages,
+                <div className="col-span-full space-y-6 border-t border-slate-100 pt-6 mt-4">
+                  {/* Warehouse Address sub-section */}
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                      <MapPin className="w-4.5 h-4.5 text-slate-400" /> Warehouse Address
+                    </h4>
+                    {vdSameAsLegal ? (
+                      <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800 font-medium">
+                        <MapPin className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                        Warehouse Address is the same as the Legal Address &amp; Factory Site above.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                        {vd.factoryAddress && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Address Line 1</label>
+                            <p className="text-sm font-semibold text-slate-800">{vd.factoryAddress}</p>
+                          </div>
+                        )}
+                        {vd.factoryCity && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">City</label>
+                            <p className="text-sm font-semibold text-slate-800">{vd.factoryCity}</p>
+                          </div>
+                        )}
+                        {vd.factoryState && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">State</label>
+                            <p className="text-sm font-semibold text-slate-800">{vd.factoryState}</p>
+                          </div>
+                        )}
+                        {vd.factoryZipCode && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">ZIP / Postal Code</label>
+                            <p className="text-sm font-semibold text-slate-800">{vd.factoryZipCode}</p>
+                          </div>
+                        )}
+                        {vd.factoryCountry && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Country</label>
+                            <p className="text-sm font-semibold text-slate-800">{vd.factoryCountry}</p>
+                          </div>
+                        )}
+                        {vd.mapLink && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Map / Location Link</label>
+                            <a href={vd.mapLink} target="_blank" rel="noopener noreferrer"
+                              className="text-sm font-semibold text-brand-600 hover:underline flex items-center gap-1">
+                              <Globe className="w-3.5 h-3.5 shrink-0" /> View Map
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {vdSameAsLegal && vd.mapLink && (
+                      <div className="mt-3">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Map / Location Link</label>
+                        <a href={vd.mapLink} target="_blank" rel="noopener noreferrer"
+                          className="text-sm font-semibold text-brand-600 hover:underline flex items-center gap-1">
+                          <Globe className="w-3.5 h-3.5 shrink-0" /> View Map
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Factory images — view-only via DocViewerModal */}
+                  {hasFactoryImgs && (
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
+                        <ImageIcon className="w-4.5 h-4.5 text-slate-400" /> Factory Images ({factoryImages.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-4">
+                        {factoryImages.map((m: any, i: number) => (
+                          <div key={`${m.label}-${i}`} className="group block">
+                            <div className="relative w-28 h-28 rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
+                              <img
+                                src={m.url}
+                                alt={m.label}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setViewerDoc({ url: m.url, name: m.label })}
+                                className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors"
+                              >
+                                <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-black/50 backdrop-blur-sm rounded-lg">
+                                  <Eye className="w-3 h-3" /> View
+                                </span>
+                              </button>
+                            </div>
+                            <p className="text-xs font-semibold text-slate-600 mt-1.5 text-center max-w-28 truncate" title={m.label}>{m.label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )
@@ -662,10 +774,10 @@ export default function VendorDetail({
                             {cert.documentUrl && (
                               <button
                                 type="button"
-                                onClick={() => downloadDoc(cert.documentUrl, cert.name)}
-                                className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1"
+                                onClick={() => setViewerDoc({ url: cert.documentUrl, name: cert.name || 'Certificate' })}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-colors"
                               >
-                                <Download className="w-3.5 h-3.5" /> Download
+                                <Eye className="w-3.5 h-3.5" /> View
                               </button>
                             )}
                           </div>
@@ -857,7 +969,7 @@ export default function VendorDetail({
     )
   }
 
-  return (
+  return (<>
     <div className="pt-2 pb-8 px-6 font-sans">
       {/* Header */}
       <div className="mb-4">
@@ -1169,6 +1281,15 @@ export default function VendorDetail({
         </>
       )}
     </div>
+    {viewerDoc && (
+      <DocViewerModal
+        url={viewerDoc.url}
+        name={viewerDoc.name}
+        readOnly
+        onClose={() => setViewerDoc(null)}
+      />
+    )}
+    </>
   )
 }
 

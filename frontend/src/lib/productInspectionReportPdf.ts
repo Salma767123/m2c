@@ -17,6 +17,7 @@
 // (digitally-signed report). Without it a blank line is drawn for manual signing.
 
 import jsPDF from "jspdf"
+import { formatCheckerName } from "@/lib/checkerUtils"
 import autoTable from "jspdf-autotable"
 
 export interface ReportChecker {
@@ -53,6 +54,10 @@ function fmtDateTime(d: Date) {
         year: "numeric", month: "short", day: "2-digit",
         hour: "2-digit", minute: "2-digit", hour12: true,
     })
+}
+
+function fmtTime(d: Date) {
+    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
 }
 
 function blank(v: unknown): boolean {
@@ -327,27 +332,18 @@ export function generateProductInspectionPdf(
         }
     }
 
-    // ── H. Final Decision ─────────────────────────────────────────────────────
-    sectionTitle("H. Final Decision")
-    runTable(
-        [["Field", "Value"]],
-        [
-            ["Decision", val(formData.finalDecision)],
-            ["Reviewer Remarks", val(formData.reviewerRemarks)],
-        ]
-    )
-
-    // ── I. Inspector Details ──────────────────────────────────────────────────
+    // ── H. Inspector Details ──────────────────────────────────────────────────
     const loc = meta.location
-    sectionTitle("I. Inspector Details")
+    sectionTitle("H. Inspector Details")
     runTable(
         [["Field", "Value"]],
         [
-            ["Inspector Name", val(checker.name || formData.inspectorSignature)],
+            ["Inspector Name", val(formatCheckerName(checker) || formData.inspectorSignature)],
             ["Checker ID", val(checker.checkerId)],
             ["Email", val(checker.email)],
             ["Phone", val(checker.phone)],
             ["Inspection Date", val(formData.serviceStartDate)],
+            ["Inspection Time", fmtTime(generatedAt)],
             ["Inspection Status", val(formData.inspectionStatus)],
             [
                 "GPS Location",
@@ -390,44 +386,56 @@ export function generateProductInspectionPdf(
     }
 
     // ── Signature block ────────────────────────────────────────────────────────
-    ensureSpace(130)
-    y = Math.max(y, pageH - margin - 120)
+    const sig = options.clientSignatureDataUrl
+    ensureSpace(160)
+    y = Math.max(y, pageH - margin - 150)
 
     doc.setDrawColor(...BRAND)
     doc.setLineWidth(0.5)
     doc.line(margin, y, margin + contentW, y)
-    y += 20
+    const blockY = y + 20
 
-    // Left: Inspector
+    // Left: Inspector section (Name + Date + Time)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(10)
     doc.setTextColor(...SLATE)
-    doc.text("Inspector:", margin, y)
+    doc.text("Inspector:", margin, blockY)
     doc.setFont("helvetica", "normal")
-    doc.text(val(checker.name || formData.inspectorSignature), margin + 65, y)
+    doc.text(val(formatCheckerName(checker) || formData.inspectorSignature), margin + 65, blockY)
 
-    // Right: Client Signature
+    doc.setFont("helvetica", "bold")
+    doc.text("Inspection Date:", margin, blockY + 22)
+    doc.setFont("helvetica", "normal")
+    doc.text(val(formData.serviceStartDate), margin + 108, blockY + 22)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Inspection Time:", margin, blockY + 44)
+    doc.setFont("helvetica", "normal")
+    doc.text(fmtTime(generatedAt), margin + 108, blockY + 44)
+
+    // Right: Client Signature section
     const sigX = margin + contentW / 2
     doc.setFont("helvetica", "bold")
-    doc.text("Client Signature:", sigX, y)
+    doc.setFontSize(10)
+    doc.setTextColor(...SLATE)
 
-    const sig = options.clientSignatureDataUrl
     if (sig) {
+        // Digital signed report — "Client Signature:" + embedded image
+        doc.text("Client Signature:", sigX, blockY)
         const sigFmt = /^data:image\/png/i.test(sig) ? "PNG" : "JPEG"
         try {
-            doc.addImage(sig, sigFmt, sigX, y + 8, 150, 50, undefined, "FAST")
+            doc.addImage(sig, sigFmt, sigX, blockY + 8, 150, 50, undefined, "FAST")
         } catch { /* ignore malformed */ }
         doc.setFont("helvetica", "italic")
         doc.setFontSize(8)
         doc.setTextColor(...MUTED)
-        doc.text(`Digitally signed  ·  ${fmtDateTime(generatedAt)}`, sigX, y + 74)
+        doc.text(`Digitally signed  ·  ${fmtDateTime(generatedAt)}`, sigX, blockY + 74)
     } else {
+        // Manual report — "Client Signature & Seal:" + blank line (no "Signature / Date")
+        doc.text("Client Signature & Seal:", sigX, blockY)
         doc.setDrawColor(...MUTED)
-        doc.line(sigX, y + 50, sigX + 180, y + 50)
-        doc.setFont("helvetica", "italic")
-        doc.setFontSize(8)
-        doc.setTextColor(...MUTED)
-        doc.text("Signature / Date", sigX, y + 62)
+        doc.setLineWidth(0.5)
+        doc.line(sigX, blockY + 50, sigX + 180, blockY + 50)
     }
 
     // Inspection Status stamp (bottom-left of signature block)
@@ -437,13 +445,13 @@ export function generateProductInspectionPdf(
             Approved: [22, 163, 74],
             Rejected: [220, 38, 38],
             "On Hold": [202, 138, 4],
-            "Re-Inspection": [37, 99, 235],
+            "Re-Inspection": [234, 88, 12],
         }
         const color: [number, number, number] = statusColors[status] || SLATE
         doc.setFont("helvetica", "bold")
         doc.setFontSize(9)
         doc.setTextColor(...color)
-        doc.text(`Status: ${status}`, margin, y + 50)
+        doc.text(`Status: ${status}`, margin, blockY + 70)
         doc.setTextColor(...SLATE)
     }
 

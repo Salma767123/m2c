@@ -371,25 +371,26 @@ export default function Defects({ formData, setFormData }: DefectsProps) {
       <div>
         <label className="block text-slate-700 font-semibold mb-3">Photo Evidence:</label>
         <p className="text-slate-600 text-sm mb-4">Major/minor defects, sealed samples with AQF tape</p>
-        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
-          <input
-            ref={defectPhotoInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleDefectPhotoUpload}
-            className="hidden"
-          />
-          <button
-            type="button"
-            onClick={() => defectPhotoInputRef.current?.click()}
-            className="flex flex-col items-center justify-center w-full outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-xl"
-          >
-            <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <p className="text-slate-700 font-medium">Upload defect photos</p>
-            <p className="text-slate-500 text-sm mt-1">Drag & drop or click to browse</p>
-          </button>
-        </div>
+        {(formData.defectPhotos || []).length === 0 && (
+          <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
+            <input
+              ref={defectPhotoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleDefectPhotoUpload}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => defectPhotoInputRef.current?.click()}
+              className="flex flex-col items-center justify-center w-full outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-xl"
+            >
+              <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+              <p className="text-slate-700 font-medium">Upload defect photo</p>
+              <p className="text-slate-500 text-sm mt-1">1 photo — click to browse</p>
+            </button>
+          </div>
+        )}
 
         {/* Uploaded Photos List */}
         {formData.defectPhotos && formData.defectPhotos.length > 0 && (

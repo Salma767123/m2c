@@ -37,7 +37,6 @@ export function getExpectedProductVerificationKeys(productData: any): string[] {
     if (notEmptyVal(p.name))        keys.push("pv_name")
     if (notEmptyVal(p.category))    keys.push("pv_category")
     if (notEmptyVal(p.subCategory)) keys.push("pv_subCategory")
-    if (notEmptyVal(p.baseSku))     keys.push("pv_baseSku")
     if (notEmptyVal(p.brand))       keys.push("pv_brand")
     if (notEmptyVal(p.description)) keys.push("pv_description")
 
@@ -49,6 +48,8 @@ export function getExpectedProductVerificationKeys(productData: any): string[] {
     if (notEmptyVal(p.material))     keys.push("pv_material")
     if (notEmptyVal(p.construction)) keys.push("pv_construction")
     if (notEmptyVal(p.weight))       keys.push("pv_weight")
+    if (notEmptyVal(p.dispatchTimeline?.processingDays)) keys.push("pv_processingDays")
+    if (notEmptyVal(p.dispatchTimeline?.shippingDays))   keys.push("pv_shippingDays")
 
     if (Array.isArray(p.variants)) {
         p.variants.forEach((v: any, vi: number) => {
@@ -63,6 +64,7 @@ export function getExpectedProductVerificationKeys(productData: any): string[] {
     if (notEmptyVal(p.dimensions)) keys.push("pv_dimensions")
     if (p.fabricSpecifications && typeof p.fabricSpecifications === "object") {
         Object.entries(p.fabricSpecifications).forEach(([key, val]) => {
+            if (key === 'basis') return
             if (notEmptyVal(val)) keys.push(`pv_spec_${key}`)
         })
     }
@@ -146,16 +148,21 @@ function validateTesting(d: any): StepErrors {
     for (const group of groups) {
         const tests: any[] = Array.isArray(group.tests) ? group.tests : []
         for (const t of tests) {
+            const displayName = t.label || (t.isOther ? "Custom test" : "Unnamed test")
+            if (t.isOther && (isBlank(t.subject) || isBlank(t.label))) {
+                e.testGroups = `Fill in Test Subject and Test Name for the custom test in "${group.label}"`
+                return e
+            }
             if (t.pass !== true && t.fail !== true) {
-                e.testGroups = `"${t.label}" — select Pass or Fail before continuing`
+                e.testGroups = `"${displayName}" — select Pass or Fail before continuing`
                 return e
             }
             if (t.pass === true && (!Array.isArray(t.rightPhotos) || t.rightPhotos.length === 0)) {
-                e.testGroups = `"${t.label}" passed — upload at least one correct photo`
+                e.testGroups = `"${displayName}" passed — upload a correct photo`
                 return e
             }
             if (t.fail === true && (!Array.isArray(t.wrongPhotos) || t.wrongPhotos.length === 0)) {
-                e.testGroups = `"${t.label}" failed — upload at least one wrong photo`
+                e.testGroups = `"${displayName}" failed — upload a wrong photo`
                 return e
             }
         }
@@ -167,11 +174,8 @@ function validateTesting(d: any): StepErrors {
 // ── Step 6: Review ───────────────────────────────────────────────────────────
 function validateReview(d: any): StepErrors {
     const e: StepErrors = {}
-    if (d.finalDecision !== "Approved" && d.finalDecision !== "Rejected") {
-        e.finalDecision = "Select Approved or Rejected"
-    }
-    if (d.finalDecision === "Rejected" && isBlank(d.reviewerRemarks)) {
-        e.reviewerRemarks = "Rejection remarks are required"
+    if (!d.inspectionStatus) {
+        e.inspectionStatus = "Select an inspection status before continuing"
     }
     return e
 }
@@ -183,9 +187,6 @@ function validateDocumentation(d: any): StepErrors {
     const signedReport = Array.isArray(d.signedReport) ? d.signedReport : []
     if (signedScans.length === 0 && signedReport.length === 0) {
         e.signedDocuments = "Upload a signed report, or generate the digitally-signed report"
-    }
-    if (!d.inspectionStatus) {
-        e.inspectionStatus = "Select an inspection status before submitting"
     }
     return e
 }

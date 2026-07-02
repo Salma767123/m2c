@@ -49,6 +49,7 @@ const createQCChecker = async (req, res) => {
     try {
         const {
             name,
+            title,
             email,
             phone,
             address,
@@ -101,6 +102,7 @@ const createQCChecker = async (req, res) => {
                 email,
                 password: hashedPassword,
                 name,
+                title: title || null,
                 phone,
                 address: address || null,
                 city: city || null,
@@ -185,6 +187,7 @@ const getAllQCCheckers = async (req, res) => {
                     checkerId: true,
                     email: true,
                     name: true,
+                    title: true,
                     phone: true,
                     address: true,
                     city: true,
@@ -245,6 +248,7 @@ const getQCCheckerById = async (req, res) => {
                 checkerId: true,
                 email: true,
                 name: true,
+                title: true,
                 phone: true,
                 address: true,
                 city: true,
@@ -299,6 +303,7 @@ const updateQCChecker = async (req, res) => {
         const { id } = req.params;
         const {
             name,
+            title,
             phone,
             address,
             city,
@@ -328,6 +333,7 @@ const updateQCChecker = async (req, res) => {
 
         const updateData = {};
         if (name) updateData.name = name;
+        if (title !== undefined) updateData.title = title || null;
         if (phone) updateData.phone = phone;
         if (address !== undefined) updateData.address = address || null;
         if (city !== undefined) updateData.city = city || null;
@@ -357,6 +363,7 @@ const updateQCChecker = async (req, res) => {
                 checkerId: true,
                 email: true,
                 name: true,
+                title: true,
                 phone: true,
                 address: true,
                 city: true,
@@ -539,6 +546,7 @@ const qcCheckerLogin = async (req, res) => {
                     checkerId: checker.checkerId,
                     email: checker.email,
                     name: checker.name,
+                    title: checker.title,
                     phone: checker.phone,
                     status: checker.status,
                     specialization: checker.specialization,
@@ -569,6 +577,7 @@ const getCheckerProfile = async (req, res) => {
                 checkerId: true,
                 email: true,
                 name: true,
+                title: true,
                 phone: true,
                 address: true,
                 city: true,
@@ -821,7 +830,7 @@ const getVendorDetails = async (req, res) => {
                 documents: true,
                 bankDetails: true,
                 assignedQc: {
-                    select: { name: true, checkerId: true, email: true, phone: true },
+                    select: { name: true, title: true, checkerId: true, email: true, phone: true },
                 },
             },
         });
@@ -959,6 +968,7 @@ const getActiveInspectionForVendor = async (req, res) => {
             cycleNumber: true,
             parentInspectionId: true,
             rejectionReason: true,
+            checker: { select: { name: true, title: true, checkerId: true, email: true, phone: true } },
             vendor: {
                 select: {
                     id: true,
@@ -1552,7 +1562,7 @@ const getProductDetails = async (req, res) => {
                 },
                 images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
                 variants: { orderBy: { createdAt: 'asc' } },
-                assignedQc: { select: { name: true, email: true } },
+                assignedQc: { select: { name: true, title: true, email: true, checkerId: true, phone: true } },
             },
         });
 

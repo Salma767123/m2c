@@ -21,6 +21,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
 } from '@tabler/icons-react';
+import { formatCheckerName } from '@/lib/checkerUtils';
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   SUBMITTED: { label: 'Submitted', className: 'bg-blue-100 text-blue-800' },
@@ -271,7 +272,7 @@ function FactoryTable({
                 {ins.vendor.businessCity && `${ins.vendor.businessCity}, ${ins.vendor.businessState}`}
               </div>
             </td>
-            <td className="px-4 py-3 text-sm text-gray-700">{ins.checker.name}</td>
+            <td className="px-4 py-3 text-sm text-gray-700">{formatCheckerName(ins.checker)}</td>
             <td className="px-4 py-3">{getStatusBadge(ins.status)}</td>
             <td className="px-4 py-3">
               {ins.result === 'PASSED' ? (

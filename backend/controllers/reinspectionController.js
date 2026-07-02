@@ -76,7 +76,7 @@ const getInspectionsForAdminReview = async (req, res) => {
                         rejectionReason: true,
                         createdAt: true,
                         vendor: { select: { id: true, companyName: true, businessCity: true, businessState: true } },
-                        checker: { select: { id: true, name: true, email: true } },
+                        checker: { select: { id: true, name: true, title: true, email: true } },
                     },
                     orderBy: { updatedAt: 'desc' },
                     skip: (page - 1) * limit,
@@ -119,7 +119,7 @@ const getInspectionsForAdminReview = async (req, res) => {
                         updatedAt: true,
                         createdAt: true,
                         vendor: { select: { id: true, companyName: true } },
-                        assignedQc: { select: { id: true, name: true, email: true } },
+                        assignedQc: { select: { id: true, name: true, title: true, email: true } },
                     },
                     orderBy: { updatedAt: 'desc' },
                     skip: (page - 1) * limit,
@@ -240,7 +240,7 @@ const getInspectionAuditTrail = async (req, res) => {
                     submittedAt: true,
                     completedAt: true,
                     createdAt: true,
-                    checker: { select: { id: true, name: true } },
+                    checker: { select: { id: true, name: true, title: true } },
                 },
                 orderBy: { cycleNumber: 'asc' },
             });
@@ -290,7 +290,7 @@ const adminReviewFactoryInspection = async (req, res) => {
             where: { id: inspectionId },
             include: {
                 vendor: { select: { id: true, companyName: true } },
-                checker: { select: { id: true, name: true } },
+                checker: { select: { id: true, name: true, title: true } },
             },
         });
 
@@ -534,7 +534,7 @@ const adminReviewProductInspection = async (req, res) => {
             where: { id: productId },
             include: {
                 vendor: { select: { id: true, companyName: true } },
-                assignedQc: { select: { id: true, name: true } },
+                assignedQc: { select: { id: true, name: true, title: true } },
             },
         });
 

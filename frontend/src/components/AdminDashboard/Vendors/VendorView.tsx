@@ -1016,62 +1016,101 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
         </CardContent>
       </Card>
 
-      {/* Warehouse & Map Details */}
+      {/* Legal Address & Factory Site */}
       {vendor.warehouseAddress && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <MapPin className="h-5 w-5" />
-              <span>Warehouse & Location</span>
+              <span>Legal Address &amp; Factory Site</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {(vendor as any).ownershipType && (
                 <div>
-                  <p className="text-sm text-slate-500 font-semibold mb-1">Facility Ownership</p>
+                  <p className="text-sm text-slate-500 font-semibold mb-1">Ownership Type</p>
                   <p className="font-medium capitalize">{(vendor as any).ownershipType}</p>
                 </div>
               )}
-              {vendor.warehouseAddress ? (
-                <div>
-                  <p className="text-sm text-slate-500 font-semibold mb-1">Warehouse Address</p>
-                  <p className="font-medium">{vendor.warehouseAddress}</p>
-                  {(vendor as any).warehouseAddressLine2 && (
-                    <p className="font-medium">{(vendor as any).warehouseAddressLine2}</p>
-                  )}
-                  {(vendor as any).warehouseAddressLine3 && (
-                    <p className="font-medium">{(vendor as any).warehouseAddressLine3}</p>
-                  )}
-                  {(vendor as any).warehouseLandmark && (
-                    <p className="text-sm text-slate-500">
-                      <span className="font-semibold">Landmark:</span> {(vendor as any).warehouseLandmark}
-                    </p>
-                  )}
-                  <p className="font-medium">
-                    {vendor.warehouseCity}, {vendor.warehouseState} {vendor.warehouseZipCode}
+              <div>
+                <p className="font-medium">{vendor.warehouseAddress}</p>
+                {(vendor as any).warehouseAddressLine2 && (
+                  <p className="font-medium">{(vendor as any).warehouseAddressLine2}</p>
+                )}
+                {(vendor as any).warehouseAddressLine3 && (
+                  <p className="font-medium">{(vendor as any).warehouseAddressLine3}</p>
+                )}
+                {(vendor as any).warehouseLandmark && (
+                  <p className="text-sm text-slate-500">
+                    <span className="font-semibold">Landmark:</span> {(vendor as any).warehouseLandmark}
                   </p>
-                  {vendor.warehouseCountry && <p className="font-medium">{vendor.warehouseCountry}</p>}
-                </div>
-              ) : (
-                <div className="p-3 bg-blue-50 text-blue-800 rounded-md text-sm border border-blue-200">
-                  No separate warehouse address provided. Using business location.
+                )}
+                <p className="font-medium">
+                  {vendor.warehouseCity}, {vendor.warehouseState} {vendor.warehouseZipCode}
+                </p>
+                {vendor.warehouseCountry && <p className="font-medium">{vendor.warehouseCountry}</p>}
+              </div>
+              {vendor.warehouseSize && (
+                <div>
+                  <p className="text-sm text-slate-500">Warehousing Capacity</p>
+                  <p className="font-medium">{vendor.warehouseSize}</p>
                 </div>
               )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {vendor.warehouseSize && (
-                  <div>
-                    <p className="text-sm text-slate-500">Warehousing Capacity</p>
-                    <p className="font-medium">{vendor.warehouseSize}</p>
-                  </div>
-                )}
-              </div>
-
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Warehouse Address (separate from legal address, if provided) */}
+      {(() => {
+        const v = vendor as any
+        const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
+        const isSameAsLegal = (
+          !v.factoryAddress && !v.factoryCity
+        ) || (
+          eq(v.factoryAddress, vendor.warehouseAddress) &&
+          eq(v.factoryCity, vendor.warehouseCity) &&
+          eq(v.factoryState, vendor.warehouseState) &&
+          eq(v.factoryZipCode, vendor.warehouseZipCode) &&
+          eq(v.factoryCountry, vendor.warehouseCountry)
+        )
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <MapPin className="h-5 w-5" />
+                <span>Warehouse Address</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isSameAsLegal ? (
+                <div className="p-3 bg-blue-50 text-blue-800 rounded-lg text-sm border border-blue-200 font-medium">
+                  Warehouse Address is the same as the Legal Address &amp; Factory Site above.
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {v.factoryAddress && <p className="font-medium">{v.factoryAddress}</p>}
+                  {v.factoryCity && (
+                    <p className="font-medium">
+                      {v.factoryCity}{v.factoryState ? `, ${v.factoryState}` : ''}{v.factoryZipCode ? ` ${v.factoryZipCode}` : ''}
+                    </p>
+                  )}
+                  {v.factoryCountry && <p className="font-medium">{v.factoryCountry}</p>}
+                </div>
+              )}
+              {v.mapLink && (
+                <div className="mt-3">
+                  <a href={v.mapLink} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline">
+                    <MapPin className="w-4 h-4" /> View on Map
+                  </a>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
     </div>
   )
 }

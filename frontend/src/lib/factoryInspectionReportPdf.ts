@@ -16,6 +16,7 @@
 //      Signature block
 
 import jsPDF from "jspdf"
+import { formatCheckerName } from "@/lib/checkerUtils"
 import autoTable from "jspdf-autotable"
 import type { Verifications } from "@/components/Checker/Vendor/Steps/VI_VerifyField"
 export interface FactoryReportChecker {
@@ -266,7 +267,7 @@ export function generateFactoryInspectionPdf(
   // ── B. Warehouse & Factory Details ─────────────────────────────────────────
   sectionTitle("B. Warehouse & Factory Details", sectionStatus(['w_']))
 
-  subTitle("Warehouse Address")
+  subTitle("Legal Address & Factory Site")
   const warehouseRows: string[][] = [
     ["Ownership Type", val(OWNERSHIP_TYPE[v.ownershipType] || v.ownershipType)],
     ["Warehousing Capacity", val(v.warehouseSize)],
@@ -281,15 +282,30 @@ export function generateFactoryInspectionPdf(
   if (!blank(v.warehouseCountry)) warehouseRows.push(["Country", val(v.warehouseCountry)])
   runTable([["Field", "Value"]], warehouseRows)
 
-  subTitle("Factory Address")
-  const factoryRows: string[][] = []
-  if (!blank(v.factoryAddress)) factoryRows.push(["Factory Address", val(v.factoryAddress)])
-  if (!blank(v.factoryCity)) factoryRows.push(["City", val(v.factoryCity)])
-  if (!blank(v.factoryState)) factoryRows.push(["State", val(v.factoryState)])
-  if (!blank(v.factoryZipCode)) factoryRows.push(["ZIP / Postal Code", val(v.factoryZipCode)])
-  if (!blank(v.factoryCountry)) factoryRows.push(["Country", val(v.factoryCountry)])
-  if (!blank(v.mapLink)) factoryRows.push(["Map / Location Link", val(v.mapLink)])
-  if (factoryRows.length > 0) runTable([["Field", "Value"]], factoryRows)
+  subTitle("Warehouse Address")
+  const pdfEq = (a: unknown, b: unknown) => (String(a || '').trim()) === (String(b || '').trim())
+  const pdfSameAsLegal = (
+    (blank(v.factoryAddress) && blank(v.factoryCity))
+  ) || (
+    pdfEq(v.factoryAddress, v.warehouseAddress) &&
+    pdfEq(v.factoryCity, v.warehouseCity) &&
+    pdfEq(v.factoryState, v.warehouseState) &&
+    pdfEq(v.factoryZipCode, v.warehouseZipCode) &&
+    pdfEq(v.factoryCountry, v.warehouseCountry)
+  )
+  if (pdfSameAsLegal) {
+    runTable([["Field", "Value"]], [["Warehouse Address", "Same as Legal Address & Factory Site above"]])
+    if (!blank(v.mapLink)) runTable([["Field", "Value"]], [["Map / Location Link", val(v.mapLink)]])
+  } else {
+    const factoryRows: string[][] = []
+    if (!blank(v.factoryAddress)) factoryRows.push(["Address Line 1", val(v.factoryAddress)])
+    if (!blank(v.factoryCity)) factoryRows.push(["City", val(v.factoryCity)])
+    if (!blank(v.factoryState)) factoryRows.push(["State", val(v.factoryState)])
+    if (!blank(v.factoryZipCode)) factoryRows.push(["ZIP / Postal Code", val(v.factoryZipCode)])
+    if (!blank(v.factoryCountry)) factoryRows.push(["Country", val(v.factoryCountry)])
+    if (!blank(v.mapLink)) factoryRows.push(["Map / Location Link", val(v.mapLink)])
+    if (factoryRows.length > 0) runTable([["Field", "Value"]], factoryRows)
+  }
 
   // ── C. Owner Profile ────────────────────────────────────────────────────────
   sectionTitle("C. Owner Profile", sectionStatus(['o_']))
@@ -557,7 +573,7 @@ export function generateFactoryInspectionPdf(
   runTable(
     [["Field", "Value"]],
     [
-      ["Inspector Name",   val(meta.inspectorName || meta.checker?.name)],
+      ["Inspector Name",   val(meta.inspectorName || formatCheckerName(meta.checker))],
       ["Checker ID",       val(meta.checker?.checkerId)],
       ["Inspector Email",  val(meta.checker?.email)],
       ["Inspector Phone",  val(meta.checker?.phone)],
@@ -606,58 +622,74 @@ export function generateFactoryInspectionPdf(
     renderImageGroup("Inspector Evidence Photos", inspectorImgs)
   }
 
-  // ── Signature block ─────────────────────────────────────────────────────────
+  // ── Sign-off block ───────────────────────────────────────────────────────────
   ensureSpace(130)
   y = Math.max(y, pageH - margin - 120)
 
   doc.setDrawColor(...BRAND)
   doc.setLineWidth(0.5)
   doc.line(margin, y, margin + contentW, y)
-  y += 20
+  y += 16
 
-  doc.setFont("helvetica", "bold")
-  doc.setFontSize(10)
-  doc.setTextColor(...SLATE)
-  doc.text("Inspector:", margin, y)
-  doc.setFont("helvetica", "normal")
-  doc.text(val(meta.inspectorName || meta.checker?.name), margin + 65, y)
+  const inspectionTime = generatedAt.toLocaleString("en-US", {
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  })
 
-  const sigX = margin + contentW / 2
-  doc.setFont("helvetica", "bold")
-  doc.text("Client Signature:", sigX, y)
-
-  const sig = options.clientSignatureDataUrl
-  if (sig) {
-    const sigFmt = /^data:image\/png/i.test(sig) ? "PNG" : "JPEG"
-    try { doc.addImage(sig, sigFmt, sigX, y + 8, 150, 50, undefined, "FAST") } catch { /* ignore */ }
-    doc.setFont("helvetica", "italic")
-    doc.setFontSize(8)
-    doc.setTextColor(...MUTED)
-    doc.text(`Digitally signed  ·  ${fmtDateTime(generatedAt)}`, sigX, y + 74)
-  } else {
-    doc.setDrawColor(...MUTED)
-    doc.line(sigX, y + 50, sigX + 180, y + 50)
-    doc.setFont("helvetica", "italic")
-    doc.setFontSize(8)
-    doc.setTextColor(...MUTED)
-    doc.text("Signature / Date", sigX, y + 62)
+  // Left: Inspector Name + Inspection Date + Inspection Time
+  doc.setFontSize(9)
+  const leftLines: Array<{ label: string; value: string }> = [
+    { label: "Inspector:", value: val(meta.inspectorName || formatCheckerName(meta.checker)) },
+    { label: "Inspection Date:", value: fmtDate(meta.inspectionDate) },
+    { label: "Inspection Time:", value: inspectionTime },
+  ]
+  let lineY = y
+  for (const { label, value } of leftLines) {
+    doc.setFont("helvetica", "bold")
+    doc.setTextColor(...SLATE)
+    doc.text(label, margin, lineY)
+    doc.setFont("helvetica", "normal")
+    doc.text(value, margin + 95, lineY)
+    lineY += 14
   }
 
-  // Result stamp
+  // Result stamp (bottom-left, below inspector lines)
   const result = meta.overallResult
   if (result) {
     const resultColors: Record<string, [number, number, number]> = {
       Approved: [22, 163, 74],
       Rejected: [220, 38, 38],
       "On Hold": [202, 138, 4],
-      "Re-inspection Required": [37, 99, 235],
+      "Re-inspection Required": [234, 88, 12],
     }
     const color: [number, number, number] = resultColors[result] || SLATE
     doc.setFont("helvetica", "bold")
-    doc.setFontSize(9)
+    doc.setFontSize(10)
     doc.setTextColor(...color)
-    doc.text(`Result: ${result}`, margin, y + 50)
+    doc.text(`Result: ${result}`, margin, lineY + 10)
     doc.setTextColor(...SLATE)
+  }
+
+  // Right: signature block — label and content differ for digital vs manual
+  const sigX = margin + contentW / 2
+  doc.setFont("helvetica", "bold")
+  doc.setFontSize(9)
+  doc.setTextColor(...SLATE)
+
+  const sig = options.clientSignatureDataUrl
+  if (sig) {
+    // Digital: embed captured signature, label without "& Seal"
+    doc.text("Client Signature:", sigX, y)
+    const sigFmt = /^data:image\/png/i.test(sig) ? "PNG" : "JPEG"
+    try { doc.addImage(sig, sigFmt, sigX, y + 8, 150, 50, undefined, "FAST") } catch { /* ignore */ }
+    doc.setFont("helvetica", "italic")
+    doc.setFontSize(8)
+    doc.setTextColor(...MUTED)
+    doc.text(`Digitally signed  ·  ${fmtDateTime(generatedAt)}`, sigX, y + 70)
+  } else {
+    // Manual: blank line only — client will sign and stamp physically
+    doc.text("Client Signature & Seal:", sigX, y)
+    doc.setDrawColor(...MUTED)
+    doc.line(sigX, y + 55, sigX + 185, y + 55)
   }
 
   // ── Page footers ────────────────────────────────────────────────────────────

@@ -13,6 +13,8 @@ import {
   Ruler,
   Zap,
   Camera,
+  Plus,
+  Trash2,
 } from 'lucide-react'
 import type { TestGroup, TestItem } from './PI_data'
 import { ADDITIONAL_EVIDENCE_DEFS } from './PI_data'
@@ -102,20 +104,21 @@ function PhotoStrip({
             </button>
           </div>
         ))}
-        <label
-          className={`w-14 h-14 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer flex-shrink-0 transition-colors ${colorMap[accent]}`}
-          title={`Upload ${label}`}
-        >
-          <Upload className="w-4 h-4 text-slate-400" />
-          <span className="text-[10px] text-slate-400 mt-0.5">Add</span>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handleInputChange}
-          />
-        </label>
+        {photos.length === 0 && (
+          <label
+            className={`w-14 h-14 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer flex-shrink-0 transition-colors ${colorMap[accent]}`}
+            title={`Upload ${label}`}
+          >
+            <Upload className="w-4 h-4 text-slate-400" />
+            <span className="text-[10px] text-slate-400 mt-0.5">Add</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleInputChange}
+            />
+          </label>
+        )}
       </div>
       <ImageCropModal
         src={cropSrc}
@@ -263,16 +266,146 @@ function TestRow({
   )
 }
 
+// ── Custom "Others" test row ─────────────────────────────────────────────────
+function OtherTestRow({
+  test,
+  onChange,
+  onRemove,
+}: {
+  test: TestItem
+  onChange: (patch: Partial<TestItem>) => void
+  onRemove: () => void
+}) {
+  const togglePass = () => onChange({ pass: test.pass ? null : true, fail: null })
+  const toggleFail = () => onChange({ fail: test.fail ? null : true, pass: null })
+
+  return (
+    <div
+      className={`border rounded-xl overflow-hidden transition-colors ${
+        test.pass ? 'border-emerald-200 bg-emerald-50/20'
+          : test.fail ? 'border-red-200 bg-red-50/20'
+          : 'border-brand-200 bg-brand-50/10'
+      }`}
+    >
+      <div className="px-4 py-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-bold text-brand-600 uppercase tracking-wide">Custom Test</span>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="p-1 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+            title="Remove"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Test Subject</label>
+            <input
+              type="text"
+              value={test.subject || ''}
+              onChange={(e) => onChange({ subject: e.target.value })}
+              placeholder="e.g. Stitching"
+              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-200"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Test Name</label>
+            <input
+              type="text"
+              value={test.label}
+              onChange={(e) => onChange({ label: e.target.value })}
+              placeholder="e.g. Seam integrity"
+              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-200"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={togglePass}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${
+              test.pass
+                ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                : 'border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" /> Pass
+          </button>
+          <button
+            type="button"
+            onClick={toggleFail}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border-2 transition-all ${
+              test.fail
+                ? 'bg-red-500 border-red-500 text-white shadow-sm'
+                : 'border-red-200 text-red-600 bg-red-50 hover:bg-red-100'
+            }`}
+          >
+            <XCircle className="w-3.5 h-3.5" /> Fail
+          </button>
+        </div>
+      </div>
+      {(test.pass || test.fail) && (
+        <div className="px-4 pb-3 space-y-2 border-t border-slate-100 pt-3">
+          {test.pass && (
+            <div>
+              <p className="text-xs font-semibold text-emerald-700 mb-1">Correct / Right Photo</p>
+              <PhotoStrip
+                photos={test.rightPhotos}
+                onAdd={(photo) => onChange({ rightPhotos: [photo] })}
+                onRemove={() => onChange({ rightPhotos: [] })}
+                label="right photo"
+                accent="emerald"
+              />
+            </div>
+          )}
+          {test.fail && (
+            <>
+              <div>
+                <p className="text-xs font-semibold text-red-700 mb-1">Wrong / Incorrect Photo</p>
+                <PhotoStrip
+                  photos={test.wrongPhotos}
+                  onAdd={(photo) => onChange({ wrongPhotos: [photo] })}
+                  onRemove={() => onChange({ wrongPhotos: [] })}
+                  label="wrong photo"
+                  accent="red"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Remarks</label>
+                <textarea
+                  value={test.remarks}
+                  onChange={(e) => onChange({ remarks: e.target.value })}
+                  placeholder="Describe the failure…"
+                  rows={2}
+                  className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-200 resize-none"
+                />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Collapsible group ────────────────────────────────────────────────────────
 function TestGroupCard({
   group,
   onToggleCollapse,
   onTestChange,
+  onAddOther,
+  onRemoveOther,
 }: {
   group: TestGroup
   onToggleCollapse: () => void
   onTestChange: (testId: string, patch: Partial<TestItem>) => void
+  onAddOther: () => void
+  onRemoveOther: (testId: string) => void
 }) {
+  const regularTests = group.tests.filter((t) => !t.isOther)
+  const otherTests = group.tests.filter((t) => t.isOther)
   const passed = group.tests.filter((t) => t.pass).length
   const failed = group.tests.filter((t) => t.fail).length
   const total = group.tests.length
@@ -314,13 +447,28 @@ function TestGroupCard({
       {/* Tests */}
       {!group.collapsed && (
         <div className="p-4 space-y-3">
-          {group.tests.map((test) => (
+          {regularTests.map((test) => (
             <TestRow
               key={test.id}
               test={test}
               onChange={(patch) => onTestChange(test.id, patch)}
             />
           ))}
+          {otherTests.map((test) => (
+            <OtherTestRow
+              key={test.id}
+              test={test}
+              onChange={(patch) => onTestChange(test.id, patch)}
+              onRemove={() => onRemoveOther(test.id)}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={onAddOther}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border-2 border-dashed border-brand-200 text-brand-600 hover:bg-brand-50 hover:border-brand-400 text-sm font-semibold transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Add Others
+          </button>
         </div>
       )}
     </div>
@@ -396,17 +544,18 @@ function EvidenceCard({
                 </button>
               </div>
             ))}
-            <label className="w-20 h-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors">
-              <Upload className="w-5 h-5 text-slate-400" />
-              <span className="text-xs text-slate-400 mt-1">Add</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleInputChange}
-              />
-            </label>
+            {photos.length === 0 && (
+              <label className="w-20 h-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors">
+                <Upload className="w-5 h-5 text-slate-400" />
+                <span className="text-xs text-slate-400 mt-1">Add</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleInputChange}
+                />
+              </label>
+            )}
           </div>
         </div>
       </div>
@@ -461,6 +610,35 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
               tests: g.tests.map((t) => (t.id === testId ? { ...t, ...patch } : t)),
             }
           : g
+      ),
+    })
+  }
+
+  const addOtherTest = (groupId: string) => {
+    const newItem: TestItem = {
+      id: `other_${groupId}_${Date.now()}`,
+      label: '',
+      pass: null,
+      fail: null,
+      remarks: '',
+      rightPhotos: [],
+      wrongPhotos: [],
+      isOther: true,
+      subject: '',
+    }
+    setFormData({
+      ...formData,
+      testGroups: groups.map((g) =>
+        g.id === groupId ? { ...g, tests: [...g.tests, newItem] } : g
+      ),
+    })
+  }
+
+  const removeOtherTest = (groupId: string, testId: string) => {
+    setFormData({
+      ...formData,
+      testGroups: groups.map((g) =>
+        g.id === groupId ? { ...g, tests: g.tests.filter((t) => t.id !== testId) } : g
       ),
     })
   }
@@ -526,6 +704,8 @@ export default function PI_Step5_Testing({ formData, setFormData, errors = {} }:
             group={group}
             onToggleCollapse={() => toggleCollapse(group.id)}
             onTestChange={(testId, patch) => updateTest(group.id, testId, patch)}
+            onAddOther={() => addOtherTest(group.id)}
+            onRemoveOther={(testId) => removeOtherTest(group.id, testId)}
           />
         ))}
       </div>

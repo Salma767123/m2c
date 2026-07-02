@@ -30,6 +30,7 @@ interface QCChecker {
 
 import vendorService from '@/services/vendorService';
 import qcCheckerService from '@/services/qcCheckerService';
+import { formatCheckerName } from '@/lib/checkerUtils';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -53,7 +54,7 @@ export default function AssignQCChecker() {
       phone: v.businessPhone,
       status: v.status,
       assignedChecker: v.assignedQcId || null,
-      assignedCheckerName: v.assignedQc?.name || null,
+      assignedCheckerName: v.assignedQc ? formatCheckerName(v.assignedQc) : null,
       inspectionStatus: v.latestInspection?.status || null,
       inspectionResult: v.latestInspection?.result || null,
     }));
@@ -134,7 +135,7 @@ export default function AssignQCChecker() {
       PENDING: "bg-amber-50 text-amber-700 border border-amber-200 font-bold",
       UNDER_REVIEW: "bg-blue-50 text-blue-700 border border-blue-200 font-bold",
       REJECTED: "bg-red-50 text-red-700 border border-red-200 font-bold",
-      REINSPECTION: "bg-purple-50 text-purple-700 border border-purple-200 font-bold",
+      REINSPECTION: "bg-orange-50 text-orange-700 border border-orange-200 font-bold",
       SUSPENDED: "bg-slate-100 text-slate-600 border border-slate-200 font-bold",
     };
     return (

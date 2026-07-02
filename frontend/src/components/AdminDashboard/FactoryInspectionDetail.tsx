@@ -12,6 +12,7 @@ import { Badge } from '@/components/UI/Badge'
 import vendorService from '@/services/vendorService'
 import { generateFactoryInspectionPdf } from '@/lib/factoryInspectionReportPdf'
 import type { FactoryImageEntry, FactoryReportMeta } from '@/lib/factoryInspectionReportPdf'
+import { formatCheckerName } from '@/lib/checkerUtils'
 
 async function fetchImgDataUrl(url: string): Promise<string | null> {
     try {
@@ -216,7 +217,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
             )
             const vendorFactoryImages = imgResults.filter((x): x is FactoryImageEntry => x !== null)
             const meta: FactoryReportMeta = {
-                inspectorName: fd.inspectorName || inspection.checker?.name,
+                inspectorName: fd.inspectorName || formatCheckerName(inspection.checker),
                 inspectionDate: fd.inspectionDate,
                 overallResult: fd.inspectionStatus,
                 inspectorRemarks: fd.inspectorRemarks || inspection.notes,
@@ -227,6 +228,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 generatedAt: new Date(),
             }
             const pdf = generateFactoryInspectionPdf(vendor, isNewFmt ? fd.verifications : {}, meta, {
+                clientSignatureDataUrl: fd.clientSignature || null,
                 vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
                 inspectorEvidenceImages: null,
             })
@@ -272,7 +274,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
             )
             const vendorFactoryImages = imgResults.filter((x): x is FactoryImageEntry => x !== null)
             const meta: FactoryReportMeta = {
-                inspectorName: fd.inspectorName || inspection.checker?.name,
+                inspectorName: fd.inspectorName || formatCheckerName(inspection.checker),
                 inspectionDate: fd.inspectionDate,
                 overallResult: fd.inspectionStatus,
                 inspectorRemarks: fd.inspectorRemarks || inspection.notes,
@@ -283,6 +285,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 generatedAt: new Date(),
             }
             const pdf = generateFactoryInspectionPdf(vendor, isNewFmt ? fd.verifications : {}, meta, {
+                clientSignatureDataUrl: fd.clientSignature || null,
                 vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
                 inspectorEvidenceImages: null,
             })
@@ -362,7 +365,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     </div>
                     <div>
                         <p className="text-neutral-400 text-xs font-medium uppercase mb-1">QC Checker</p>
-                        <p className="font-semibold text-sm">{inspection.checker?.name || '—'}</p>
+                        <p className="font-semibold text-sm">{formatCheckerName(inspection.checker) || '—'}</p>
                         <p className="text-neutral-400 text-xs mt-0.5">{inspection.checker?.email}</p>
                     </div>
                     <div>
@@ -444,7 +447,7 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     {/* Section 2: Warehouse & Factory Details */}
                     <Section title="2 — Warehouse & Factory Details" icon={Warehouse} accent="bg-teal-50 text-teal-800"
                         badge={<StepBadge prefixes={['w_']} vf={vf} />}>
-                        <SubHead title="Warehouse Address" />
+                        <SubHead title="Legal Address & Factory Site" />
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             <VCard label="Ownership Type" value={OWN_TYPE[vendor.ownershipType] || vendor.ownershipType} k="w_ownershipType" vf={vf} />
                             <VCard label="Warehousing Capacity" value={vendor.warehouseSize} k="w_warehouseSize" vf={vf} />
@@ -457,19 +460,43 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                             {vendor.warehouseZipCode && <VCard label="ZIP / Postal Code" value={vendor.warehouseZipCode} k="w_warehouseZipCode" vf={vf} />}
                             {vendor.warehouseCountry && <VCard label="Country" value={vendor.warehouseCountry} k="w_warehouseCountry" vf={vf} />}
                         </div>
-                        {(vendor.factoryAddress || vendor.factoryCity) && (
-                            <>
-                                <SubHead title="Factory Address" />
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                    {vendor.factoryAddress && <VCard label="Factory Address" value={vendor.factoryAddress} k="w_factoryAddress" vf={vf} />}
-                                    {vendor.factoryCity && <VCard label="City" value={vendor.factoryCity} k="w_factoryCity" vf={vf} />}
-                                    {vendor.factoryState && <VCard label="State" value={vendor.factoryState} k="w_factoryState" vf={vf} />}
-                                    {vendor.factoryZipCode && <VCard label="ZIP Code" value={vendor.factoryZipCode} k="w_factoryZipCode" vf={vf} />}
-                                    {vendor.factoryCountry && <VCard label="Country" value={vendor.factoryCountry} k="w_factoryCountry" vf={vf} />}
-                                    {vendor.mapLink && <VCard label="Map / Location Link" value={vendor.mapLink} k="w_mapLink" vf={vf} />}
-                                </div>
-                            </>
-                        )}
+                        {(() => {
+                            const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
+                            const isSameAsLegal = (
+                              !vendor.factoryAddress && !vendor.factoryCity
+                            ) || (
+                              eq(vendor.factoryAddress, vendor.warehouseAddress) &&
+                              eq(vendor.factoryCity, vendor.warehouseCity) &&
+                              eq(vendor.factoryState, vendor.warehouseState) &&
+                              eq(vendor.factoryZipCode, vendor.warehouseZipCode) &&
+                              eq(vendor.factoryCountry, vendor.warehouseCountry)
+                            )
+                            return (
+                                <>
+                                    <SubHead title="Warehouse Address" />
+                                    {isSameAsLegal ? (
+                                        <div className="col-span-full p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 font-medium">
+                                            Warehouse Address is the same as the Legal Address &amp; Factory Site provided above.
+                                            {vf['w_sameWarehouse'] && <span className="ml-2"><VerBadge k="w_sameWarehouse" vf={vf} /></span>}
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {vendor.factoryAddress && <VCard label="Address Line 1" value={vendor.factoryAddress} k="w_factoryAddress" vf={vf} />}
+                                            {vendor.factoryCity && <VCard label="City" value={vendor.factoryCity} k="w_factoryCity" vf={vf} />}
+                                            {vendor.factoryState && <VCard label="State" value={vendor.factoryState} k="w_factoryState" vf={vf} />}
+                                            {vendor.factoryZipCode && <VCard label="ZIP Code" value={vendor.factoryZipCode} k="w_factoryZipCode" vf={vf} />}
+                                            {vendor.factoryCountry && <VCard label="Country" value={vendor.factoryCountry} k="w_factoryCountry" vf={vf} />}
+                                            {vendor.mapLink && <VCard label="Map / Location Link" value={vendor.mapLink} k="w_mapLink" vf={vf} />}
+                                        </div>
+                                    )}
+                                    {isSameAsLegal && vendor.mapLink && (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                                            <VCard label="Map / Location Link" value={vendor.mapLink} k="w_mapLink" vf={vf} />
+                                        </div>
+                                    )}
+                                </>
+                            )
+                        })()}
                         {(() => {
                             const factoryImgs = Array.isArray(vendor.documents)
                                 ? vendor.documents.filter((d: any) => d.type === 'OTHER' && d.documentUrl)

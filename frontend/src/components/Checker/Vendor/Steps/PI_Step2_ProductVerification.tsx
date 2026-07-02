@@ -1,10 +1,13 @@
 'use client'
 
-import { Package, Image as ImageIcon, Layers, Tag, Ruler, Upload, X } from 'lucide-react'
+import { Package, Image as ImageIcon, Layers, Tag, Ruler, Upload, X, Eye } from 'lucide-react'
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import VerifyField, { SectionBlock, HighlightFieldsProvider, type Verifications } from './VI_VerifyField'
 import ImageCropModal from '@/components/UI/ImageCropModal'
 import { getExpectedProductVerificationKeys } from '@/components/Checker/Products/validation'
+import { parseDimensions } from '@/lib/dimensions'
+import { CARE_INSTRUCTIONS, CATEGORY_COLORS, CareIcon } from '@/components/VendorDashboard/Products/CareInstructionModal'
 
 // ── Image compressor (same quality settings as Testing.tsx) ─────────────────
 async function compressImage(file: File, maxWidth = 1200, quality = 0.7): Promise<string> {
@@ -71,6 +74,9 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
       productVerifications: { ...verifications, [key]: { ok, remarks } },
     })
   }
+
+  // ── Image viewer modal ───────────────────────────────────────────────────
+  const [viewingImage, setViewingImage] = useState<{ url: string; label: string } | null>(null)
 
   // ── Crop state for photo evidence ────────────────────────────────────────
   const [cropQueue, setCropQueue] = useState<File[]>([])
@@ -158,19 +164,13 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
             <VerifyField fieldKey="pv_subCategory" label="Sub-Category" value={p.subCategory}
               verifications={verifications} onChange={onVerify} />
           )}
-          {notEmpty(p.baseSku) && (
-            <VerifyField fieldKey="pv_baseSku" label="Base SKU" value={p.baseSku}
-              verifications={verifications} onChange={onVerify} />
-          )}
           {notEmpty(p.brand) && (
             <VerifyField fieldKey="pv_brand" label="Brand" value={p.brand}
               verifications={verifications} onChange={onVerify} />
           )}
           {notEmpty(p.description) && (
-            <div className="md:col-span-2">
-              <VerifyField fieldKey="pv_description" label="Product Description" value={p.description}
-                verifications={verifications} onChange={onVerify} />
-            </div>
+            <VerifyField fieldKey="pv_description" label="Product Description" value={p.description}
+              verifications={verifications} onChange={onVerify} />
           )}
         </div>
       </SectionBlock>
@@ -179,17 +179,32 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
       {Array.isArray(p.images) && p.images.length > 0 && (
         <SectionBlock title="Product Images" icon={<ImageIcon className="w-4 h-4" />}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {p.images.map((img: any, i: number) => (
-              <VerifyField
-                key={i}
-                fieldKey={`pv_img_${i}`}
-                label={img.alt || `Product Image ${i + 1}${img.isPrimary ? ' (Primary)' : ''}`}
-                value={img.url || img.imageUrl}
-                type="image"
-                verifications={verifications}
-                onChange={onVerify}
-              />
-            ))}
+            {p.images.map((img: any, i: number) => {
+              const imgUrl = img.url || img.imageUrl
+              const imgLabel = img.alt || `Product Image ${i + 1}${img.isPrimary ? ' (Primary)' : ''}`
+              return (
+                <VerifyField
+                  key={i}
+                  fieldKey={`pv_img_${i}`}
+                  label={imgLabel}
+                  value={imgUrl}
+                  type="image"
+                  verifications={verifications}
+                  onChange={onVerify}
+                  headerAction={
+                    imgUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => setViewingImage({ url: imgUrl, label: imgLabel })}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded-lg border border-brand-100 transition-colors"
+                      >
+                        <Eye className="w-3 h-3" /> View
+                      </button>
+                    ) : undefined
+                  }
+                />
+              )
+            })}
           </div>
         </SectionBlock>
       )}
@@ -203,7 +218,7 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                 verifications={verifications} onChange={onVerify} />
             )}
             {notEmpty(p.material) && (
-              <VerifyField fieldKey="pv_material" label="Material" value={p.material}
+              <VerifyField fieldKey="pv_material" label="Material Description" value={p.material}
                 verifications={verifications} onChange={onVerify} />
             )}
             {notEmpty(p.construction) && (
@@ -211,7 +226,17 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                 verifications={verifications} onChange={onVerify} />
             )}
             {notEmpty(p.weight) && (
-              <VerifyField fieldKey="pv_weight" label="Weight" value={p.weight}
+              <VerifyField fieldKey="pv_weight" label="Shipping Weight" value={`${p.weight}${p.weightUnit ? ' ' + p.weightUnit : ''}`}
+                verifications={verifications} onChange={onVerify} />
+            )}
+            {notEmpty(p.dispatchTimeline?.processingDays) && (
+              <VerifyField fieldKey="pv_processingDays" label="Processing Days"
+                value={`${p.dispatchTimeline.processingDays} Day${p.dispatchTimeline.processingDays !== 1 ? 's' : ''}`}
+                verifications={verifications} onChange={onVerify} />
+            )}
+            {notEmpty(p.dispatchTimeline?.shippingDays) && (
+              <VerifyField fieldKey="pv_shippingDays" label="Shipping Days"
+                value={`${p.dispatchTimeline.shippingDays} Day${p.dispatchTimeline.shippingDays !== 1 ? 's' : ''}`}
                 verifications={verifications} onChange={onVerify} />
             )}
           </div>
@@ -267,21 +292,40 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
               <VerifyField fieldKey="pv_dimensions" label="Dimensions" value={
                 typeof p.dimensions === 'object'
                   ? Object.entries(p.dimensions).map(([k, v]) => `${k}: ${v}`).join(' | ')
-                  : p.dimensions
+                  : (() => { const { value, unit } = parseDimensions(p.dimensions); return value ? `${value} ${unit}` : p.dimensions })()
               } verifications={verifications} onChange={onVerify} />
             )}
             {p.fabricSpecifications && typeof p.fabricSpecifications === 'object' &&
-              Object.entries(p.fabricSpecifications).filter(([, val]) => notEmpty(val)).map(([key, val]) => (
-                <VerifyField
-                  key={key}
-                  fieldKey={`pv_spec_${key}`}
-                  label={key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())}
-                  value={safe(val)}
-                  verifications={verifications}
-                  onChange={onVerify}
-                />
-              ))
+              Object.entries(p.fabricSpecifications)
+                .filter(([key]) => key !== 'basis' && key !== 'careInstructions')
+                .filter(([, val]) => notEmpty(val))
+                .map(([key, val]) => {
+                  const label = key === 'weightValue'
+                    ? 'Weight Per Unit'
+                    : key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())
+                  return (
+                    <VerifyField
+                      key={key}
+                      fieldKey={`pv_spec_${key}`}
+                      label={label}
+                      value={Array.isArray(val) ? val : safe(val)}
+                      verifications={verifications}
+                      onChange={onVerify}
+                    />
+                  )
+                })
             }
+            {Array.isArray(p.fabricSpecifications?.careInstructions) && p.fabricSpecifications.careInstructions.length > 0 && (
+              <div className="md:col-span-2">
+                <CareInstructionsVerifyBlock
+                  fieldKey="pv_spec_careInstructions"
+                  labels={p.fabricSpecifications.careInstructions}
+                  verifications={verifications}
+                  onVerify={onVerify}
+                  needsHighlight={unverifiedKeys.has('pv_spec_careInstructions')}
+                />
+              </div>
+            )}
           </div>
         </SectionBlock>
       )}
@@ -341,20 +385,21 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
           <h3 className="text-base font-bold text-slate-800">Photo Evidence</h3>
         </div>
 
-        <label
-          className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl px-6 py-8 cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors group"
-        >
-          <Upload className="w-8 h-8 text-slate-400 group-hover:text-brand-500 mb-2 transition-colors" />
-          <p className="text-sm font-medium text-slate-700">Upload product evidence photos</p>
-          <p className="text-xs text-slate-400 mt-1">PNG, JPG, JPEG — multiple files accepted</p>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handlePhotoUpload}
-          />
-        </label>
+        {(formData.productEvidencePhotos || []).length === 0 && (
+          <label
+            className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl px-6 py-8 cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors group"
+          >
+            <Upload className="w-8 h-8 text-slate-400 group-hover:text-brand-500 mb-2 transition-colors" />
+            <p className="text-sm font-medium text-slate-700">Upload product evidence photo</p>
+            <p className="text-xs text-slate-400 mt-1">PNG, JPG, JPEG — 1 photo</p>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
+          </label>
+        )}
 
         {(formData.productEvidencePhotos || []).length > 0 && (
           <div className="mt-4 grid grid-cols-3 md:grid-cols-5 gap-3">
@@ -391,7 +436,108 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
         }}
         onCropped={onEvidenceCropped}
       />
+
+      {/* ── Image viewer lightbox ─────────────────────────────────────────── */}
+      {viewingImage && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/85 backdrop-blur-sm p-4"
+          onClick={() => setViewingImage(null)}
+        >
+          <div
+            className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setViewingImage(null)}
+              className="absolute -top-4 -right-4 w-9 h-9 bg-white rounded-full shadow-xl flex items-center justify-center z-10 hover:bg-slate-50 transition-colors"
+              aria-label="Close viewer"
+            >
+              <X className="w-4 h-4 text-slate-700" />
+            </button>
+            <img
+              src={viewingImage.url}
+              alt={viewingImage.label}
+              className="max-w-full max-h-[80vh] rounded-xl object-contain shadow-2xl"
+            />
+            <p className="text-white/80 text-sm mt-3 text-center">{viewingImage.label}</p>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
     </HighlightFieldsProvider>
+  )
+}
+
+// ── Care instructions with icons ─────────────────────────────────────────────
+function CareInstructionsVerifyBlock({
+  fieldKey, labels, verifications, onVerify, needsHighlight,
+}: {
+  fieldKey: string
+  labels: string[]
+  verifications: Verifications
+  onVerify: (key: string, ok: boolean | null, remarks: string) => void
+  needsHighlight: boolean
+}) {
+  const v = verifications[fieldKey] ?? { ok: null, remarks: '' }
+  return (
+    <div
+      id={`vf-${fieldKey}`}
+      className={`rounded-xl border transition-colors ${
+        needsHighlight
+          ? 'border-red-500 bg-red-50/40 ring-2 ring-red-400 ring-offset-1'
+          : v.ok === true
+            ? 'border-emerald-200 bg-emerald-50/30'
+            : v.ok === false
+              ? 'border-red-200 bg-red-50/20'
+              : 'border-slate-200 bg-white'
+      }`}
+    >
+      <div className="p-4">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Care Instructions</p>
+        <div className="flex flex-wrap gap-3">
+          {labels.map((label: string) => {
+            const instr = CARE_INSTRUCTIONS.find((c) => c.label === label)
+            const colorCls = instr ? CATEGORY_COLORS[instr.category] : 'text-slate-500'
+            return (
+              <div key={label} className="flex items-center gap-1.5">
+                {instr && <CareIcon paths={instr.paths} className={`w-5 h-5 shrink-0 ${colorCls}`} />}
+                <span className="text-sm text-slate-700">{label}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      <div className="border-t border-slate-100 px-4 py-3 flex flex-col gap-2">
+        <p className="text-xs font-semibold text-slate-600">Verification</p>
+        <div className="flex gap-6">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="radio" name={`verify_${fieldKey}`} checked={v.ok === true}
+              onChange={() => onVerify(fieldKey, true, v.remarks)}
+              className="w-4 h-4 accent-emerald-600" />
+            <span className={`text-sm font-semibold ${v.ok === true ? 'text-emerald-700' : 'text-slate-600'}`}>Yes</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="radio" name={`verify_${fieldKey}`} checked={v.ok === false}
+              onChange={() => onVerify(fieldKey, false, v.remarks)}
+              className="w-4 h-4 accent-red-600" />
+            <span className={`text-sm font-semibold ${v.ok === false ? 'text-red-700' : 'text-slate-600'}`}>No</span>
+          </label>
+        </div>
+        {needsHighlight && v.ok === null && (
+          <p className="text-xs text-red-600 font-medium">Please complete this verification before continuing.</p>
+        )}
+        {v.ok === false && (
+          <textarea
+            value={v.remarks}
+            onChange={(e) => onVerify(fieldKey, v.ok, e.target.value)}
+            placeholder="Remarks for this field…"
+            rows={2}
+            className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-200 resize-none"
+          />
+        )}
+      </div>
+    </div>
   )
 }

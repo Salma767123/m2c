@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Phone, FileText, Globe, Landmark, User } from 'lucide-react'
+import { FileText, Globe, Landmark, User } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
-import { formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
 import { buildFullName } from '@/lib/utils'
 import { Country } from 'country-state-city'
 
@@ -30,47 +29,33 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
   )
 
-  const localLandline = formatLocalLandline({ countryCode: '+91', std: v.localLandlineStd, number: v.landlineNumber })
-  const intlLandline = formatIntlLandline(v.intlLandline)
   const mainContact = v.mainContact || null
   const alternateContacts: any[] = Array.isArray(v.alternateContacts) ? v.alternateContacts : []
   const bankDetails = v.bankDetails || null
 
   useEffect(() => {
     const keys: string[] = [
-      'ct_businessPhone',
-      ...(v.phoneNumber2 ? ['ct_phoneNumber2'] : []),
-      'ct_businessEmail',
-      ...(v.businessEmail2 ? ['ct_businessEmail2'] : []),
-      ...(localLandline ? ['ct_landline'] : []),
-      ...(intlLandline ? ['ct_intlLandline'] : []),
-      ...(v.businessAddress ? ['ct_businessAddress'] : []),
-      ...(v.addressLine2 ? ['ct_addressLine2'] : []),
-      ...(v.addressLine3 ? ['ct_addressLine3'] : []),
-      ...(v.landmark ? ['ct_landmark'] : []),
-      ...(v.businessCity ? ['ct_businessCity'] : []),
-      ...(v.businessState ? ['ct_businessState'] : []),
-      ...(v.businessZipCode ? ['ct_businessZipCode'] : []),
-      ...(v.businessCountry ? ['ct_businessCountry'] : []),
       ...(mainContact ? [
+        ...(mainContact.photo ? ['ct_mainContact_photo'] : []),
         'ct_mainContact_name',
         ...(mainContact.designation ? ['ct_mainContact_designation'] : []),
         ...(mainContact.department ? ['ct_mainContact_department'] : []),
-        ...(mainContact.email1 ? ['ct_mainContact_email1'] : []),
-        ...(mainContact.email2 ? ['ct_mainContact_email2'] : []),
         ...(mainContact.phone1 ? ['ct_mainContact_phone1'] : []),
         ...(mainContact.phone2 ? ['ct_mainContact_phone2'] : []),
-        ...(mainContact.photo ? ['ct_mainContact_photo'] : []),
+        ...(mainContact.email1 ? ['ct_mainContact_email1'] : []),
+        ...(mainContact.email2 ? ['ct_mainContact_email2'] : []),
       ] : []),
       ...alternateContacts.flatMap((contact: any, idx: number) => {
         const prefix = `ct_alt_${idx}`
         return [
+          ...(contact.photo ? [`${prefix}_photo`] : []),
           `${prefix}_name`,
           ...(contact.designation ? [`${prefix}_designation`] : []),
           ...(contact.department ? [`${prefix}_department`] : []),
-          ...(contact.email1 ? [`${prefix}_email1`] : []),
           ...(contact.phone1 ? [`${prefix}_phone1`] : []),
-          ...(contact.photo ? [`${prefix}_photo`] : []),
+          ...(contact.phone2 ? [`${prefix}_phone2`] : []),
+          ...(contact.email1 ? [`${prefix}_email1`] : []),
+          ...(contact.email2 ? [`${prefix}_email2`] : []),
         ]
       }),
       ...(v.tradeLicenseNumber ? ['ct_tradeLicense'] : []),
@@ -99,70 +84,52 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
     <div className="space-y-10">
       <div className="border-b border-slate-200 pb-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-1">Contact & Trade Information</h2>
-        <p className="text-slate-500 text-sm">Verify business contact details, trade information, import/export experience, and banking details.</p>
+        <p className="text-slate-500 text-sm">Verify contact persons, trade information, import/export experience, and banking details.</p>
       </div>
 
-      {/* Business Contact */}
-      <SectionBlock title="Business Contact Details" icon={<Phone className="w-4 h-4" />}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {vf('ct_businessPhone', 'Primary Phone', v.businessPhone)}
-          {v.phoneNumber2 && vf('ct_phoneNumber2', 'Secondary Phone', v.phoneNumber2)}
-          {vf('ct_businessEmail', 'Primary Email', v.businessEmail)}
-          {v.businessEmail2 && vf('ct_businessEmail2', 'Secondary Email', v.businessEmail2)}
-          {localLandline && vf('ct_landline', 'Local Landline', localLandline)}
-          {intlLandline && vf('ct_intlLandline', 'International Landline', intlLandline)}
-        </div>
-      </SectionBlock>
-
-      {/* Factory Site / Legal Address */}
-      {(v.businessAddress || v.businessCity) && (
-        <SectionBlock title="Factory Site / Legal Address">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {v.businessAddress && vf('ct_businessAddress', 'Address Line 1', v.businessAddress)}
-            {v.addressLine2 && vf('ct_addressLine2', 'Address Line 2', v.addressLine2)}
-            {v.addressLine3 && vf('ct_addressLine3', 'Address Line 3', v.addressLine3)}
-            {v.landmark && vf('ct_landmark', 'Landmark', v.landmark)}
-            {v.businessCity && vf('ct_businessCity', 'City', v.businessCity)}
-            {v.businessState && vf('ct_businessState', 'State', v.businessState)}
-            {v.businessZipCode && vf('ct_businessZipCode', 'ZIP / Postal Code', v.businessZipCode)}
-            {v.businessCountry && vf('ct_businessCountry', 'Country', v.businessCountry)}
-          </div>
-        </SectionBlock>
-      )}
-
-      {/* Main Contact Person */}
+      {/* Main Contact Person — Photo first, then fields in Vendor Registration order */}
       {mainContact && (
         <SectionBlock title="Main Contact Person" icon={<User className="w-4 h-4" />}>
+          {mainContact.photo && (
+            <div className="mb-4">
+              {vf('ct_mainContact_photo', 'Profile Photo', mainContact.photo, 'image')}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {vf('ct_mainContact_name', 'Contact Name', buildFullName(mainContact.title, mainContact.firstName, mainContact.middleName, mainContact.lastName))}
+            {vf('ct_mainContact_name', 'Full Name', buildFullName(mainContact.title, mainContact.firstName, mainContact.middleName, mainContact.lastName))}
             {mainContact.designation && vf('ct_mainContact_designation', 'Designation', mainContact.designation)}
             {mainContact.department && vf('ct_mainContact_department', 'Department', mainContact.department)}
-            {mainContact.email1 && vf('ct_mainContact_email1', 'Primary Email', mainContact.email1)}
-            {mainContact.email2 && vf('ct_mainContact_email2', 'Secondary Email', mainContact.email2)}
             {mainContact.phone1 && vf('ct_mainContact_phone1', 'Primary Phone', mainContact.phone1)}
             {mainContact.phone2 && vf('ct_mainContact_phone2', 'Secondary Phone', mainContact.phone2)}
+            {mainContact.email1 && vf('ct_mainContact_email1', 'Primary Email', mainContact.email1)}
+            {mainContact.email2 && vf('ct_mainContact_email2', 'Secondary Email', mainContact.email2)}
           </div>
-          {mainContact.photo && vf('ct_mainContact_photo', 'Contact Photo', mainContact.photo, 'image')}
         </SectionBlock>
       )}
 
-      {/* Contact Person 2 (and onwards) */}
+      {/* Additional Contact Persons */}
       {alternateContacts.length > 0 && (
-        <SectionBlock title="Contact Person 2" icon={<User className="w-4 h-4" />}>
+        <SectionBlock title={`Additional Contact Person${alternateContacts.length > 1 ? 's' : ''}`} icon={<User className="w-4 h-4" />}>
           <div className="space-y-4">
             {alternateContacts.map((contact: any, idx: number) => {
               const prefix = `ct_alt_${idx}`
               return (
                 <div key={idx} className="bg-slate-50/60 border border-slate-200 rounded-xl p-4 space-y-4">
                   <p className="text-xs font-bold text-slate-600">Contact Person {idx + 2}</p>
+                  {contact.photo && (
+                    <div className="mb-2">
+                      {vf(`${prefix}_photo`, 'Profile Photo', contact.photo, 'image')}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {vf(`${prefix}_name`, 'Name', buildFullName(contact.title, contact.firstName, contact.middleName, contact.lastName))}
+                    {vf(`${prefix}_name`, 'Full Name', buildFullName(contact.title, contact.firstName, contact.middleName, contact.lastName))}
                     {contact.designation && vf(`${prefix}_designation`, 'Designation', contact.designation)}
                     {contact.department && vf(`${prefix}_department`, 'Department', contact.department)}
-                    {contact.email1 && vf(`${prefix}_email1`, 'Primary Email', contact.email1)}
                     {contact.phone1 && vf(`${prefix}_phone1`, 'Primary Phone', contact.phone1)}
+                    {contact.phone2 && vf(`${prefix}_phone2`, 'Secondary Phone', contact.phone2)}
+                    {contact.email1 && vf(`${prefix}_email1`, 'Primary Email', contact.email1)}
+                    {contact.email2 && vf(`${prefix}_email2`, 'Secondary Email', contact.email2)}
                   </div>
-                  {contact.photo && vf(`${prefix}_photo`, 'Photo', contact.photo, 'image')}
                 </div>
               )
             })}

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { qcCheckerService } from '@/services/qcCheckerService'
+import { formatCheckerName } from '@/lib/checkerUtils'
 
 interface HeaderProps {
   onMenuToggle?: () => void
@@ -39,23 +40,19 @@ export default function Header({ onMenuToggle, isSidebarOpen = true }: HeaderPro
 
   useEffect(() => {
     const data = qcCheckerService.getCheckerData()
-    if (data?.name) setCheckerName(data.name)
-    if (data?.profilePhoto) {
-      setProfilePhoto(data.profilePhoto)
-    } else {
-      // Login response doesn't include profilePhoto — fetch the full profile
-      qcCheckerService.getCheckerProfile().then((res) => {
-        const photo = res?.data?.profilePhoto
-        if (photo) {
-          setProfilePhoto(photo)
-          // Cache it so next page load is instant
-          const cached = qcCheckerService.getCheckerData()
-          if (cached) {
-            qcCheckerService.storeCheckerAuth(qcCheckerService.getCheckerToken()!, { ...cached, profilePhoto: photo })
-          }
-        }
-      }).catch(() => {})
-    }
+    if (data) setCheckerName(formatCheckerName(data))
+    if (data?.profilePhoto) setProfilePhoto(data.profilePhoto)
+
+    // Always fetch fresh profile to pick up any admin edits to name/title
+    qcCheckerService.getCheckerProfile().then((res) => {
+      if (!res?.success || !res.data) return
+      const fresh = res.data
+      setCheckerName(formatCheckerName(fresh))
+      if (fresh.profilePhoto) setProfilePhoto(fresh.profilePhoto)
+      const token = qcCheckerService.getCheckerToken()
+      const cached = qcCheckerService.getCheckerData() || {}
+      if (token) qcCheckerService.storeCheckerAuth(token, { ...cached, name: fresh.name, title: fresh.title ?? null, profilePhoto: fresh.profilePhoto ?? cached.profilePhoto })
+    }).catch(() => {})
   }, [])
 
   // Close dropdowns when clicking outside

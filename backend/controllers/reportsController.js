@@ -689,7 +689,7 @@ const getQcFactoryReports = async (req, res) => {
                     createdAt: true,
                     completedAt: true,
                     vendor: { select: { id: true, companyName: true, email: true } },
-                    checker: { select: { id: true, name: true, email: true } },
+                    checker: { select: { id: true, name: true, title: true, email: true } },
                 },
                 orderBy: { [sortBy]: sortOrder },
                 skip,

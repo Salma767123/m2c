@@ -1,8 +1,12 @@
 'use client'
 
-import { CheckCircle2, XCircle, Minus, Pencil, Package, Box, Ruler, Zap, ClipboardList, Building2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { CheckCircle2, XCircle, Minus, Pencil, Package, Box, Ruler, Zap, ClipboardList, Building2, User, ChevronDown } from 'lucide-react'
 import type { PackagingItem, TestGroup } from './PI_data'
 import { ADDITIONAL_EVIDENCE_DEFS } from './PI_data'
+import { qcCheckerService } from '@/services/qcCheckerService'
+import { formatCheckerName } from '@/lib/checkerUtils'
 
 // ── Code badge helper ────────────────────────────────────────────────────────
 const CODE_LABELS: Record<number, string> = {
@@ -68,6 +72,15 @@ function VerificationBadge({ ok }: { ok: boolean | null }) {
   )
 }
 
+const INSPECTION_STATUS_OPTIONS = ['Approved', 'Rejected', 'On Hold', 'Re-Inspection']
+
+const STATUS_STYLES: Record<string, { btn: string; item: string }> = {
+  'Approved':      { btn: 'border-emerald-500 bg-emerald-50 text-emerald-600',  item: 'bg-emerald-50 text-emerald-700 font-semibold border-l-2 border-emerald-500' },
+  'Rejected':      { btn: 'border-red-500 bg-red-50 text-red-600',              item: 'bg-red-50 text-red-700 font-semibold border-l-2 border-red-500' },
+  'On Hold':       { btn: 'border-yellow-500 bg-yellow-50 text-yellow-600',     item: 'bg-yellow-50 text-yellow-700 font-semibold border-l-2 border-yellow-500' },
+  'Re-Inspection': { btn: 'border-orange-500 bg-orange-50 text-orange-600',     item: 'bg-orange-50 text-orange-700 font-semibold border-l-2 border-orange-500' },
+}
+
 // ── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   formData: {
@@ -92,13 +105,48 @@ interface Props {
     minorDefectDetails: string
     testGroups: TestGroup[]
     additionalEvidence: Record<string, any[]>
-    finalDecision: string
-    reviewerRemarks: string
+    inspectionStatus: string
   }
+  setFormData: (d: any) => void
   onEditStep: (stepId: string) => void
+  errors?: Record<string, string>
 }
 
-export default function PI_Step6_Review({ formData: d, onEditStep }: Props) {
+export default function PI_Step6_Review({ formData: d, setFormData, onEditStep, errors = {} }: Props) {
+  // Use the live name from formData (set from DB via getProductDetails.assignedQc).
+  // Fall back to formatted cached name only if the form hasn't been prefilled yet.
+  const inspectorName = d.inspectorSignature || formatCheckerName(qcCheckerService.getCheckerData?.() || null) || ''
+
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const statusButtonRef = useRef<HTMLButtonElement | null>(null)
+  const statusMenuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!showStatusDropdown) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (!statusButtonRef.current?.contains(target) && !statusMenuRef.current?.contains(target)) {
+        setShowStatusDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showStatusDropdown])
+
+  useEffect(() => {
+    if (!showStatusDropdown || !statusButtonRef.current) return
+    const rect = statusButtonRef.current.getBoundingClientRect()
+    setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    const close = () => setShowStatusDropdown(false)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [showStatusDropdown])
+
   const v = d.vendorData || {}
   const p = d.productData || {}
 
@@ -246,17 +294,17 @@ export default function PI_Step6_Review({ formData: d, onEditStep }: Props) {
           onEdit={() => onEditStep('defects')}
         />
         <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="border border-purple-200 bg-purple-50 rounded-xl p-3 text-center">
+            <p className="text-xl font-bold text-purple-700">{d.criticalDefects}</p>
+            <p className="text-xs text-purple-600 font-semibold">Critical</p>
+          </div>
           <div className="border border-red-200 bg-red-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-red-700">{d.criticalDefects}</p>
-            <p className="text-xs text-red-600 font-semibold">Critical</p>
+            <p className="text-xl font-bold text-red-700">{d.majorDefects}</p>
+            <p className="text-xs text-red-600 font-semibold">Major</p>
           </div>
           <div className="border border-amber-200 bg-amber-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-amber-700">{d.majorDefects}</p>
-            <p className="text-xs text-amber-600 font-semibold">Major</p>
-          </div>
-          <div className="border border-slate-200 bg-slate-50 rounded-xl p-3 text-center">
-            <p className="text-xl font-bold text-slate-700">{d.minorDefects}</p>
-            <p className="text-xs text-slate-600 font-semibold">Minor</p>
+            <p className="text-xl font-bold text-amber-700">{d.minorDefects}</p>
+            <p className="text-xs text-amber-600 font-semibold">Minor</p>
           </div>
         </div>
         <div className="space-y-1">
@@ -315,25 +363,76 @@ export default function PI_Step6_Review({ formData: d, onEditStep }: Props) {
         </div>
       </div>
 
-      {/* ── Final Decision ────────────────────────────────────────────────── */}
+      {/* ── Inspector Details ─────────────────────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center gap-2">
-          <ClipboardList className="w-4 h-4 text-brand-500" />
-          <h3 className="text-sm font-bold text-slate-800">Final Decision</h3>
+          <User className="w-4 h-4 text-brand-600" />
+          <h3 className="text-sm font-bold text-slate-800">Inspector Details</h3>
         </div>
-        <div className="p-5 space-y-2">
-          <ReviewRow label="Decision" value={
-            <span className={`font-bold px-3 py-1 rounded-full text-xs border ${
-              d.finalDecision === 'Approved'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-red-50 text-red-700 border-red-200'
-            }`}>
-              {d.finalDecision}
-            </span>
-          } />
-          {d.reviewerRemarks && (
-            <ReviewRow label="Remarks" value={d.reviewerRemarks} />
-          )}
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Inspector Name</p>
+              <div className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-sm">
+                {inspectorName || '—'}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Inspection Date</p>
+              <div className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-sm">
+                {d.serviceStartDate || new Date().toISOString().split('T')[0]}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                Inspection Status <span className="text-red-500">*</span>
+              </label>
+              <button
+                ref={statusButtonRef}
+                type="button"
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                className={`w-full px-4 py-3 border rounded-xl text-left flex items-center justify-between text-sm font-semibold transition-all duration-200 ${
+                  errors.inspectionStatus
+                    ? 'border-red-500 bg-red-50/40 text-red-700'
+                    : d.inspectionStatus && STATUS_STYLES[d.inspectionStatus]
+                      ? STATUS_STYLES[d.inspectionStatus].btn
+                      : 'border-slate-300 bg-white text-slate-400 hover:border-slate-400'
+                }`}
+              >
+                <span>{d.inspectionStatus || 'Select status…'}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showStatusDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {errors.inspectionStatus && (
+                <p className="mt-1.5 text-xs text-red-600">{errors.inspectionStatus}</p>
+              )}
+              {showStatusDropdown && dropdownPos && typeof document !== 'undefined' && createPortal(
+                <div
+                  ref={statusMenuRef}
+                  style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }}
+                  className="bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden"
+                >
+                  {INSPECTION_STATUS_OPTIONS.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...d, inspectionStatus: status })
+                        setShowStatusDropdown(false)
+                      }}
+                      className={`block w-full px-4 py-2.5 text-sm text-left transition-colors ${
+                        d.inspectionStatus === status && STATUS_STYLES[status]
+                          ? STATUS_STYLES[status].item
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>,
+                document.body
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

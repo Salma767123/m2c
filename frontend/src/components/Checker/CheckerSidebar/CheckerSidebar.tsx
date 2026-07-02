@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { qcCheckerService } from '@/services/qcCheckerService'
+import { formatCheckerName } from '@/lib/checkerUtils'
 
 const sidebarItems = [
   { title: 'Dashboard', href: '/checker/dashboard',          icon: LayoutDashboard },
@@ -37,8 +38,18 @@ export default function Sidebar({ isCollapsed = false, onToggleCollapse }: Check
 
   useEffect(() => {
     const data = qcCheckerService.getCheckerData()
-    if (data?.name) setCheckerName(data.name)
+    if (data) setCheckerName(formatCheckerName(data))
     if (data?.profilePhoto) setProfilePhoto(data.profilePhoto)
+
+    qcCheckerService.getCheckerProfile().then((res) => {
+      if (!res?.success || !res.data) return
+      const fresh = res.data
+      setCheckerName(formatCheckerName(fresh))
+      if (fresh.profilePhoto) setProfilePhoto(fresh.profilePhoto)
+      const token = qcCheckerService.getCheckerToken()
+      const cached = qcCheckerService.getCheckerData() || {}
+      if (token) qcCheckerService.storeCheckerAuth(token, { ...cached, name: fresh.name, title: fresh.title ?? null, profilePhoto: fresh.profilePhoto ?? cached.profilePhoto })
+    }).catch(() => {})
   }, [])
 
   const handleLogout = () => {

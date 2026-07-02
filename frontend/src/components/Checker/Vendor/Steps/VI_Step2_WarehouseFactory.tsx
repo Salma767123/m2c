@@ -1,9 +1,11 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Warehouse, MapPin, Image as ImageIcon, Camera, X } from 'lucide-react'
+import { Warehouse, MapPin, Image as ImageIcon, Camera, X, Eye } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
 import ImageCropModal from '@/components/UI/ImageCropModal'
+import DocViewerModal from '@/components/UI/DocViewerModal'
+
 function getOwnershipTypeLabel(val: string) {
   const map: Record<string, string> = { owned: 'Owned', rented: 'Rented', lease: 'Lease' }
   return map[val] || val
@@ -104,7 +106,24 @@ function EvidenceUpload({
   )
 }
 
+const eq = (a: any, b: any) => (a || '').trim() === (b || '').trim()
+
+function detectSameAsLegal(v: any): boolean {
+  // No separate warehouse address was entered at all
+  if (!v.factoryAddress && !v.factoryCity) return true
+  // All provided warehouse (factory*) fields match the legal address (warehouse*)
+  return (
+    eq(v.factoryAddress, v.warehouseAddress) &&
+    eq(v.factoryCity, v.warehouseCity) &&
+    eq(v.factoryState, v.warehouseState) &&
+    eq(v.factoryZipCode, v.warehouseZipCode) &&
+    eq(v.factoryCountry, v.warehouseCountry)
+  )
+}
+
 export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, onChange, onRegisterFields, factoryEvidence, onEvidenceChange, evidenceError }: Props) {
+  const [viewerImg, setViewerImg] = useState<{ url: string; name: string } | null>(null)
+
   const vf = (key: string, label: string, value: any, type?: any) => (
     <VerifyField key={key} fieldKey={key} label={label} value={value} type={type} verifications={verifications} onChange={onChange} />
   )
@@ -112,6 +131,8 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
   const factoryImages = Array.isArray(v.documents)
     ? v.documents.filter((d: any) => d.type === 'OTHER').map((d: any) => ({ label: d.name || 'Factory Image', url: d.documentUrl }))
     : []
+
+  const isSameAsLegal = detectSameAsLegal(v)
 
   useEffect(() => {
     const keys: string[] = [
@@ -125,11 +146,17 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
       ...(v.warehouseState ? ['w_warehouseState'] : []),
       ...(v.warehouseZipCode ? ['w_warehouseZipCode'] : []),
       ...(v.warehouseCountry ? ['w_warehouseCountry'] : []),
-      ...(v.factoryAddress ? ['w_factoryAddress'] : []),
-      ...(v.factoryCity ? ['w_factoryCity'] : []),
-      ...(v.factoryState ? ['w_factoryState'] : []),
-      ...(v.factoryZipCode ? ['w_factoryZipCode'] : []),
-      ...(v.factoryCountry ? ['w_factoryCountry'] : []),
+      // Warehouse Address section: one key if same as legal, individual fields if different
+      ...(isSameAsLegal
+        ? ['w_sameWarehouse']
+        : [
+            ...(v.factoryAddress ? ['w_factoryAddress'] : []),
+            ...(v.factoryCity ? ['w_factoryCity'] : []),
+            ...(v.factoryState ? ['w_factoryState'] : []),
+            ...(v.factoryZipCode ? ['w_factoryZipCode'] : []),
+            ...(v.factoryCountry ? ['w_factoryCountry'] : []),
+          ]
+      ),
       ...(v.mapLink ? ['w_mapLink'] : []),
       ...factoryImages.map((_: any, idx: number) => `w_factoryImg_${idx}`),
     ]
@@ -137,15 +164,15 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [v])
 
-  return (
+  return (<>
     <div className="space-y-10">
       <div className="border-b border-slate-200 pb-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-1">Warehouse & Factory Details</h2>
         <p className="text-slate-500 text-sm">Verify the warehouse and factory address and physical infrastructure.</p>
       </div>
 
-      {/* Warehouse Address */}
-      <SectionBlock title="Warehouse Address" icon={<Warehouse className="w-4 h-4" />}>
+      {/* Section 1: Legal Address & Factory Site */}
+      <SectionBlock title="Legal Address & Factory Site" icon={<Warehouse className="w-4 h-4" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {vf('w_ownershipType', 'Ownership Type', getOwnershipTypeLabel(v.ownershipType))}
           {vf('w_warehouseSize', 'Warehousing Capacity', v.warehouseSize)}
@@ -162,23 +189,49 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
         </div>
       </SectionBlock>
 
-      {/* Factory Address */}
-      <SectionBlock title="Factory Address" icon={<MapPin className="w-4 h-4" />}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {v.factoryAddress && vf('w_factoryAddress', 'Factory Address', v.factoryAddress)}
-          {v.factoryCity && vf('w_factoryCity', 'Factory City', v.factoryCity)}
-          {v.factoryState && vf('w_factoryState', 'Factory State', v.factoryState)}
-          {v.factoryZipCode && vf('w_factoryZipCode', 'Factory ZIP', v.factoryZipCode)}
-          {v.factoryCountry && vf('w_factoryCountry', 'Factory Country', v.factoryCountry)}
-        </div>
-        {v.mapLink && (
+      {/* Section 2: Warehouse Address */}
+      <SectionBlock title="Warehouse Address" icon={<MapPin className="w-4 h-4" />}>
+        {isSameAsLegal ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <MapPin className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-800 font-medium">
+                Warehouse Address is the same as the Legal Address &amp; Factory Site provided above. Please verify.
+              </p>
+            </div>
+            <VerifyField
+              fieldKey="w_sameWarehouse"
+              label="Warehouse Address"
+              value="Same as Legal Address & Factory Site"
+              verifications={verifications}
+              onChange={onChange}
+            />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {v.factoryAddress && vf('w_factoryAddress', 'Address Line 1', v.factoryAddress)}
+              {v.factoryCity && vf('w_factoryCity', 'City', v.factoryCity)}
+              {v.factoryState && vf('w_factoryState', 'State', v.factoryState)}
+              {v.factoryZipCode && vf('w_factoryZipCode', 'ZIP / Postal Code', v.factoryZipCode)}
+              {v.factoryCountry && vf('w_factoryCountry', 'Country', v.factoryCountry)}
+            </div>
+            {v.mapLink && (
+              <div className="mt-2">
+                {vf('w_mapLink', 'Map / Location Link', v.mapLink, 'url')}
+              </div>
+            )}
+          </div>
+        )}
+        {/* Map link always shown if present and same-as-legal */}
+        {isSameAsLegal && v.mapLink && (
           <div className="mt-4">
             {vf('w_mapLink', 'Map / Location Link', v.mapLink, 'url')}
           </div>
         )}
       </SectionBlock>
 
-      {/* Vendor-uploaded Factory Photos — all get Yes/No verification */}
+      {/* Vendor-uploaded Factory Photos — each with a View button in the card header */}
       {factoryImages.length > 0 && (
         <SectionBlock title="Factory Photos (Vendor-Uploaded)" icon={<ImageIcon className="w-4 h-4" />}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -191,6 +244,15 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
                 type="image"
                 verifications={verifications}
                 onChange={onChange}
+                headerAction={img.url ? (
+                  <button
+                    type="button"
+                    onClick={() => setViewerImg({ url: img.url, name: img.label })}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
+                  >
+                    <Eye className="w-3 h-3" /> View
+                  </button>
+                ) : undefined}
               />
             ))}
           </div>
@@ -226,5 +288,14 @@ export default function VI_Step2_WarehouseFactory({ vendor: v, verifications, on
         </SectionBlock>
       </div>
     </div>
-  )
+
+    {viewerImg && (
+      <DocViewerModal
+        url={viewerImg.url}
+        name={viewerImg.name}
+        readOnly
+        onClose={() => setViewerImg(null)}
+      />
+    )}
+  </>)
 }

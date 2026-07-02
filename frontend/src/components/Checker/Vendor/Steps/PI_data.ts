@@ -100,6 +100,8 @@ export type TestItem = {
   remarks: string
   rightPhotos: any[]
   wrongPhotos: any[]
+  isOther?: boolean
+  subject?: string
 }
 
 export type TestGroup = {

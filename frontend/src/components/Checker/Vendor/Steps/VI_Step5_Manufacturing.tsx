@@ -1,57 +1,65 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Factory, Settings } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
 
-const FACILITY_META: Record<string, { label: string; detailFields: Array<{ key: string; label: string }> }> = {
+const FACILITY_META: Record<string, { label: string; detailFields: Array<{ key: string; label: string; unit?: string }> }> = {
   spinning: {
     label: 'Spinning',
     detailFields: [
-      { key: 'spinningMachines', label: 'Number of Machines' },
-      { key: 'spinningCapacity', label: 'Monthly Capacity' },
+      { key: 'spinningMachines', label: 'Number of Machines', unit: 'Machines' },
+      { key: 'spinningCapacity', label: 'Daily Capacity', unit: 'Kg / Day' },
       { key: 'remarks', label: 'Remarks' },
     ],
   },
   weaving: {
     label: 'Weaving',
     detailFields: [
-      { key: 'loomCount', label: 'Loom Count' },
-      { key: 'weavingCapacity', label: 'Monthly Capacity' },
+      { key: 'loomCount', label: 'Number of Looms', unit: 'Looms' },
+      { key: 'weavingCapacity', label: 'Daily Capacity', unit: 'Kg / Day' },
       { key: 'remarks', label: 'Remarks' },
     ],
   },
   dyeing: {
     label: 'Dyeing',
     detailFields: [
-      { key: 'dyeingMachines', label: 'Number of Machines' },
-      { key: 'dyeingCapacity', label: 'Monthly Capacity' },
+      { key: 'dyeingMachines', label: 'Number of Machines', unit: 'Machines' },
+      { key: 'dyeingCapacity', label: 'Daily Capacity', unit: 'Kg / Day' },
       { key: 'remarks', label: 'Remarks' },
     ],
   },
   printing: {
     label: 'Printing',
     detailFields: [
-      { key: 'printingMachines', label: 'Number of Machines' },
-      { key: 'printingCapacity', label: 'Monthly Capacity' },
+      { key: 'printingMachines', label: 'Number of Machines', unit: 'Machines' },
+      { key: 'printingCapacity', label: 'Daily Capacity', unit: 'Kg / Day' },
       { key: 'remarks', label: 'Remarks' },
     ],
   },
   stitching: {
     label: 'Stitching',
     detailFields: [
-      { key: 'stitchingMachines', label: 'Number of Machines' },
-      { key: 'stitchingCapacity', label: 'Monthly Capacity' },
+      { key: 'stitchingMachines', label: 'Number of Machines', unit: 'Machines' },
+      { key: 'stitchingCapacity', label: 'Daily Capacity', unit: 'Pieces / Day' },
       { key: 'remarks', label: 'Remarks' },
     ],
   },
   finishing: {
     label: 'Finishing',
     detailFields: [
-      { key: 'finishingCapacity', label: 'Monthly Capacity' },
+      { key: 'finishingCapacity', label: 'Daily Capacity', unit: 'Pieces / Day' },
       { key: 'remarks', label: 'Remarks' },
     ],
   },
+}
+
+// Append unit if the value is a plain number (no letters already present)
+function withUnit(val: any, unit?: string): any {
+  if (!val || !unit) return val
+  const s = String(val).trim()
+  if (/[a-zA-Z]/.test(s)) return s   // already has unit-like text
+  return `${s} ${unit}`
 }
 
 interface Props {
@@ -72,7 +80,6 @@ export default function VI_Step5_Manufacturing({ vendor: v, verifications, onCha
 
   useEffect(() => {
     const keys: string[] = [
-      ...(v.productionCapacity ? ['mf_productionCapacity'] : []),
       ...activeFacilities.flatMap((facilityKey) => {
         const meta = FACILITY_META[facilityKey]
         const details = facilityDetails[facilityKey] || {}
@@ -96,14 +103,7 @@ export default function VI_Step5_Manufacturing({ vendor: v, verifications, onCha
         <p className="text-slate-500 text-sm">Verify the production facilities, machinery, and capacity information submitted by the vendor.</p>
       </div>
 
-      {/* Production Capacity Overview */}
-      {v.productionCapacity && (
-        <SectionBlock title="Overall Production Capacity" icon={<Factory className="w-4 h-4" />}>
-          {vf('mf_productionCapacity', 'Monthly Production Capacity', v.productionCapacity)}
-        </SectionBlock>
-      )}
-
-      {/* Enabled Facilities */}
+      {/* Active Facilities */}
       <SectionBlock title="Active Facilities" icon={<Settings className="w-4 h-4" />}>
         {activeFacilities.length === 0 ? (
           <p className="text-sm text-slate-400 italic">No facilities declared.</p>
@@ -123,10 +123,10 @@ export default function VI_Step5_Manufacturing({ vendor: v, verifications, onCha
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {vf(`${prefix}_active`, `${meta.label} Facility Active`, 'Yes — declared as active')}
-                    {meta.detailFields.map(({ key, label }) => {
+                    {meta.detailFields.map(({ key, label, unit }) => {
                       const val = details[key]
                       if (!val) return null
-                      return vf(`${prefix}_${key}`, label, val)
+                      return vf(`${prefix}_${key}`, label, withUnit(val, unit))
                     })}
                   </div>
                 </div>
@@ -135,8 +135,6 @@ export default function VI_Step5_Manufacturing({ vendor: v, verifications, onCha
           </div>
         )}
       </SectionBlock>
-
-
     </div>
   )
 }

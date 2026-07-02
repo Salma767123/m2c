@@ -11,6 +11,7 @@ import InspectionInfo from "./Steps/InspectionInfo"
 import BasicEvidence from "./Steps/BasicEvidence"
 
 import qcCheckerService from "@/services/qcCheckerService"
+import { formatCheckerName } from "@/lib/checkerUtils"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import { validateStep, validateAll, hasErrors, groupFieldErrors, type Step as ValidationStep, type StepErrors, type AllErrors } from "./validation"
 
@@ -223,11 +224,10 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
     let cancelled = false
 
     async function loadActiveInspection() {
-      // Inspector name from cached login data — zero network cost.
-      // `prev.inspectorName ||` so a typed value is never overwritten.
+      // Inspector name: seed from cache instantly, then overwrite with live DB value.
       const cached = qcCheckerService.getCheckerData?.()
       if (cached?.name && !cancelled) {
-        setFormData(prev => ({ ...prev, inspectorName: prev.inspectorName || cached.name }))
+        setFormData(prev => ({ ...prev, inspectorName: prev.inspectorName || formatCheckerName(cached) }))
       }
 
       if (!vendorId) {
@@ -248,6 +248,10 @@ export default function InspectionForm({ vendorName, vendorId, onComplete }: Ins
 
         const inspection = res?.inspection
         if (inspection) {
+          // Overwrite inspectorName with the current name from DB (picks up admin edits to title/name).
+          if (inspection.checker) {
+            setFormData(prev => ({ ...prev, inspectorName: formatCheckerName(inspection.checker) }))
+          }
           setInspectionId(inspection.id)
           if (inspection.cycleNumber > 1) setCycleNumber(inspection.cycleNumber)
           if (res.previousRejectionReason) setPreviousRejectionReason(res.previousRejectionReason)

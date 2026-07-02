@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Briefcase, FileText, Image as ImageIcon } from 'lucide-react'
+import { Briefcase, FileText, Image as ImageIcon, Phone } from 'lucide-react'
 import VerifyField, { SectionBlock, DocCard, Verifications } from './VI_VerifyField'
+import { formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
 
 const COMPANY_DOC_TYPES = ['GST_CERTIFICATE', 'PAN_CARD', 'COMPANY_REGISTRATION', 'AADHAAR_CARD', 'TRADE_LICENSE', 'EXPORT_LICENSE']
 
@@ -42,6 +43,9 @@ export default function VI_Step1_CompanyInfo({ vendor: v, verifications, onChang
     ? v.documents.filter((d: any) => COMPANY_DOC_TYPES.includes(d.type))
     : []
 
+  const localLandline = formatLocalLandline({ countryCode: '+91', std: v.localLandlineStd, number: v.landlineNumber })
+  const intlLandline = formatIntlLandline(v.intlLandline)
+
   useEffect(() => {
     const keys: string[] = [
       ...(v.companyLogo ? ['c_companyLogo'] : []),
@@ -54,6 +58,13 @@ export default function VI_Step1_CompanyInfo({ vendor: v, verifications, onChang
       ...(v.aadhaarNumber ? ['c_aadhaarNumber'] : []),
       ...(v.website ? ['c_website'] : []),
       ...companyDocs.map((d: any, idx: number) => `c_doc_${d.type || idx}`),
+      // Business & Contact Details (moved from Step 7)
+      'ct_businessPhone',
+      ...(v.phoneNumber2 ? ['ct_phoneNumber2'] : []),
+      'ct_businessEmail',
+      ...(v.businessEmail2 ? ['ct_businessEmail2'] : []),
+      ...(localLandline ? ['ct_landline'] : []),
+      ...(intlLandline ? ['ct_intlLandline'] : []),
     ]
     onRegisterFields(keys)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,6 +104,18 @@ export default function VI_Step1_CompanyInfo({ vendor: v, verifications, onChang
           {v.iecCode && vf('c_iecCode', 'IEC Code', v.iecCode)}
           {v.aadhaarNumber && vf('c_aadhaarNumber', 'Aadhaar Number', v.aadhaarNumber)}
           {v.website && vf('c_website', 'Website', v.website, 'url')}
+        </div>
+      </SectionBlock>
+
+      {/* Business & Contact Details (moved here from Step 7) */}
+      <SectionBlock title="Business & Contact Details" icon={<Phone className="w-4 h-4" />}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {vf('ct_businessPhone', 'Primary Phone', v.businessPhone)}
+          {v.phoneNumber2 && vf('ct_phoneNumber2', 'Secondary Phone', v.phoneNumber2)}
+          {vf('ct_businessEmail', 'Primary Email', v.businessEmail)}
+          {v.businessEmail2 && vf('ct_businessEmail2', 'Secondary Email', v.businessEmail2)}
+          {localLandline && vf('ct_landline', 'Local Landline', localLandline)}
+          {intlLandline && vf('ct_intlLandline', 'International Landline', intlLandline)}
         </div>
       </SectionBlock>
 

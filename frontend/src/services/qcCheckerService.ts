@@ -7,6 +7,7 @@ export interface QCCheckerData {
     checkerId: string;
     email: string;
     name: string;
+    title?: string | null;
     phone: string;
     address?: string;
     addressLine2?: string;
@@ -35,6 +36,7 @@ export interface QCCheckerData {
 
 export interface CreateQCCheckerData {
     name: string;
+    title?: string;
     email: string;
     phone: string;
     address?: string;
@@ -71,6 +73,7 @@ export interface QCCheckerLoginResponse {
             checkerId: string;
             email: string;
             name: string;
+            title?: string | null;
             phone: string;
             status: string;
             specialization?: string;

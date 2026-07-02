@@ -276,22 +276,23 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
           )}
         </div>
 
-        <label
-          className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl px-6 py-8 cursor-pointer transition-colors group ${
-            errors.packagingPhotos ? 'border-red-300 bg-red-50/30 hover:border-red-400' : 'border-slate-300 hover:border-brand-400 hover:bg-brand-50/30'
-          }`}
-        >
-          <Upload className="w-7 h-7 text-slate-400 group-hover:text-brand-500 mb-2 transition-colors" />
-          <p className="text-sm font-medium text-slate-700">Upload packaging photos</p>
-          <p className="text-xs text-slate-400 mt-1">PNG, JPG, JPEG — multiple files accepted</p>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handlePhotoUpload}
-          />
-        </label>
+        {(formData.packagingPhotos || []).length === 0 && (
+          <label
+            className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl px-6 py-8 cursor-pointer transition-colors group ${
+              errors.packagingPhotos ? 'border-red-300 bg-red-50/30 hover:border-red-400' : 'border-slate-300 hover:border-brand-400 hover:bg-brand-50/30'
+            }`}
+          >
+            <Upload className="w-7 h-7 text-slate-400 group-hover:text-brand-500 mb-2 transition-colors" />
+            <p className="text-sm font-medium text-slate-700">Upload packaging photo</p>
+            <p className="text-xs text-slate-400 mt-1">PNG, JPG, JPEG — 1 photo</p>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
+          </label>
+        )}
 
         {(formData.packagingPhotos || []).length > 0 && (
           <div className="mt-4 grid grid-cols-3 md:grid-cols-5 gap-3">

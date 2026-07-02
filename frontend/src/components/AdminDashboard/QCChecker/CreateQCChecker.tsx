@@ -15,8 +15,13 @@ import ImageCropModal from "@/components/UI/ImageCropModal";
 const INPUT_CLASS =
   "w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white";
 
+const TITLE_OPTIONS = ['Mr.', 'Mrs.', 'Miss']
+
 const EMPTY_FORM = {
-  name: "",
+  title: "",
+  firstName: "",
+  middleName: "",
+  lastName: "",
   email: "",
   phone: "",
   alternatePhone: "",
@@ -109,8 +114,10 @@ export default function CreateQCChecker() {
     setIsSubmitting(true);
 
     try {
+      const fullName = [formData.firstName, formData.middleName, formData.lastName].filter(Boolean).join(' ').trim()
       const result = await qcCheckerService.createQCChecker({
-        name: formData.name,
+        name: fullName,
+        title: formData.title || undefined,
         email: formData.email,
         phone: formData.phone,
         alternatePhone: formData.alternatePhone || undefined,
@@ -262,18 +269,57 @@ export default function CreateQCChecker() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Title + First Name row */}
+              <div className="flex gap-3">
+                <div className="w-28 shrink-0">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Title</label>
+                  <select
+                    name="title"
+                    value={formData.title}
+                    onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    className={INPUT_CLASS}
+                  >
+                    <option value="">—</option>
+                    {TITLE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    First Name <span className="text-brand-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    placeholder="First name"
+                    className={INPUT_CLASS}
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Full Name <span className="text-brand-500">*</span>
-                </label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name</label>
                 <input
                   type="text"
-                  name="name"
-                  value={formData.name}
+                  name="lastName"
+                  value={formData.lastName}
                   onChange={handleInputChange}
-                  placeholder="Enter full name"
+                  placeholder="Last name"
                   className={INPUT_CLASS}
-                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Middle Name <span className="font-normal text-slate-400">(optional)</span></label>
+                <input
+                  type="text"
+                  name="middleName"
+                  value={formData.middleName}
+                  onChange={handleInputChange}
+                  placeholder="Middle name"
+                  className={INPUT_CLASS}
                 />
               </div>
 

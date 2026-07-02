@@ -10,6 +10,7 @@ import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils";
 import vendorService from "@/services/vendorService";
 import qcCheckerService from "@/services/qcCheckerService";
+import { formatCheckerName } from "@/lib/checkerUtils";
 import { useSearchParams } from 'next/navigation';
 
 interface Vendor {
@@ -310,7 +311,7 @@ export default function CreateAssignment() {
                         { value: "", label: "Choose a QC checker" },
                         ...qcCheckers.map((checker) => ({
                           value: checker.id,
-                          label: `${checker.name} (${checker.assignedVendors} vendors)`,
+                          label: `${formatCheckerName(checker)} (${checker.assignedVendors} vendors)`,
                         })),
                       ]}
                       onChange={handleCheckerChange}

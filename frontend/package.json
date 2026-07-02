@@ -29,6 +29,7 @@
     "libphonenumber-js": "^1.13.2",
     "lucide-react": "^0.562.0",
     "next": "^16.1.4",
+    "pdfjs-dist": "^6.1.200",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-easy-crop": "^6.0.2",

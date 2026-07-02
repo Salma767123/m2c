@@ -10,6 +10,7 @@ import { Card, CardContent } from "../../UI/Card";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb";
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService";
 import { showErrorToast } from "@/lib/toast-utils";
+import { formatCheckerName } from "@/lib/checkerUtils";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -118,14 +119,14 @@ export default function QCCheckerDetail() {
                 <div className="w-24 h-24 rounded-full border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
                   {checker.profilePhoto ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={checker.profilePhoto} alt={checker.name} className="w-full h-full object-cover" />
+                    <img src={checker.profilePhoto} alt={formatCheckerName(checker)} className="w-full h-full object-cover" />
                   ) : (
                     <User className="w-10 h-10 text-slate-300" />
                   )}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="text-2xl font-bold text-slate-900">{checker.name}</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">{formatCheckerName(checker)}</h2>
                     <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg border text-xs font-semibold ${statusStyle}`}>
                       <BadgeCheck className="w-3.5 h-3.5" />{checker.status}
                     </span>

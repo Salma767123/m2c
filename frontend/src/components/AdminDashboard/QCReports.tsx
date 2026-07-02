@@ -22,6 +22,7 @@ import { showErrorToast } from '@/lib/toast-utils'
 import { useDebounce } from '@/hooks/useDebounce'
 import reportsService from '@/services/reportsService'
 import { hasPermission } from '@/lib/auth'
+import { formatCheckerName } from '@/lib/checkerUtils'
 
 const PAGE_SIZE = 12
 const DEFAULT_SORT = 'desc'
@@ -403,7 +404,7 @@ export default function QCReports() {
                                                 <TableCell>
                                                     {report.checker ? (
                                                         <>
-                                                            <div className="font-medium text-gray-900">{report.checker.name}</div>
+                                                            <div className="font-medium text-gray-900">{formatCheckerName(report.checker)}</div>
                                                             <div className="text-xs text-gray-500">{report.checker.email}</div>
                                                         </>
                                                     ) : (

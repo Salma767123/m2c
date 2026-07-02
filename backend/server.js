@@ -245,7 +245,22 @@ app.get("/api/document-proxy", async (req, res) => {
     jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp",
   };
 
-  const isDownload = download === "true";
+  // Block downloads for QC checkers regardless of the download param
+  let isDownload = download === "true";
+  if (isDownload) {
+    const authHeader = req.headers.authorization;
+    const cookieToken = req.cookies && req.cookies.token;
+    const rawToken = (authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null) || cookieToken;
+    if (rawToken) {
+      try {
+        const jwt = require("jsonwebtoken");
+        const decoded = jwt.verify(rawToken, process.env.JWT_SECRET);
+        if (decoded && decoded.type === "qc_checker") {
+          return res.status(403).json({ error: "Download not permitted for quality checkers" });
+        }
+      } catch { /* invalid or expired token — proceed normally */ }
+    }
+  }
 
   // Helper: send file buffer with correct headers
   const sendBuffer = (buffer, contentType) => {

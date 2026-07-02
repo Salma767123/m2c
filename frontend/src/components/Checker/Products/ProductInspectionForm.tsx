@@ -21,6 +21,7 @@ import {
 
 // ── Services + utilities ──────────────────────────────────────────────────────
 import { qcCheckerService } from "@/services/qcCheckerService"
+import { formatCheckerName } from "@/lib/checkerUtils"
 import { showSuccessToast, showErrorToast } from "@/lib/toast-utils"
 import {
     validateStep,
@@ -203,7 +204,7 @@ export default function ProductInspectionForm({
         if (cached?.name && !cancelled) {
             setFormData((prev) => ({
                 ...prev,
-                inspectorSignature: prev.inspectorSignature || cached.name,
+                inspectorSignature: prev.inspectorSignature || formatCheckerName(cached),
             }))
         }
 
@@ -219,6 +220,8 @@ export default function ProductInspectionForm({
                     vendor: prev.vendor || v.companyName || vendorName,
                     vendorData: v,
                     productData: product,
+                    // Overwrite inspectorSignature with the current name from DB (picks up admin edits)
+                    inspectorSignature: product?.assignedQc ? formatCheckerName(product.assignedQc) : prev.inspectorSignature,
                 }))
 
                 prefilledRef.current = productId
@@ -476,7 +479,7 @@ export default function ProductInspectionForm({
                         <PI_Step5_Testing formData={formData} setFormData={setFormData} errors={errors.testing || {}} />
                     )}
                     {currentStep === "review" && (
-                        <PI_Step6_Review formData={formData as any} onEditStep={handleEditStep} />
+                        <PI_Step6_Review formData={formData as any} setFormData={setFormData} onEditStep={handleEditStep} errors={errors.review || {}} />
                     )}
                     {currentStep === "documentation" && (
                         <Documentation formData={formData} setFormData={setFormData} errors={errors.documentation || {}} />

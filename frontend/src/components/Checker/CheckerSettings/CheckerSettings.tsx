@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { User, Loader2, Mail, Phone, MapPin, Shield, FileText, ExternalLink } from "lucide-react"
 import { qcCheckerService, QCCheckerData } from "@/services/qcCheckerService"
+import { formatCheckerName } from "@/lib/checkerUtils"
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -63,6 +64,17 @@ export default function SettingsPage() {
           const res = await qcCheckerService.getCheckerProfile()
           if (res.success && res.data) {
             setProfile(res.data)
+            // Keep localStorage in sync so sidebar/header pick up the latest name+title
+            const token = qcCheckerService.getCheckerToken()
+            if (token) {
+              const fresh = res.data
+              qcCheckerService.storeCheckerAuth(token, {
+                ...(localData || {}),
+                name: fresh.name,
+                title: fresh.title ?? null,
+                profilePhoto: fresh.profilePhoto ?? localData?.profilePhoto ?? null,
+              })
+            }
           } else if (localData) {
             setProfile(localData)
           }
@@ -116,7 +128,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6">
                   <Field label="Checker ID" value={profile?.checkerId || "—"} />
-                  <Field label="Full Name" value={profile?.name} />
+                  <Field label="Full Name" value={formatCheckerName(profile) || profile?.name} />
                   <div>
                     <label className="block text-slate-500 font-medium mb-1.5 text-xs uppercase tracking-wide">Status</label>
                     <div className={`inline-flex items-center px-3 py-1.5 rounded-lg border text-sm font-semibold ${statusStyle}`}>

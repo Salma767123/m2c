@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useContext, createContext } from 'react'
-import { FileText, ExternalLink, Download, Image as ImageIcon } from 'lucide-react'
-import { downloadDoc } from '@/lib/docDownload'
+import React, { useContext, createContext, useState } from 'react'
+import { FileText, ExternalLink, Eye } from 'lucide-react'
+import DocViewerModal from '@/components/UI/DocViewerModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type FieldVerification = { ok: boolean | null; remarks: string }
@@ -104,9 +104,11 @@ interface VerifyFieldProps {
   verifications: Verifications
   onChange: (key: string, ok: boolean | null, remarks: string) => void
   type?: 'text' | 'image' | 'document' | 'list' | 'date' | 'url' | 'badge'
+  /** Optional action rendered in the top-right of the card, beside the label */
+  headerAction?: React.ReactNode
 }
 
-export default function VerifyField({ fieldKey, label, value, verifications, onChange, type }: VerifyFieldProps) {
+export default function VerifyField({ fieldKey, label, value, verifications, onChange, type, headerAction }: VerifyFieldProps) {
   const highlightedKeys = useContext(HighlightedFieldsCtx)
   const v = verifications[fieldKey] ?? { ok: null, remarks: '' }
   const isEmpty = value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)
@@ -129,7 +131,10 @@ export default function VerifyField({ fieldKey, label, value, verifications, onC
       }`}
     >
       <div className="p-4">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</p>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+          {headerAction}
+        </div>
         <div className="min-h-[1.5rem]">
           {isEmpty
             ? <span className="text-slate-400 italic text-sm">Not provided</span>
@@ -209,7 +214,7 @@ export function InfoRow({ label, value, type }: { label: string; value: any; typ
   )
 }
 
-// ── DocCard — document/image card with single open/download action ────────────
+// ── DocCard — document/image card with view-only action ──────────────────────
 export function DocCard({ doc, index, fieldKey, verifications, onChange }: {
   doc: { name?: string; documentUrl?: string; type?: string }
   index: number
@@ -217,12 +222,23 @@ export function DocCard({ doc, index, fieldKey, verifications, onChange }: {
   verifications: Verifications
   onChange: (key: string, ok: boolean | null, remarks: string) => void
 }) {
+  const [viewerOpen, setViewerOpen] = useState(false)
   const url = doc.documentUrl || ''
   const name = doc.name || doc.type || `Document ${index + 1}`
   const isImg = isImageUrl(url, doc.name)
 
+  const viewButton = url ? (
+    <button
+      type="button"
+      onClick={() => setViewerOpen(true)}
+      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition-colors shrink-0"
+    >
+      <Eye className="w-3 h-3" /> View
+    </button>
+  ) : undefined
+
   return (
-    <div className="space-y-2">
+    <>
       <VerifyField
         fieldKey={fieldKey}
         label={name}
@@ -230,28 +246,16 @@ export function DocCard({ doc, index, fieldKey, verifications, onChange }: {
         type={isImg ? 'image' : 'document'}
         verifications={verifications}
         onChange={onChange}
+        headerAction={viewButton}
       />
-      {url && (
-        isImg ? (
-          <button
-            type="button"
-            onClick={() => downloadDoc(url, name)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors"
-          >
-            <Download className="w-3 h-3" />
-            Download Image
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => downloadDoc(url, name)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors"
-          >
-            <Download className="w-3 h-3" />
-            Download
-          </button>
-        )
+      {viewerOpen && url && (
+        <DocViewerModal
+          url={url}
+          name={name}
+          readOnly
+          onClose={() => setViewerOpen(false)}
+        />
       )}
-    </div>
+    </>
   )
 }

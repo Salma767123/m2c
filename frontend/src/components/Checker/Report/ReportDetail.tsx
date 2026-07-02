@@ -1,18 +1,16 @@
 /* eslint-disable @next/next/no-img-element */
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { useSearchParams } from "next/navigation"
+import { useState, useEffect } from "react"
 import {
   ArrowLeft, FileText, CheckCircle, XCircle, AlertTriangle,
   Building2, ShieldCheck, Factory, Settings, ClipboardList, Package,
-  Download, Camera, Clock, MapPin, Tags, Briefcase, User, Warehouse,
+  Camera, Clock, MapPin, Tags, Briefcase, User, Warehouse,
   Phone, Award,
 } from "lucide-react"
 import { Badge } from "@/components/UI/Badge"
 import qcCheckerService from "@/services/qcCheckerService"
-import { generateFactoryInspectionPdf } from "@/lib/factoryInspectionReportPdf"
-import type { FactoryImageEntry, FactoryReportMeta } from "@/lib/factoryInspectionReportPdf"
+import { formatCheckerName } from "@/lib/checkerUtils"
 
 interface ReportDetailProps {
   reportId: string
@@ -54,21 +52,6 @@ function buildName(...parts: (string | undefined | null)[]): string {
 
 // ── Verification types ──────────────────────────────────────────────────────────
 type VF = Record<string, { ok: boolean | null; remarks: string }>
-
-// ── Async image fetch helper ────────────────────────────────────────────────────
-async function fetchImgDataUrl(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return null
-    const blob = await res.blob()
-    return await new Promise<string | null>((resolve) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
-  } catch { return null }
-}
 
 // ── Helper components ───────────────────────────────────────────────────────────
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
@@ -222,59 +205,12 @@ interface InspectionRecord {
   locationDistanceM?: number
 }
 
-// ── Build PDF (async — fetches vendor images before calling jsPDF generator) ────
-async function buildFactoryPdf(inspection: InspectionRecord, reportId: string) {
-  const rawItems = inspection.itemsToInspect
-  const isFormData = rawItems && !Array.isArray(rawItems) && typeof rawItems === "object"
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formData: Record<string, any> = isFormData ? (rawItems as Record<string, any>) : {}
-  const isNewFormat = isFormData && typeof formData.verifications === "object" && formData.verifications !== null
-  const vendor: Record<string, any> = (inspection.vendor as Record<string, any>) || {}
-
-  // Fetch vendor factory images from Cloudinary (CORS-safe via base64)
-  const vendorDocs: any[] = Array.isArray(vendor.documents) ? vendor.documents : []
-  const factoryDocs = vendorDocs.filter((d: any) => d.type === "OTHER" && d.documentUrl)
-  const imgResults = await Promise.all(
-    factoryDocs.map(async (d: any): Promise<FactoryImageEntry | null> => {
-      const dataUrl = await fetchImgDataUrl(d.documentUrl)
-      return dataUrl ? { label: d.name || "Factory Image", dataUrl } : null
-    })
-  )
-  const vendorFactoryImages = imgResults.filter((x): x is FactoryImageEntry => x !== null)
-
-  const meta: FactoryReportMeta = {
-    inspectorName: formData.inspectorName || inspection.checker?.name,
-    inspectionDate: formData.inspectionDate,
-    overallResult: formData.inspectionStatus,
-    inspectorRemarks: formData.inspectorRemarks || inspection.notes,
-    checker: inspection.checker || null,
-    location: inspection.checkerLatitude != null
-      ? { latitude: inspection.checkerLatitude, longitude: inspection.checkerLongitude! }
-      : null,
-    generatedAt: new Date(),
-  }
-
-  const vfToUse = isNewFormat ? formData.verifications : {}
-  const pdf = generateFactoryInspectionPdf(vendor, vfToUse, meta, {
-    vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
-    inspectorEvidenceImages: null,
-  })
-
-  const vendorName = vendor.companyName || formData.vendorName || "Report"
-  const filename = `Factory_Report_${vendorName.replace(/\s+/g, "_")}_${reportId.slice(-8).toUpperCase()}.pdf`
-  return { pdf, filename }
-}
-
 // ── Main Component ──────────────────────────────────────────────────────────────
 export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
-  const searchParams = useSearchParams()
-  const autoDownload = searchParams.get("download") === "true"
   const [inspection, setInspection] = useState<InspectionRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [downloading, setDownloading] = useState(false)
   const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null)
-  const autoDownloadTriggered = useRef(false)
 
   useEffect(() => {
     const load = async () => {
@@ -291,28 +227,6 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
     load()
   }, [reportId])
 
-  // Auto-trigger PDF download when navigated with ?download=true
-  useEffect(() => {
-    if (!autoDownload || autoDownloadTriggered.current || loading || !inspection || downloading) return
-    autoDownloadTriggered.current = true
-    buildFactoryPdf(inspection, reportId)
-      .then(({ pdf, filename }) => pdf.save(filename))
-      .catch(() => {})
-  }, [autoDownload, loading, inspection, downloading, reportId])
-
-  const handleDownloadPdf = async () => {
-    if (!inspection) return
-    setDownloading(true)
-    try {
-      const { pdf, filename } = await buildFactoryPdf(inspection, reportId)
-      pdf.save(filename)
-    } catch {
-      alert("Failed to generate PDF. Please try again.")
-    } finally {
-      setDownloading(false)
-    }
-  }
-
   if (loading) return (
     <div className="p-8 max-w-5xl mx-auto font-sans space-y-6 animate-pulse">
       <div className="flex items-center gap-4">
@@ -321,7 +235,6 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
           <div className="h-8 bg-slate-200 rounded w-64" />
           <div className="h-4 bg-slate-100 rounded w-48" />
         </div>
-        <div className="h-10 bg-slate-200 rounded-lg w-36" />
       </div>
       <div className="h-24 bg-slate-200 rounded-2xl" />
       {Array.from({ length: 4 }).map((_, i) => (
@@ -384,14 +297,6 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
             {vendor.companyName || fd.vendorName} &bull; Ref: {reportId.slice(-8).toUpperCase()}
           </p>
         </div>
-        <button
-          onClick={handleDownloadPdf}
-          disabled={downloading}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand-500 rounded-xl hover:bg-brand-600 active:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shadow-brand-500/10 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1"
-        >
-          <Download className="w-4 h-4" />
-          {downloading ? "Generating..." : "Download PDF"}
-        </button>
         {inspection.result && (
           <Badge className={`${resultColors[inspection.result] || "bg-gray-100 text-gray-700"} text-sm px-4 py-1.5`}>
             {inspection.result === "PASSED" && <CheckCircle className="w-4 h-4 mr-1.5" />}
@@ -991,7 +896,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
           <Section title="Section 6 — Inspection Info" icon={ClipboardList} accent="bg-orange-50 text-orange-800">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
               <InfoRow label="Inspection Date" value={fd.inspectionDate} />
-              <InfoRow label="Inspector Name" value={fd.inspectorName || inspection.checker?.name} />
+              <InfoRow label="Inspector Name" value={fd.inspectorName || formatCheckerName(inspection.checker)} />
               <InfoRow label="Inspection Status" value={fd.inspectionStatus} />
             </div>
             {(fd.inspectorRemarks || inspection.notes) && (
@@ -1035,7 +940,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                   <div className="flex flex-wrap gap-2">
                     {(fd.documentsUpload as DocItem[]).map((doc, i) =>
                       doc?.data ? (
-                        <a key={i} href={doc.data} download={doc.name || `Document_${i + 1}`}
+                        <a key={i} href={doc.data} target="_blank" rel="noopener noreferrer"
                           className="flex items-center gap-2 px-3 py-2 bg-brand-50 text-brand-700 border border-brand-200 rounded-lg text-xs font-medium hover:bg-brand-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-1">
                           <FileText className="w-3.5 h-3.5" />
                           {doc.name || `Document ${i + 1}`}

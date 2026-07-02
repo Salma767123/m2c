@@ -52,7 +52,7 @@ const SORT_OPTIONS = [
 const MAIN_STATUS_COLORS: Record<string, string> = {
   "New Assignment": "bg-blue-50 text-blue-700 border-blue-200/85",
   "Under Review by Admin": "bg-orange-50 text-orange-700 border-orange-200/85",
-  "Re-Inspection": "bg-purple-50 text-purple-700 border-purple-200/85",
+  "Re-Inspection": "bg-orange-50 text-orange-700 border-orange-200/85",
   "Re-Inspection Under Review by Admin": "bg-amber-50 text-amber-700 border-amber-200/85",
   "Re-Inspection Under Review": "bg-amber-50 text-amber-700 border-amber-200/85",
   "Approved": "bg-emerald-50 text-emerald-700 border-emerald-200/85",

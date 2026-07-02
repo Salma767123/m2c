@@ -41,8 +41,13 @@ export default function EditQCChecker() {
   const [idProofName, setIdProofName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const TITLE_OPTIONS = ['Mr.', 'Mrs.', 'Miss']
+
   const [formData, setFormData] = useState({
-    name: "",
+    title: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
     email: "",
     phone: "",
     alternatePhone: "",
@@ -75,8 +80,16 @@ export default function EditQCChecker() {
         const result = await qcCheckerService.getQCCheckerById(id);
         const c = result.data;
         setCheckerId(c.checkerId || "");
+        // Split stored name into parts for individual fields
+        const nameParts = (c.name || "").trim().split(/\s+/).filter(Boolean)
+        const firstName = nameParts[0] || ""
+        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : ""
+        const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : ""
         setFormData({
-          name: c.name || "",
+          title: c.title || "",
+          firstName,
+          middleName,
+          lastName,
           email: c.email || "",
           phone: c.phone || "",
           alternatePhone: c.alternatePhone || "",
@@ -159,8 +172,10 @@ export default function EditQCChecker() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      const fullName = [formData.firstName, formData.middleName, formData.lastName].filter(Boolean).join(' ').trim()
       await qcCheckerService.updateQCChecker(id, {
-        name: formData.name,
+        name: fullName,
+        title: formData.title || undefined,
         phone: formData.phone,
         alternatePhone: formData.alternatePhone || undefined,
         alternateEmail: formData.alternateEmail || undefined,
@@ -320,18 +335,57 @@ export default function EditQCChecker() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Title + First Name */}
+              <div className="flex gap-3">
+                <div className="w-28 shrink-0">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Title</label>
+                  <select
+                    name="title"
+                    value={formData.title}
+                    onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    className={INPUT_CLASS}
+                  >
+                    <option value="">—</option>
+                    {TITLE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    First Name <span className="text-brand-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    placeholder="First name"
+                    className={INPUT_CLASS}
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Full Name <span className="text-brand-500">*</span>
-                </label>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Last Name</label>
                 <input
                   type="text"
-                  name="name"
-                  value={formData.name}
+                  name="lastName"
+                  value={formData.lastName}
                   onChange={handleInputChange}
-                  placeholder="Enter full name"
+                  placeholder="Last name"
                   className={INPUT_CLASS}
-                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Middle Name <span className="font-normal text-slate-400">(optional)</span></label>
+                <input
+                  type="text"
+                  name="middleName"
+                  value={formData.middleName}
+                  onChange={handleInputChange}
+                  placeholder="Middle name"
+                  className={INPUT_CLASS}
                 />
               </div>
 

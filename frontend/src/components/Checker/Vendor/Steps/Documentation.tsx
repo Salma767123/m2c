@@ -1,18 +1,18 @@
 "use client"
 
-import { Upload, X, FileText, Download, PenLine, CheckCircle2, Loader2, RotateCcw, User, ChevronDown } from "lucide-react"
+import { Upload, X, FileText, PenLine, CheckCircle2, Loader2, RotateCcw, Eye, Trash2, Download } from "lucide-react"
 import { useRef, useState, useEffect, useCallback } from "react"
-import { createPortal } from "react-dom"
 import SignatureCanvas from "react-signature-canvas"
 import type SignatureCanvasType from "react-signature-canvas"
 import { qcCheckerService } from "@/services/qcCheckerService"
+import { formatCheckerName } from "@/lib/checkerUtils"
 import {
   generateProductInspectionPdf,
   pdfFileName,
   type ReportMeta,
 } from "@/lib/productInspectionReportPdf"
+import { showSuccessToast } from "@/lib/toast-utils"
 
-// Compress image before storing to keep payload manageable
 const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
   return new Promise((resolve) => {
     const reader = new FileReader()
@@ -37,7 +37,6 @@ const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<stri
   })
 }
 
-// Read any file as a data URL (used for PDFs which cannot go through canvas)
 const readFileAsDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -46,9 +45,19 @@ const readFileAsDataUrl = (file: File): Promise<string> =>
     reader.readAsDataURL(file)
   })
 
+function openDataUriInTab(dataUri: string, mimeType: string) {
+  try {
+    const b64 = dataUri.split(",")[1]
+    const bytes = atob(b64)
+    const ab = new ArrayBuffer(bytes.length)
+    const ia = new Uint8Array(ab)
+    for (let i = 0; i < bytes.length; i++) ia[i] = bytes.charCodeAt(i)
+    const blob = new Blob([ab], { type: mimeType })
+    window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer")
+  } catch { /* ignore */ }
+}
+
 interface DocumentationProps {
-  // The whole inspection formData is passed in; we read across many steps to
-  // build the report, so keep this permissive.
   formData: any
   setFormData: (data: any) => void
   errors?: Record<string, string>
@@ -61,47 +70,14 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
 
   const [showDocModal, setShowDocModal] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
-  const statusButtonRef = useRef<HTMLButtonElement | null>(null)
-  const statusMenuRef = useRef<HTMLDivElement | null>(null)
-
-  const checker = qcCheckerService.getCheckerData?.() || null
-  const inspectorName = checker?.name || formData.inspectorSignature || ''
-
-  const INSPECTION_STATUS_OPTIONS = ['Approved', 'Rejected', 'On Hold', 'Re-Inspection']
-
-  // Outside-click: close if click is outside both the trigger button and the portal menu
-  useEffect(() => {
-    if (!showStatusDropdown) return
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node
-      const inButton = statusButtonRef.current?.contains(target)
-      const inMenu = statusMenuRef.current?.contains(target)
-      if (!inButton && !inMenu) setShowStatusDropdown(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showStatusDropdown])
-
-  // Compute portal position when dropdown opens; close on scroll/resize
-  useEffect(() => {
-    if (!showStatusDropdown || !statusButtonRef.current) return
-    const rect = statusButtonRef.current.getBoundingClientRect()
-    setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
-    const close = () => setShowStatusDropdown(false)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
-    return () => {
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
-    }
-  }, [showStatusDropdown])
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [downloading, setDownloading] = useState(false)
+  const [hasDownloaded, setHasDownloaded] = useState(false)
   const [sigCanvasSize, setSigCanvasSize] = useState({ width: 460, height: 200 })
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [confirmRemoveDoc, setConfirmRemoveDoc] = useState(false)
+  const [confirmRemoveReport, setConfirmRemoveReport] = useState(false)
 
-  // Best-effort GPS capture for the report's location field. Silent on failure.
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
@@ -111,7 +87,6 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
     )
   }, [])
 
-  // Measure the canvas container width when the signature modal opens
   useEffect(() => {
     if (!showSignModal) return
     const measure = () => {
@@ -120,23 +95,26 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
         if (w > 0) setSigCanvasSize({ width: w, height: Math.round(w * 0.42) })
       }
     }
-    // Small delay lets the modal finish painting before measuring
     const t = setTimeout(measure, 50)
     window.addEventListener("resize", measure)
     return () => { clearTimeout(t); window.removeEventListener("resize", measure) }
   }, [showSignModal])
 
   const buildMeta = (): ReportMeta => {
-    const checker = qcCheckerService.getCheckerData?.() || null
+    // Prefer live assignedQc from the product API response (always current from DB).
+    // Fall back to cached localStorage data only if assignedQc is unavailable.
+    const liveQc = formData?.productData?.assignedQc || null
+    const cachedChecker = qcCheckerService.getCheckerData?.() || null
+    const checker = liveQc || cachedChecker
     return {
       productName: formData?.items?.[0]?.itemName || formData?.vendor || "Product",
       vendorName: formData?.vendor || formData?.factory || "",
       checker: checker
         ? {
-          name: checker.name,
+          name: formatCheckerName(checker),
           checkerId: checker.checkerId,
           email: checker.email,
-          phone: checker.phone || checker.mobile || checker.businessPhone,
+          phone: checker.phone || (checker as any).mobile || (checker as any).businessPhone,
         }
         : null,
       location: coords,
@@ -144,39 +122,45 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
     }
   }
 
-  // ── General Document: download the (unsigned) overview PDF ───────────────────
-  const handleDownloadPdf = (signatureDataUrl?: string) => {
-    const meta = buildMeta()
-    const doc = generateProductInspectionPdf(formData, meta, {
-      clientSignatureDataUrl: signatureDataUrl || null,
-    })
-    doc.save(pdfFileName(meta, !!signatureDataUrl))
+  const handleDownloadReport = async () => {
+    setDownloading(true)
+    try {
+      const meta = buildMeta()
+      const doc = generateProductInspectionPdf(formData, meta, { clientSignatureDataUrl: null })
+      doc.save(pdfFileName(meta, false))
+      setHasDownloaded(true)
+    } finally {
+      setDownloading(false)
+    }
   }
 
   const handleSignedDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    const newDocs = await Promise.all(
-      files.map(async (file) => {
-        const isPdf = file.type === "application/pdf"
-        const data = isPdf ? await readFileAsDataUrl(file) : await compressImage(file)
-        return { file, name: file.name, url: data, data, isPdf, id: Date.now() + Math.random() }
-      })
-    )
+    const file = e.target.files?.[0]
+    if (!file) return
+    const isPdf = file.type === "application/pdf"
+    const data = isPdf ? await readFileAsDataUrl(file) : await compressImage(file)
     setFormData({
       ...formData,
-      signedDocuments: [...(formData.signedDocuments || []), ...newDocs],
+      signedDocuments: [{ file, name: file.name, url: data, data, isPdf, id: Date.now() }],
     })
     if (e.target) e.target.value = ""
+    setShowDocModal(false)
+    setHasDownloaded(false)
+    showSuccessToast("Signed document uploaded successfully.")
   }
 
-  const removeSignedDoc = (id: number | string) => {
-    setFormData({
-      ...formData,
-      signedDocuments: (formData.signedDocuments || []).filter((d: any) => d.id !== id),
-    })
+  const viewManualDoc = () => {
+    const doc = signedDocs[0]
+    if (!doc?.data) return
+    const mimeType = doc.isPdf ? "application/pdf" : "image/jpeg"
+    openDataUriInTab(doc.data, mimeType)
   }
 
-  // ── Digital signed report: capture pad → merge → generate ───────────────────
+  const removeManualDoc = () => {
+    setFormData({ ...formData, signedDocuments: [] })
+    setConfirmRemoveDoc(false)
+  }
+
   const handleConfirmSignature = useCallback(async () => {
     if (!sigPadRef.current || sigPadRef.current.isEmpty()) return
     setGenerating(true)
@@ -199,17 +183,20 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
     }
   }, [formData, setFormData]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const downloadSignedReport = () => {
+  const viewSignedReport = () => {
     const report = (formData.signedReport || [])[0]
     if (!report?.data) return
-    const a = document.createElement("a")
-    a.href = report.data
-    a.download = report.name || "signed-inspection-report.pdf"
-    a.click()
+    openDataUriInTab(report.data, "application/pdf")
   }
 
-  const clearSignedReport = () => {
+  const removeSignedReport = () => {
     setFormData({ ...formData, clientSignature: "", signedReport: [] })
+    setConfirmRemoveReport(false)
+  }
+
+  const closeDocModal = () => {
+    setShowDocModal(false)
+    setHasDownloaded(false)
   }
 
   const signedDocs = formData.signedDocuments || []
@@ -224,36 +211,82 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
         <p className="text-slate-600">Generate the inspection report, capture the client&apos;s signature, and submit.</p>
       </div>
 
-      {/* Two sign-off paths */}
+      {/* Two sign-off paths — mutually exclusive */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* General Document */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 flex flex-col">
-          <div className="flex items-start gap-3 mb-4">
+
+        {/* ── Manual Document ── */}
+        <div className={`rounded-2xl border bg-white p-6 flex flex-col gap-4 transition-opacity ${hasSignedReport ? "opacity-40 pointer-events-none select-none" : "border-slate-200"}`}>
+          <div className="flex items-start gap-3">
             <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900">General Document</h3>
-              <p className="text-sm text-slate-600">Download the full report PDF, then upload the manually-signed copy.</p>
+              <h3 className="font-bold text-slate-900">Manual Signed Document</h3>
+              <p className="text-sm text-slate-600">Download the report, get it signed, then upload the scanned copy.</p>
             </div>
           </div>
-          {hasSignedDoc && (
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 mb-3">
-              <CheckCircle2 className="w-4 h-4" /> {signedDocs.length} signed document{signedDocs.length > 1 ? "s" : ""} uploaded
+
+          {hasSignedDoc ? (
+            <div className="space-y-3 mt-auto">
+              <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="text-sm font-bold text-emerald-800">Final Signed Document Uploaded</span>
+              </div>
+
+              {confirmRemoveDoc ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2">
+                  <p className="text-sm font-semibold text-red-700">Remove this document?</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={removeManualDoc}
+                      className="flex-1 px-3 py-2 rounded-lg font-semibold bg-red-600 hover:bg-red-700 text-white text-sm transition-colors"
+                    >
+                      Yes, Remove
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRemoveDoc(false)}
+                      className="flex-1 px-3 py-2 rounded-lg font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={viewManualDoc}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10"
+                  >
+                    <Eye className="w-4 h-4" /> View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRemoveDoc(true)}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-semibold border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                    title="Remove document"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowDocModal(true)}
+              className="mt-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10"
+            >
+              <FileText className="w-4 h-4" /> Open Document Center
+            </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowDocModal(true)}
-            className="mt-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10"
-          >
-            <FileText className="w-4 h-4" /> Open Document Center
-          </button>
         </div>
 
-        {/* Digital Signed Report */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 flex flex-col">
-          <div className="flex items-start gap-3 mb-4">
+        {/* ── Digital Signed Report ── */}
+        <div className={`rounded-2xl border bg-white p-6 flex flex-col gap-4 transition-opacity ${hasSignedDoc ? "opacity-40 pointer-events-none select-none" : "border-slate-200"}`}>
+          <div className="flex items-start gap-3">
             <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
               <PenLine className="w-5 h-5" />
             </div>
@@ -262,22 +295,66 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
               <p className="text-sm text-slate-600">Draw the client&apos;s signature on-screen to auto-generate a digitally-signed report.</p>
             </div>
           </div>
-          {hasSignedReport && (
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600 mb-3">
-              <CheckCircle2 className="w-4 h-4" /> Signed report generated
+
+          {hasSignedReport ? (
+            <div className="space-y-3 mt-auto">
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600">
+                <CheckCircle2 className="w-4 h-4" /> Signed report generated
+              </div>
+
+              {confirmRemoveReport ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2">
+                  <p className="text-sm font-semibold text-red-700">Remove signed report and signature?</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={removeSignedReport}
+                      className="flex-1 px-3 py-2 rounded-lg font-semibold bg-red-600 hover:bg-red-700 text-white text-sm transition-colors"
+                    >
+                      Yes, Remove
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRemoveReport(false)}
+                      className="flex-1 px-3 py-2 rounded-lg font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={viewSignedReport}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10"
+                  >
+                    <Eye className="w-4 h-4" /> View Signed Report
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRemoveReport(true)}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-semibold border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                    title="Remove signed report"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSignModal(true)}
+              className="mt-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold border border-brand-200 bg-brand-50 hover:bg-brand-100 text-brand-700 transition-colors"
+            >
+              <PenLine className="w-4 h-4" /> Open Signature Center
+            </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowSignModal(true)}
-            className="mt-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold border border-brand-200 bg-brand-50 hover:bg-brand-100 text-brand-700 transition-colors"
-          >
-            <PenLine className="w-4 h-4" /> Open Signature Center
-          </button>
         </div>
       </div>
 
-      {/* Requirement hint */}
+      {/* Status hint */}
       <div
         className={`rounded-xl px-4 py-3 text-sm border ${hasSignedDoc || hasSignedReport
           ? "bg-emerald-50 border-emerald-200 text-emerald-700"
@@ -291,181 +368,91 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
           : errors.signedDocuments || "At least one signed document is required — upload a signed copy or generate the digitally-signed report."}
       </div>
 
-      {/* ── Inspector Details ─────────────────────────────────────────────── */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center gap-2">
-          <User className="w-4 h-4 text-brand-600" />
-          <h3 className="text-sm font-bold text-slate-800">Inspector Details</h3>
-        </div>
-        <div className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
-            {/* Inspector Name — auto-filled */}
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Inspector Name</p>
-              <div className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-sm">
-                {inspectorName || '—'}
-              </div>
-            </div>
-            {/* Inspection Date — auto-filled */}
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Inspection Date</p>
-              <div className="px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-sm">
-                {formData.serviceStartDate || new Date().toISOString().split('T')[0]}
-              </div>
-            </div>
-            {/* Inspection Status — required dropdown (portal-rendered to escape overflow:hidden) */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                Inspection Status <span className="text-red-500">*</span>
-              </label>
-              <button
-                ref={statusButtonRef}
-                type="button"
-                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className={`w-full px-4 py-3 border rounded-xl bg-white text-left flex items-center justify-between text-sm transition-all duration-200 ${
-                  errors.inspectionStatus
-                    ? 'border-red-500 bg-red-50/40'
-                    : 'border-slate-300 hover:border-slate-400'
-                }`}
-              >
-                <span className={formData.inspectionStatus ? 'text-slate-900' : 'text-slate-400'}>
-                  {formData.inspectionStatus || 'Select status…'}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${showStatusDropdown ? 'rotate-180' : ''}`} />
-              </button>
-              {errors.inspectionStatus && (
-                <p className="mt-1.5 text-xs text-red-600">{errors.inspectionStatus}</p>
-              )}
-              {showStatusDropdown && dropdownPos && typeof document !== 'undefined' && createPortal(
-                <div
-                  ref={statusMenuRef}
-                  style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }}
-                  className="bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden"
-                >
-                  {INSPECTION_STATUS_OPTIONS.map((status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, inspectionStatus: status })
-                        setShowStatusDropdown(false)
-                      }}
-                      className={`block w-full px-4 py-2.5 text-sm text-left transition-colors ${
-                        formData.inspectionStatus === status
-                          ? 'bg-brand-50 text-brand-600 font-semibold border-l-2 border-brand-500'
-                          : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {status}
-                    </button>
-                  ))}
-                </div>,
-                document.body
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Document Center modal ─────────────────────────────────────────────── */}
+      {/* ── Document Center modal ── */}
       {showDocModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
-          onClick={() => setShowDocModal(false)}
+          onClick={closeDocModal}
         >
           <div
             className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900">Inspection Report</h3>
-              <button onClick={() => setShowDocModal(false)} className="p-1.5 hover:bg-slate-100 rounded-lg" aria-label="Close">
+              <h3 className="font-bold text-slate-900">Document Center</h3>
+              <button onClick={closeDocModal} className="p-1.5 hover:bg-slate-100 rounded-lg" aria-label="Close">
                 <X className="w-4 h-4 text-slate-500" />
               </button>
             </div>
-            <div className="p-6 space-y-5 overflow-y-auto">
-              <div>
-                <p className="text-sm text-slate-600 mb-3">
-                  Download the complete report (all inspection data, attached documents, checker details, location &amp; time, with a blank client-signature space).
+
+            <div className="p-6 space-y-6 overflow-y-auto">
+              {/* Step 1: Download Report */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-brand-500 text-white text-xs font-bold flex items-center justify-center shrink-0">1</span>
+                  <p className="text-sm font-bold text-slate-800">Download Inspection Report</p>
+                </div>
+                <p className="text-xs text-slate-500 pl-8">
+                  Download the report, print it, have it signed by the client, then scan it.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => handleDownloadPdf()}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10"
-                >
-                  <Download className="w-4 h-4" /> Download as PDF
-                </button>
+                <div className="pl-8">
+                  <button
+                    type="button"
+                    onClick={handleDownloadReport}
+                    disabled={downloading}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white transition-colors shadow-sm shadow-brand-500/10 disabled:opacity-60"
+                  >
+                    {downloading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Preparing…</>
+                    ) : (
+                      <><Download className="w-4 h-4" /> Download Inspection Report</>
+                    )}
+                  </button>
+                  {hasDownloaded && (
+                    <p className="text-xs text-emerald-600 font-semibold mt-2 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Report downloaded
+                    </p>
+                  )}
+                </div>
               </div>
 
-              <div className="border-t border-slate-100 pt-5">
-                <label className="block text-slate-700 font-semibold mb-1 text-sm">Upload signed document</label>
-                <p className="text-slate-500 text-xs mb-3">After the client signs the printed report, upload the scanned copy here. Accepted: PDF, PNG, JPG.</p>
-                <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-brand-400 transition-colors cursor-pointer bg-slate-50/50">
+              {/* Step 2: Upload Signed Copy — only shown after download */}
+              {hasDownloaded && (
+                <div className="space-y-3 border-t border-slate-100 pt-6">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-brand-500 text-white text-xs font-bold flex items-center justify-center shrink-0">2</span>
+                    <p className="text-sm font-bold text-slate-800">Upload Signed Copy</p>
+                  </div>
+                  <p className="text-xs text-slate-500 pl-8">
+                    Upload the scanned, signed copy. Accepted formats: PDF, PNG, JPG.
+                  </p>
                   <input
                     ref={signedDocInputRef}
                     type="file"
-                    multiple
                     accept="image/png,image/jpeg,image/jpg,application/pdf,.pdf"
                     onChange={handleSignedDocUpload}
                     className="hidden"
                   />
-                  <button
-                    type="button"
-                    onClick={() => signedDocInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center w-full outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-xl"
-                  >
-                    <Upload className="w-7 h-7 text-slate-400 mb-2" />
-                    <p className="text-slate-700 font-medium text-sm">Upload signed copy</p>
-                    <p className="text-slate-400 text-xs mt-1">PDF, PNG, JPG</p>
-                  </button>
-                </div>
-                {signedDocs.length > 0 && (
-                  <div className="grid grid-cols-3 gap-3 mt-4">
-                    {signedDocs.map((doc: any, index: number) => (
-                      <div key={doc.id || index} className="relative group">
-                        {doc.isPdf ? (
-                          <a
-                            href={doc.url || doc.data}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="aspect-square flex flex-col items-center justify-center gap-1.5 bg-slate-50 rounded-lg border border-slate-200 hover:border-brand-400 transition-colors p-2"
-                          >
-                            <FileText className="w-7 h-7 text-red-500 shrink-0" />
-                            <span className="text-xs text-slate-600 text-center leading-tight line-clamp-2 break-all">{doc.name}</span>
-                          </a>
-                        ) : (
-                          <div className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
-                            <img src={doc.url || doc.data} alt={`Signed ${index + 1}`} className="w-full h-full object-cover" />
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removeSignedDoc(doc.id)}
-                          className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
+                  <div className="pl-8">
+                    <div
+                      className="border-2 border-dashed border-brand-300 rounded-xl p-6 text-center hover:border-brand-400 hover:bg-brand-50/50 transition-colors cursor-pointer"
+                      onClick={() => signedDocInputRef.current?.click()}
+                    >
+                      <Upload className="w-7 h-7 text-brand-400 mb-2 mx-auto" />
+                      <p className="text-slate-700 font-medium text-sm">Click to upload signed copy</p>
+                      <p className="text-slate-400 text-xs mt-1">PDF, PNG, JPG</p>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50">
-              <button
-                onClick={() => setShowDocModal(false)}
-                className="w-full px-4 py-2.5 rounded-xl font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors"
-              >
-                Done
-              </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Signature Center modal ────────────────────────────────────────────── */}
+      {/* ── Signature Center modal ── */}
       {showSignModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
@@ -479,16 +466,14 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
-                <h3 className="font-bold text-slate-900">Client Signature</h3>
+                <h3 className="font-bold text-slate-900">Signature Center</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Draw signature using finger, stylus, or mouse</p>
               </div>
               <button onClick={() => setShowSignModal(false)} className="p-1.5 hover:bg-slate-100 rounded-lg" aria-label="Close">
                 <X className="w-4 h-4 text-slate-500" />
               </button>
             </div>
-
             <div className="p-6 space-y-4 overflow-y-auto">
-              {/* Signature pad */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-slate-700 font-semibold text-sm">Sign below</label>
@@ -520,45 +505,7 @@ export default function Documentation({ formData, setFormData, errors = {} }: Do
                   Use your finger, stylus, or mouse to draw your signature
                 </p>
               </div>
-
-              {/* Already-captured signature preview (when re-opening) */}
-              {formData.clientSignature && !hasSignedReport && (
-                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <span className="text-xs font-medium text-slate-500 shrink-0">Saved:</span>
-                  <img
-                    src={formData.clientSignature}
-                    alt="Saved signature"
-                    className="h-10 object-contain"
-                  />
-                </div>
-              )}
-
-              {/* Generated report actions */}
-              {hasSignedReport && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                  <div className="flex items-center gap-2 text-emerald-700 font-semibold text-sm mb-3">
-                    <CheckCircle2 className="w-4 h-4" /> Digitally-signed report generated
-                  </div>
-                  <div className="flex gap-3 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={downloadSignedReport}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold bg-brand-500 hover:bg-brand-600 text-white text-sm transition-colors"
-                    >
-                      <Download className="w-4 h-4" /> Download report
-                    </button>
-                    <button
-                      type="button"
-                      onClick={clearSignedReport}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-sm transition-colors"
-                    >
-                      <X className="w-4 h-4" /> Re-sign
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
-
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex gap-3">
               <button
                 type="button"

@@ -28,7 +28,7 @@ const RESULT_COLORS: Record<string, string> = {
   Approved: 'text-emerald-700 bg-emerald-50 border-emerald-300',
   Rejected: 'text-red-700 bg-red-50 border-red-300',
   'On Hold': 'text-amber-700 bg-amber-50 border-amber-300',
-  'Re-inspection Required': 'text-blue-700 bg-blue-50 border-blue-300',
+  'Re-inspection Required': 'text-orange-700 bg-orange-50 border-orange-300',
 }
 
 // ── Field-key → step mapping ──────────────────────────────────────────────────

@@ -1573,6 +1573,7 @@ model QCChecker {
   email     String @unique
   password  String // Hashed password
   name      String
+  title     String?
   phone     String
 
   // Address
