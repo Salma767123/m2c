@@ -21,7 +21,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
 }
 
 // Border color used on checked cards, matched to category
-const CATEGORY_BORDER: Record<string, string> = {
+export const CATEGORY_BORDER: Record<string, string> = {
   'Washing':      'border-blue-400 bg-blue-50 text-blue-800',
   'Bleaching':    'border-amber-400 bg-amber-50 text-amber-800',
   'Drying':       'border-emerald-400 bg-emerald-50 text-emerald-800',
