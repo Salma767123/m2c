@@ -141,6 +141,7 @@ export interface ProductDetailData {
   dimensions?: string | null
   dimensionUnit?: string | null
   weight?: string | null
+  weightUnit?: string | null
   tags?: string[]
   lowStockThreshold?: number | null
   // Fabric & Specifications

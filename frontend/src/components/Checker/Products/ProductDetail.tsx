@@ -368,7 +368,6 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                     <Row icon={<Package className="w-4 h-4" />} label="Total Stock" value={String(product.totalStock ?? 0)} />
                     {product.uom && <Row icon={<Package className="w-4 h-4" />} label="Selling Unit (UOM)" value={product.uom} />}
                     {product.dimensions && <Row icon={<Layers className="w-4 h-4" />} label="Display Dimensions" value={product.dimensionUnit ? `${product.dimensions} ${product.dimensionUnit}` : product.dimensions} />}
-                    {product.weight && <Row icon={<Package className="w-4 h-4" />} label="Display Weight" value={product.weight} />}
                     {product.tags && product.tags.length > 0 && (
                         <Row
                             icon={<FileText className="w-4 h-4" />}
@@ -425,13 +424,22 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                 )}
 
                 {/* Dispatch & Shipping */}
-                {dt && (
+                {(dt || product.weight) && (
                     <div className="sm:col-span-2">
                         <Section title="Dispatch & Shipping">
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6">
-                                <Row icon={<Clock className="w-4 h-4" />} label="Processing Days" value={`${dt.processingDays} day${dt.processingDays !== 1 ? 's' : ''}`} />
-                                <Row icon={<Clock className="w-4 h-4" />} label="Shipping Days" value={`${dt.shippingDays} day${dt.shippingDays !== 1 ? 's' : ''}`} />
-                                <Row icon={<Clock className="w-4 h-4" />} label="Total Days" value={`${dt.totalDays} day${dt.totalDays !== 1 ? 's' : ''}`} />
+                                {product.weight && (
+                                    <Row
+                                        icon={<Package className="w-4 h-4" />}
+                                        label="Shipping Weight"
+                                        value={product.weightUnit ? `${product.weight} ${product.weightUnit}` : product.weight}
+                                    />
+                                )}
+                                {dt && <>
+                                    <Row icon={<Clock className="w-4 h-4" />} label="Processing Days" value={`${dt.processingDays} day${dt.processingDays !== 1 ? 's' : ''}`} />
+                                    <Row icon={<Clock className="w-4 h-4" />} label="Shipping Days" value={`${dt.shippingDays} day${dt.shippingDays !== 1 ? 's' : ''}`} />
+                                    <Row icon={<Clock className="w-4 h-4" />} label="Total Days" value={`${dt.totalDays} day${dt.totalDays !== 1 ? 's' : ''}`} />
+                                </>}
                             </div>
                         </Section>
                     </div>
