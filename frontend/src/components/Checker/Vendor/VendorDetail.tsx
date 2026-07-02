@@ -299,6 +299,44 @@ export default function VendorDetail({
         ]
       },
       {
+        id: "contact",
+        title: "Contact & Communication Details",
+        icon: <Phone className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "businessPhone", label: "Primary Phone" },
+          { key: "phoneNumber2", label: "Secondary Phone" },
+          { key: "businessEmail", label: "Primary Email" },
+          { key: "businessEmail2", label: "Secondary Email" },
+          { key: "landlineNumber", label: "Local Landline Number", valueOverride: formatLocalLandline({ countryCode: '+91', std: fullVendor.localLandlineStd as any, number: fullVendor.landlineNumber as any }) || undefined },
+          { key: "intlLandline", label: "International Landline Number", valueOverride: formatIntlLandline(fullVendor.intlLandline as any) || undefined },
+          { key: "businessAddress", label: "Address Line 1", condition: fullVendor.businessAddress },
+          { key: "addressLine2", label: "Address Line 2", condition: fullVendor.addressLine2 },
+          { key: "addressLine3", label: "Address Line 3", condition: fullVendor.addressLine3 },
+          { key: "landmark", label: "Landmark", condition: fullVendor.landmark },
+          { key: "businessCity", label: "City", condition: fullVendor.businessCity },
+          { key: "businessState", label: "State", condition: fullVendor.businessState },
+          { key: "businessZipCode", label: "ZIP / Postal Code", condition: fullVendor.businessZipCode },
+          { key: "businessCountry", label: "Country", condition: fullVendor.businessCountry },
+        ]
+      },
+      {
+        id: "owner_profile",
+        title: "Owner Profile",
+        icon: <UserCircle className="w-5 h-5 text-brand-600" />,
+        fields: [
+          { key: "ownerName", label: "Owner Full Name", valueOverride: buildFullName(fullVendor.ownerTitle, fullVendor.ownerFirstName, fullVendor.ownerMiddleName, fullVendor.ownerLastName, fullVendor.ownerName) || undefined },
+          { key: "designation", label: "Designation" },
+          { key: "ownerPhone", label: "Primary Phone" },
+          { key: "ownerPhone2", label: "Secondary Phone" },
+          { key: "ownerEmail", label: "Primary Email" },
+          { key: "ownerEmail2", label: "Secondary Email" },
+          { key: "ownerLandline", label: "Local Landline", valueOverride: formatLocalLandline({ countryCode: '+91', std: fullVendor.ownerLocalLandlineStd as any, number: fullVendor.ownerLandline as any }) || undefined },
+          { key: "ownerIntlLandline", label: "International Landline", valueOverride: formatIntlLandline(fullVendor.ownerIntlLandline as any) || undefined },
+          { key: "businessStartDate", label: "Business Start Date", type: "date" },
+          { key: "employeeCount", label: "Number of Employees", transform: (val: string) => getEmployeeCountLabel(val) }
+        ]
+      },
+      {
         id: "warehouse",
         title: "Legal Address & Factory Site",
         icon: <Warehouse className="w-5 h-5 text-brand-600" />,
@@ -313,23 +351,6 @@ export default function VendorDetail({
           { key: "warehouseZipCode", label: "ZIP / Postal Code", condition: fullVendor.warehouseZipCode },
           { key: "warehouseCountry", label: "Country", condition: fullVendor.warehouseCountry },
           { key: "warehouseSize", label: "Warehousing Capacity" },
-        ]
-      },
-      {
-        id: "owner_profile",
-        title: "Owner Identity",
-        icon: <UserCircle className="w-5 h-5 text-brand-600" />,
-        fields: [
-          { key: "ownerName", label: "Owner Full Name", valueOverride: buildFullName(fullVendor.ownerTitle, fullVendor.ownerFirstName, fullVendor.ownerMiddleName, fullVendor.ownerLastName, fullVendor.ownerName) || undefined },
-          { key: "designation", label: "Designation" },
-          { key: "ownerPhone", label: "Primary Phone" },
-          { key: "ownerPhone2", label: "Secondary Phone" },
-          { key: "ownerEmail", label: "Primary Email" },
-          { key: "ownerEmail2", label: "Secondary Email" },
-          { key: "ownerLandline", label: "Local Landline", valueOverride: formatLocalLandline({ countryCode: '+91', std: fullVendor.ownerLocalLandlineStd as any, number: fullVendor.ownerLandline as any }) || undefined },
-          { key: "ownerIntlLandline", label: "International Landline", valueOverride: formatIntlLandline(fullVendor.ownerIntlLandline as any) || undefined },
-          { key: "businessStartDate", label: "Business Start Date", type: "date" },
-          { key: "employeeCount", label: "Number of Employees", transform: (val: string) => getEmployeeCountLabel(val) }
         ]
       },
       {
@@ -357,27 +378,6 @@ export default function VendorDetail({
           { key: "packagingCapabilities", label: "Packaging Capabilities" },
           { key: "logisticsPartners", label: "Logistics Partners" },
           { key: "shippingMethods", label: "Shipping Methods", type: "list" }
-        ]
-      },
-      {
-        id: "contact",
-        title: "Contact & Communication Details",
-        icon: <Phone className="w-5 h-5 text-brand-600" />,
-        fields: [
-          { key: "businessPhone", label: "Primary Phone" },
-          { key: "phoneNumber2", label: "Secondary Phone" },
-          { key: "businessEmail", label: "Primary Email" },
-          { key: "businessEmail2", label: "Secondary Email" },
-          { key: "landlineNumber", label: "Local Landline Number", valueOverride: formatLocalLandline({ countryCode: '+91', std: fullVendor.localLandlineStd as any, number: fullVendor.landlineNumber as any }) || undefined },
-          { key: "intlLandline", label: "International Landline Number", valueOverride: formatIntlLandline(fullVendor.intlLandline as any) || undefined },
-          { key: "businessAddress", label: "Address Line 1", condition: fullVendor.businessAddress },
-          { key: "addressLine2", label: "Address Line 2", condition: fullVendor.addressLine2 },
-          { key: "addressLine3", label: "Address Line 3", condition: fullVendor.addressLine3 },
-          { key: "landmark", label: "Landmark", condition: fullVendor.landmark },
-          { key: "businessCity", label: "City", condition: fullVendor.businessCity },
-          { key: "businessState", label: "State", condition: fullVendor.businessState },
-          { key: "businessZipCode", label: "ZIP / Postal Code", condition: fullVendor.businessZipCode },
-          { key: "businessCountry", label: "Country", condition: fullVendor.businessCountry },
         ]
       },
       {
@@ -641,41 +641,9 @@ export default function VendorDetail({
               )
             }
           } else if (section.id === "owner_profile") {
-            const additional = fullVendor.additionalOwners
-            const hasOwnerPhoto = !!fullVendor.ownerPhoto
-            const hasAdditional = Array.isArray(additional) && additional.length > 0
-            if (hasOwnerPhoto || hasAdditional) {
+            // Photo and additional owners rendered in the dedicated layout below
+            if (!!fullVendor.ownerPhoto || (Array.isArray(fullVendor.additionalOwners) && fullVendor.additionalOwners.length > 0)) {
               hasCustomData = true
-              customContent = (
-                <div className="col-span-full space-y-6 border-t border-slate-100 pt-6 mt-4">
-                  {hasOwnerPhoto &&
-                    renderImageStrip("Owner Photo", <ImageIcon className="w-4.5 h-4.5 text-slate-400" />, [
-                      { label: "Owner Photo", url: fullVendor.ownerPhoto },
-                    ])}
-                  {hasAdditional && (
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-1.5">
-                        <UserCircle className="w-4.5 h-4.5 text-slate-400" /> Additional Owners ({additional.length})
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {additional.map((owner: any, idx: number) => (
-                          <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
-                            <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
-                            {(owner.name || owner.firstName) && <Field label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
-                            {owner.designation && <Field label="Designation" value={owner.designation} />}
-                            {owner.email && <Field label="Primary Email" value={owner.email} />}
-                            {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
-                            {owner.phone && <Field label="Primary Phone" value={owner.phone} />}
-                            {owner.phone2 && <Field label="Secondary Phone" value={owner.phone2} />}
-                            {(owner.localLandline || owner.landline) && <Field label="Local Landline" value={formatLocalLandline({ countryCode: '+91', std: owner.localLandlineStd, number: owner.localLandline || owner.landline })} />}
-                            {owner.intlLandline && <Field label="International Landline" value={formatIntlLandline(owner.intlLandline)} />}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
             }
           } else if (section.id === "capabilities") {
             if (productPhotos.length > 0) {
@@ -891,52 +859,111 @@ export default function VendorDetail({
           // If there is no data in this section, hide it completely!
           if (activeFields.length === 0 && !hasCustomData) return null
 
+          const renderField = (field: { label: string; value: any; type?: string }) => (
+            <div key={field.label}>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">{field.label}</label>
+              <div className="text-sm font-semibold text-slate-900 leading-relaxed">
+                {field.type === 'list' && Array.isArray(field.value) ? (
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {field.value.map((item: string, idx: number) => (
+                      <span key={idx} className="px-2.5 py-0.5 bg-slate-100 text-slate-800 text-xs font-bold rounded-lg border border-slate-200">{item}</span>
+                    ))}
+                  </div>
+                ) : field.type === 'badge' ? (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-100 capitalize mt-1">
+                    {field.value.toString().replace(/_/g, " ").toLowerCase()}
+                  </span>
+                ) : field.type === 'url' ? (
+                  (() => {
+                    const url = safeExternalUrl(field.value)
+                    return url ? (
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1 mt-1 break-all">
+                        <Globe className="w-4 h-4 shrink-0" /> {field.value}
+                      </a>
+                    ) : (
+                      <span className="text-slate-700 font-semibold flex items-center gap-1 mt-1 break-all">
+                        <Globe className="w-4 h-4 shrink-0 text-slate-400" /> {field.value}
+                      </span>
+                    )
+                  })()
+                ) : field.type === 'date' ? (
+                  <span className="text-slate-800 font-semibold">{formatDate(field.value)}</span>
+                ) : (
+                  <span className="text-slate-800 font-semibold">{field.value.toString()}</span>
+                )}
+              </div>
+            </div>
+          )
+
           return (
             <div key={section.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 hover:shadow-sm transition-all duration-200">
               <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2.5 pb-3 border-b border-slate-100">
                 <span className="p-2 bg-brand-50 rounded-xl text-brand-600">{section.icon}</span>
                 {section.title}
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                {activeFields.map((field) => (
-                  <div key={field.label}>
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">{field.label}</label>
-                    <div className="text-sm font-semibold text-slate-900 leading-relaxed">
-                      {field.type === 'list' && Array.isArray(field.value) ? (
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                          {field.value.map((item, idx) => (
-                            <span key={idx} className="px-2.5 py-0.5 bg-slate-100 text-slate-800 text-xs font-bold rounded-lg border border-slate-200">
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      ) : field.type === 'badge' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-100 capitalize mt-1">
-                          {field.value.toString().replace(/_/g, " ").toLowerCase()}
-                        </span>
-                      ) : field.type === 'url' ? (
-                        (() => {
-                          const url = safeExternalUrl(field.value)
-                          return url ? (
-                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 hover:underline font-bold flex items-center gap-1 mt-1 break-all">
-                              <Globe className="w-4 h-4 shrink-0" /> {field.value}
-                            </a>
-                          ) : (
-                            <span className="text-slate-700 font-semibold flex items-center gap-1 mt-1 break-all">
-                              <Globe className="w-4 h-4 shrink-0 text-slate-400" /> {field.value}
-                            </span>
-                          )
-                        })()
-                      ) : field.type === 'date' ? (
-                        <span className="text-slate-800 font-semibold">{formatDate(field.value)}</span>
+
+              {section.id === 'owner_profile' ? (
+                <div className="space-y-6">
+                  {/* Photo left, details right */}
+                  <div className="flex flex-col sm:flex-row gap-6 items-start">
+                    {/* Owner photo */}
+                    <div className="shrink-0">
+                      {fullVendor.ownerPhoto ? (
+                        <button
+                          type="button"
+                          onClick={() => setViewerDoc({ url: fullVendor.ownerPhoto, name: 'Owner Photo' })}
+                          className="group relative block w-28 h-28 rounded-2xl overflow-hidden border-2 border-slate-200 hover:border-brand-300 transition-colors"
+                          aria-label="View owner photo"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={fullVendor.ownerPhoto} alt="Owner" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/25 transition-colors">
+                            <Eye className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </button>
                       ) : (
-                        <span className="text-slate-800 font-semibold">{field.value.toString()}</span>
+                        <div className="w-28 h-28 rounded-2xl bg-slate-100 border-2 border-slate-200 flex items-center justify-center">
+                          <UserCircle className="w-14 h-14 text-slate-300" />
+                        </div>
                       )}
                     </div>
+                    {/* Owner details */}
+                    {activeFields.length > 0 && (
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+                        {activeFields.map(renderField)}
+                      </div>
+                    )}
                   </div>
-                ))}
-                {customContent}
-              </div>
+                  {/* Additional owners */}
+                  {Array.isArray(fullVendor.additionalOwners) && fullVendor.additionalOwners.length > 0 && (
+                    <div className="border-t border-slate-100 pt-6">
+                      <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-1.5">
+                        <UserCircle className="w-4 h-4 text-slate-400" /> Additional Owners ({fullVendor.additionalOwners.length})
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {fullVendor.additionalOwners.map((owner: any, idx: number) => (
+                          <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                            <p className="text-sm font-bold text-slate-800">Owner {idx + 2}</p>
+                            {(owner.name || owner.firstName) && <Field label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />}
+                            {owner.designation && <Field label="Designation" value={owner.designation} />}
+                            {owner.email && <Field label="Primary Email" value={owner.email} />}
+                            {owner.email2 && <Field label="Secondary Email" value={owner.email2} />}
+                            {owner.phone && <Field label="Primary Phone" value={owner.phone} />}
+                            {owner.phone2 && <Field label="Secondary Phone" value={owner.phone2} />}
+                            {(owner.localLandline || owner.landline) && <Field label="Local Landline" value={formatLocalLandline({ countryCode: '+91', std: owner.localLandlineStd, number: owner.localLandline || owner.landline })} />}
+                            {owner.intlLandline && <Field label="International Landline" value={formatIntlLandline(owner.intlLandline)} />}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                  {activeFields.map(renderField)}
+                  {customContent}
+                </div>
+              )}
             </div>
           )
         })}
