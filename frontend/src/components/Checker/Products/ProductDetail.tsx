@@ -9,7 +9,6 @@ import {
     Mail,
     Phone,
     MapPin,
-    IndianRupee,
     Layers,
     FileText,
     RotateCw,
@@ -340,9 +339,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     )
 }
 
+const SUPPORTED_WEIGHT_UNITS = ['kg', 'g', 'lb', 'oz']
+
 function OverviewTab({ product, primaryImage }: { product: ProductDetailData; primaryImage: string | null }) {
     const v = product.vendor || {}
-    const lc = product.logisticsConfig
     const dt = product.dispatchTimeline
     const fs = product.fabricSpecifications as Record<string, unknown> | null | undefined
 
@@ -454,7 +454,7 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                                     <Row
                                         icon={<Package className="w-4 h-4" />}
                                         label="Shipping Weight"
-                                        value={product.weightUnit ? `${product.weight} ${product.weightUnit}` : product.weight}
+                                        value={SUPPORTED_WEIGHT_UNITS.includes(product.weightUnit ?? '') ? `${product.weight} ${product.weightUnit}` : product.weight}
                                     />
                                 )}
                                 {dt && <>
@@ -462,27 +462,6 @@ function OverviewTab({ product, primaryImage }: { product: ProductDetailData; pr
                                     <Row icon={<Clock className="w-4 h-4" />} label="Shipping Days" value={`${dt.shippingDays} day${dt.shippingDays !== 1 ? 's' : ''}`} />
                                     <Row icon={<Clock className="w-4 h-4" />} label="Total Days" value={`${dt.totalDays} day${dt.totalDays !== 1 ? 's' : ''}`} />
                                 </>}
-                            </div>
-                        </Section>
-                    </div>
-                )}
-
-                {/* Logistics Configuration */}
-                {lc && (
-                    <div className="sm:col-span-2">
-                        <Section title="Logistics Configuration">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                                <Row icon={<Package className="w-4 h-4" />} label="Shipping Weight per Unit" value={`${lc.unitWeight} ${lc.weightUom}`} />
-                                {lc.maxWeight > 0 && <Row icon={<Package className="w-4 h-4" />} label="Max Shippable Weight" value={`${lc.maxWeight} ${lc.weightUom}`} />}
-                                {lc.dimensions && (
-                                    <Row icon={<Layers className="w-4 h-4" />} label="Shipping Dimensions" value={`${lc.dimensions.length} × ${lc.dimensions.width} × ${lc.dimensions.height} ${lc.dimensions.unit}`} />
-                                )}
-                                {(lc.transportTypes?.length > 0) && <Row icon={<Package className="w-4 h-4" />} label="Transport Types" value={lc.transportTypes.join(', ')} />}
-                                {lc.transportTypes?.includes('AIR') && lc.airDeliveryDays > 0 && <Row icon={<Clock className="w-4 h-4" />} label="Air Delivery Days" value={`${lc.airDeliveryDays} days`} />}
-                                {lc.transportTypes?.includes('SHIP') && lc.shipDeliveryDays > 0 && <Row icon={<Clock className="w-4 h-4" />} label="Ship Delivery Days" value={`${lc.shipDeliveryDays} days`} />}
-                                {lc.airCostPerKg > 0 && <Row icon={<IndianRupee className="w-4 h-4" />} label="Air Cost per KG" value={formatCurrency(lc.airCostPerKg)} />}
-                                {lc.shipCostPerKg > 0 && <Row icon={<IndianRupee className="w-4 h-4" />} label="Ship Cost per KG" value={formatCurrency(lc.shipCostPerKg)} />}
-                                {lc.notes && <Row icon={<FileText className="w-4 h-4" />} label="Logistics Notes" value={lc.notes} />}
                             </div>
                         </Section>
                     </div>
