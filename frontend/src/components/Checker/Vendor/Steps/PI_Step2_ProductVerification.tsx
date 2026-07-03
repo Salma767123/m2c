@@ -33,6 +33,8 @@ async function compressImage(file: File, maxWidth = 1200, quality = 0.7): Promis
   })
 }
 
+const SUPPORTED_WEIGHT_UNITS = ['kg', 'g', 'lb', 'oz']
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function safe(val: any): string {
   if (val === null || val === undefined || val === '') return ''
@@ -228,7 +230,8 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                 verifications={verifications} onChange={onVerify} />
             )}
             {notEmpty(p.weight) && (
-              <VerifyField fieldKey="pv_weight" label="Shipping Weight" value={`${p.weight}${p.weightUnit ? ' ' + p.weightUnit : ''}`}
+              <VerifyField fieldKey="pv_weight" label="Shipping Weight"
+                value={SUPPORTED_WEIGHT_UNITS.includes(p.weightUnit ?? '') ? `${p.weight} ${p.weightUnit}` : p.weight}
                 verifications={verifications} onChange={onVerify} />
             )}
             {notEmpty(p.dispatchTimeline?.processingDays) && (
@@ -302,9 +305,12 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
                 .filter(([key]) => key !== 'basis' && key !== 'careInstructions')
                 .filter(([, val]) => notEmpty(val))
                 .map(([key, val]) => {
-                  const label = key === 'weightValue'
-                    ? 'Weight Per Unit'
-                    : key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())
+                  const SPEC_LABEL_MAP: Record<string, string> = {
+                    weightValue: 'Weight Per Unit',
+                    weave: 'Weave Type',
+                  }
+                  const label = SPEC_LABEL_MAP[key]
+                    ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())
                   return (
                     <VerifyField
                       key={key}
