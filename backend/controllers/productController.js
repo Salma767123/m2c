@@ -94,6 +94,7 @@ const createProduct = async (req, res) => {
       tags,
       dimensions,
       weight,
+      weightUnit,
       inStock,
       status,
 
@@ -231,6 +232,7 @@ const createProduct = async (req, res) => {
           tags: tags || [],
           dimensions,
           weight,
+          weightUnit,
           inStock: inStock !== false,
           logisticsConfig: logisticsConfig || null,
           status: 'ACTIVE', // Default status is ACTIVE
@@ -659,6 +661,7 @@ const updateProduct = async (req, res) => {
           ...(updateData.tags !== undefined && { tags: updateData.tags }),
           ...(updateData.dimensions !== undefined && { dimensions: updateData.dimensions }),
           ...(updateData.weight !== undefined && { weight: updateData.weight }),
+          ...(updateData.weightUnit !== undefined && { weightUnit: updateData.weightUnit }),
           ...(updateData.inStock !== undefined && { inStock: updateData.inStock }),
           ...(updateData.logisticsConfig !== undefined && { logisticsConfig: updateData.logisticsConfig }),
           ...(updateData.status && { status: updateData.status.toUpperCase() })
@@ -1497,6 +1500,7 @@ const createProductByAdmin = async (req, res) => {
       tags,
       dimensions,
       weight,
+      weightUnit,
       inStock,
       status,
       approvalStatus, // Admin can set approval status directly
@@ -1669,6 +1673,7 @@ const createProductByAdmin = async (req, res) => {
           tags: tags || [],
           dimensions,
           weight,
+          weightUnit,
           inStock: inStock !== false,
           logisticsConfig: logisticsConfig || null,
           status: status ? status.toUpperCase() : 'ACTIVE',
@@ -1946,6 +1951,7 @@ const updateProductByAdmin = async (req, res) => {
         ...(updateData.tags !== undefined && { tags: updateData.tags }),
         ...(updateData.dimensions !== undefined && { dimensions: updateData.dimensions }),
         ...(updateData.weight !== undefined && { weight: updateData.weight }),
+        ...(updateData.weightUnit !== undefined && { weightUnit: updateData.weightUnit }),
         ...(updateData.inStock !== undefined && { inStock: updateData.inStock }),
         ...(updateData.logisticsConfig !== undefined && { logisticsConfig: updateData.logisticsConfig }),
         ...(updateData.status && { status: updateData.status.toUpperCase() }),

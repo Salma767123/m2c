@@ -816,9 +816,10 @@ model Product {
   // Additional Info
   uom        String   @default("pcs") // Unit of Measurement: pcs, meters, kg, yards, sets, rolls
   tags       String[] @default([])
-  dimensions String?
-  weight     String?
-  inStock    Boolean  @default(true)
+  dimensions  String?
+  weight      String?
+  weightUnit  String?
+  inStock     Boolean  @default(true)
 
   // Logistics Configuration (per-product transport, weight rules, costs)
   logisticsConfig Json? // LogisticsConfig object
