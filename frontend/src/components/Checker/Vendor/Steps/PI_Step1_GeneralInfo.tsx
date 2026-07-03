@@ -109,7 +109,7 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
           <InfoBlock label="Company Name" value={v.companyName} />
           <InfoBlock label="Business Type" value={v.businessType} />
           <InfoBlock label="Primary Phone" value={v.businessPhone} />
-          <InfoBlock label="Secondary Phone" value={v.phoneNumber2} />
+          {v.phoneNumber2 && <InfoBlock label="Secondary Phone" value={v.phoneNumber2} />}
           <InfoBlock label="Primary Email" value={v.businessEmail} />
         </div>
       </div>
@@ -191,9 +191,9 @@ export default function PI_Step1_GeneralInfo({ formData, setFormData, errors = {
               <InfoBlock label="Designation" value={mc?.customDesignation || mc?.designation || v.designation} />
               <InfoBlock label="Department" value={mc?.customDepartment || mc?.department} />
               <InfoBlock label="Primary Phone" value={mc?.phone1 || mc?.phone || v.ownerPhone} />
-              <InfoBlock label="Secondary Phone" value={mc?.phone2 || v.ownerPhone2} />
+              {(mc?.phone2 || v.ownerPhone2) && <InfoBlock label="Secondary Phone" value={mc?.phone2 || v.ownerPhone2} />}
               <InfoBlock label="Primary Email" value={mc?.email1 || mc?.email || v.ownerEmail} />
-              <InfoBlock label="Secondary Email" value={mc?.email2 || v.ownerEmail2} />
+              {(mc?.email2 || v.ownerEmail2) && <InfoBlock label="Secondary Email" value={mc?.email2 || v.ownerEmail2} />}
             </div>
           </div>
         </div>
