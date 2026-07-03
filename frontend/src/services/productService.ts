@@ -71,6 +71,7 @@ export interface ProductFormData {
   tags: string[];
   dimensions?: string;
   weight?: string;
+  weightUnit?: string;
   inStock: boolean;
 
   // Logistics Configuration
