@@ -5,6 +5,7 @@ import Header from '@/components/Checker/CheckerHeader/CheckerHeader'
 import Sidebar from '@/components/Checker/CheckerSidebar/CheckerSidebar'
 import CheckerProtectedRoute from '@/components/Checker/CheckerProtectedRoute'
 import { Toaster } from '@/components/UI/Toaster'
+import { CenterNoticeHost } from '@/components/UI/CenterNotice'
 import { NotificationProvider } from '@/components/Shared/NotificationProvider'
 
 const COLLAPSE_KEY = 'checker_sidebar_collapsed'
@@ -72,6 +73,7 @@ export default function DashboardLayout({
           </div>
 
           <Toaster />
+          <CenterNoticeHost />
         </div>
       </NotificationProvider>
     </CheckerProtectedRoute>
