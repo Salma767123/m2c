@@ -10,7 +10,7 @@ import { generateFactoryInspectionPdf, pdfFileName } from "@/lib/factoryInspecti
 import type { Verifications } from "@/components/Checker/Vendor/Steps/VI_VerifyField"
 import type { InspectorMeta } from "@/components/Checker/Vendor/Steps/VI_Step8_FinalReview"
 import type { FactoryEvidenceState } from "@/components/Checker/Vendor/Steps/VI_Step2_WarehouseFactory"
-import { showSuccessToast } from "@/lib/toast-utils"
+import { notifyUploadSuccess } from "@/lib/toast-utils"
 
 const compressImage = (file: File, maxWidth = 1200, quality = 0.7): Promise<string> =>
   new Promise((resolve) => {
@@ -179,7 +179,7 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
     if (e.target) e.target.value = ""
     setShowDocModal(false)
     setHasDownloaded(false)
-    showSuccessToast("Signed document uploaded successfully.")
+    notifyUploadSuccess('Signed Document', file.name)
   }
 
   const viewManualDoc = () => {

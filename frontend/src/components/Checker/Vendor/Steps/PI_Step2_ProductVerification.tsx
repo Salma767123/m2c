@@ -8,6 +8,7 @@ import ImageCropModal from '@/components/UI/ImageCropModal'
 import { getExpectedProductVerificationKeys } from '@/components/Checker/Products/validation'
 import { parseDimensions } from '@/lib/dimensions'
 import { CARE_INSTRUCTIONS, CATEGORY_COLORS, CareIcon } from '@/components/VendorDashboard/Products/CareInstructionModal'
+import { notifyUploadSuccess } from '@/lib/toast-utils'
 
 // ── Image compressor (same quality settings as Testing.tsx) ─────────────────
 async function compressImage(file: File, maxWidth = 1200, quality = 0.7): Promise<string> {
@@ -105,6 +106,7 @@ export default function PI_Step2_ProductVerification({ formData, setFormData, er
       ...formData,
       productEvidencePhotos: [...(formData.productEvidencePhotos || []), { name: cropFileName, data }],
     })
+    notifyUploadSuccess('Evidence Photo', cropFileName)
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
     if (cropQueue.length > 0) {

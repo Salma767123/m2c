@@ -5,6 +5,7 @@ import { Warehouse, MapPin, Image as ImageIcon, Camera, X, Eye } from 'lucide-re
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
 import ImageCropModal from '@/components/UI/ImageCropModal'
 import DocViewerModal from '@/components/UI/DocViewerModal'
+import { notifyUploadSuccess } from '@/lib/toast-utils'
 
 function getOwnershipTypeLabel(val: string) {
   const map: Record<string, string> = { owned: 'Owned', rented: 'Rented', lease: 'Lease' }
@@ -95,6 +96,7 @@ function EvidenceUpload({
           const reader = new FileReader()
           reader.onload = (ev) => {
             onChange({ name: cropFileName, url: ev.target?.result as string, id: Date.now() })
+            notifyUploadSuccess(label, cropFileName)
           }
           reader.readAsDataURL(croppedFile)
           if (cropSrc?.startsWith('blob:')) URL.revokeObjectURL(cropSrc)

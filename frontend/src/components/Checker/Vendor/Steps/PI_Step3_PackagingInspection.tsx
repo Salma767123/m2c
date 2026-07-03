@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Package, Upload, X, CheckCircle2, XCircle } from 'lucide-react'
 import type { PackagingItem } from './PI_data'
 import ImageCropModal from '@/components/UI/ImageCropModal'
+import { notifyUploadSuccess } from '@/lib/toast-utils'
 
 // ── Remark code colours ───────────────────────────────────────────────────────
 // 1-5 → REJECTED (red)   6-7 → RE-INSPECTION (amber)   8-10 → PASS (emerald)
@@ -208,6 +209,7 @@ export default function PI_Step3_PackagingInspection({ formData, setFormData, er
       ...formData,
       packagingPhotos: [...(formData.packagingPhotos || []), { name: cropFileName, data }],
     })
+    notifyUploadSuccess('Packaging Photo', cropFileName)
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
     if (cropQueue.length > 0) {

@@ -19,6 +19,7 @@ import {
 import type { TestGroup, TestItem } from './PI_data'
 import { ADDITIONAL_EVIDENCE_DEFS } from './PI_data'
 import ImageCropModal from '@/components/UI/ImageCropModal'
+import { notifyUploadSuccess } from '@/lib/toast-utils'
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve) => {
@@ -72,6 +73,7 @@ function PhotoStrip({
   const onCropped = async (croppedFile: File) => {
     const data = await readAsDataUrl(croppedFile)
     onAdd({ name: cropFileName, data })
+    notifyUploadSuccess(label.charAt(0).toUpperCase() + label.slice(1), cropFileName)
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
     if (cropQueue.length > 0) {
@@ -505,6 +507,7 @@ function EvidenceCard({
   const onCropped = async (croppedFile: File) => {
     const data = await readAsDataUrl(croppedFile)
     onAdd({ name: cropFileName, data })
+    notifyUploadSuccess(label, cropFileName)
     const cur = cropSrc
     if (cur?.startsWith('blob:')) URL.revokeObjectURL(cur)
     if (cropQueue.length > 0) {
