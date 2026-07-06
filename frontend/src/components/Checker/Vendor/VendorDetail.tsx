@@ -287,7 +287,7 @@ export default function VendorDetail({
           { key: "companyName", label: "Company Name" },
           { key: "companyType", label: "Company Type", type: "badge" },
           { key: "businessType", label: "Business Type", transform: (val: string) => getBusinessTypeLabel(val) },
-          { key: "factoryOwnershipType", label: "Factory Ownership", transform: (val: string) => getOwnershipTypeLabel(val) },
+          { key: "factoryOwnershipType", label: "Factory Ownership Type", transform: (val: string) => getOwnershipTypeLabel(val) },
           { key: "establishedYear", label: "Year Established" },
           { key: "gstNumber", label: "GST Number", condition: fullVendor.gstNumber },
           { key: "_unregistered", label: "Vendor Type", valueOverride: !fullVendor.gstNumber ? "Unregistered — identified by email" : undefined, condition: !fullVendor.gstNumber },

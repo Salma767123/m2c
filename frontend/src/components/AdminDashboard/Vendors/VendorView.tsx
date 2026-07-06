@@ -987,7 +987,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
               )}
               {v.factoryOwnershipType && (
                 <div>
-                  <p className="text-sm text-slate-500">Ownership Type</p>
+                  <p className="text-sm text-slate-500">Factory Ownership Type</p>
                   <p className="font-medium capitalize">{v.factoryOwnershipType}</p>
                 </div>
               )}

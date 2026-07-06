@@ -316,7 +316,7 @@ export default function VendorDataSummary({
           <InfoRow label="Country" value={data.country} />
           {data.factoryOwnershipType && (
             <InfoRow
-              label="Factory Ownership"
+              label="Factory Ownership Type"
               value={<span className="capitalize">{data.factoryOwnershipType}</span>}
             />
           )}
@@ -336,6 +336,9 @@ export default function VendorDataSummary({
       <AccordionSection {...sectionProps('warehouse', 'Warehouse / Factory', 'Operating locations and premises', <Warehouse className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('warehouse'))}>
         <div className="flex flex-col">
           <InfoRow label="Ownership Type" value={getOwnershipTypeLabel(data.ownershipType)} />
+          {data.warehousingCapacity && (
+            <InfoRow label="Warehousing Capacity" value={`${data.warehousingCapacity} sq ft`} />
+          )}
           <InfoRow
             label="Address"
             value={
@@ -638,7 +641,6 @@ export default function VendorDataSummary({
           <InfoRow label="Quality Control Process" value={data.qualityControlProcess || 'Not provided'} />
           <InfoRow label="Compliance Standards" value={data.complianceStandards || 'Not provided'} />
           {data.packagingCapabilities && <InfoRow label="Packaging Capabilities" value={data.packagingCapabilities} />}
-          {data.warehousingCapacity && <InfoRow label="Warehousing Capacity" value={`${data.warehousingCapacity} sq ft`} />}
           {data.logisticsPartners && <InfoRow label="Logistics Partners" value={data.logisticsPartners} />}
           {Array.isArray(data.shippingMethods) && data.shippingMethods.length > 0 && (
             <InfoRow
