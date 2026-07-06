@@ -113,7 +113,7 @@ interface OwnerStructureConfig {
   description: string;
 }
 
-const MAX_ADDITIONAL_OWNERS = 5;
+const MAX_ADDITIONAL_OWNERS = 4;
 
 const OWNER_STRUCTURE: Record<string, OwnerStructureConfig> = {
   proprietorship: {
@@ -1113,23 +1113,23 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
       <AccordionSection
         {...sectionProps('team')}
         icon={<Users className="w-4.5 h-4.5" aria-hidden="true" />}
-        title={`Additional ${ownerStructure.contactLabelPlural}`}
+        title="Additional Owners"
         subtitle={
           additionalOwners.length > 0
-            ? `${additionalOwners.length} ${additionalOwners.length === 1 ? ownerStructure.contactLabel.toLowerCase() : ownerStructure.contactLabelPlural.toLowerCase()} added — ${ownerStructure.description.toLowerCase()}`
+            ? `${additionalOwners.length} ${additionalOwners.length === 1 ? 'owner' : 'owners'} added — ${ownerStructure.description.toLowerCase()}`
             : ownerStructure.description
         }
       >
           {additionalOwners.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-2">
-              No additional {ownerStructure.contactLabelPlural.toLowerCase()} added yet.
+              No additional owners added yet.
               {' '}
               <button
                 type="button"
                 onClick={handleAddOwner}
                 className="text-brand-700 font-medium hover:text-brand-600 underline-offset-2 hover:underline"
               >
-                Add a {ownerStructure.contactLabel.toLowerCase()}
+                Add an additional owner
               </button>
               {' '}to get started.
             </p>
@@ -1138,12 +1138,12 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
               <div key={index} className="p-4 border border-gray-200 rounded-lg bg-gray-50/40 relative">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-semibold text-gray-800">
-                    {ownerStructure.contactLabel} {index + 2}
+                    Owner {index + 2}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveOwner(index)}
-                    aria-label={`Remove ${ownerStructure.contactLabel} ${index + 2}`}
+                    aria-label={`Remove Owner ${index + 2}`}
                     className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 rounded"
                   >
                     <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -1340,7 +1340,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
           {additionalOwners.length > 0 && (
             additionalOwners.length >= MAX_ADDITIONAL_OWNERS ? (
               <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-center">
-                Maximum of {MAX_ADDITIONAL_OWNERS} additional {ownerStructure.contactLabelPlural.toLowerCase()} reached.
+                Maximum of {MAX_ADDITIONAL_OWNERS} additional owners reached.
               </p>
             ) : (
               <button
@@ -1349,7 +1349,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-brand-700 bg-brand-50/50 border border-dashed border-brand-300 rounded-lg hover:bg-brand-50 hover:border-brand-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
               >
                 <Plus className="w-4 h-4" aria-hidden="true" />
-                Add another {ownerStructure.contactLabel.toLowerCase()}
+                Add Additional Owner
               </button>
             )
           )}

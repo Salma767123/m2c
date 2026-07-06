@@ -406,9 +406,9 @@ export default function VendorPanel() {
         </aside>
 
         {/* Right Content Area (responsive width) */}
-        <div className="flex-1 w-full min-w-0 overflow-y-auto max-h-[calc(100vh-142px)] relative">
+        <div className="flex-1 w-full min-w-0 overflow-y-auto relative">
           {/* Mobile Sticky Progress Tracker */}
-          <div className="md:hidden sticky top-0 z-(--z-sticky) bg-white/95 backdrop-blur-md border-b border-gray-200/80 px-4 py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] transition-all duration-300">
+          <div className="md:hidden sticky top-19.25 z-(--z-sticky) bg-white/95 backdrop-blur-md border-b border-gray-200/80 px-4 py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.02)] transition-all duration-300">
             <div className="flex justify-between items-center gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex items-center justify-center w-8 h-8 bg-brand-500 text-white rounded-lg font-bold shrink-0 text-sm shadow-[0_3px_8px_rgba(224,26,27,0.15)]">
