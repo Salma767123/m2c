@@ -174,46 +174,48 @@ export default function VendorTypeProducts({
     productId: string,
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const files = Array.from(e.target.files || []);
+    const file = Array.from(e.target.files || [])[0];
+    e.target.value = "";
+    if (!file) return;
 
-    files.forEach((file) => {
-      const result = validateUpload(file, {
-        label: 'Product Image',
-        allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
-        allowedLabel: 'JPEG, PNG, or WEBP',
-        maxBytes: 5 * 1024 * 1024,
-        maxLabel: '5,120 KB',
-      });
-      if (!result.ok) {
-        notifyUploadError('Product Image', result.message);
+    const currentProduct = (categoryProducts[categoryId] || []).find((p) => p.id === productId);
+    if (currentProduct && currentProduct.photos.length >= 1) {
+      notifyUploadError('Product Image', 'Only 1 image is allowed. Remove the existing image to upload a new one.');
+      return;
+    }
+
+    const result = validateUpload(file, {
+      label: 'Product Image',
+      allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      allowedLabel: 'JPEG, PNG, or WEBP',
+      maxBytes: 5 * 1024 * 1024,
+      maxLabel: '5,120 KB',
+    });
+    if (!result.ok) {
+      notifyUploadError('Product Image', result.message);
+      return;
+    }
+
+    compressImageToDataUrl(file).then((preview) => {
+      if (!preview) {
+        notifyUploadError('Product Image', 'Could not process this image. Please try again.');
         return;
       }
-
-      compressImageToDataUrl(file).then((preview) => {
-        if (!preview) {
-          notifyUploadError('Product Image', 'Could not process this image. Please try again.');
-          return;
-        }
-        setCategoryProducts((prev) => {
-          const categoryList = prev[categoryId] || [];
-          return {
-            ...prev,
-            [categoryId]: categoryList.map((p) => {
-              if (p.id === productId) {
-                if (p.photos.length >= 5) return p;
-                return {
-                  ...p,
-                  photos: [...p.photos, { file, preview }],
-                };
-              }
-              return p;
-            }),
-          };
-        });
-        notifyUploadSuccess('Product Image', file.name);
+      setCategoryProducts((prev) => {
+        const categoryList = prev[categoryId] || [];
+        return {
+          ...prev,
+          [categoryId]: categoryList.map((p) => {
+            if (p.id === productId) {
+              if (p.photos.length >= 1) return p;
+              return { ...p, photos: [...p.photos, { file, preview }] };
+            }
+            return p;
+          }),
+        };
       });
+      notifyUploadSuccess('Product Image', file.name);
     });
-    e.target.value = "";
   };
 
   const removeProductPhoto = (
@@ -330,50 +332,53 @@ export default function VendorTypeProducts({
     productId: string,
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const files = Array.from(e.target.files || []);
+    const file = Array.from(e.target.files || [])[0];
+    e.target.value = "";
+    if (!file) return;
 
-    files.forEach((file) => {
-      const result = validateUpload(file, {
-        label: 'Product Image',
-        allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
-        allowedLabel: 'JPEG, PNG, or WEBP',
-        maxBytes: 5 * 1024 * 1024,
-        maxLabel: '5,120 KB',
-      });
-      if (!result.ok) {
-        notifyUploadError('Product Image', result.message);
+    const currentCategory = additionalCategories.find((c) => c.id === categoryId);
+    const currentProduct = currentCategory?.products.find((p) => p.id === productId);
+    if (currentProduct && currentProduct.photos.length >= 1) {
+      notifyUploadError('Product Image', 'Only 1 image is allowed. Remove the existing image to upload a new one.');
+      return;
+    }
+
+    const result = validateUpload(file, {
+      label: 'Product Image',
+      allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      allowedLabel: 'JPEG, PNG, or WEBP',
+      maxBytes: 5 * 1024 * 1024,
+      maxLabel: '5,120 KB',
+    });
+    if (!result.ok) {
+      notifyUploadError('Product Image', result.message);
+      return;
+    }
+
+    compressImageToDataUrl(file).then((preview) => {
+      if (!preview) {
+        notifyUploadError('Product Image', 'Could not process this image. Please try again.');
         return;
       }
-
-      compressImageToDataUrl(file).then((preview) => {
-        if (!preview) {
-          notifyUploadError('Product Image', 'Could not process this image. Please try again.');
-          return;
-        }
-        setAdditionalCategories((prev) =>
-          prev.map((c) => {
-            if (c.id === categoryId) {
-              return {
-                ...c,
-                products: c.products.map((p) => {
-                  if (p.id === productId) {
-                    if (p.photos.length >= 5) return p;
-                    return {
-                      ...p,
-                      photos: [...p.photos, { file, preview }],
-                    };
-                  }
-                  return p;
-                }),
-              };
-            }
-            return c;
-          }),
-        );
-        notifyUploadSuccess('Product Image', file.name);
-      });
+      setAdditionalCategories((prev) =>
+        prev.map((c) => {
+          if (c.id === categoryId) {
+            return {
+              ...c,
+              products: c.products.map((p) => {
+                if (p.id === productId) {
+                  if (p.photos.length >= 1) return p;
+                  return { ...p, photos: [...p.photos, { file, preview }] };
+                }
+                return p;
+              }),
+            };
+          }
+          return c;
+        }),
+      );
+      notifyUploadSuccess('Product Image', file.name);
     });
-    e.target.value = "";
   };
 
   const removeAdditionalProductPhoto = (
@@ -1018,7 +1023,7 @@ export default function VendorTypeProducts({
                                 {/* Product Photos */}
                                 <div>
                                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                                    Product Photos (Max 5)
+                                    Product Photo
                                   </label>
                                   <div className="flex flex-wrap gap-3">
                                     {product.photos.map((photo, photoIndex) => (
@@ -1049,11 +1054,11 @@ export default function VendorTypeProducts({
                                       </div>
                                     ))}
 
-                                    {product.photos.length < 5 && (
+                                    {product.photos.length < 1 && (
                                       <label
                                         tabIndex={0}
                                         role="button"
-                                        aria-label="Upload product photos"
+                                        aria-label="Upload product photo"
                                         onKeyDown={(e) => {
                                           if (e.key === 'Enter' || e.key === ' ') {
                                             e.preventDefault();
@@ -1066,7 +1071,6 @@ export default function VendorTypeProducts({
                                         <input
                                           type="file"
                                           accept="image/jpeg,image/png,image/webp"
-                                          multiple
                                           onChange={(e) =>
                                             handleProductPhotoUpload(
                                               category.id,
@@ -1199,7 +1203,7 @@ export default function VendorTypeProducts({
                           {/* Product Photos */}
                           <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">
-                              Product Photos (Max 5)
+                              Product Photo
                             </label>
                             <div className="flex flex-wrap gap-3">
                               {product.photos.map((photo, photoIndex) => (
@@ -1230,11 +1234,11 @@ export default function VendorTypeProducts({
                                 </div>
                               ))}
 
-                              {product.photos.length < 5 && (
+                              {product.photos.length < 1 && (
                                 <label
                                   tabIndex={0}
                                   role="button"
-                                  aria-label="Upload product photos"
+                                  aria-label="Upload product photo"
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
                                       e.preventDefault();
@@ -1247,7 +1251,6 @@ export default function VendorTypeProducts({
                                   <input
                                     type="file"
                                     accept="image/jpeg,image/png,image/webp"
-                                    multiple
                                     onChange={(e) =>
                                       handleAdditionalProductPhotoUpload(
                                         category.id,

@@ -189,9 +189,7 @@ export default function WarehouseDetails({
   // from re-rendering just because the parent re-rendered.
   const handleInputChange = useCallback(
     (field: string, value: any) => {
-      // Defensive: ignore edits while linked, EXCEPT for warehousingCapacity
-      // which should remain editable even when address is linked
-      if (isLinked && field !== 'warehousingCapacity') return;
+      if (isLinked) return;
       setFormData((prev) => ({ ...prev, [field]: value }));
       // Clear error when user starts typing
       setErrors((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
@@ -551,7 +549,7 @@ export default function WarehouseDetails({
                   <span className="text-slate-400 text-xs font-normal">(sq ft, optional)</span>
                 </label>
                 <p className="text-xs text-slate-500 mb-3">Total floor area of your warehouse.</p>
-                <div className="flex items-stretch border border-slate-300 hover:border-slate-400 rounded-lg overflow-hidden transition-colors focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
+                <div className={`flex items-stretch border rounded-lg overflow-hidden transition-colors ${isLinked ? 'border-slate-200 bg-slate-50 cursor-not-allowed' : 'border-slate-300 hover:border-slate-400 focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500'}`}>
                   <input
                     id="warehousingCapacity"
                     type="number"
@@ -559,7 +557,10 @@ export default function WarehouseDetails({
                     value={formData.warehousingCapacity || ''}
                     onChange={(e) => handleInputChange('warehousingCapacity', e.target.value)}
                     onBlur={() => handleBlur('warehousingCapacity')}
-                    className="flex-1 min-w-0 text-sm font-medium pl-4 pr-2 py-2.5 border-0 outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    disabled={isLinked}
+                    readOnly={isLinked}
+                    aria-readonly={isLinked}
+                    className={`flex-1 min-w-0 text-sm font-medium pl-4 pr-2 py-2.5 border-0 outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isLinked ? 'text-slate-500 cursor-not-allowed' : ''}`}
                     placeholder="e.g. 50000"
                     min="0"
                   />
@@ -836,131 +837,188 @@ export default function WarehouseDetails({
           {...sectionProps('photos')}
           icon={<Camera className="w-4 h-4" aria-hidden="true" />}
           title="Factory & Facility Photos"
-          subtitle="Upload named facility photos — Name Board and Front View are required"
+          subtitle={isLinked ? "Synced from Manufacturing Facilities — read-only" : "Upload named facility photos — Name Board and Front View are required"}
         >
-          <div className="flex flex-col">
-            <p className="text-xs text-slate-500 mb-2">
-              PNG, JPG, WEBP, or GIF • up to {FACTORY_IMAGE_MAX_LABEL} each.{' '}
-              <span className="font-semibold text-slate-700">Required:</span> Factory Name Board, Front View.
-            </p>
+          {isLinked ? (
+            /* ── Read-only view: photos come from Manufacturing Facilities ── */
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-4 bg-brand-50/60 border border-brand-200 rounded-xl">
+                <Camera className="w-5 h-5 text-brand-500 mt-0.5 shrink-0" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-semibold text-brand-700">Synced from Manufacturing Facilities</p>
+                  <p className="text-xs text-brand-600 mt-0.5">
+                    These photos were uploaded in the Manufacturing Facilities step. To change them, go back and update
+                    them there.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {FACTORY_IMAGE_SLOTS.map((slot) => {
+                  const value = formData.factoryImages[slot.id];
+                  return (
+                    <div key={slot.id} className="flex flex-col rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                      <div className="mb-2">
+                        <p className="text-xs font-bold text-slate-800 leading-tight">
+                          {slot.label}
+                          {slot.required ? (
+                            <span className="text-brand-500 ml-0.5" aria-hidden="true">*</span>
+                          ) : (
+                            <span className="ml-1 text-[10px] font-normal text-slate-400">(optional)</span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{slot.description}</p>
+                      </div>
+                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        {value?.url ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={value.url}
+                              alt={`${slot.label} preview`}
+                              className="absolute inset-0 w-full h-full object-cover"
+                            />
+                            <div className="absolute bottom-1.5 left-1.5 bg-brand-700/80 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
+                              Synced
+                            </div>
+                          </>
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-slate-300">
+                            <Camera className="w-6 h-6" aria-hidden="true" />
+                            <span className="text-[10px]">Not uploaded</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* ── Editable view: independent uploads ───────────────────── */
+            <div className="flex flex-col">
+              <p className="text-xs text-slate-500 mb-2">
+                PNG, JPG, WEBP, or GIF • up to {FACTORY_IMAGE_MAX_LABEL} each.{' '}
+                <span className="font-semibold text-slate-700">Required:</span> Factory Name Board, Front View.
+              </p>
 
-            <div
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-              role="group"
-              aria-label="Factory images"
-            >
-            {FACTORY_IMAGE_SLOTS.map((slot) => {
-              const value = formData.factoryImages[slot.id];
-              const slotErrKey = `factoryImage:${slot.id}`;
-              const slotError = errors[slotErrKey] && touched[slotErrKey] ? errors[slotErrKey] : '';
-              const inputId = `factory-img-${slot.id}`;
+              <div
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                role="group"
+                aria-label="Factory images"
+              >
+              {FACTORY_IMAGE_SLOTS.map((slot) => {
+                const value = formData.factoryImages[slot.id];
+                const slotErrKey = `factoryImage:${slot.id}`;
+                const slotError = errors[slotErrKey] && touched[slotErrKey] ? errors[slotErrKey] : '';
+                const inputId = `factory-img-${slot.id}`;
 
-              return (
-                <div
-                  key={slot.id}
-                  data-field={slotErrKey}
-                  className={`flex flex-col rounded-xl border p-3 transition-all duration-200 ${
-                    slotError
-                      ? 'border-red-300 bg-red-50/30'
-                      : value
-                      ? 'border-brand-300/40 bg-brand-50/10'
-                      : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
-                  }`}
-                >
-                  {/* Slot header */}
-                  <div className="mb-2">
-                    <p className="text-xs font-bold text-slate-800 leading-tight">
-                      {slot.label}
-                      {slot.required ? (
-                        <span className="text-brand-500 ml-0.5" aria-hidden="true">*</span>
-                      ) : (
-                        <span className="ml-1 text-[10px] font-normal text-slate-400">(optional)</span>
-                      )}
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{slot.description}</p>
-                  </div>
-
-                  {/* Upload zone */}
+                return (
                   <div
-                    className={`relative aspect-[4/3] w-full overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
+                    key={slot.id}
+                    data-field={slotErrKey}
+                    className={`flex flex-col rounded-xl border p-3 transition-all duration-200 ${
                       slotError
-                        ? 'border-red-400 bg-red-50/30'
+                        ? 'border-red-300 bg-red-50/30'
                         : value
-                        ? 'border-brand-400/30 bg-white'
-                        : 'border-slate-300 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                        ? 'border-brand-300/40 bg-brand-50/10'
+                        : 'border-slate-200 bg-slate-50/50 hover:border-slate-300'
                     }`}
                   >
-                    {value?.url ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={value.url}
-                          alt={`${slot.label} preview`}
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSlotRemove(slot.id)}
-                          aria-label={`Remove ${slot.label}`}
-                          className="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/95 text-red-600 shadow-sm hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" aria-hidden="true" />
-                        </button>
-                      </>
-                    ) : (
-                      <label
-                        htmlFor={inputId}
-                        tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById(inputId)?.click(); } }}
-                        className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer text-center px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
-                      >
-                        <Upload className="w-5 h-5 text-slate-300" aria-hidden="true" />
-                        <span className="text-[11px] font-semibold text-brand-600">Upload</span>
-                        <span className="text-[10px] text-slate-400">or drag & drop</span>
-                      </label>
-                    )}
-                    <input
-                      id={inputId}
-                      type="file"
-                      accept={FACTORY_IMAGE_ALLOWED_TYPES.join(',')}
-                      className="sr-only"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleSlotUpload(slot.id, file);
-                        e.target.value = '';
-                      }}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const file = e.dataTransfer.files?.[0];
-                        if (file) handleSlotUpload(slot.id, file);
-                      }}
-                    />
-                  </div>
-
-                  {/* Filename + replace link */}
-                  {value && (
-                    <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px]">
-                      <p className="truncate text-slate-600" title={value.name}>{value.name}</p>
-                      <label
-                        htmlFor={inputId}
-                        tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById(inputId)?.click(); } }}
-                        className="shrink-0 cursor-pointer text-brand-600 hover:text-brand-500 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded"
-                      >
-                        Replace
-                      </label>
+                    {/* Slot header */}
+                    <div className="mb-2">
+                      <p className="text-xs font-bold text-slate-800 leading-tight">
+                        {slot.label}
+                        {slot.required ? (
+                          <span className="text-brand-500 ml-0.5" aria-hidden="true">*</span>
+                        ) : (
+                          <span className="ml-1 text-[10px] font-normal text-slate-400">(optional)</span>
+                        )}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{slot.description}</p>
                     </div>
-                  )}
 
-                  {slotError && (
-                    <p className="text-red-600 text-[11px] mt-1 font-medium" role="alert">{slotError}</p>
-                  )}
-                </div>
-              );
-            })}
+                    {/* Upload zone */}
+                    <div
+                      className={`relative aspect-[4/3] w-full overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
+                        slotError
+                          ? 'border-red-400 bg-red-50/30'
+                          : value
+                          ? 'border-brand-400/30 bg-white'
+                          : 'border-slate-300 bg-white hover:border-brand-400/50 hover:bg-brand-50/10'
+                      }`}
+                    >
+                      {value?.url ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={value.url}
+                            alt={`${slot.label} preview`}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSlotRemove(slot.id)}
+                            aria-label={`Remove ${slot.label}`}
+                            className="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/95 text-red-600 shadow-sm hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" aria-hidden="true" />
+                          </button>
+                        </>
+                      ) : (
+                        <label
+                          htmlFor={inputId}
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById(inputId)?.click(); } }}
+                          className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer text-center px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded-lg"
+                        >
+                          <Upload className="w-5 h-5 text-slate-300" aria-hidden="true" />
+                          <span className="text-[11px] font-semibold text-brand-600">Upload</span>
+                          <span className="text-[10px] text-slate-400">or drag & drop</span>
+                        </label>
+                      )}
+                      <input
+                        id={inputId}
+                        type="file"
+                        accept={FACTORY_IMAGE_ALLOWED_TYPES.join(',')}
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSlotUpload(slot.id, file);
+                          e.target.value = '';
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) handleSlotUpload(slot.id, file);
+                        }}
+                      />
+                    </div>
+
+                    {/* Filename + replace link */}
+                    {value && (
+                      <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px]">
+                        <p className="truncate text-slate-600" title={value.name}>{value.name}</p>
+                        <label
+                          htmlFor={inputId}
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById(inputId)?.click(); } }}
+                          className="shrink-0 cursor-pointer text-brand-600 hover:text-brand-500 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 rounded"
+                        >
+                          Replace
+                        </label>
+                      </div>
+                    )}
+
+                    {slotError && (
+                      <p className="text-red-600 text-[11px] mt-1 font-medium" role="alert">{slotError}</p>
+                    )}
+                  </div>
+                );
+              })}
+              </div>
             </div>
-          </div>
+          )}
         </AccordionSection>
 
       </div>{/* end accordion sections */}

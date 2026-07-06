@@ -113,12 +113,20 @@ interface OwnerStructureConfig {
   description: string;
 }
 
-const OWNER_STRUCTURE: Record<CompanyTypeKey, OwnerStructureConfig> = {
+const MAX_ADDITIONAL_OWNERS = 5;
+
+const OWNER_STRUCTURE: Record<string, OwnerStructureConfig> = {
   proprietorship: {
     allowMultiple: false,
     contactLabel: 'Owner',
     contactLabelPlural: 'Owners',
     description: 'A sole proprietorship has one owner — no additional contacts needed.',
+  },
+  unregistered: {
+    allowMultiple: false,
+    contactLabel: 'Owner',
+    contactLabelPlural: 'Owners',
+    description: 'An unregistered vendor has one owner — no additional contacts needed.',
   },
   'pvt-ltd': {
     allowMultiple: true,
@@ -140,13 +148,12 @@ const OWNER_STRUCTURE: Record<CompanyTypeKey, OwnerStructureConfig> = {
   },
 };
 
-// Fallback for "other" / unset types — keeps the section available but
-// uses generic copy.
+// Fallback for "others" / unset types — single owner only.
 const DEFAULT_OWNER_STRUCTURE: OwnerStructureConfig = {
-  allowMultiple: true,
+  allowMultiple: false,
   contactLabel: 'Owner',
   contactLabelPlural: 'Owners',
-  description: 'Add additional owners or directors with their contact details.',
+  description: 'Only one owner is allowed for this business type.',
 };
 
 function resolveOwnerStructure(businessType: string | undefined): OwnerStructureConfig {
@@ -313,6 +320,7 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
     // single owner. The button is hidden in the UI, but a stale event or
     // programmatic call shouldn't be able to bypass the rule either.
     if (!resolveOwnerStructure(data.businessType).allowMultiple) return;
+    if (additionalOwners.length >= MAX_ADDITIONAL_OWNERS) return;
     setAdditionalOwners(prev => [...prev, {
       title: '',
       firstName: '',
@@ -1327,18 +1335,23 @@ export default function OwnerProfile({ onNext, onPrev, onUpdateData, data }: Own
           )}
 
           {/* "+ Add another" tile — sits inside the section body, after the
-              last director card. Replaces the old header-strip button which
-              created a visually disjointed band between the section header
-              and the first form card. */}
+              last director card. Disabled and replaced with a limit notice
+              once MAX_ADDITIONAL_OWNERS is reached. */}
           {additionalOwners.length > 0 && (
-            <button
-              type="button"
-              onClick={handleAddOwner}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-brand-700 bg-brand-50/50 border border-dashed border-brand-300 rounded-lg hover:bg-brand-50 hover:border-brand-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
-            >
-              <Plus className="w-4 h-4" aria-hidden="true" />
-              Add another {ownerStructure.contactLabel.toLowerCase()}
-            </button>
+            additionalOwners.length >= MAX_ADDITIONAL_OWNERS ? (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-center">
+                Maximum of {MAX_ADDITIONAL_OWNERS} additional {ownerStructure.contactLabelPlural.toLowerCase()} reached.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAddOwner}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-brand-700 bg-brand-50/50 border border-dashed border-brand-300 rounded-lg hover:bg-brand-50 hover:border-brand-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+              >
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                Add another {ownerStructure.contactLabel.toLowerCase()}
+              </button>
+            )
           )}
       </AccordionSection>
       )}

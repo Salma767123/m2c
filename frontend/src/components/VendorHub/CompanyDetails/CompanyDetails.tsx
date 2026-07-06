@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/UI/Button";
-import { Building2, Globe, Mail, Phone, MapPin, Image, Home, Building, User, Users, Scale, HelpCircle, Loader2, Briefcase, ArrowRight, Upload, Eye, RefreshCw, X, CheckCircle2, ChevronDown, AlertCircle } from "lucide-react";
+import { Building2, Globe, Mail, Phone, MapPin, Image, Home, Building, User, Users, Scale, HelpCircle, Loader2, Briefcase, ArrowRight, Upload, Eye, RefreshCw, X, CheckCircle2, ChevronDown, AlertCircle, Camera } from "lucide-react";
 import { ToggleButton, PhoneInput, parsePhone, CountrySelect, validatePhoneE164, PHONE_COUNTRY_CODES, AddressAutocomplete, AccordionSection, LocalLandlineInput, type LocalLandlineValue } from "@/components/VendorHub/FormUI";
 import { IconFile, IconFileText } from "@tabler/icons-react";
-import { handleUpload } from "@/lib/toast-utils";
+import { handleUpload, validateUpload, notifyUploadError, notifyUploadSuccess } from "@/lib/toast-utils";
+import ImageCropModal from "@/components/UI/ImageCropModal";
 import { centerNotice } from "@/components/UI/CenterNotice";
 import { useZipLookup } from "@/hooks/useZipLookup";
 import { zipPlaceLabel } from "@/lib/zipLookup";
@@ -88,6 +89,12 @@ interface FormData {
   warehouseState?: string;
   warehouseZip?: string;
   warehouseCountry?: string;
+  /** Warehousing capacity for the factory site (sq ft). Only used when
+   *  sameAsWarehouse is false — otherwise we read data.warehousingCapacity. */
+  factorySiteCapacity: string;
+  /** Factory & facility photo slots — independent from warehouse photos.
+   *  Only required when sameAsWarehouse is false. */
+  factorySiteImages: Partial<Record<FactoryImageSlotId, FactoryImageValue>>;
 }
 
 const businessTypes = [
@@ -113,6 +120,55 @@ const factoryOwnershipTypes = [
   { id: "lease", label: "Lease" },
 ];
 const FACTORY_OWNERSHIP_IDS = new Set(factoryOwnershipTypes.map((t) => t.id));
+
+// ── Factory & Facility Photo Slots ────────────────────────────────────────
+// Same slot definitions as WarehouseDetails — reused here so CompanyDetails
+// can capture factory photos when the factory site ≠ warehouse.
+type FactoryImageSlotId =
+  | 'nameBoard' | 'frontView' | 'backView' | 'leftView'
+  | 'rightView' | 'roadView' | 'insideFactory' | 'others';
+
+interface FactoryImageSlotConfig {
+  id: FactoryImageSlotId;
+  label: string;
+  description: string;
+  required: boolean;
+}
+
+interface FactoryImageValue { file: File | null; url: string; name: string; }
+
+const FACTORY_IMAGE_SLOTS: FactoryImageSlotConfig[] = [
+  { id: 'nameBoard',      label: 'Factory Name Board', description: 'Signage showing the factory name',  required: true  },
+  { id: 'frontView',      label: 'Front View',          description: 'Main entrance / facade',            required: true  },
+  { id: 'backView',       label: 'Back View',           description: 'Rear of the building',              required: true  },
+  { id: 'leftView',       label: 'Left View',           description: 'Left-side elevation',               required: true  },
+  { id: 'rightView',      label: 'Right View',          description: 'Right-side elevation',              required: true  },
+  { id: 'roadView',       label: 'Road View',           description: 'Approach road / driveway',          required: true  },
+  { id: 'insideFactory',  label: 'Inside Factory',      description: 'Production floor or interior',      required: true  },
+  { id: 'others',         label: 'Others',              description: 'Any additional photo',              required: false },
+];
+
+const SITE_IMAGE_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const SITE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const SITE_IMAGE_MAX_LABEL = '10,240 KB';
+
+function normaliseFactorySiteImages(
+  raw: unknown,
+): Partial<Record<FactoryImageSlotId, FactoryImageValue>> {
+  if (!raw) return {};
+  if (Array.isArray(raw)) {
+    const out: Partial<Record<FactoryImageSlotId, FactoryImageValue>> = {};
+    for (const item of raw) {
+      const slotId = item?.slotId as FactoryImageSlotId | undefined;
+      if (slotId && FACTORY_IMAGE_SLOTS.some((s) => s.id === slotId)) {
+        out[slotId] = { file: item.file ?? null, url: item.url ?? '', name: item.name ?? '' };
+      }
+    }
+    return out;
+  }
+  if (typeof raw === 'object') return raw as Partial<Record<FactoryImageSlotId, FactoryImageValue>>;
+  return {};
+}
 
 // Reserved IDs — anything else stored in businessType is treated as a
 // user-provided "Others" value, so the chip + input stay populated when
@@ -283,7 +339,6 @@ function DocUpload({
       <label htmlFor={inputId} className="block text-sm font-semibold text-slate-700 mb-1">
         {title}
         {requiredMark === 'required' && <span className="text-brand-500 ml-0.5" aria-hidden="true">*</span>}
-        {requiredMark === 'optional' && <span className="text-slate-400 text-xs font-normal ml-1">(Optional)</span>}
       </label>
 
       {/* Hidden input is always mounted so the "Replace" label can re-open it. */}
@@ -435,14 +490,25 @@ export default function CompanyDetails({
         ? { [data.businessType]: { file: data.typeCertFile || null, document: data.typeCertDocument || null } }
         : {}
     ),
+    factorySiteCapacity: data.factorySiteCapacity || '',
+    factorySiteImages: normaliseFactorySiteImages(data.factorySiteImages),
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // ── Factory site photo crop state ──────────────────────────────────
+  const [factoryCropPending, setFactoryCropPending] = useState<{
+    slotId: FactoryImageSlotId;
+    src: string;
+    fileName: string;
+  } | null>(null);
+  const factoryCropPendingRef = useRef(factoryCropPending);
+  factoryCropPendingRef.current = factoryCropPending;
+
   // ── Accordion Section State ────────────────────────────────────────
   // Tracks which of the 4 logical subsections is currently expanded.
-  type SectionKey = 'profile' | 'contact' | 'address';
+  type SectionKey = 'profile' | 'contact' | 'address' | 'photos';
   const [activeSection, setActiveSection] = useState<SectionKey>('profile');
 
   // Maps validation error field names → their parent accordion section.
@@ -478,6 +544,10 @@ export default function CompanyDetails({
     panCardDocument: 'profile',
     typeCertDocument: 'profile',
     aadhaarDocument: 'profile',
+    // Factory photo slot errors → photos section
+    ...Object.fromEntries(
+      FACTORY_IMAGE_SLOTS.map((s) => [`factorySiteImage:${s.id}`, 'photos' as SectionKey]),
+    ),
   };
 
   // ── ZIP / postal-code auto-fill ─────────────────────────────────
@@ -499,6 +569,57 @@ export default function CompanyDetails({
     runLookup: runZipLookup,
     clear: clearZip,
   } = useZipLookup(handleZipResult);
+
+  // ── Factory Site Photo Handlers ─────────────────────────────────────
+  const handleFactorySlotUpload = useCallback((slotId: FactoryImageSlotId, file: File) => {
+    const slot = FACTORY_IMAGE_SLOTS.find((s) => s.id === slotId);
+    const label = slot ? slot.label : 'Image';
+    const result = validateUpload(file, {
+      label,
+      allowedTypes: SITE_IMAGE_ALLOWED_TYPES,
+      allowedLabel: 'PNG, JPG, WEBP, or GIF',
+      maxBytes: SITE_IMAGE_MAX_BYTES,
+      maxLabel: SITE_IMAGE_MAX_LABEL,
+    });
+    if (!result.ok) { notifyUploadError(label, result.message); return; }
+    const pending = factoryCropPendingRef.current;
+    if (pending) URL.revokeObjectURL(pending.src);
+    setFactoryCropPending({ slotId, src: URL.createObjectURL(file), fileName: file.name });
+  }, []);
+
+  const handleFactoryCropConfirm = useCallback((croppedFile: File) => {
+    const pending = factoryCropPendingRef.current;
+    if (!pending) return;
+    const { slotId, fileName } = pending;
+    setFactoryCropPending(null);
+    const url = URL.createObjectURL(croppedFile);
+    setFormData((prev) => {
+      const existing = prev.factorySiteImages[slotId];
+      if (existing?.url && existing.url.startsWith('blob:')) URL.revokeObjectURL(existing.url);
+      return {
+        ...prev,
+        factorySiteImages: { ...prev.factorySiteImages, [slotId]: { file: croppedFile, url, name: fileName } },
+      };
+    });
+    setErrors((prev) => ({ ...prev, [`factorySiteImage:${slotId}`]: '' }));
+    notifyUploadSuccess(fileName, '');
+  }, []);
+
+  const handleFactoryCropCancel = useCallback(() => {
+    const pending = factoryCropPendingRef.current;
+    if (pending) URL.revokeObjectURL(pending.src);
+    setFactoryCropPending(null);
+  }, []);
+
+  const handleFactorySlotRemove = useCallback((slotId: FactoryImageSlotId) => {
+    setFormData((prev) => {
+      const existing = prev.factorySiteImages[slotId];
+      if (existing?.url && existing.url.startsWith('blob:')) URL.revokeObjectURL(existing.url);
+      const next = { ...prev.factorySiteImages };
+      delete next[slotId];
+      return { ...prev, factorySiteImages: next };
+    });
+  }, []);
 
   // Note (was: real-time "Same as warehouse" sync) ─────────────────────
   // We previously pushed mirrored warehouse fields to VendorPanel on every
@@ -571,6 +692,8 @@ export default function CompanyDetails({
           ? { [data.businessType]: { file: data.typeCertFile || null, document: data.typeCertDocument || null } }
           : {}
       ),
+      factorySiteCapacity: data.factorySiteCapacity || '',
+      factorySiteImages: normaliseFactorySiteImages(data.factorySiteImages),
     });
   }
 
@@ -592,48 +715,75 @@ export default function CompanyDetails({
         const oldType = prev.businessType;
         const newType = value;
 
-        // Moving WITHIN the "Others" family — i.e. between the 'others'
-        // placeholder and the custom name the vendor types (neither is a
-        // canonical chip id) — must NOT reset the type certificate / company
-        // id. The custom name changes on every keystroke, so without this the
-        // "Other Supporting Document" a custom vendor uploaded would be wiped
-        // as soon as they typed their business-type name.
+        // Typing within the "Others" custom input — both old and new values
+        // are non-canonical (e.g. 'others' placeholder → user-typed string,
+        // or updated string on every keystroke). Nothing to reset here.
         if (!BUSINESS_TYPE_IDS.has(oldType) && !BUSINESS_TYPE_IDS.has(newType)) {
           return { ...prev, businessType: newType };
         }
 
-        const nextCompanyIdByType = { ...prev.companyIdByType };
-        const nextTypeCertByType = { ...prev.typeCertByType };
-
-        // Stash current values under the OLD type — only when oldType is
-        // one of the four canonical chip ids (proprietorship / pvt-ltd /
-        // partnership-firm / llp). The 'others' placeholder and any custom
-        // string typed under Others have no dynamic ID field, so there's
-        // nothing meaningful to stash for them.
-        if (oldType && BUSINESS_TYPE_IDS.has(oldType)) {
-          nextCompanyIdByType[oldType] = prev.companyIdNumber || '';
-          nextTypeCertByType[oldType] = {
-            file: prev.typeCertFile,
-            document: prev.typeCertDocument,
-          };
-        }
-
-        // Restore from stash for the NEW type (empty if never visited).
-        const restoredId = nextCompanyIdByType[newType] ?? '';
-        const restoredCert = nextTypeCertByType[newType];
+        // Business Type switched between distinct types: revoke any blob URLs
+        // that are about to be cleared so the browser can reclaim the memory.
+        if (prev.logoFile && typeof prev.logo === 'string') URL.revokeObjectURL(prev.logo);
+        if (prev.gstFile && typeof prev.gstDocument === 'string') URL.revokeObjectURL(prev.gstDocument);
+        if (prev.panCardFile && typeof prev.panCardDocument === 'string') URL.revokeObjectURL(prev.panCardDocument);
+        if (prev.typeCertFile && typeof prev.typeCertDocument === 'string') URL.revokeObjectURL(prev.typeCertDocument);
+        if (prev.iecCertFile && typeof prev.iecCertDocument === 'string') URL.revokeObjectURL(prev.iecCertDocument);
+        if (prev.aadhaarFile && typeof prev.aadhaarDocument === 'string') URL.revokeObjectURL(prev.aadhaarDocument);
 
         return {
           ...prev,
           businessType: newType,
-          companyIdNumber: restoredId,
-          typeCertFile: restoredCert?.file ?? null,
-          typeCertDocument: restoredCert?.document ?? null,
-          companyIdByType: nextCompanyIdByType,
-          typeCertByType: nextTypeCertByType,
+          companyName: '',
+          // ── Company Logo ─────────────────────────────────────────────
+          logo: null,
+          logoFile: null,
+          // ── Regulatory ID fields ─────────────────────────────────────
+          gstNumber: '',
+          companyIdNumber: '',
+          iecCode: '',
+          panNumber: '',
+          aadhaarNumber: '',
+          // ── Regulatory document uploads ──────────────────────────────
+          gstDocument: null,
+          gstFile: null,
+          typeCertDocument: null,
+          typeCertFile: null,
+          iecCertDocument: null,
+          iecCertFile: null,
+          panCardDocument: null,
+          panCardFile: null,
+          aadhaarDocument: null,
+          aadhaarFile: null,
+          // Reset per-type stash buckets — fresh start for new type
+          companyIdByType: {},
+          typeCertByType: {},
         };
       }
       return { ...prev, [field]: value };
     });
+
+    // When business type switches between distinct types, clear upload
+    // error banners and touched flags for all regulatory fields so the
+    // new-type form starts clean with no stale red states.
+    if (field === 'businessType') {
+      const prevType = formDataRef.current.businessType;
+      if (value !== prevType && (BUSINESS_TYPE_IDS.has(prevType) || BUSINESS_TYPE_IDS.has(value))) {
+        setLogoError(null);
+        setGstError(null);
+        setPanCardError(null);
+        setTypeCertError(null);
+        setIecCertError(null);
+        setAadhaarError(null);
+        setTouched((prev) => {
+          const next = { ...prev };
+          ['companyName', 'logo', 'gstNumber', 'gstDocument', 'companyIdNumber', 'typeCertDocument',
+           'iecCode', 'iecCertDocument', 'panNumber', 'panCardDocument',
+           'aadhaarNumber', 'aadhaarDocument'].forEach((k) => { delete next[k]; });
+          return next;
+        });
+      }
+    }
 
     // ── Live validation for phone fields ────────────────────────────
     // Re-run libphonenumber-js on every keystroke and update errors
@@ -1138,6 +1288,13 @@ export default function CompanyDetails({
       } else if (!AADHAAR_PATTERN.test(currentFormData.aadhaarNumber)) {
         newErrors.aadhaarNumber = 'Aadhaar Number must be exactly 12 digits';
       }
+      // PAN and IEC Code are optional but format-validated when provided.
+      if (currentFormData.panNumber && !PAN_PATTERN.test(currentFormData.panNumber)) {
+        newErrors.panNumber = 'PAN must be 5 letters + 4 digits + 1 letter (e.g. AAAAA0000A)';
+      }
+      if (currentFormData.iecCode && !/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
+        newErrors.iecCode = 'IEC Code must be exactly 10 alphanumeric characters';
+      }
     } else {
       if (!currentFormData.gstNumber) {
         newErrors.gstNumber = 'GST Number is required';
@@ -1166,11 +1323,13 @@ export default function CompanyDetails({
         newErrors.panNumber = 'PAN must be 5 letters + 4 digits + 1 letter (e.g. AAAAA0000A)';
       }
     }
-    // "Others" (custom non-canonical type) now shows a PAN number field, but
-    // it is OPTIONAL — only validate its format when a value is entered.
-    // "Unregistered Vendor" has no PAN field at all, so it's never validated.
+    // "Others" (custom non-canonical type) — PAN is optional, format-check only.
     if (!typeMeta && !isUnregistered && currentFormData.panNumber && !PAN_PATTERN.test(currentFormData.panNumber)) {
       newErrors.panNumber = 'PAN must be 5 letters + 4 digits + 1 letter (e.g. AAAAA0000A)';
+    }
+    // Others Registration Number is required when a supporting document is uploaded.
+    if (!typeMeta && !isUnregistered && currentFormData.typeCertDocument && !currentFormData.companyIdNumber) {
+      newErrors.companyIdNumber = 'Registration number is required when a supporting document is uploaded';
     }
 
     // IEC Code (Import Export Code) — only rendered when a supported business
@@ -1230,11 +1389,18 @@ export default function CompanyDetails({
       newErrors.factoryOwnershipType = 'Invalid factory ownership type';
     }
 
-    // ── Required uploads (Change 6) ──────────────────────────────────
-    // Logo, GST certificate, and PAN card are mandatory for every vendor
-    // regardless of business type. The type-specific certificate (IEC /
-    // CIN / Deed / LLPIN) is only required when one of the four supported
-    // types is selected — "Other" vendors aren't blocked on this.
+    // ── Required uploads ─────────────────────────────────────────────
+    if (!currentFormData.logo) {
+      newErrors.logo = 'Company Logo is required';
+    }
+
+    // Factory site photos are always required here — when sameAsWarehouse is
+    // true the user still uploads them in this step and they sync to Warehouse.
+    for (const slot of FACTORY_IMAGE_SLOTS) {
+      if (slot.required && !currentFormData.factorySiteImages[slot.id]) {
+        newErrors[`factorySiteImage:${slot.id}`] = `${slot.label} photo is required`;
+      }
+    }
 
     // For "Unregistered Vendor" the GST / PAN / type-cert uploads are all
     // optional; instead the Aadhaar card upload is mandatory.
@@ -1293,11 +1459,13 @@ export default function CompanyDetails({
         'panCardDocument',
         'typeCertDocument',
         'aadhaarDocument',
+        ...FACTORY_IMAGE_SLOTS.map((s) => `factorySiteImage:${s.id}`),
       ];
 
       const firstErrorField = FIELD_ORDER.find(f => newErrors[f]);
       if (firstErrorField) {
-        const targetSection = FIELD_SECTION_MAP[firstErrorField];
+        const targetSection = FIELD_SECTION_MAP[firstErrorField] ||
+          (firstErrorField.startsWith('factorySiteImage:') ? 'photos' as SectionKey : undefined);
         if (targetSection) setActiveSection(targetSection);
       }
 
@@ -1354,6 +1522,11 @@ export default function CompanyDetails({
       // WarehouseDetails reads `data.ownershipType` (the field is shared,
       // not prefixed). Mirror factory ownership to it.
       updatedData.ownershipType = currentFormData.factoryOwnershipType;
+      // Mirror warehousing capacity so the Warehouse step shows the same value.
+      updatedData.warehousingCapacity = currentFormData.factorySiteCapacity;
+      // Sync factory photos to warehouse — WarehouseDetails displays them
+      // as read-only when isLinked=true.
+      updatedData.factoryImages = currentFormData.factorySiteImages;
     }
     
     onUpdateData(updatedData);
@@ -1393,6 +1566,14 @@ export default function CompanyDetails({
       const userEntered = [formData.address, formData.city, formData.state, formData.zipCode, formData.factoryOwnershipType];
       if (required.every(Boolean)) return 'complete';
       if (userEntered.some(Boolean)) return 'partial';
+      return 'empty';
+    }
+    if (section === 'photos') {
+      const images = formData.factorySiteImages;
+      const required = FACTORY_IMAGE_SLOTS.filter((s) => s.required);
+      const filled = required.filter((s) => images[s.id]);
+      if (filled.length === required.length) return 'complete';
+      if (filled.length > 0) return 'partial';
       return 'empty';
     }
     return 'empty';
@@ -1549,7 +1730,7 @@ export default function CompanyDetails({
 
             <DocUpload
               title="Company Logo"
-              requiredMark="optional"
+              requiredMark="required"
               hint="PNG, JPG, WEBP or SVG · max 2 MB"
               inputId="logoUpload"
               accept="image/*"
@@ -1582,8 +1763,8 @@ export default function CompanyDetails({
               const meta = COMPANY_TYPE_META[formData.businessType as CompanyTypeId];
               const isUnreg = formData.businessType === UNREGISTERED_TYPE_ID;
               const isProp = formData.businessType === 'proprietorship';
-              const panCardLabel = isProp ? 'Proprietor PAN Card' : 'Company PAN Card';
-              const panNumberLabel = isProp ? 'Proprietor PAN Number' : 'Company PAN Number';
+              const panCardLabel = isProp ? 'Proprietor PAN Card' : (meta ? 'Company PAN Card' : 'PAN Card');
+              const panNumberLabel = isProp ? 'Proprietor PAN Number' : (meta ? 'Company PAN Number' : 'PAN Number');
               const idErr = !!(errors.companyIdNumber && touched.companyIdNumber);
               const panErr = !!(errors.panNumber && touched.panNumber);
               const iecErr = !!(errors.iecCode && touched.iecCode);
@@ -1595,11 +1776,7 @@ export default function CompanyDetails({
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1">
                         GST Number{' '}
-                        {isUnreg ? (
-                          <span className="text-slate-400 text-xs font-normal">(Optional)</span>
-                        ) : (
-                          <span className="text-brand-500" aria-hidden="true">*</span>
-                        )}
+                        {!isUnreg && <span className="text-brand-500" aria-hidden="true">*</span>}
                       </label>
                       <input
                         type="text"
@@ -1724,7 +1901,7 @@ export default function CompanyDetails({
                         {isProp ? (
                           <DocUpload
                             title="IEC Certificate"
-                            requiredMark="optional"
+                            requiredMark="none"
                             inputId="typeCertUpload"
                             accept="application/pdf,image/*,.doc,.docx"
                             file={formData.typeCertFile}
@@ -1741,7 +1918,7 @@ export default function CompanyDetails({
                         ) : (
                           <DocUpload
                             title="IEC Certificate"
-                            requiredMark="optional"
+                            requiredMark="none"
                             inputId="iecCertUpload"
                             accept="application/pdf,image/*,.doc,.docx"
                             file={formData.iecCertFile}
@@ -1857,13 +2034,11 @@ export default function CompanyDetails({
                   )}
 
                   {/* Custom "Others" type or no type yet — show an optional
-                      Company PAN Number + Company PAN Card pair (PAN is not
-                      mandatory for custom vendors), plus an Other Supporting
-                      Document for whatever registration proof applies to their
-                      category (Trust / Society / NGO / Section 8 / etc.). */}
+                      PAN Number + PAN Card pair, plus an Others Registration
+                      Number alongside the Other Supporting Document upload. */}
                   {!meta && !isUnreg && (
                     <>
-                      {/* Company PAN Number | Company PAN Card (both optional) */}
+                      {/* PAN Number | PAN Card (both optional) */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                         <div>
                           <label htmlFor="panNumber" className="block text-sm font-semibold text-slate-700 mb-1">
@@ -1893,7 +2068,7 @@ export default function CompanyDetails({
                         </div>
                         <DocUpload
                           title={panCardLabel}
-                          requiredMark="optional"
+                          requiredMark="none"
                           inputId="panCardUpload"
                           accept="application/pdf,image/*,.doc,.docx"
                           file={formData.panCardFile}
@@ -1909,13 +2084,36 @@ export default function CompanyDetails({
                         />
                       </div>
 
-                      {/* Other Supporting Document — custom business proof.
-                          Stored in the type-certificate slot, which the backend
-                          persists as the business-registration document. */}
+                      {/* Others Registration Number | Other Supporting Document */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                        <div>
+                          <label htmlFor="companyIdNumber" className="block text-sm font-semibold text-slate-700 mb-1">
+                            Others Registration Number
+                          </label>
+                          <input
+                            id="companyIdNumber"
+                            type="text"
+                            name="companyIdNumber"
+                            value={formData.companyIdNumber}
+                            onChange={(e) => handleInputChange('companyIdNumber', e.target.value)}
+                            onBlur={() => handleBlur('companyIdNumber')}
+                            maxLength={120}
+                            spellCheck={false}
+                            autoComplete="off"
+                            aria-describedby={idErr ? 'companyIdNumber-error' : undefined}
+                            aria-invalid={idErr}
+                            className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                              idErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                            }`}
+                            placeholder="Registration / certificate number"
+                          />
+                          {idErr && (
+                            <p id="companyIdNumber-error" className="text-red-500 text-xs mt-1" role="alert">{errors.companyIdNumber}</p>
+                          )}
+                        </div>
                         <DocUpload
                           title="Other Supporting Document"
-                          requiredMark="optional"
+                          requiredMark="none"
                           hint="Trust / Society / NGO / Section 8 / other registration proof"
                           inputId="typeCertUpload"
                           accept="application/pdf,image/*,.doc,.docx"
@@ -1932,41 +2130,100 @@ export default function CompanyDetails({
                     </>
                   )}
 
-                  {/* Unregistered Vendor — PAN Card and IEC Certificate remain
-                      available (both optional), just as before. */}
+                  {/* Unregistered Vendor — PAN Number + PAN Card (optional),
+                      then IEC Code + IEC Certificate (optional). */}
                   {isUnreg && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                      <DocUpload
-                        title={panCardLabel}
-                        requiredMark="optional"
-                        inputId="panCardUpload"
-                        accept="application/pdf,image/*,.doc,.docx"
-                        file={formData.panCardFile}
-                        documentUrl={formData.panCardDocument}
-                        fallbackName="pan_card.pdf"
-                        error={panCardError || errors.panCardDocument}
-                        invalid={!!errors.panCardDocument}
-                        dataField="panCardDocument"
-                        onChange={handlePanCardChange}
-                        onDrop={handlePanCardDrop}
-                        onDragOver={handleDragOver}
-                        onRemove={handleRemovePanCard}
-                      />
-                      <DocUpload
-                        title="IEC Certificate"
-                        requiredMark="optional"
-                        inputId="iecCertUpload"
-                        accept="application/pdf,image/*,.doc,.docx"
-                        file={formData.iecCertFile}
-                        documentUrl={formData.iecCertDocument}
-                        fallbackName="iec_certificate.pdf"
-                        error={iecCertError}
-                        onChange={handleIecCertChange}
-                        onDrop={handleIecCertDrop}
-                        onDragOver={handleDragOver}
-                        onRemove={handleRemoveIecCert}
-                      />
-                    </div>
+                    <>
+                      {/* PAN Number | PAN Card */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                        <div>
+                          <label htmlFor="panNumber" className="block text-sm font-semibold text-slate-700 mb-1">
+                            {panNumberLabel}
+                          </label>
+                          <input
+                            id="panNumber"
+                            type="text"
+                            name="panNumber"
+                            value={formData.panNumber}
+                            onChange={(e) => handleInputChange('panNumber', e.target.value.toUpperCase())}
+                            onBlur={() => handleBlur('panNumber')}
+                            maxLength={10}
+                            spellCheck={false}
+                            autoComplete="off"
+                            aria-describedby={panErr ? 'panNumber-error' : undefined}
+                            aria-invalid={panErr}
+                            className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                              panErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                            }`}
+                            placeholder="AAAAA0000A"
+                            style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+                          />
+                          {panErr && (
+                            <p id="panNumber-error" className="text-red-500 text-xs mt-1" role="alert">{errors.panNumber}</p>
+                          )}
+                        </div>
+                        <DocUpload
+                          title={panCardLabel}
+                          requiredMark="none"
+                          inputId="panCardUpload"
+                          accept="application/pdf,image/*,.doc,.docx"
+                          file={formData.panCardFile}
+                          documentUrl={formData.panCardDocument}
+                          fallbackName="pan_card.pdf"
+                          error={panCardError || errors.panCardDocument}
+                          invalid={!!errors.panCardDocument}
+                          dataField="panCardDocument"
+                          onChange={handlePanCardChange}
+                          onDrop={handlePanCardDrop}
+                          onDragOver={handleDragOver}
+                          onRemove={handleRemovePanCard}
+                        />
+                      </div>
+
+                      {/* IEC Code | IEC Certificate */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                        <div>
+                          <label htmlFor="iecCode" className="block text-sm font-semibold text-slate-700 mb-1">
+                            IEC Code
+                          </label>
+                          <input
+                            id="iecCode"
+                            type="text"
+                            name="iecCode"
+                            value={formData.iecCode}
+                            onChange={(e) => handleInputChange('iecCode', e.target.value.toUpperCase())}
+                            onBlur={() => handleBlur('iecCode')}
+                            maxLength={10}
+                            spellCheck={false}
+                            autoComplete="off"
+                            aria-describedby={iecErr ? 'iecCode-error' : undefined}
+                            aria-invalid={iecErr}
+                            className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                              iecErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                            }`}
+                            placeholder="AAAAA1234A"
+                            style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+                          />
+                          {iecErr && (
+                            <p id="iecCode-error" className="text-red-500 text-xs mt-1" role="alert">{errors.iecCode}</p>
+                          )}
+                        </div>
+                        <DocUpload
+                          title="IEC Certificate"
+                          requiredMark="none"
+                          inputId="iecCertUpload"
+                          accept="application/pdf,image/*,.doc,.docx"
+                          file={formData.iecCertFile}
+                          documentUrl={formData.iecCertDocument}
+                          fallbackName="iec_certificate.pdf"
+                          error={iecCertError}
+                          onChange={handleIecCertChange}
+                          onDrop={handleIecCertDrop}
+                          onDragOver={handleDragOver}
+                          onRemove={handleRemoveIecCert}
+                        />
+                      </div>
+                    </>
                   )}
                 </>
               );
@@ -2013,7 +2270,6 @@ export default function CompanyDetails({
               <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>Secondary Email</span>
-                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
               <input
                 type="email"
@@ -2059,7 +2315,6 @@ export default function CompanyDetails({
               <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>Secondary Phone</span>
-                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
               <PhoneInput
                 name="phoneNumber2"
@@ -2082,7 +2337,6 @@ export default function CompanyDetails({
               <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>Local Landline</span>
-                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
               <LocalLandlineInput
                 locked
@@ -2098,7 +2352,6 @@ export default function CompanyDetails({
               <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>International Landline</span>
-                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
               <LocalLandlineInput
                 value={{ countryCode: formData.intlLandlineCountryCode, std: formData.intlLandlineStd, number: formData.intlLandlineNumber }}
@@ -2114,7 +2367,6 @@ export default function CompanyDetails({
               <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>Website</span>
-                <span className="text-slate-400 text-xs font-normal">(Optional)</span>
               </label>
               <div className="relative">
                 <input
@@ -2450,44 +2702,164 @@ export default function CompanyDetails({
             </div>
           </div>
 
-          {/* Same as Warehouse Checkbox */}
-          <div
-            className={`rounded-lg border p-4 transition-colors ${
-              formData.sameAsWarehouse
-                ? 'border-brand-300/50 bg-brand-50/40'
-                : 'border-slate-200 bg-white'
-            }`}
-          >
-            <label htmlFor="sameAsWarehouse" className="flex cursor-pointer items-start gap-3 select-none">
-              <input
-                type="checkbox"
-                id="sameAsWarehouse"
-                checked={formData.sameAsWarehouse}
-                onChange={(e) => handleInputChange('sameAsWarehouse', e.target.checked)}
-                className="h-4.5 w-4.5 mt-[2px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 focus-visible:ring-2 focus-visible:ring-brand-500/40"
-              />
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <div className="text-sm font-semibold text-slate-900 leading-snug">
-                  Same as warehouse address
-                </div>
-                <div className="text-xs text-slate-500 leading-relaxed">
-                  {formData.sameAsWarehouse ? (
-                    <>
-                      <strong className="text-brand-600">Linked.</strong>{' '}
-                      Warehouse step will use this address and ownership type. Uncheck if your warehouse is at a different location.
-                    </>
-                  ) : (
-                    <>
-                      Check this if your warehouse uses the same address and ownership type. Warehouse fields will auto-fill.
-                    </>
-                  )}
-                </div>
-              </div>
+          {/* Warehousing Capacity */}
+          <div className="w-full max-w-xs">
+            <label htmlFor="factorySiteCapacity" className="block text-sm font-semibold text-slate-700 mb-1">
+              Warehousing Capacity{' '}
+              <span className="text-slate-400 text-xs font-normal">(sq ft, optional)</span>
             </label>
+            <p className="text-xs text-slate-500 mb-3">Total floor area of your factory / warehouse site.</p>
+            <div className="flex items-stretch border border-slate-300 hover:border-slate-400 rounded-lg overflow-hidden transition-colors focus-within:ring-2 focus-within:ring-brand-500/40 focus-within:border-brand-500">
+              <input
+                id="factorySiteCapacity"
+                type="number"
+                name="factorySiteCapacity"
+                value={formData.factorySiteCapacity || ''}
+                onChange={(e) => handleInputChange('factorySiteCapacity', e.target.value)}
+                onBlur={() => handleBlur('factorySiteCapacity')}
+                className="flex-1 min-w-0 text-sm font-medium pl-4 pr-2 py-2.5 border-0 outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="e.g. 50000"
+                min="0"
+              />
+              <span className="flex items-center px-3 text-sm font-semibold text-slate-500 bg-slate-50 border-l border-slate-200 select-none whitespace-nowrap">sq ft</span>
+            </div>
           </div>
         </AccordionSection>
 
+        {/* ── SECTION 4 — Factory & Facility Photos ──────────────────── */}
+        <AccordionSection
+          {...sectionProps('photos')}
+          icon={<Camera className="w-5 h-5" />}
+          title="Factory & Facility Photos"
+          subtitle="Upload photos of your factory site for quality inspection records."
+        >
+          <div className="space-y-5">
+            <p className="text-sm text-slate-500">
+              Upload photos for each location. All required slots must be filled before proceeding.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {FACTORY_IMAGE_SLOTS.map((slot) => {
+                const img = formData.factorySiteImages[slot.id as FactoryImageSlotId];
+                const errKey = `factorySiteImage:${slot.id}` as keyof typeof errors;
+                const hasErr = !!(errors[errKey] && (touched[errKey] || errors[errKey]));
+
+                return (
+                  <div key={slot.id} className="flex flex-col gap-2">
+                    <p className="text-xs font-semibold text-slate-700 truncate">
+                      {slot.label}
+                      {slot.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-tight -mt-1">{slot.description}</p>
+
+                    {img?.url ? (
+                      /* ── Filled slot ─────────────────────────────── */
+                      <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-slate-200 bg-slate-50 group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.url} alt={slot.label} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            title="View"
+                            onClick={() => window.open(img.url, '_blank')}
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/90 text-slate-700 hover:bg-white transition-colors"
+                          >
+                            <Eye className="w-4 h-4" aria-hidden="true" />
+                          </button>
+                          <label
+                            title="Replace"
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/90 text-slate-700 hover:bg-white transition-colors cursor-pointer"
+                          >
+                            <Upload className="w-4 h-4" aria-hidden="true" />
+                            <input
+                              type="file"
+                              accept={SITE_IMAGE_ALLOWED_TYPES.join(',')}
+                              className="sr-only"
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFactorySlotUpload(slot.id as FactoryImageSlotId, f); e.target.value = ''; }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            title="Remove"
+                            onClick={() => handleFactorySlotRemove(slot.id as FactoryImageSlotId)}
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/90 text-red-500 hover:bg-white transition-colors"
+                          >
+                            <X className="w-4 h-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── Empty slot ──────────────────────────────── */
+                      <label
+                        className={`aspect-[4/3] rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
+                          hasErr
+                            ? 'border-red-400 bg-red-50 hover:border-red-500'
+                            : 'border-slate-300 bg-slate-50 hover:border-brand-400 hover:bg-brand-50/30'
+                        }`}
+                      >
+                        <Camera className={`w-7 h-7 ${hasErr ? 'text-red-400' : 'text-slate-400'}`} aria-hidden="true" />
+                        <span className={`text-xs font-medium ${hasErr ? 'text-red-500' : 'text-slate-500'}`}>
+                          Upload photo
+                        </span>
+                        <input
+                          type="file"
+                          accept={SITE_IMAGE_ALLOWED_TYPES.join(',')}
+                          className="sr-only"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFactorySlotUpload(slot.id as FactoryImageSlotId, f); e.target.value = ''; }}
+                        />
+                      </label>
+                    )}
+
+                    {hasErr && (
+                      <p className="text-red-500 text-xs mt-0.5" role="alert">{errors[errKey]}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </AccordionSection>
+
+        {/* ── Same as Warehouse Checkbox — placed after photos so user
+              fills everything first, then decides to link ─────────── */}
+        <div
+          className={`rounded-lg border p-4 transition-colors ${
+            formData.sameAsWarehouse
+              ? 'border-brand-300/50 bg-brand-50/40'
+              : 'border-slate-200 bg-white'
+          }`}
+        >
+          <label htmlFor="sameAsWarehouse" className="flex cursor-pointer items-start gap-3 select-none">
+            <input
+              type="checkbox"
+              id="sameAsWarehouse"
+              checked={formData.sameAsWarehouse}
+              onChange={(e) => handleInputChange('sameAsWarehouse', e.target.checked)}
+              className="h-4.5 w-4.5 mt-[2px] shrink-0 cursor-pointer accent-brand-500 rounded border-slate-300 focus-visible:ring-2 focus-visible:ring-brand-500/40"
+            />
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <div className="text-sm font-semibold text-slate-900 leading-snug">
+                Same as Warehouse Address &amp; Warehouse Photos
+              </div>
+              <div className="text-xs text-slate-500 leading-relaxed">
+                Check this if your warehouse uses the same address, capacity, and photos as your factory site.
+                All Warehouse fields will be pre-filled and locked when you reach the Warehouse step.
+              </div>
+            </div>
+          </label>
+        </div>
+
       </div>{/* end accordion sections */}
+
+      {/* ── Factory Image Crop Modal ────────────────────────────────────── */}
+      <ImageCropModal
+        src={factoryCropPending?.src ?? null}
+        fileName={factoryCropPending?.fileName}
+        title="Crop Factory Image"
+        cropShape="rect"
+        showGrid={true}
+        onCancel={handleFactoryCropCancel}
+        onCropped={handleFactoryCropConfirm}
+      />
 
       {/* ── Footer Navigation ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between pt-4 gap-3">
