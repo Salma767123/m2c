@@ -1307,7 +1307,7 @@ export default function VendorSettings() {
             </SubSection>
           )}
           {additionalOwners.length > 0 && (
-            <SubSection title={`Additional Owners / Directors / Partners (${additionalOwners.length})`} icon={<UserCircle className="w-4 h-4" />}>
+            <SubSection title={`Additional Owners (${additionalOwners.length})`} icon={<UserCircle className="w-4 h-4" />}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {additionalOwners.map((owner: any, idx: number) => (
                   <div key={idx} className="bg-slate-50/50 border border-slate-200/80 rounded-xl p-4 space-y-3">

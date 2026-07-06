@@ -130,9 +130,9 @@ const OWNER_STRUCTURE: Record<string, OwnerStructureConfig> = {
   },
   'pvt-ltd': {
     allowMultiple: true,
-    contactLabel: 'Director',
-    contactLabelPlural: 'Directors',
-    description: 'Add each director with their contact details.',
+    contactLabel: 'Owner',
+    contactLabelPlural: 'Owners',
+    description: 'Add each owner with their contact details.',
   },
   'partnership-firm': {
     allowMultiple: true,

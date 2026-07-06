@@ -77,7 +77,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
     <div className="space-y-10">
       <div className="border-b border-slate-200 pb-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-1">Owner Profile</h2>
-        <p className="text-slate-500 text-sm">Verify the proprietor/director identity, contact details, and business history.</p>
+        <p className="text-slate-500 text-sm">Verify the proprietor/owner identity, contact details, and business history.</p>
       </div>
 
       {/* Owner Photo */}
@@ -118,7 +118,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
 
       {/* Additional Owners */}
       {additionalOwners.length > 0 && (
-        <SectionBlock title="Additional Owners / Directors" icon={<Users className="w-4 h-4" />}>
+        <SectionBlock title="Additional Owners" icon={<Users className="w-4 h-4" />}>
           {additionalOwners.map((owner: any, idx: number) => {
             const name = buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName) || `${owner.firstName || ''} ${owner.lastName || ''}`.trim()
             const ll = formatLocalLandline({ countryCode: '+91', std: owner.localLandlineStd, number: owner.localLandlineNumber })
@@ -128,7 +128,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
 
             return (
               <div key={idx} className="bg-slate-50/60 border border-slate-200 rounded-xl p-4 space-y-4">
-                <p className="text-sm font-bold text-slate-700">Director / Owner #{idx + 1}</p>
+                <p className="text-sm font-bold text-slate-700">Owner #{idx + 2}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {vf(`o_add_${idx}_name`, 'Full Name', name)}
                   {vf(`o_add_${idx}_designation`, 'Designation', owner.designation)}

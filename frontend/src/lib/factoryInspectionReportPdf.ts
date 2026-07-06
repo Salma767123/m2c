@@ -341,7 +341,7 @@ export function generateFactoryInspectionPdf(
 
   const additionalOwners: any[] = Array.isArray(v.additionalOwners) ? v.additionalOwners : []
   if (additionalOwners.length > 0) {
-    subTitle("Additional Owners / Directors")
+    subTitle("Additional Owners")
     runTable(
       [["Name", "Designation", "Primary Email", "Primary Phone"]],
       additionalOwners.map((o: any) => [

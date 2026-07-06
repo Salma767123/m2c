@@ -561,11 +561,11 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                         )}
                         {Array.isArray(vendor.additionalOwners) && vendor.additionalOwners.length > 0 && (
                             <>
-                                <SubHead title="Additional Owners / Directors" />
+                                <SubHead title="Additional Owners" />
                                 <div className="space-y-4">
                                     {vendor.additionalOwners.map((owner: any, idx: number) => (
                                         <div key={idx} className="bg-slate-50/60 border border-slate-200 rounded-xl p-4">
-                                            <p className="text-xs font-bold text-slate-600 mb-3">Director / Owner #{idx + 1}</p>
+                                            <p className="text-xs font-bold text-slate-600 mb-3">Owner #{idx + 2}</p>
                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                                 <VCard label="Full Name"
                                                     value={buildName(owner.title, owner.firstName, owner.middleName, owner.lastName)}
