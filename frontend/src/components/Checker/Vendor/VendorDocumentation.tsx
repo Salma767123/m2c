@@ -151,17 +151,26 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
     if (factoryEvidence?.nameBoard?.url) inspectorEvidenceImages.push({ label: "Name Board", dataUrl: factoryEvidence.nameBoard.url })
     if (factoryEvidence?.routeMap?.url) inspectorEvidenceImages.push({ label: "Route Map", dataUrl: factoryEvidence.routeMap.url })
 
-    return { vendorFactoryImages, inspectorEvidenceImages }
+    const [companyLogoDataUrl, ownerPhotoDataUrl, mainContactPhotoDataUrl] = await Promise.all([
+      vendor?.companyLogo ? fetchImgDataUrl(vendor.companyLogo) : Promise.resolve(null),
+      vendor?.ownerPhoto ? fetchImgDataUrl(vendor.ownerPhoto) : Promise.resolve(null),
+      vendor?.mainContact?.photo ? fetchImgDataUrl(vendor.mainContact.photo) : Promise.resolve(null),
+    ])
+
+    return { vendorFactoryImages, inspectorEvidenceImages, companyLogoDataUrl, ownerPhotoDataUrl, mainContactPhotoDataUrl }
   }
 
   const handleDownloadReport = async () => {
     setDownloading(true)
     try {
       const reportMeta = buildMeta()
-      const { vendorFactoryImages, inspectorEvidenceImages } = await gatherFactoryImages()
+      const { vendorFactoryImages, inspectorEvidenceImages, companyLogoDataUrl, ownerPhotoDataUrl, mainContactPhotoDataUrl } = await gatherFactoryImages()
       const doc = generateFactoryInspectionPdf(vendor, verifications, reportMeta, {
         vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
         inspectorEvidenceImages: inspectorEvidenceImages.length > 0 ? inspectorEvidenceImages : null,
+        companyLogoDataUrl,
+        ownerPhotoDataUrl,
+        mainContactPhotoDataUrl,
       })
       doc.save(pdfFileName(reportMeta, false))
       setHasDownloaded(true)
@@ -200,11 +209,14 @@ export default function VendorDocumentation({ vendor, verifications, meta, docDa
     try {
       const sigDataUrl = sigPadRef.current.toDataURL("image/png")
       const reportMeta = buildMeta()
-      const { vendorFactoryImages, inspectorEvidenceImages } = await gatherFactoryImages()
+      const { vendorFactoryImages, inspectorEvidenceImages, companyLogoDataUrl, ownerPhotoDataUrl, mainContactPhotoDataUrl } = await gatherFactoryImages()
       const docPdf = generateFactoryInspectionPdf(vendor, verifications, reportMeta, {
         clientSignatureDataUrl: sigDataUrl,
         vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
         inspectorEvidenceImages: inspectorEvidenceImages.length > 0 ? inspectorEvidenceImages : null,
+        companyLogoDataUrl,
+        ownerPhotoDataUrl,
+        mainContactPhotoDataUrl,
       })
       const pdfDataUrl = docPdf.output("datauristring")
       const name = pdfFileName(reportMeta, true)

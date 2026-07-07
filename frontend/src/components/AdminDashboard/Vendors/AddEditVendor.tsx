@@ -768,10 +768,11 @@ export default function AddEditVendor({ vendorId, mode }: AddEditVendorProps) {
           photo: mainContactData.photo || vendor.ownerPhoto || null,
         },
         alternateContacts: vendor.alternateContacts || [],
-        // Treat either flag as "yes" so the FE chip reflects any kind of
-        // international trade experience the vendor declared.
+        // Prefer the Step 1 hasImportExport field; fall back to deriving
+        // from the Step 6 experience flags for legacy rows that pre-date it.
         hasImportExport:
-          vendor.importExperience || vendor.exportExperience ? "yes" : "",
+          (vendor as any).hasImportExport ||
+          (vendor.importExperience || vendor.exportExperience ? "yes" : ""),
         importCountries: vendor.importCountries || [],
         exportCountries: vendor.exportCountries || [],
         tradeLicenseNumber: vendor.tradeLicenseNumber || "",

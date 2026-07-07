@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { Settings } from 'lucide-react'
 import VerifyField, { SectionBlock, Verifications } from './VI_VerifyField'
 
-const FACILITY_META: Record<string, { label: string; detailFields: Array<{ key: string; label: string; unit?: string }> }> = {
+export const FACILITY_META: Record<string, { label: string; detailFields: Array<{ key: string; label: string; unit?: string }> }> = {
   spinning: {
     label: 'Spinning',
     detailFields: [
@@ -55,7 +55,7 @@ const FACILITY_META: Record<string, { label: string; detailFields: Array<{ key: 
 }
 
 // Append unit if the value is a plain number (no letters already present)
-function withUnit(val: any, unit?: string): any {
+export function withUnit(val: any, unit?: string): any {
   if (!val || !unit) return val
   const s = String(val).trim()
   if (/[a-zA-Z]/.test(s)) return s   // already has unit-like text

@@ -733,7 +733,13 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                 {(vendor as any).designation && (
                   <div>
                     <p className="text-sm text-slate-500">Designation</p>
-                    <p className="font-medium">{(vendor as any).designation}</p>
+                    <p className="font-medium capitalize">{(vendor as any).designation}</p>
+                  </div>
+                )}
+                {(vendor as any).designation === 'Others' && (vendor as any).customDesignation && (
+                  <div>
+                    <p className="text-sm text-slate-500">Custom Designation</p>
+                    <p className="font-medium">{(vendor as any).customDesignation}</p>
                   </div>
                 )}
                 <div>
@@ -804,7 +810,13 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                           {owner.designation && (
                             <div>
                               <p className="text-slate-500">Designation</p>
-                              <p className="font-medium">{owner.designation}</p>
+                              <p className="font-medium capitalize">{owner.designation}</p>
+                            </div>
+                          )}
+                          {owner.designation === 'Others' && owner.customDesignation && (
+                            <div>
+                              <p className="text-slate-500">Custom Designation</p>
+                              <p className="font-medium">{owner.customDesignation}</p>
                             </div>
                           )}
                           <div>
@@ -951,7 +963,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
       {/* Identification & Compliance — legal IDs collected on Step 1
           (CompanyDetails). Surfaced here so admins can verify against
           uploaded certificates during approval review. */}
-      {(v.companyIdNumber || v.panNumber || v.factoryOwnershipType || v.iecCode || v.aadhaarNumber) && (
+      {(v.companyIdNumber || v.panNumber || v.factoryOwnershipType || v.iecCode || v.aadhaarNumber || v.hasImportExport) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -965,6 +977,12 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                 <div>
                   <p className="text-sm text-slate-500">{companyIdLabel}</p>
                   <p className="font-medium">{v.companyIdNumber}</p>
+                </div>
+              )}
+              {v.hasImportExport && (
+                <div>
+                  <p className="text-sm text-slate-500">Import/Export Activities</p>
+                  <p className="font-medium capitalize">{v.hasImportExport === 'yes' ? 'Yes' : v.hasImportExport === 'no' ? 'No' : v.hasImportExport}</p>
                 </div>
               )}
               {v.iecCode && (
@@ -1798,10 +1816,14 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
               </div>
               <div>
                 <p className="text-sm text-slate-500">Designation</p>
-                <p className="font-medium">
-                  {(vendor.mainContact as any).customDesignation || vendor.mainContact.designation || 'N/A'}
-                </p>
+                <p className="font-medium capitalize">{vendor.mainContact.designation || 'N/A'}</p>
               </div>
+              {vendor.mainContact.designation === 'Others' && (vendor.mainContact as any).customDesignation && (
+                <div>
+                  <p className="text-sm text-slate-500">Custom Designation</p>
+                  <p className="font-medium">{(vendor.mainContact as any).customDesignation}</p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-slate-500">Primary Email</p>
                 <p className="font-medium">{vendor.mainContact.email1 || vendor.mainContact.email || 'N/A'}</p>
@@ -1849,10 +1871,14 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
               })()}
               <div>
                 <p className="text-sm text-slate-500">Department</p>
-                <p className="font-medium capitalize">
-                  {(vendor.mainContact as any).customDepartment || vendor.mainContact.department || 'N/A'}
-                </p>
+                <p className="font-medium capitalize">{vendor.mainContact.department || 'N/A'}</p>
               </div>
+              {vendor.mainContact.department === 'Others' && (vendor.mainContact as any).customDepartment && (
+                <div>
+                  <p className="text-sm text-slate-500">Custom Department</p>
+                  <p className="font-medium">{(vendor.mainContact as any).customDepartment}</p>
+                </div>
+              )}
               </div>
             </div>
           </CardContent>
@@ -1885,10 +1911,14 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Designation</p>
-                      <p className="font-medium">
-                        {contact.customDesignation || contact.designation || 'N/A'}
-                      </p>
+                      <p className="font-medium capitalize">{contact.designation || 'N/A'}</p>
                     </div>
+                    {contact.designation === 'Others' && contact.customDesignation && (
+                      <div>
+                        <p className="text-sm text-slate-500">Custom Designation</p>
+                        <p className="font-medium">{contact.customDesignation}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm text-slate-500">Primary Email</p>
                       <p className="font-medium">{contact.email1 || contact.email || 'N/A'}</p>
@@ -1923,10 +1953,14 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                     )}
                     <div>
                       <p className="text-sm text-slate-500">Department</p>
-                      <p className="font-medium capitalize">
-                        {contact.customDepartment || contact.department || 'N/A'}
-                      </p>
+                      <p className="font-medium capitalize">{contact.department || 'N/A'}</p>
                     </div>
+                    {contact.department === 'Others' && contact.customDepartment && (
+                      <div>
+                        <p className="text-sm text-slate-500">Custom Department</p>
+                        <p className="font-medium">{contact.customDepartment}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1936,7 +1970,8 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
       )}
 
       {/* Import / Export — split flags + country lists */}
-      {((vendor as any).importExperience ||
+      {((vendor as any).hasImportExport === 'yes' ||
+        (vendor as any).importExperience ||
         (vendor as any).exportExperience ||
         ((vendor as any).importCountries?.length > 0) ||
         ((vendor as any).exportCountries?.length > 0)) && (

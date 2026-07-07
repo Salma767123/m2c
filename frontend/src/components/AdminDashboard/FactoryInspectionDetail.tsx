@@ -216,6 +216,11 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     })
             )
             const vendorFactoryImages = imgResults.filter((x): x is FactoryImageEntry => x !== null)
+            const [companyLogoDataUrl, ownerPhotoDataUrl, mainContactPhotoDataUrl] = await Promise.all([
+                vendor.companyLogo ? fetchImgDataUrl(vendor.companyLogo) : Promise.resolve(null),
+                vendor.ownerPhoto ? fetchImgDataUrl(vendor.ownerPhoto) : Promise.resolve(null),
+                vendor.mainContact?.photo ? fetchImgDataUrl(vendor.mainContact.photo) : Promise.resolve(null),
+            ])
             const meta: FactoryReportMeta = {
                 inspectorName: fd.inspectorName || formatCheckerName(inspection.checker),
                 inspectionDate: fd.inspectionDate,
@@ -231,6 +236,9 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 clientSignatureDataUrl: fd.clientSignature || null,
                 vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
                 inspectorEvidenceImages: null,
+                companyLogoDataUrl,
+                ownerPhotoDataUrl,
+                mainContactPhotoDataUrl,
             })
             const vendorName = vendor.companyName || fd.vendorName || 'Report'
             pdf.save(`Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}.pdf`)
@@ -273,6 +281,11 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                     })
             )
             const vendorFactoryImages = imgResults.filter((x): x is FactoryImageEntry => x !== null)
+            const [companyLogoDataUrl, ownerPhotoDataUrl, mainContactPhotoDataUrl] = await Promise.all([
+                vendor.companyLogo ? fetchImgDataUrl(vendor.companyLogo) : Promise.resolve(null),
+                vendor.ownerPhoto ? fetchImgDataUrl(vendor.ownerPhoto) : Promise.resolve(null),
+                vendor.mainContact?.photo ? fetchImgDataUrl(vendor.mainContact.photo) : Promise.resolve(null),
+            ])
             const meta: FactoryReportMeta = {
                 inspectorName: fd.inspectorName || formatCheckerName(inspection.checker),
                 inspectionDate: fd.inspectionDate,
@@ -288,6 +301,9 @@ export default function FactoryInspectionDetail({ inspectionId }: Props) {
                 clientSignatureDataUrl: fd.clientSignature || null,
                 vendorFactoryImages: vendorFactoryImages.length > 0 ? vendorFactoryImages : null,
                 inspectorEvidenceImages: null,
+                companyLogoDataUrl,
+                ownerPhotoDataUrl,
+                mainContactPhotoDataUrl,
             })
             const vendorName = vendor.companyName || fd.vendorName || 'Report'
             pdf.save(`Factory_Report_${vendorName.replace(/\s+/g, '_')}_${inspectionId.slice(-8).toUpperCase()}.pdf`)

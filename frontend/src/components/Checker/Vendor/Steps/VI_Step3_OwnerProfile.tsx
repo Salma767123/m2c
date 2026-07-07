@@ -39,6 +39,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
       ...(v.ownerPhoto ? ['o_ownerPhoto'] : []),
       'o_ownerName',
       'o_designation',
+      ...(v.designation === 'Others' && v.customDesignation ? ['o_customDesignation'] : []),
       'o_ownerPhone',
       ...(v.ownerPhone2 ? ['o_ownerPhone2'] : []),
       'o_ownerEmail',
@@ -60,6 +61,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
         return [
           `o_add_${idx}_name`,
           `o_add_${idx}_designation`,
+          ...(owner.designation === 'Others' && owner.customDesignation ? [`o_add_${idx}_customDesignation`] : []),
           ...(owner.email ? [`o_add_${idx}_email`] : []),
           ...(owner.email2 ? [`o_add_${idx}_email2`] : []),
           ...(owner.phone ? [`o_add_${idx}_phone`] : []),
@@ -92,6 +94,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {vf('o_ownerName', 'Owner Full Name', ownerFullName)}
           {vf('o_designation', 'Designation', v.designation)}
+          {v.designation === 'Others' && v.customDesignation && vf('o_customDesignation', 'Custom Designation', v.customDesignation)}
           {vf('o_ownerPhone', 'Primary Phone', v.ownerPhone)}
           {v.ownerPhone2 && vf('o_ownerPhone2', 'Secondary Phone', v.ownerPhone2)}
           {vf('o_ownerEmail', 'Primary Email', v.ownerEmail)}
@@ -132,6 +135,7 @@ export default function VI_Step3_OwnerProfile({ vendor: v, verifications, onChan
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {vf(`o_add_${idx}_name`, 'Full Name', name)}
                   {vf(`o_add_${idx}_designation`, 'Designation', owner.designation)}
+                  {owner.designation === 'Others' && owner.customDesignation && vf(`o_add_${idx}_customDesignation`, 'Custom Designation', owner.customDesignation)}
                   {owner.email && vf(`o_add_${idx}_email`, 'Email', owner.email)}
                   {owner.email2 && vf(`o_add_${idx}_email2`, 'Secondary Email', owner.email2)}
                   {owner.phone && vf(`o_add_${idx}_phone`, 'Phone', owner.phone)}

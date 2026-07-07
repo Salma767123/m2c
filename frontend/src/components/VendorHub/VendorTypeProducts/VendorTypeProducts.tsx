@@ -108,13 +108,19 @@ export default function VendorTypeProducts({
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isImportExportDisabled = data.hasImportExport === 'no';
+  const IE_TYPES = ['importer', 'exporter'];
+
   const [formData, setFormData] = useState({
     // allow multiple selections; accept legacy single-value strings
-    vendorType: Array.isArray(data.vendorType)
-      ? data.vendorType
-      : data.vendorType
-        ? [data.vendorType]
-        : [],
+    vendorType: (() => {
+      const raw = Array.isArray(data.vendorType)
+        ? data.vendorType
+        : data.vendorType
+          ? [data.vendorType]
+          : [];
+      return isImportExportDisabled ? raw.filter((t: string) => !IE_TYPES.includes(t)) : raw;
+    })(),
     marketType: Array.isArray(data.marketType)
       ? data.marketType
       : data.marketType
@@ -486,12 +492,15 @@ export default function VendorTypeProducts({
 
   // Sync formData with data prop when it changes (for edit mode)
   useEffect(() => {
+    const rawVendorType = Array.isArray(data.vendorType)
+      ? data.vendorType
+      : data.vendorType
+        ? [data.vendorType]
+        : [];
     setFormData({
-      vendorType: Array.isArray(data.vendorType)
-        ? data.vendorType
-        : data.vendorType
-          ? [data.vendorType]
-          : [],
+      vendorType: data.hasImportExport === 'no'
+        ? rawVendorType.filter((t: string) => !IE_TYPES.includes(t))
+        : rawVendorType,
       marketType: Array.isArray(data.marketType)
         ? data.marketType
         : data.marketType
@@ -591,6 +600,7 @@ export default function VendorTypeProducts({
   }, []);
 
   const toggleVendorType = (typeId: string) => {
+    if (isImportExportDisabled && IE_TYPES.includes(typeId)) return;
     setFormData((prev) => {
       const current: string[] = prev.vendorType || [];
       const exists = current.includes(typeId);
@@ -766,18 +776,22 @@ export default function VendorTypeProducts({
                   type.id,
                 );
                 const hasError = errors.vendorType && touched.vendorType;
+                const isDisabled = isImportExportDisabled && IE_TYPES.includes(type.id);
 
                 return (
                   <button
                     type="button"
                     key={type.id}
                     onClick={() => toggleVendorType(type.id)}
-                    className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 active:scale-[0.98] ${
-                      isSelected
-                        ? "border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10"
-                        : hasError
-                          ? "border-red-500 bg-red-50 hover:bg-red-100 hover:border-red-600"
-                          : "border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm"
+                    disabled={isDisabled}
+                    className={`p-3 border rounded-lg transition-all duration-200 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                      isDisabled
+                        ? "border-slate-200 bg-slate-50 opacity-40 cursor-not-allowed"
+                        : isSelected
+                          ? "border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10 cursor-pointer active:scale-[0.98]"
+                          : hasError
+                            ? "border-red-500 bg-red-50 hover:bg-red-100 hover:border-red-600 cursor-pointer active:scale-[0.98]"
+                            : "border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm cursor-pointer active:scale-[0.98]"
                     }`}
                   >
                     <div

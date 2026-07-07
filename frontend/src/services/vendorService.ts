@@ -296,6 +296,8 @@ export interface VendorProfile {
   /** User-defined custom categories. */
   additionalCategories?: Array<{ id: string; name: string; products: unknown[] }>;
   annualTurnover?: string;
+  /** Step 1 toggle — whether the vendor engages in import/export ('yes' | 'no' | ''). */
+  hasImportExport?: string;
   /** Import / export experience flags (split as of Step 7 audit). */
   importExperience?: boolean;
   exportExperience?: boolean;

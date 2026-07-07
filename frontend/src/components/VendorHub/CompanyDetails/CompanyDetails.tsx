@@ -28,6 +28,8 @@ interface FormData {
   companyIdNumber: string;
   /** IEC (Import Export Code) — shown for every business type, optional. */
   iecCode: string;
+  /** Whether vendor engages in import/export — 'yes' | 'no' | '' */
+  hasImportExport: string;
   /** PAN Number — required across all four supported business types. */
   panNumber: string;
   /** Aadhaar Number — required ONLY for the "Unregistered Vendor" type. */
@@ -431,6 +433,7 @@ export default function CompanyDetails({
     gstNumber: data.gstNumber || "",
     companyIdNumber: data.companyIdNumber || "",
     iecCode: data.iecCode || "",
+    hasImportExport: data.hasImportExport || '',
     panNumber: data.panNumber || "",
     aadhaarNumber: data.aadhaarNumber || "",
     email: data.email || "",
@@ -543,6 +546,7 @@ export default function CompanyDetails({
     gstDocument: 'profile',
     panCardDocument: 'profile',
     typeCertDocument: 'profile',
+    iecCertDocument: 'profile',
     aadhaarDocument: 'profile',
     // Factory photo slot errors → photos section
     ...Object.fromEntries(
@@ -644,6 +648,7 @@ export default function CompanyDetails({
       gstNumber: data.gstNumber || "",
       companyIdNumber: data.companyIdNumber || "",
       iecCode: data.iecCode || "",
+      hasImportExport: data.hasImportExport || '',
       panNumber: data.panNumber || "",
       aadhaarNumber: data.aadhaarNumber || "",
       email: data.email || "",
@@ -742,6 +747,7 @@ export default function CompanyDetails({
           gstNumber: '',
           companyIdNumber: '',
           iecCode: '',
+          hasImportExport: '',
           panNumber: '',
           aadhaarNumber: '',
           // ── Regulatory document uploads ──────────────────────────────
@@ -1292,7 +1298,16 @@ export default function CompanyDetails({
       if (currentFormData.panNumber && !PAN_PATTERN.test(currentFormData.panNumber)) {
         newErrors.panNumber = 'PAN must be 5 letters + 4 digits + 1 letter (e.g. AAAAA0000A)';
       }
-      if (currentFormData.iecCode && !/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
+      if (currentFormData.hasImportExport === 'yes') {
+        if (!currentFormData.iecCode) {
+          newErrors.iecCode = 'IEC Code is required';
+        } else if (!/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
+          newErrors.iecCode = 'IEC Code must be exactly 10 alphanumeric characters';
+        }
+        if (!currentFormData.iecCertDocument) {
+          newErrors.iecCertDocument = 'IEC Certificate upload is required';
+        }
+      } else if (currentFormData.iecCode && !/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
         newErrors.iecCode = 'IEC Code must be exactly 10 alphanumeric characters';
       }
     } else {
@@ -1331,13 +1346,34 @@ export default function CompanyDetails({
     if (!typeMeta && !isUnregistered && currentFormData.typeCertDocument && !currentFormData.companyIdNumber) {
       newErrors.companyIdNumber = 'Registration number is required when a supporting document is uploaded';
     }
+    // "Others" IEC Code + Certificate — required when hasImportExport === 'yes'.
+    if (!typeMeta && !isUnregistered && currentFormData.businessType) {
+      if (currentFormData.hasImportExport === 'yes') {
+        if (!currentFormData.iecCode) {
+          newErrors.iecCode = 'IEC Code is required';
+        } else if (!/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
+          newErrors.iecCode = 'IEC Code must be exactly 10 alphanumeric characters';
+        }
+        if (!currentFormData.iecCertDocument) {
+          newErrors.iecCertDocument = 'IEC Certificate upload is required';
+        }
+      } else if (currentFormData.iecCode && !/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
+        newErrors.iecCode = 'IEC Code must be exactly 10 alphanumeric characters';
+      }
+    }
 
-    // IEC Code (Import Export Code) — only rendered when a supported business
-    // type is selected (inside the `typeMeta` block in the JSX). Skip the
-    // format check when the field is hidden so a leftover value can't block
-    // submission on an invisible field. Never mandatory.
-    if (typeMeta && currentFormData.iecCode && !/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
-      newErrors.iecCode = 'IEC Code must be exactly 10 alphanumeric characters';
+    // IEC Code — required + format-validated when hasImportExport === 'yes';
+    // format-only when value is present but import/export is not declared.
+    if (typeMeta) {
+      if (currentFormData.hasImportExport === 'yes') {
+        if (!currentFormData.iecCode) {
+          newErrors.iecCode = 'IEC Code is required';
+        } else if (!/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
+          newErrors.iecCode = 'IEC Code must be exactly 10 alphanumeric characters';
+        }
+      } else if (currentFormData.iecCode && !/^[A-Z0-9]{10}$/i.test(currentFormData.iecCode)) {
+        newErrors.iecCode = 'IEC Code must be exactly 10 alphanumeric characters';
+      }
     }
 
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1422,6 +1458,20 @@ export default function CompanyDetails({
       if (typeMeta && typeMeta.certLabel !== 'IEC Certificate' && !currentFormData.typeCertDocument) {
         newErrors.typeCertDocument = `${typeMeta.certLabel} upload is required`;
       }
+      // IEC Certificate becomes required when hasImportExport === 'yes'.
+      // For Proprietorship the IEC cert IS the typeCertDocument field;
+      // for all other registered types it's the separate iecCertDocument.
+      if (typeMeta && currentFormData.hasImportExport === 'yes') {
+        if (currentFormData.businessType === 'proprietorship') {
+          if (!currentFormData.typeCertDocument) {
+            newErrors.typeCertDocument = 'IEC Certificate upload is required';
+          }
+        } else {
+          if (!currentFormData.iecCertDocument) {
+            newErrors.iecCertDocument = 'IEC Certificate upload is required';
+          }
+        }
+      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -1442,6 +1492,7 @@ export default function CompanyDetails({
         'gstNumber',
         'companyIdNumber',
         'iecCode',
+        'iecCertDocument',
         'panNumber',
         'aadhaarNumber',
         'email',
@@ -1488,6 +1539,7 @@ export default function CompanyDetails({
             gstDocument: '[data-field="gstDocument"]',
             panCardDocument: '[data-field="panCardDocument"]',
             typeCertDocument: '[data-field="typeCertDocument"]',
+            iecCertDocument: '[data-field="iecCertDocument"]',
             aadhaarDocument: '[data-field="aadhaarDocument"]',
           },
         });
@@ -1527,6 +1579,20 @@ export default function CompanyDetails({
       // Sync factory photos to warehouse — WarehouseDetails displays them
       // as read-only when isLinked=true.
       updatedData.factoryImages = currentFormData.factorySiteImages;
+    } else {
+      // Checkbox was unchecked — wipe every previously-synced warehouse field
+      // so Step 2 opens as a fresh empty form with no stale linked values.
+      updatedData.warehouseAddress = '';
+      updatedData.warehouseAddressLine2 = '';
+      updatedData.warehouseAddressLine3 = '';
+      updatedData.warehouseLandmark = '';
+      updatedData.warehouseCity = '';
+      updatedData.warehouseState = '';
+      updatedData.warehouseZip = '';
+      updatedData.warehouseCountry = '';
+      updatedData.ownershipType = '';
+      updatedData.warehousingCapacity = '';
+      updatedData.factoryImages = {};
     }
     
     onUpdateData(updatedData);
@@ -1706,6 +1772,30 @@ export default function CompanyDetails({
             })()}
           </div>
 
+          {/* Import / Export activity — shown for all registered and
+              unregistered business types that support IEC. */}
+          {!!formData.businessType && (
+            <div>
+              <p className="text-sm font-semibold text-slate-700 mb-2">
+                Do you engage in Import or Export activities?
+              </p>
+              <div className="flex gap-2.5">
+                <ToggleButton
+                  selected={formData.hasImportExport === 'yes'}
+                  onClick={() => handleInputChange('hasImportExport', formData.hasImportExport === 'yes' ? '' : 'yes')}
+                >
+                  Yes
+                </ToggleButton>
+                <ToggleButton
+                  selected={formData.hasImportExport === 'no'}
+                  onClick={() => handleInputChange('hasImportExport', formData.hasImportExport === 'no' ? '' : 'no')}
+                >
+                  No
+                </ToggleButton>
+              </div>
+            </div>
+          )}
+
           {/* Company Name + Company Logo — 2-col pair */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <div>
@@ -1867,71 +1957,73 @@ export default function CompanyDetails({
                       each paired with its certificate. */}
                   {meta && (
                     <>
-                      {/* IEC Code | IEC Certificate. For a Proprietorship the
-                          IEC certificate IS the type-specific certificate
-                          (typeCert handlers); for the other types it's the
-                          separate optional IEC certificate (iecCert handlers). */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                        <div>
-                          <label htmlFor="iecCode" className="block text-sm font-semibold text-slate-700 mb-1">
-                            IEC Code
-                          </label>
-                          <input
-                            id="iecCode"
-                            type="text"
-                            name="iecCode"
-                            value={formData.iecCode}
-                            onChange={(e) => handleInputChange('iecCode', e.target.value.toUpperCase())}
-                            onBlur={() => handleBlur('iecCode')}
-                            maxLength={10}
-                            spellCheck={false}
-                            autoComplete="off"
-                            aria-describedby={iecErr ? 'iecCode-error' : undefined}
-                            aria-invalid={iecErr}
-                            className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                              iecErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
-                            }`}
-                            placeholder="AAAAA1234A"
-                            style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
-                          />
-                          {iecErr && (
-                            <p id="iecCode-error" className="text-red-500 text-xs mt-1" role="alert">{errors.iecCode}</p>
+                      {/* IEC Code | IEC Certificate — only shown when the
+                          vendor has declared import/export activity. */}
+                      {formData.hasImportExport === 'yes' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                          <div>
+                            <label htmlFor="iecCode" className="block text-sm font-semibold text-slate-700 mb-1">
+                              IEC Code <span className="text-brand-500" aria-hidden="true">*</span>
+                            </label>
+                            <input
+                              id="iecCode"
+                              type="text"
+                              name="iecCode"
+                              value={formData.iecCode}
+                              onChange={(e) => handleInputChange('iecCode', e.target.value.toUpperCase())}
+                              onBlur={() => handleBlur('iecCode')}
+                              maxLength={10}
+                              spellCheck={false}
+                              autoComplete="off"
+                              aria-describedby={iecErr ? 'iecCode-error' : undefined}
+                              aria-invalid={iecErr}
+                              className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                                iecErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                              placeholder="AAAAA1234A"
+                              style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+                            />
+                            {iecErr && (
+                              <p id="iecCode-error" className="text-red-500 text-xs mt-1" role="alert">{errors.iecCode}</p>
+                            )}
+                          </div>
+                          {isProp ? (
+                            <DocUpload
+                              title="IEC Certificate"
+                              requiredMark="required"
+                              inputId="typeCertUpload"
+                              accept="application/pdf,image/*,.doc,.docx"
+                              file={formData.typeCertFile}
+                              documentUrl={formData.typeCertDocument}
+                              fallbackName="iec_certificate.pdf"
+                              error={typeCertError || errors.typeCertDocument}
+                              invalid={!!errors.typeCertDocument}
+                              dataField="typeCertDocument"
+                              onChange={handleTypeCertChange}
+                              onDrop={handleTypeCertDrop}
+                              onDragOver={handleDragOver}
+                              onRemove={handleRemoveTypeCert}
+                            />
+                          ) : (
+                            <DocUpload
+                              title="IEC Certificate"
+                              requiredMark="required"
+                              inputId="iecCertUpload"
+                              accept="application/pdf,image/*,.doc,.docx"
+                              file={formData.iecCertFile}
+                              documentUrl={formData.iecCertDocument}
+                              fallbackName="iec_certificate.pdf"
+                              error={iecCertError || errors.iecCertDocument}
+                              invalid={!!errors.iecCertDocument}
+                              dataField="iecCertDocument"
+                              onChange={handleIecCertChange}
+                              onDrop={handleIecCertDrop}
+                              onDragOver={handleDragOver}
+                              onRemove={handleRemoveIecCert}
+                            />
                           )}
                         </div>
-                        {isProp ? (
-                          <DocUpload
-                            title="IEC Certificate"
-                            requiredMark="none"
-                            inputId="typeCertUpload"
-                            accept="application/pdf,image/*,.doc,.docx"
-                            file={formData.typeCertFile}
-                            documentUrl={formData.typeCertDocument}
-                            fallbackName="iec_certificate.pdf"
-                            error={typeCertError || errors.typeCertDocument}
-                            invalid={!!errors.typeCertDocument}
-                            dataField="typeCertDocument"
-                            onChange={handleTypeCertChange}
-                            onDrop={handleTypeCertDrop}
-                            onDragOver={handleDragOver}
-                            onRemove={handleRemoveTypeCert}
-                          />
-                        ) : (
-                          <DocUpload
-                            title="IEC Certificate"
-                            requiredMark="none"
-                            inputId="iecCertUpload"
-                            accept="application/pdf,image/*,.doc,.docx"
-                            file={formData.iecCertFile}
-                            documentUrl={formData.iecCertDocument}
-                            fallbackName="iec_certificate.pdf"
-                            error={iecCertError}
-                            onChange={handleIecCertChange}
-                            onDrop={handleIecCertDrop}
-                            onDragOver={handleDragOver}
-                            onRemove={handleRemoveIecCert}
-                          />
-                        )}
-                      </div>
+                      )}
 
                       {/* Type-specific regulatory ID (CIN / Deed / LLPIN) |
                           its certificate — not shown for Proprietorship. */}
@@ -2127,6 +2219,54 @@ export default function CompanyDetails({
                           onRemove={handleRemoveTypeCert}
                         />
                       </div>
+
+                      {/* IEC Code | IEC Certificate — shown when import/export = yes */}
+                      {formData.hasImportExport === 'yes' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                          <div>
+                            <label htmlFor="iecCode" className="block text-sm font-semibold text-slate-700 mb-1">
+                              IEC Code <span className="text-brand-500" aria-hidden="true">*</span>
+                            </label>
+                            <input
+                              id="iecCode"
+                              type="text"
+                              name="iecCode"
+                              value={formData.iecCode}
+                              onChange={(e) => handleInputChange('iecCode', e.target.value.toUpperCase())}
+                              onBlur={() => handleBlur('iecCode')}
+                              maxLength={10}
+                              spellCheck={false}
+                              autoComplete="off"
+                              aria-describedby={iecErr ? 'iecCode-error' : undefined}
+                              aria-invalid={iecErr}
+                              className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                                iecErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                              placeholder="AAAAA1234A"
+                              style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+                            />
+                            {iecErr && (
+                              <p id="iecCode-error" className="text-red-500 text-xs mt-1" role="alert">{errors.iecCode}</p>
+                            )}
+                          </div>
+                          <DocUpload
+                            title="IEC Certificate"
+                            requiredMark="required"
+                            inputId="iecCertUpload"
+                            accept="application/pdf,image/*,.doc,.docx"
+                            file={formData.iecCertFile}
+                            documentUrl={formData.iecCertDocument}
+                            fallbackName="iec_certificate.pdf"
+                            error={iecCertError || errors.iecCertDocument}
+                            invalid={!!errors.iecCertDocument}
+                            dataField="iecCertDocument"
+                            onChange={handleIecCertChange}
+                            onDrop={handleIecCertDrop}
+                            onDragOver={handleDragOver}
+                            onRemove={handleRemoveIecCert}
+                          />
+                        </div>
+                      )}
                     </>
                   )}
 
@@ -2180,49 +2320,54 @@ export default function CompanyDetails({
                         />
                       </div>
 
-                      {/* IEC Code | IEC Certificate */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                        <div>
-                          <label htmlFor="iecCode" className="block text-sm font-semibold text-slate-700 mb-1">
-                            IEC Code
-                          </label>
-                          <input
-                            id="iecCode"
-                            type="text"
-                            name="iecCode"
-                            value={formData.iecCode}
-                            onChange={(e) => handleInputChange('iecCode', e.target.value.toUpperCase())}
-                            onBlur={() => handleBlur('iecCode')}
-                            maxLength={10}
-                            spellCheck={false}
-                            autoComplete="off"
-                            aria-describedby={iecErr ? 'iecCode-error' : undefined}
-                            aria-invalid={iecErr}
-                            className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
-                              iecErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
-                            }`}
-                            placeholder="AAAAA1234A"
-                            style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+                      {/* IEC Code | IEC Certificate — only shown when the
+                          vendor has declared import/export activity. */}
+                      {formData.hasImportExport === 'yes' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                          <div>
+                            <label htmlFor="iecCode" className="block text-sm font-semibold text-slate-700 mb-1">
+                              IEC Code <span className="text-brand-500" aria-hidden="true">*</span>
+                            </label>
+                            <input
+                              id="iecCode"
+                              type="text"
+                              name="iecCode"
+                              value={formData.iecCode}
+                              onChange={(e) => handleInputChange('iecCode', e.target.value.toUpperCase())}
+                              onBlur={() => handleBlur('iecCode')}
+                              maxLength={10}
+                              spellCheck={false}
+                              autoComplete="off"
+                              aria-describedby={iecErr ? 'iecCode-error' : undefined}
+                              aria-invalid={iecErr}
+                              className={`w-full text-sm font-medium px-4 py-2.5 border rounded-lg transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:border-brand-500 ${
+                                iecErr ? 'border-red-500 bg-red-50' : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                              placeholder="AAAAA1234A"
+                              style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}
+                            />
+                            {iecErr && (
+                              <p id="iecCode-error" className="text-red-500 text-xs mt-1" role="alert">{errors.iecCode}</p>
+                            )}
+                          </div>
+                          <DocUpload
+                            title="IEC Certificate"
+                            requiredMark="required"
+                            inputId="iecCertUpload"
+                            accept="application/pdf,image/*,.doc,.docx"
+                            file={formData.iecCertFile}
+                            documentUrl={formData.iecCertDocument}
+                            fallbackName="iec_certificate.pdf"
+                            error={iecCertError || errors.iecCertDocument}
+                            invalid={!!errors.iecCertDocument}
+                            dataField="iecCertDocument"
+                            onChange={handleIecCertChange}
+                            onDrop={handleIecCertDrop}
+                            onDragOver={handleDragOver}
+                            onRemove={handleRemoveIecCert}
                           />
-                          {iecErr && (
-                            <p id="iecCode-error" className="text-red-500 text-xs mt-1" role="alert">{errors.iecCode}</p>
-                          )}
                         </div>
-                        <DocUpload
-                          title="IEC Certificate"
-                          requiredMark="none"
-                          inputId="iecCertUpload"
-                          accept="application/pdf,image/*,.doc,.docx"
-                          file={formData.iecCertFile}
-                          documentUrl={formData.iecCertDocument}
-                          fallbackName="iec_certificate.pdf"
-                          error={iecCertError}
-                          onChange={handleIecCertChange}
-                          onDrop={handleIecCertDrop}
-                          onDragOver={handleDragOver}
-                          onRemove={handleRemoveIecCert}
-                        />
-                      </div>
+                      )}
                     </>
                   )}
                 </>

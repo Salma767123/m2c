@@ -54,6 +54,7 @@ export default function VI_Step1_CompanyInfo({ vendor: v, verifications, onChang
       v.gstNumber ? 'c_gstNumber' : 'c_unregistered',
       ...(v.panNumber ? ['c_panNumber'] : []),
       ...(v.companyIdNumber ? ['c_companyIdNumber'] : []),
+      ...(v.hasImportExport ? ['c_hasImportExport'] : []),
       ...(v.iecCode ? ['c_iecCode'] : []),
       ...(v.aadhaarNumber ? ['c_aadhaarNumber'] : []),
       ...(v.website ? ['c_website'] : []),
@@ -101,6 +102,7 @@ export default function VI_Step1_CompanyInfo({ vendor: v, verifications, onChang
           }
           {v.panNumber && vf('c_panNumber', v.businessType === 'proprietorship' ? 'Proprietor PAN' : 'Company PAN', v.panNumber)}
           {v.companyIdNumber && vf('c_companyIdNumber', getCompanyIdLabel(v.businessType), v.companyIdNumber)}
+          {v.hasImportExport && vf('c_hasImportExport', 'Import/Export Activities', v.hasImportExport === 'yes' ? 'Yes' : v.hasImportExport === 'no' ? 'No' : v.hasImportExport)}
           {v.iecCode && vf('c_iecCode', 'IEC Code', v.iecCode)}
           {v.aadhaarNumber && vf('c_aadhaarNumber', 'Aadhaar Number', v.aadhaarNumber)}
           {v.website && vf('c_website', 'Website', v.website, 'url')}

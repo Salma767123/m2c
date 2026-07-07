@@ -1486,13 +1486,14 @@ export default function ContactTradeInfo({ onNext, onPrev, onUpdateData, data }:
               Do you engage in import/export activities?
             </label>
             <div className="flex space-x-4">
-              <label className="flex items-center cursor-pointer">
+              <label className={`flex items-center ${data.hasImportExport === 'no' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                 <input
                   type="radio"
                   value="yes"
                   checked={formData.hasImportExport === 'yes'}
                   onChange={(e) => handleInputChange('hasImportExport', e.target.value)}
-                  className="w-4 h-4 accent-brand-500 border-slate-300 focus-visible:ring-brand-500"
+                  disabled={data.hasImportExport === 'no'}
+                  className="w-4 h-4 accent-brand-500 border-slate-300 focus-visible:ring-brand-500 disabled:cursor-not-allowed"
                 />
                 <span className="ml-2 text-sm text-gray-700">Yes</span>
               </label>

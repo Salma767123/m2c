@@ -542,11 +542,13 @@ function MainContactSection({
         {!editing ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
             {mcName && <Field label="Main Contact Name" value={mcName} />}
-            {(mc.customDesignation || mc.designation) && (
-              <Field label="Designation" value={mc.customDesignation || mc.designation} />
+            {mc.designation && <Field label="Designation" value={mc.designation} />}
+            {mc.designation === 'Others' && mc.customDesignation && (
+              <Field label="Custom Designation" value={mc.customDesignation} />
             )}
-            {(mc.customDepartment || mc.department) && (
-              <Field label="Department" value={mc.customDepartment || mc.department} />
+            {mc.department && <Field label="Department" value={mc.department} />}
+            {mc.department === 'Others' && mc.customDepartment && (
+              <Field label="Custom Department" value={mc.customDepartment} />
             )}
             {primaryEmail && <Field label="Primary Email" value={primaryEmail} />}
             {mc.email2 && <Field label="Secondary Email" value={mc.email2} />}
@@ -947,10 +949,11 @@ export default function VendorSettings() {
   // ===================================================================
   const businessProfile = compact([
     mk("Business Type", v.businessType, { transform: getBusinessTypeLabel }),
+    v.hasImportExport ? mk("Import/Export Activities", v.hasImportExport === 'yes' ? 'Yes' : v.hasImportExport === 'no' ? 'No' : v.hasImportExport) : null,
     mk("Company Name", v.companyName),
     mk("GST Number", v.gstNumber),
     mk(getCompanyIdLabel(v.businessType), v.companyIdNumber),
-    mk("IEC Code", v.iecCode),
+    v.hasImportExport !== 'no' ? mk("IEC Code", v.iecCode) : null,
     mk(v.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number', v.panNumber),
     mk("Aadhaar Number", v.aadhaarNumber),
     mk("Website", v.website, { type: "url" }),
@@ -987,7 +990,7 @@ export default function VendorSettings() {
   // ===================================================================
   const warehouseOwnership = compact([
     mk("Ownership Type", v.ownershipType, { transform: getOwnershipTypeLabel }),
-    mk("Warehousing Capacity", v.storageCapacity || v.warehouseSize),
+    mk("Warehousing Capacity", v.warehouseSize || v.storageCapacity),
   ]);
   const warehouseAddress = compact([
     mk(
@@ -1013,6 +1016,7 @@ export default function VendorSettings() {
   // ===================================================================
   const ownerIdentity = compact([
     mk("Designation", v.designation),
+    v.designation === 'Others' && v.customDesignation ? mk("Custom Designation", v.customDesignation) : null,
     mk("Owner Name", buildFullName(v.ownerTitle, v.ownerFirstName, v.ownerMiddleName, v.ownerLastName, v.ownerName)),
   ]);
   const ownerContact = compact([
@@ -1098,6 +1102,7 @@ export default function VendorSettings() {
   const hasMainContact = mc && typeof mc === "object" && Object.keys(mc).length > 0;
   const alternateContacts: any[] = Array.isArray(v.alternateContacts) ? v.alternateContacts : [];
   const tradeFlow = compact([
+    v.hasImportExport ? mk("Import/Export Activities", v.hasImportExport === 'yes' ? 'Yes' : v.hasImportExport === 'no' ? 'No' : v.hasImportExport) : null,
     mk("Import Experience", v.importExperience, { transform: (x: boolean) => (x ? "Yes" : "No") }),
     mk("Export Experience", v.exportExperience, { transform: (x: boolean) => (x ? "Yes" : "No") }),
     mk("Import Countries", v.importCountries, { type: "list" }),
@@ -1127,11 +1132,13 @@ export default function VendorSettings() {
           )}
           <p className="text-sm font-bold text-slate-800">{cName || `Contact ${idx + 1}`}</p>
         </div>
-        {(contact.customDesignation || contact.designation) && (
-          <Field label="Designation" value={contact.customDesignation || contact.designation} />
+        {contact.designation && <Field label="Designation" value={contact.designation} />}
+        {contact.designation === 'Others' && contact.customDesignation && (
+          <Field label="Custom Designation" value={contact.customDesignation} />
         )}
-        {(contact.customDepartment || contact.department) && (
-          <Field label="Department" value={contact.customDepartment || contact.department} />
+        {contact.department && <Field label="Department" value={contact.department} />}
+        {contact.department === 'Others' && contact.customDepartment && (
+          <Field label="Custom Department" value={contact.customDepartment} />
         )}
         {(contact.email1 || contact.email) && <Field label="Primary Email" value={contact.email1 || contact.email} />}
         {contact.email2 && <Field label="Secondary Email" value={contact.email2} />}

@@ -45,6 +45,9 @@ export interface FactoryReportOptions {
   clientSignatureDataUrl?: string | null
   vendorFactoryImages?: FactoryImageEntry[] | null
   inspectorEvidenceImages?: FactoryImageEntry[] | null
+  companyLogoDataUrl?: string | null
+  ownerPhotoDataUrl?: string | null
+  mainContactPhotoDataUrl?: string | null
 }
 
 // ── Colours ───────────────────────────────────────────────────────────────────
@@ -74,13 +77,13 @@ const EMPLOYEE_COUNT: Record<string, string> = {
   "100+": "More than 100 employees",
 }
 
-const FACILITY_META: Record<string, { label: string; detailFields: Array<{ key: string; label: string }> }> = {
-  spinning:  { label: "Spinning",  detailFields: [{ key: "spinningMachines", label: "Number of Machines" }, { key: "spinningCapacity", label: "Monthly Capacity" }, { key: "remarks", label: "Remarks" }] },
-  weaving:   { label: "Weaving",   detailFields: [{ key: "loomCount", label: "Loom Count" }, { key: "weavingCapacity", label: "Monthly Capacity" }, { key: "remarks", label: "Remarks" }] },
-  dyeing:    { label: "Dyeing",    detailFields: [{ key: "dyeingMachines", label: "Number of Machines" }, { key: "dyeingCapacity", label: "Monthly Capacity" }, { key: "remarks", label: "Remarks" }] },
-  printing:  { label: "Printing",  detailFields: [{ key: "printingMachines", label: "Number of Machines" }, { key: "printingCapacity", label: "Monthly Capacity" }, { key: "remarks", label: "Remarks" }] },
-  stitching: { label: "Stitching", detailFields: [{ key: "stitchingMachines", label: "Number of Machines" }, { key: "stitchingCapacity", label: "Monthly Capacity" }, { key: "remarks", label: "Remarks" }] },
-  finishing: { label: "Finishing", detailFields: [{ key: "finishingCapacity", label: "Monthly Capacity" }, { key: "remarks", label: "Remarks" }] },
+const FACILITY_META: Record<string, { label: string; detailFields: Array<{ key: string; label: string; unit?: string }> }> = {
+  spinning:  { label: "Spinning",  detailFields: [{ key: "spinningMachines", label: "Number of Machines", unit: "Machines" }, { key: "spinningCapacity", label: "Monthly Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
+  weaving:   { label: "Weaving",   detailFields: [{ key: "loomCount", label: "Loom Count", unit: "Looms" }, { key: "weavingCapacity", label: "Monthly Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
+  dyeing:    { label: "Dyeing",    detailFields: [{ key: "dyeingMachines", label: "Number of Machines", unit: "Machines" }, { key: "dyeingCapacity", label: "Monthly Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
+  printing:  { label: "Printing",  detailFields: [{ key: "printingMachines", label: "Number of Machines", unit: "Machines" }, { key: "printingCapacity", label: "Monthly Capacity", unit: "Kg / Day" }, { key: "remarks", label: "Remarks" }] },
+  stitching: { label: "Stitching", detailFields: [{ key: "stitchingMachines", label: "Number of Machines", unit: "Machines" }, { key: "stitchingCapacity", label: "Monthly Capacity", unit: "Pieces / Day" }, { key: "remarks", label: "Remarks" }] },
+  finishing: { label: "Finishing", detailFields: [{ key: "finishingCapacity", label: "Monthly Capacity", unit: "Pieces / Day" }, { key: "remarks", label: "Remarks" }] },
 }
 
 // ── Step-key → step label (for Issues section) ────────────────────────────────
@@ -105,6 +108,14 @@ function val(v: unknown): string {
   if (Array.isArray(v)) return v.length === 0 ? "—" : v.join(", ")
   if (typeof v === "boolean") return v ? "Yes" : "No"
   return String(v).trim()
+}
+
+// Append unit when value is a plain number (no letters already present)
+function withUnit(v: unknown, unit?: string): string {
+  const s = val(v)
+  if (s === "—" || !unit) return s
+  if (/[a-zA-Z]/.test(s)) return s
+  return `${s} ${unit}`
 }
 
 function buildName(...parts: (string | undefined | null)[]): string {
@@ -226,6 +237,21 @@ export function generateFactoryInspectionPdf(
     return 'Pending'
   }
 
+  // Render a small inline thumbnail (photo / logo) at the current y position.
+  const renderThumbnail = (dataUrl: string | null | undefined, caption: string, size = 60) => {
+    if (blank(dataUrl)) return
+    ensureSpace(size + 16)
+    const fmt = /^data:image\/png/i.test(dataUrl as string) ? "PNG" : "JPEG"
+    try {
+      doc.addImage(dataUrl as string, fmt, margin, y, size, size, undefined, "FAST")
+      doc.setFont("helvetica", "italic")
+      doc.setFontSize(8)
+      doc.setTextColor(...MUTED)
+      doc.text(caption, margin + size + 8, y + size / 2 + 3)
+    } catch { /* skip broken image */ }
+    y += size + 10
+  }
+
   // ── Cover header ────────────────────────────────────────────────────────────
   doc.setFillColor(...BRAND)
   doc.rect(0, 0, pageW, 72, "F")
@@ -263,6 +289,21 @@ export function generateFactoryInspectionPdf(
   if (!blank(v.iecCode)) companyRows.push(["IEC Code", val(v.iecCode)])
   if (!blank(v.website)) companyRows.push(["Website", val(v.website)])
   runTable([["Field", "Value"]], companyRows)
+  renderThumbnail(options.companyLogoDataUrl, "Company Logo")
+
+  // Business Contact Details (shown immediately after Company Information)
+  const bizPhone2 = v.phoneNumber2
+  const bizEmail2 = v.businessEmail2
+  const bizLandline = localLandline("+91", v.localLandlineStd, v.landlineNumber)
+  const bizIntlLine = hasIntlLandline(v.intlLandline) ? val(v.intlLandline) : null
+  const bizContactRows: string[][] = [["Primary Phone", val(v.businessPhone)]]
+  if (!blank(bizPhone2)) bizContactRows.push(["Secondary Phone", val(bizPhone2)])
+  bizContactRows.push(["Primary Email", val(v.businessEmail)])
+  if (!blank(bizEmail2)) bizContactRows.push(["Secondary Email", val(bizEmail2)])
+  if (bizLandline) bizContactRows.push(["Local Landline", bizLandline])
+  if (bizIntlLine) bizContactRows.push(["International Landline", bizIntlLine])
+  subTitle("Business Contact Details")
+  runTable([["Field", "Value"]], bizContactRows)
 
   // ── B. Warehouse & Factory Details ─────────────────────────────────────────
   sectionTitle("B. Warehouse & Factory Details", sectionStatus(['w_']))
@@ -327,6 +368,7 @@ export function generateFactoryInspectionPdf(
   ownerRows.push(["Business Start Date", fmtDate(v.businessStartDate)])
   ownerRows.push(["Number of Employees", val(EMPLOYEE_COUNT[v.employeeCount] || v.employeeCount)])
   runTable([["Field", "Value"]], ownerRows)
+  renderThumbnail(options.ownerPhotoDataUrl, "Owner Profile Photo")
 
   if (v.ownerAddress || v.ownerCity || v.ownerState) {
     subTitle("Owner Address")
@@ -379,32 +421,25 @@ export function generateFactoryInspectionPdf(
   const facilityDetails: Record<string, any> = v.facilityDetails || {}
   const activeFacilities = Object.keys(FACILITY_META).filter(f => enabledFacilities[f])
 
-  if (v.productionCapacity || activeFacilities.length > 0) {
+  if (activeFacilities.length > 0) {
     sectionTitle("F. Manufacturing Facilities", sectionStatus(['mf_']))
 
-    if (!blank(v.productionCapacity)) {
-      subTitle("Overall Production Capacity")
-      runTable([["Field", "Value"]], [["Monthly Production Capacity", val(v.productionCapacity)]])
-    }
-
-    if (activeFacilities.length > 0) {
-      subTitle("Active Facilities")
-      activeFacilities.forEach((facilityKey) => {
-        const fMeta = FACILITY_META[facilityKey]
-        const details = facilityDetails[facilityKey] || {}
-        const facilityRows: string[][] = [["Facility Status", "Active — declared"]]
-        fMeta.detailFields.forEach(({ key, label }) => {
-          if (!blank(details[key])) facilityRows.push([label, val(details[key])])
-        })
-        ensureSpace(24)
-        doc.setFont("helvetica", "bold")
-        doc.setFontSize(9)
-        doc.setTextColor(...SLATE)
-        doc.text(fMeta.label, margin, y)
-        y += 10
-        runTable([["Detail", "Value"]], facilityRows)
+    subTitle("Active Facilities")
+    activeFacilities.forEach((facilityKey) => {
+      const fMeta = FACILITY_META[facilityKey]
+      const details = facilityDetails[facilityKey] || {}
+      const facilityRows: string[][] = [["Facility Status", "Active — declared"]]
+      fMeta.detailFields.forEach(({ key, label, unit }) => {
+        if (!blank(details[key])) facilityRows.push([label, withUnit(details[key], unit)])
       })
-    }
+      ensureSpace(24)
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(9)
+      doc.setTextColor(...SLATE)
+      doc.text(fMeta.label, margin, y)
+      y += 10
+      runTable([["Detail", "Value"]], facilityRows)
+    })
   }
 
   // ── G. Certifications & Quality Control ────────────────────────────────────
@@ -437,49 +472,28 @@ export function generateFactoryInspectionPdf(
   // ── H. Contact & Trade Information ─────────────────────────────────────────
   sectionTitle("H. Contact & Trade Information", sectionStatus(['ct_']))
 
-  // Business Contact Details
-  const bizPhone2 = v.phoneNumber2
-  const bizEmail2 = v.businessEmail2
-  const bizLandline = localLandline("+91", v.localLandlineStd, v.landlineNumber)
-  const bizIntlLine = hasIntlLandline(v.intlLandline) ? val(v.intlLandline) : null
-  const bizContactRows: string[][] = [["Primary Phone", val(v.businessPhone)]]
-  if (!blank(bizPhone2)) bizContactRows.push(["Secondary Phone", val(bizPhone2)])
-  bizContactRows.push(["Primary Email", val(v.businessEmail)])
-  if (!blank(bizEmail2)) bizContactRows.push(["Secondary Email", val(bizEmail2)])
-  if (bizLandline) bizContactRows.push(["Local Landline", bizLandline])
-  if (bizIntlLine) bizContactRows.push(["International Landline", bizIntlLine])
-  subTitle("Business Contact Details")
-  runTable([["Field", "Value"]], bizContactRows)
-
-  // Factory Site / Legal Address
-  const hasAddress = v.businessAddress || v.businessCity
-  if (hasAddress) {
-    subTitle("Factory Site / Legal Address")
-    const addrRows: string[][] = []
-    if (!blank(v.businessAddress)) addrRows.push(["Address Line 1", val(v.businessAddress)])
-    if (!blank(v.addressLine2)) addrRows.push(["Address Line 2", val(v.addressLine2)])
-    if (!blank(v.addressLine3)) addrRows.push(["Address Line 3", val(v.addressLine3)])
-    if (!blank(v.landmark)) addrRows.push(["Landmark", val(v.landmark)])
-    if (!blank(v.businessCity)) addrRows.push(["City", val(v.businessCity)])
-    if (!blank(v.businessState)) addrRows.push(["State", val(v.businessState)])
-    if (!blank(v.businessZipCode)) addrRows.push(["ZIP / Postal Code", val(v.businessZipCode)])
-    if (!blank(v.businessCountry)) addrRows.push(["Country", val(v.businessCountry)])
-    runTable([["Field", "Value"]], addrRows)
-  }
-
   // Main Contact Person
   const mainContact = v.mainContact || null
   if (mainContact) {
     subTitle("Main Contact Person")
     const mcName = buildName(mainContact.title, mainContact.firstName, mainContact.middleName, mainContact.lastName)
     const mcRows: string[][] = [["Contact Name", val(mcName)]]
-    if (!blank(mainContact.designation)) mcRows.push(["Designation", val(mainContact.designation)])
-    if (!blank(mainContact.department)) mcRows.push(["Department", val(mainContact.department)])
+    if (!blank(mainContact.designation)) {
+      mcRows.push(["Designation", val(mainContact.designation)])
+      if (mainContact.designation === "Others" && !blank(mainContact.customDesignation))
+        mcRows.push(["Custom Designation", val(mainContact.customDesignation)])
+    }
+    if (!blank(mainContact.department)) {
+      mcRows.push(["Department", val(mainContact.department)])
+      if (mainContact.department === "Others" && !blank(mainContact.customDepartment))
+        mcRows.push(["Custom Department", val(mainContact.customDepartment)])
+    }
     if (!blank(mainContact.email1)) mcRows.push(["Primary Email", val(mainContact.email1)])
     if (!blank(mainContact.email2)) mcRows.push(["Secondary Email", val(mainContact.email2)])
     if (!blank(mainContact.phone1)) mcRows.push(["Primary Phone", val(mainContact.phone1)])
     if (!blank(mainContact.phone2)) mcRows.push(["Secondary Phone", val(mainContact.phone2)])
     runTable([["Field", "Value"]], mcRows)
+    renderThumbnail(options.mainContactPhotoDataUrl, "Main Contact Photo")
   }
 
   // Contact Person 2 (alternate contacts)

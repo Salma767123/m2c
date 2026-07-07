@@ -34,6 +34,17 @@ import { formatLocalLandline, formatIntlLandline } from "@/components/VendorHub/
 import { buildFullName } from "@/lib/utils"
 import { isDocImageUrl } from "@/lib/docDownload"
 import DocViewerModal from "@/components/UI/DocViewerModal"
+import { FACILITY_META, withUnit } from "./Steps/VI_Step5_Manufacturing"
+import { Country } from "country-state-city"
+
+const COUNTRY_FLAG: Record<string, string> = {}
+Country.getAllCountries().forEach((c) => { if (c.flag) COUNTRY_FLAG[c.name] = c.flag })
+function withFlags(countries: string[]): string[] {
+  return countries.map((name) => {
+    const flag = COUNTRY_FLAG[name]
+    return flag ? `${flag} ${name}` : name
+  })
+}
 const MAIN_STATUS_COLORS: Record<string, string> = {
   "New Assignment": "bg-blue-50 text-blue-700 border-blue-200/85",
   "Under Review by Admin": "bg-orange-50 text-orange-700 border-orange-200/85",
@@ -387,8 +398,8 @@ export default function VendorDetail({
         fields: [
           { key: "importExperience", label: "Import Experience", transform: (val: any) => val ? "Yes" : "No", condition: fullVendor.importExperience !== undefined && fullVendor.importExperience !== null },
           { key: "exportExperience", label: "Export Experience", transform: (val: any) => val ? "Yes" : "No", condition: fullVendor.exportExperience !== undefined && fullVendor.exportExperience !== null },
-          { key: "importCountries", label: "Import Countries", type: "list" },
-          { key: "exportCountries", label: "Export Countries", type: "list" },
+          { key: "importCountries", label: "Import Countries", type: "list", transform: (val: any) => Array.isArray(val) ? withFlags(val) : val },
+          { key: "exportCountries", label: "Export Countries", type: "list", transform: (val: any) => Array.isArray(val) ? withFlags(val) : val },
         ]
       },
       {
@@ -695,21 +706,22 @@ export default function VendorDetail({
                     )}
                     {Object.entries(detailsMap).map(([facilityId, details]: [string, any]) => {
                       if (!enabledFacilities[facilityId]) return null
-                      const facilityName = enabledList.find((f) => f.toLowerCase().includes(facilityId)) || facilityId
+                      const meta = FACILITY_META[facilityId]
+                      const facilityLabel = meta?.label ?? (facilityId.charAt(0).toUpperCase() + facilityId.slice(1))
                       const hasDetailFields = Object.values(details || {}).some(v => v !== null && v !== undefined && v !== "")
                       if (!hasDetailFields) return null
 
                       return (
                         <div key={facilityId} className="border-l-2 border-brand-500/80 pl-4 py-1 space-y-4">
-                          <p className="font-bold text-sm text-slate-800 uppercase tracking-wide">{facilityName} Facility Details</p>
+                          <p className="font-bold text-sm text-slate-800 uppercase tracking-wide">{facilityLabel} Facility Details</p>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {Object.entries(details || {}).map(([key, value]: [string, any]) => {
+                            {(meta?.detailFields ?? []).map(({ key, label, unit }) => {
+                              const value = (details || {})[key]
                               if (value === null || value === undefined || value === "") return null
-                              const fieldLabel = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())
                               return (
                                 <div key={key}>
-                                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">{fieldLabel}</label>
-                                  <p className="text-sm font-semibold text-slate-900">{value.toString()}</p>
+                                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">{label}</label>
+                                  <p className="text-sm font-semibold text-slate-900">{withUnit(value, unit)}</p>
                                 </div>
                               )
                             })}

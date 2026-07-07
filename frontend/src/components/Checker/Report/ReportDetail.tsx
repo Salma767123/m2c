@@ -435,6 +435,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                 value={buildName(vendor.ownerTitle, vendor.ownerFirstName, vendor.ownerMiddleName, vendor.ownerLastName) || vendor.ownerName}
                 k="o_ownerName" vf={vf} />
               <VCard label="Designation" value={vendor.designation} k="o_designation" vf={vf} />
+              {vendor.designation === 'Others' && vendor.customDesignation && <VCard label="Custom Designation" value={vendor.customDesignation} k="o_customDesignation" vf={vf} />}
               <VCard label="Primary Phone" value={vendor.ownerPhone} k="o_ownerPhone" vf={vf} />
               {vendor.ownerPhone2 && <VCard label="Secondary Phone" value={vendor.ownerPhone2} k="o_ownerPhone2" vf={vf} />}
               <VCard label="Primary Email" value={vendor.ownerEmail} k="o_ownerEmail" vf={vf} />
@@ -468,6 +469,7 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <VCard label="Full Name" value={buildName(owner.title, owner.firstName, owner.middleName, owner.lastName)} k={`o_add_${idx}_name`} vf={vf} />
                         <VCard label="Designation" value={owner.designation} k={`o_add_${idx}_designation`} vf={vf} />
+                        {owner.designation === 'Others' && owner.customDesignation && <VCard label="Custom Designation" value={owner.customDesignation} k={`o_add_${idx}_customDesignation`} vf={vf} />}
                         {owner.email && <VCard label="Email" value={owner.email} k={`o_add_${idx}_email`} vf={vf} />}
                         {owner.email2 && <VCard label="Secondary Email" value={owner.email2} k={`o_add_${idx}_email2`} vf={vf} />}
                         {owner.phone && <VCard label="Phone" value={owner.phone} k={`o_add_${idx}_phone`} vf={vf} />}
@@ -678,7 +680,9 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                     value={buildName(vendor.mainContact.title, vendor.mainContact.firstName, vendor.mainContact.middleName, vendor.mainContact.lastName)}
                     k="ct_mainContact_name" vf={vf} />
                   {vendor.mainContact.designation && <VCard label="Designation" value={vendor.mainContact.designation} k="ct_mainContact_designation" vf={vf} />}
+                  {vendor.mainContact.designation === 'Others' && vendor.mainContact.customDesignation && <VCard label="Custom Designation" value={vendor.mainContact.customDesignation} k="ct_mainContact_customDesignation" vf={vf} />}
                   {vendor.mainContact.department && <VCard label="Department" value={vendor.mainContact.department} k="ct_mainContact_department" vf={vf} />}
+                  {vendor.mainContact.department === 'Others' && vendor.mainContact.customDepartment && <VCard label="Custom Department" value={vendor.mainContact.customDepartment} k="ct_mainContact_customDepartment" vf={vf} />}
                   {vendor.mainContact.email1 && <VCard label="Primary Email" value={vendor.mainContact.email1} k="ct_mainContact_email1" vf={vf} />}
                   {vendor.mainContact.email2 && <VCard label="Secondary Email" value={vendor.mainContact.email2} k="ct_mainContact_email2" vf={vf} />}
                   {vendor.mainContact.phone1 && <VCard label="Primary Phone" value={vendor.mainContact.phone1} k="ct_mainContact_phone1" vf={vf} />}
@@ -698,7 +702,9 @@ export default function ReportDetail({ reportId, onBack }: ReportDetailProps) {
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                           <VCard label="Name" value={buildName(contact.title, contact.firstName, contact.middleName, contact.lastName)} k={`${prefix}_name`} vf={vf} />
                           {contact.designation && <VCard label="Designation" value={contact.designation} k={`${prefix}_designation`} vf={vf} />}
+                          {contact.designation === 'Others' && contact.customDesignation && <VCard label="Custom Designation" value={contact.customDesignation} k={`${prefix}_customDesignation`} vf={vf} />}
                           {contact.department && <VCard label="Department" value={contact.department} k={`${prefix}_department`} vf={vf} />}
+                          {contact.department === 'Others' && contact.customDepartment && <VCard label="Custom Department" value={contact.customDepartment} k={`${prefix}_customDepartment`} vf={vf} />}
                           {contact.email1 && <VCard label="Primary Email" value={contact.email1} k={`${prefix}_email1`} vf={vf} />}
                           {contact.phone1 && <VCard label="Primary Phone" value={contact.phone1} k={`${prefix}_phone1`} vf={vf} />}
                         </div>

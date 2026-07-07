@@ -276,6 +276,12 @@ export default function VendorDataSummary({
       <AccordionSection {...sectionProps('company', 'Company Details', 'Business identity and registration info', <Building2 className="w-4.5 h-4.5" aria-hidden="true" />, getStepNumber('company'))}>
         <div className="flex flex-col">
           <InfoRow label="Business Type" value={getBusinessTypeLabel(data.businessType)} />
+          {data.hasImportExport && (
+            <InfoRow
+              label="Import/Export Activities"
+              value={data.hasImportExport === 'yes' ? 'Yes' : data.hasImportExport === 'no' ? 'No' : '—'}
+            />
+          )}
           <InfoRow label="Company Name" value={data.companyName} />
           <InfoRow label="GST Number" value={data.gstNumber || 'Not provided'} />
           {/* Type-specific regulatory ID — IEC / CIN / Deed / LLPIN. */}
@@ -285,7 +291,7 @@ export default function VendorDataSummary({
               value={data.companyIdNumber}
             />
           )}
-          {data.iecCode && <InfoRow label="IEC Code" value={data.iecCode} />}
+          {data.hasImportExport === 'yes' && data.iecCode && <InfoRow label="IEC Code" value={data.iecCode} />}
           {data.panNumber && <InfoRow label={data.businessType === 'proprietorship' ? 'Proprietor PAN Number' : 'Company PAN Number'} value={data.panNumber} />}
           {data.aadhaarNumber && <InfoRow label="Aadhaar Number" value={data.aadhaarNumber} />}
           <InfoRow label="Primary Email" value={data.email} />
@@ -404,6 +410,9 @@ export default function VendorDataSummary({
               value={<span className="capitalize">{data.designation}</span>}
             />
           )}
+          {data.designation === 'Others' && data.customDesignation && (
+            <InfoRow label="Custom Designation" value={data.customDesignation} />
+          )}
           <InfoRow label="Primary Email" value={data.ownerEmail} />
           {data.ownerEmail2 && <InfoRow label="Secondary Email" value={data.ownerEmail2} />}
           <InfoRow label="Primary Phone" value={data.ownerPhone} />
@@ -441,6 +450,9 @@ export default function VendorDataSummary({
                   <p className="text-sm font-bold text-slate-800 px-6 mt-2">Owner {index + 2}</p>
                   <InfoRow label="Name" value={buildFullName(owner.title, owner.firstName, owner.middleName, owner.lastName, owner.name)} />
                   {owner.designation && <InfoRow label="Designation" value={owner.designation} />}
+                  {owner.designation === 'Others' && owner.customDesignation && (
+                    <InfoRow label="Custom Designation" value={owner.customDesignation} />
+                  )}
                   <InfoRow label="Primary Email" value={owner.email} />
                   {owner.email2 && <InfoRow label="Secondary Email" value={owner.email2} />}
                   <InfoRow label="Primary Phone" value={owner.phone} />
@@ -670,8 +682,11 @@ export default function VendorDataSummary({
           <InfoRow label="Main Contact Name" value={buildFullName(data.mainContact?.title, data.mainContact?.firstName, data.mainContact?.middleName, data.mainContact?.lastName, data.mainContact?.name) || 'Not provided'} />
           <InfoRow
             label="Main Contact Designation"
-            value={data.mainContact?.customDesignation || data.mainContact?.designation || 'Not provided'}
+            value={data.mainContact?.designation || 'Not provided'}
           />
+          {data.mainContact?.designation === 'Others' && data.mainContact?.customDesignation && (
+            <InfoRow label="Main Contact Custom Designation" value={data.mainContact.customDesignation} />
+          )}
           <InfoRow label="Main Contact Primary Email" value={data.mainContact?.email1 || data.mainContact?.email || 'Not provided'} />
           {data.mainContact?.email2 && (
             <InfoRow label="Main Contact Secondary Email" value={data.mainContact.email2} />
@@ -692,8 +707,11 @@ export default function VendorDataSummary({
           })()}
           <InfoRow
             label="Main Contact Department"
-            value={data.mainContact?.customDepartment || data.mainContact?.department || 'Not provided'}
+            value={data.mainContact?.department || 'Not provided'}
           />
+          {data.mainContact?.department === 'Others' && data.mainContact?.customDepartment && (
+            <InfoRow label="Main Contact Custom Department" value={data.mainContact.customDepartment} />
+          )}
           <InfoRow label="Alternate Contacts" value={`${(data.alternateContacts || []).length} contact(s) added`} />
           {(data.alternateContacts || []).length > 0 && (
             <div className="ml-4 space-y-2 border-l-2 border-slate-200 pl-4 my-2">
@@ -703,18 +721,21 @@ export default function VendorDataSummary({
                   <InfoRow label="Name" value={buildFullName(contact.title, contact.firstName, contact.middleName, contact.lastName, contact.name) || 'Not provided'} />
                   <InfoRow
                     label="Designation"
-                    value={contact.customDesignation || contact.designation || 'Not provided'}
+                    value={contact.designation || 'Not provided'}
                   />
+                  {contact.designation === 'Others' && contact.customDesignation && (
+                    <InfoRow label="Custom Designation" value={contact.customDesignation} />
+                  )}
                   <InfoRow label="Primary Email" value={contact.email1 || contact.email || 'Not provided'} />
                   {contact.email2 && <InfoRow label="Secondary Email" value={contact.email2} />}
                   <InfoRow label="Primary Phone" value={contact.phone1 || contact.phone || 'Not provided'} />
                   {contact.phone2 && <InfoRow label="Secondary Phone" value={contact.phone2} />}
                   {contact.landline && <InfoRow label="Landline" value={contact.landline} />}
-                  {(contact.customDepartment || contact.department) && (
-                    <InfoRow
-                      label="Department"
-                      value={contact.customDepartment || contact.department}
-                    />
+                  {contact.department && (
+                    <InfoRow label="Department" value={contact.department} />
+                  )}
+                  {contact.department === 'Others' && contact.customDepartment && (
+                    <InfoRow label="Custom Department" value={contact.customDepartment} />
                   )}
                 </div>
               ))}

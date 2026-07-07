@@ -39,7 +39,9 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
         ...(mainContact.photo ? ['ct_mainContact_photo'] : []),
         'ct_mainContact_name',
         ...(mainContact.designation ? ['ct_mainContact_designation'] : []),
+        ...(mainContact.designation === 'Others' && mainContact.customDesignation ? ['ct_mainContact_customDesignation'] : []),
         ...(mainContact.department ? ['ct_mainContact_department'] : []),
+        ...(mainContact.department === 'Others' && mainContact.customDepartment ? ['ct_mainContact_customDepartment'] : []),
         ...(mainContact.phone1 ? ['ct_mainContact_phone1'] : []),
         ...(mainContact.phone2 ? ['ct_mainContact_phone2'] : []),
         ...(mainContact.email1 ? ['ct_mainContact_email1'] : []),
@@ -51,7 +53,9 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
           ...(contact.photo ? [`${prefix}_photo`] : []),
           `${prefix}_name`,
           ...(contact.designation ? [`${prefix}_designation`] : []),
+          ...(contact.designation === 'Others' && contact.customDesignation ? [`${prefix}_customDesignation`] : []),
           ...(contact.department ? [`${prefix}_department`] : []),
+          ...(contact.department === 'Others' && contact.customDepartment ? [`${prefix}_customDepartment`] : []),
           ...(contact.phone1 ? [`${prefix}_phone1`] : []),
           ...(contact.phone2 ? [`${prefix}_phone2`] : []),
           ...(contact.email1 ? [`${prefix}_email1`] : []),
@@ -61,6 +65,7 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
       ...(v.tradeLicenseNumber ? ['ct_tradeLicense'] : []),
       ...(v.businessRegistrationNumber ? ['ct_businessRegNumber'] : []),
       ...(v.taxIdentificationNumber ? ['ct_taxId'] : []),
+      ...(v.hasImportExport ? ['ct_hasImportExport'] : []),
       ...(v.importExperience !== undefined ? ['ct_importExp'] : []),
       ...(v.importCountries?.length > 0 ? ['ct_importCountries'] : []),
       ...(v.exportExperience !== undefined ? ['ct_exportExp'] : []),
@@ -98,7 +103,9 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {vf('ct_mainContact_name', 'Full Name', buildFullName(mainContact.title, mainContact.firstName, mainContact.middleName, mainContact.lastName))}
             {mainContact.designation && vf('ct_mainContact_designation', 'Designation', mainContact.designation)}
+            {mainContact.designation === 'Others' && mainContact.customDesignation && vf('ct_mainContact_customDesignation', 'Custom Designation', mainContact.customDesignation)}
             {mainContact.department && vf('ct_mainContact_department', 'Department', mainContact.department)}
+            {mainContact.department === 'Others' && mainContact.customDepartment && vf('ct_mainContact_customDepartment', 'Custom Department', mainContact.customDepartment)}
             {mainContact.phone1 && vf('ct_mainContact_phone1', 'Primary Phone', mainContact.phone1)}
             {mainContact.phone2 && vf('ct_mainContact_phone2', 'Secondary Phone', mainContact.phone2)}
             {mainContact.email1 && vf('ct_mainContact_email1', 'Primary Email', mainContact.email1)}
@@ -124,7 +131,9 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {vf(`${prefix}_name`, 'Full Name', buildFullName(contact.title, contact.firstName, contact.middleName, contact.lastName))}
                     {contact.designation && vf(`${prefix}_designation`, 'Designation', contact.designation)}
+                    {contact.designation === 'Others' && contact.customDesignation && vf(`${prefix}_customDesignation`, 'Custom Designation', contact.customDesignation)}
                     {contact.department && vf(`${prefix}_department`, 'Department', contact.department)}
+                    {contact.department === 'Others' && contact.customDepartment && vf(`${prefix}_customDepartment`, 'Custom Department', contact.customDepartment)}
                     {contact.phone1 && vf(`${prefix}_phone1`, 'Primary Phone', contact.phone1)}
                     {contact.phone2 && vf(`${prefix}_phone2`, 'Secondary Phone', contact.phone2)}
                     {contact.email1 && vf(`${prefix}_email1`, 'Primary Email', contact.email1)}
@@ -149,9 +158,10 @@ export default function VI_Step7_ContactTrade({ vendor: v, verifications, onChan
           </SectionBlock>
         )}
 
-        {(v.importExperience !== undefined || v.exportExperience !== undefined) && (
+        {(v.hasImportExport || v.importExperience !== undefined || v.exportExperience !== undefined) && (
           <SectionBlock title="Import / Export Experience" icon={<Globe className="w-4 h-4" />}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {v.hasImportExport && vf('ct_hasImportExport', 'Import/Export Activities (Step 1)', v.hasImportExport === 'yes' ? 'Yes' : v.hasImportExport === 'no' ? 'No' : v.hasImportExport)}
               {v.importExperience !== undefined && vf('ct_importExp', 'Import Experience', v.importExperience ? 'Yes' : 'No')}
               {v.importCountries?.length > 0 && vf('ct_importCountries', 'Import Countries', withFlags(v.importCountries), 'list')}
               {v.exportExperience !== undefined && vf('ct_exportExp', 'Export Experience', v.exportExperience ? 'Yes' : 'No')}
