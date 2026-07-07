@@ -6,7 +6,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import Dropdown from '@/components/UI/Dropdown'
 import {
     AlertCircle,
-    Calendar,
     Eye,
     FileText,
     Search,
@@ -15,6 +14,7 @@ import {
     ChevronLeft,
     ChevronRight,
 } from 'lucide-react'
+import DateRangeCalendar, { fmtDate } from '@/components/Shared/DateRangeCalendar'
 import { showErrorToast } from '@/lib/toast-utils'
 import { qcCheckerService } from '@/services/qcCheckerService'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -85,16 +85,16 @@ export default function Products() {
     const initialSearch = searchParams.get('search') ?? ''
     const initialStatus = searchParams.get('status') ?? ''
     const initialSort = searchParams.get('sort') ?? DEFAULT_SORT
-    const initialDate = searchParams.get('date') ?? ''
+    const initialFrom = searchParams.get('dateFrom') ?? ''
+    const initialTo = searchParams.get('dateTo') ?? ''
     const initialPage = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1)
 
     const [searchInput, setSearchInput] = useState(initialSearch)
     const [status, setStatus] = useState(initialStatus)
     const [sort, setSort] = useState(initialSort)
-    const [dateFilter, setDateFilter] = useState(initialDate)
+    const [dateFrom, setDateFrom] = useState(initialFrom)
+    const [dateTo, setDateTo] = useState(initialTo)
     const [page, setPage] = useState(initialPage)
-
-    const dateInputRef = useRef<HTMLInputElement>(null)
 
     const debouncedSearch = useDebounce(searchInput, 300)
 
@@ -152,23 +152,25 @@ export default function Products() {
             return
         }
         setPage(1)
-    }, [debouncedSearch, dateFilter])
+    }, [debouncedSearch, dateFrom, dateTo])
 
     // Sync URL for shareability + back-button behaviour.
     useEffect(() => {
         const params = new URLSearchParams(searchParams.toString())
-        
+
         if (debouncedSearch) params.set('search', debouncedSearch)
         else params.delete('search')
-        
+
         if (status) params.set('status', status)
         else params.delete('status')
-        
+
         if (sort !== DEFAULT_SORT) params.set('sort', sort)
         else params.delete('sort')
 
-        if (dateFilter) params.set('date', dateFilter)
-        else params.delete('date')
+        if (dateFrom) params.set('dateFrom', dateFrom)
+        else params.delete('dateFrom')
+        if (dateTo) params.set('dateTo', dateTo)
+        else params.delete('dateTo')
 
         if (page !== 1) params.set('page', String(page))
         else params.delete('page')
@@ -176,7 +178,7 @@ export default function Products() {
         const qs = params.toString()
         router.replace(qs ? `?${qs}` : '?', { scroll: false })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [debouncedSearch, status, sort, dateFilter, page, router])
+    }, [debouncedSearch, status, sort, dateFrom, dateTo, page, router])
 
     const [sortBy, sortOrder] = useMemo(() => {
         const [by, ord] = sort.split(':')
@@ -219,31 +221,32 @@ export default function Products() {
         loadProducts()
     }, [loadProducts])
 
-    // Client-side date filter (mirrors the Vendor module): match each
-    // product's createdAt against the picked day, formatted as a local
-    // YYYY-MM-DD string so the comparison is timezone-safe.
+    // Client-side date filter: match each product's createdAt against the
+    // selected range (or single day when only dateFrom is set).
     const filteredProducts = useMemo(() => {
-        if (!dateFilter) return products
+        if (!dateFrom) return products
         return products.filter((p) => {
             if (!p.createdAt) return false
             const d = new Date(p.createdAt)
             if (Number.isNaN(d.getTime())) return false
-            const raw = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-            return raw === dateFilter
+            const raw = fmtDate(d)
+            if (dateTo) return raw >= dateFrom && raw <= dateTo
+            return raw === dateFrom
         })
-    }, [products, dateFilter])
+    }, [products, dateFrom, dateTo])
 
     const handleClearFilters = () => {
         setSearchInput('')
         setStatus('')
         setSort(DEFAULT_SORT)
-        setDateFilter('')
+        setDateFrom('')
+        setDateTo('')
         setPage(1)
     }
 
-    const hasActiveFilters = Boolean(debouncedSearch || status || sort !== DEFAULT_SORT || dateFilter || page !== 1)
+    const hasActiveFilters = Boolean(debouncedSearch || status || sort !== DEFAULT_SORT || dateFrom || page !== 1)
     const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
-    const rangeEnd = dateFilter
+    const rangeEnd = dateFrom
         ? rangeStart + filteredProducts.length - 1
         : Math.min(pagination.page * pagination.limit, pagination.total)
 
@@ -343,41 +346,13 @@ export default function Products() {
                             </button>
                         )}
                     </div>
-                    <div className="relative min-w-45">
-                        <label htmlFor="product-date-filter" className="sr-only">Filter by Assigned Date</label>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                try {
-                                    dateInputRef.current?.showPicker()
-                                } catch (err) {}
-                            }}
-                            className="absolute left-3.5 top-3.5 text-slate-400 hover:text-brand-500 cursor-pointer z-10 transition-colors"
-                            title="Open calendar picker"
-                        >
-                            <Calendar className="w-5 h-5" />
-                        </button>
-                        <input
-                            ref={dateInputRef}
-                            id="product-date-filter"
-                            type="date"
-                            value={dateFilter}
-                            onChange={(e) => setDateFilter(e.target.value)}
-                            className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs text-sm text-slate-700 [&::-webkit-calendar-picker-indicator]:hidden"
+                    <div className="min-w-45">
+                        <DateRangeCalendar
+                            from={dateFrom}
+                            to={dateTo}
+                            onChange={(from, to) => { setDateFrom(from); setDateTo(to) }}
+                            placeholder="Filter by date"
                         />
-                        {dateFilter && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    setDateFilter('')
-                                }}
-                                aria-label="Clear date filter"
-                                className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer z-10"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        )}
                     </div>
                     <div className="min-w-45">
                         <Dropdown
@@ -401,7 +376,7 @@ export default function Products() {
                         ? 'Loading products...'
                         : filteredProducts.length === 0
                             ? '0 products'
-                            : `Showing ${rangeStart}–${rangeEnd} of ${dateFilter ? filteredProducts.length : pagination.total} product${(dateFilter ? filteredProducts.length : pagination.total) === 1 ? '' : 's'}`}
+                            : `Showing ${rangeStart}–${rangeEnd} of ${dateFrom ? filteredProducts.length : pagination.total} product${(dateFrom ? filteredProducts.length : pagination.total) === 1 ? '' : 's'}`}
                 </span>
                 {hasActiveFilters && (
                     <button

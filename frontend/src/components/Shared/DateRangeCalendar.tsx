@@ -77,7 +77,7 @@ export default function DateRangeCalendar({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-2 px-3 h-[38px] border rounded-lg bg-white text-sm transition-colors hover:border-brand-300 ${
+        className={`w-full flex items-center gap-2 px-3 py-3 border rounded-xl bg-white text-sm transition-colors hover:border-brand-300 ${
           from ? 'border-brand-300 text-slate-700' : 'border-slate-200 text-slate-500'
         }`}
       >

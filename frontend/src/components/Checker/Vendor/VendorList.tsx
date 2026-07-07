@@ -6,7 +6,6 @@ import {
   Search,
   Factory,
   MapPin,
-  Calendar,
   ArrowRight,
   Eye,
   CheckCircle,
@@ -16,6 +15,7 @@ import {
   X,
   Clock,
 } from "lucide-react"
+import DateRangeCalendar from "@/components/Shared/DateRangeCalendar"
 import VendorInspectionForm from "@/components/Checker/Vendor/VendorInspectionForm"
 import VendorDetail from "@/components/Checker/Vendor/VendorDetail"
 import Dropdown from "@/components/UI/Dropdown"
@@ -224,20 +224,22 @@ function transformVendor(v: RawVendor): Vendor {
 export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const dateInputRef = useRef<HTMLInputElement>(null)
+
 
   const initialSearch = searchParams.get("search") ?? ""
   const initialStatus = searchParams.get("status") ?? ""
   const initialSort = searchParams.get("sort") ?? "assignedQcAt:desc"
   const initialPage = Math.max(parseInt(searchParams.get("page") || "1", 10) || 1, 1)
-  const initialDate = searchParams.get("date") ?? ""
+  const initialFrom = searchParams.get("dateFrom") ?? ""
+  const initialTo = searchParams.get("dateTo") ?? ""
   const initialInspectionStatus = searchParams.get("inspectionStatus") ?? ""
   const initialState = searchParams.get("state") ?? ""
 
   const [searchInput, setSearchInput] = useState(initialSearch)
   const [status, setStatus] = useState(initialStatus)
   const [sort, setSort] = useState<string>(initialSort)
-  const [dateFilter, setDateFilter] = useState(initialDate)
+  const [dateFrom, setDateFrom] = useState(initialFrom)
+  const [dateTo, setDateTo] = useState(initialTo)
   const [inspectionStatus, setInspectionStatus] = useState(initialInspectionStatus)
   const [selectedState, setSelectedState] = useState(initialState)
   const [page, setPage] = useState(initialPage)
@@ -314,23 +316,25 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
       return
     }
     setPage(1)
-  }, [debouncedSearch, dateFilter, inspectionStatus, selectedState])
+  }, [debouncedSearch, dateFrom, dateTo, inspectionStatus, selectedState])
 
   // Keep URL in sync with state (shareable, back-button friendly)
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
-    
+
     if (debouncedSearch) params.set("search", debouncedSearch)
     else params.delete("search")
-    
+
     if (status) params.set("status", status)
     else params.delete("status")
-    
+
     if (sort !== "assignedQcAt:desc") params.set("sort", sort)
     else params.delete("sort")
 
-    if (dateFilter) params.set("date", dateFilter)
-    else params.delete("date")
+    if (dateFrom) params.set("dateFrom", dateFrom)
+    else params.delete("dateFrom")
+    if (dateTo) params.set("dateTo", dateTo)
+    else params.delete("dateTo")
 
     if (inspectionStatus) params.set("inspectionStatus", inspectionStatus)
     else params.delete("inspectionStatus")
@@ -344,7 +348,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
     const qs = params.toString()
     router.replace(qs ? `?${qs}` : "?", { scroll: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, status, sort, dateFilter, inspectionStatus, selectedState, page, router])
+  }, [debouncedSearch, status, sort, dateFrom, dateTo, inspectionStatus, selectedState, page, router])
 
   const [sortBy, sortOrder] = useMemo(() => {
     const parts = sort.split(":")
@@ -419,8 +423,12 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
 
   const filteredVendors = useMemo(() => {
     let result = [...vendors]
-    if (dateFilter) {
-      result = result.filter((v) => v.createdAtRaw === dateFilter)
+    if (dateFrom) {
+      result = result.filter((v) => {
+        if (!v.createdAtRaw) return false
+        if (dateTo) return v.createdAtRaw >= dateFrom && v.createdAtRaw <= dateTo
+        return v.createdAtRaw === dateFrom
+      })
     }
 
     if (inspectionStatus) {
@@ -442,19 +450,20 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
     }
 
     return result
-  }, [vendors, dateFilter, inspectionStatus, selectedState, status])
+  }, [vendors, dateFrom, dateTo, inspectionStatus, selectedState, status])
 
   const handleClearFilters = () => {
     setSearchInput("")
     setStatus("")
     setSort("assignedQcAt:desc")
-    setDateFilter("")
+    setDateFrom("")
+    setDateTo("")
     setInspectionStatus("")
     setSelectedState("")
     setPage(1)
   }
 
-  const hasActiveFilters = Boolean(debouncedSearch || status || sort !== "assignedQcAt:desc" || dateFilter || inspectionStatus || selectedState || page !== 1)
+  const hasActiveFilters = Boolean(debouncedSearch || status || sort !== "assignedQcAt:desc" || dateFrom || inspectionStatus || selectedState || page !== 1)
   const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
   const rangeEnd = Math.min(rangeStart + filteredVendors.length - 1, pagination.total)
 
@@ -534,43 +543,15 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
               </button>
             )}
           </div>
-          <div className="relative min-w-40">
-            <label htmlFor="vendor-date-filter" className="sr-only">Filter by Assigned Date</label>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                try {
-                  dateInputRef.current?.showPicker()
-                } catch (err) {}
-              }}
-              className="absolute left-3.5 top-3.5 text-slate-400 hover:text-brand-500 cursor-pointer z-10 transition-colors"
-              title="Open calendar picker"
-            >
-              <Calendar className="w-5 h-5" />
-            </button>
-            <input
-              ref={dateInputRef}
-              id="vendor-date-filter"
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs text-sm text-slate-700 [&::-webkit-calendar-picker-indicator]:hidden"
+          <div className="min-w-45">
+            <DateRangeCalendar
+              from={dateFrom}
+              to={dateTo}
+              onChange={(from, to) => { setDateFrom(from); setDateTo(to) }}
+              placeholder="Filter by date"
             />
-            {dateFilter && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setDateFilter("")
-                }}
-                aria-label="Clear date filter"
-                className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer z-10"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
           </div>
-          <div className="min-w-40">
+          <div className="min-w-45">
             <Dropdown
               id="inspection-status-filter"
               value={inspectionStatus}
@@ -589,7 +570,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
               }}
             />
           </div>
-          <div className="min-w-40">
+          <div className="min-w-45">
             <Dropdown
               id="state-filter"
               value={selectedState}
@@ -602,7 +583,7 @@ export default function VendorsPage({ selectedVendor, onVendorSelect }: VendorsP
               }}
             />
           </div>
-          <div className="min-w-40">
+          <div className="min-w-45">
             <Dropdown
               id="sort-filter"
               value={sort}

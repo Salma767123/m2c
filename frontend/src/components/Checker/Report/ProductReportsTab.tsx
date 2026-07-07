@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   Eye, Package, CheckCircle, XCircle, Download,
-  Search, X, ChevronLeft, ChevronRight, RotateCw, Calendar,
+  Search, X, ChevronLeft, ChevronRight, RotateCw,
 } from "lucide-react"
+import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -61,15 +62,16 @@ export default function ProductReportsTab() {
   const initialSearch = searchParams.get("psearch") ?? ""
   const initialSort = searchParams.get("psort") ?? DEFAULT_SORT
   const initialStatus = searchParams.get("pstatus") ?? ""
-  const initialDate = searchParams.get("pdate") ?? ""
+  const initialFrom = searchParams.get("pdateFrom") ?? ""
+  const initialTo = searchParams.get("pdateTo") ?? ""
   const initialPage = Math.max(parseInt(searchParams.get("ppage") || "1", 10) || 1, 1)
 
   const [searchInput, setSearchInput] = useState(initialSearch)
   const [sort, setSort] = useState(initialSort)
   const [statusFilter, setStatusFilter] = useState(initialStatus)
-  const [dateFilter, setDateFilter] = useState(initialDate)
+  const [dateFrom, setDateFrom] = useState(initialFrom)
+  const [dateTo, setDateTo] = useState(initialTo)
   const [page, setPage] = useState(initialPage)
-  const dateInputRef = useRef<HTMLInputElement>(null)
 
   const debouncedSearch = useDebounce(searchInput, 300)
 
@@ -85,7 +87,7 @@ export default function ProductReportsTab() {
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return }
     setPage(1)
-  }, [debouncedSearch, statusFilter, dateFilter])
+  }, [debouncedSearch, statusFilter, dateFrom, dateTo])
 
   const [sortBy, sortOrder] = useMemo(() => {
     const [by, ord] = sort.split(":")
@@ -98,15 +100,16 @@ export default function ProductReportsTab() {
     // Preserve tab param
     params.set("tab", "product")
     // Clean product params then set
-    params.delete("psearch"); params.delete("psort"); params.delete("pstatus"); params.delete("pdate"); params.delete("ppage")
+    params.delete("psearch"); params.delete("psort"); params.delete("pstatus"); params.delete("pdateFrom"); params.delete("pdateTo"); params.delete("ppage")
     if (debouncedSearch) params.set("psearch", debouncedSearch)
     if (sort !== DEFAULT_SORT) params.set("psort", sort)
     if (statusFilter) params.set("pstatus", statusFilter)
-    if (dateFilter) params.set("pdate", dateFilter)
+    if (dateFrom) params.set("pdateFrom", dateFrom)
+    if (dateTo) params.set("pdateTo", dateTo)
     if (page !== 1) params.set("ppage", String(page))
     const qs = params.toString()
     router.replace(qs ? `?${qs}` : "?tab=product", { scroll: false })
-  }, [debouncedSearch, sort, statusFilter, dateFilter, page, router])
+  }, [debouncedSearch, sort, statusFilter, dateFrom, dateTo, page, router])
 
   const fetchReports = useCallback(async () => {
     const id = ++requestIdRef.current
@@ -139,7 +142,8 @@ export default function ProductReportsTab() {
     setSearchInput("")
     setSort(DEFAULT_SORT)
     setStatusFilter("")
-    setDateFilter("")
+    setDateFrom("")
+    setDateTo("")
     setPage(1)
   }
 
@@ -151,20 +155,21 @@ export default function ProductReportsTab() {
     } else if (statusFilter === "REJECTED") {
       list = list.filter((p) => p.approvalStatus === "REJECTED")
     }
-    if (dateFilter) {
+    if (dateFrom) {
       list = list.filter((p) => {
         if (!p.updatedAt) return false
         const d = new Date(p.updatedAt)
         if (Number.isNaN(d.getTime())) return false
-        const raw = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-        return raw === dateFilter
+        const raw = fmtDate(d)
+        if (dateTo) return raw >= dateFrom && raw <= dateTo
+        return raw === dateFrom
       })
     }
     return list
-  }, [products, statusFilter, dateFilter])
+  }, [products, statusFilter, dateFrom, dateTo])
 
-  const isClientFiltered = Boolean(statusFilter || dateFilter)
-  const hasActiveFilters = Boolean(debouncedSearch || sort !== DEFAULT_SORT || statusFilter || dateFilter || page !== 1)
+  const isClientFiltered = Boolean(statusFilter || dateFrom)
+  const hasActiveFilters = Boolean(debouncedSearch || sort !== DEFAULT_SORT || statusFilter || dateFrom || page !== 1)
   const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
   const rangeEnd = isClientFiltered
     ? rangeStart + filteredProducts.length - 1
@@ -185,7 +190,7 @@ export default function ProductReportsTab() {
   return (
     <div className="space-y-4">
       {/* Filter bar */}
-      <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] items-start">
+      <div className="grid gap-4 md:grid-cols-[1fr_auto_auto_auto] items-center">
         <div className="relative">
           <label htmlFor="product-report-search" className="sr-only">Search product reports</label>
           <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 pointer-events-none" />
@@ -207,36 +212,13 @@ export default function ProductReportsTab() {
             </button>
           )}
         </div>
-        <div className="relative min-w-45">
-          <label htmlFor="product-report-date" className="sr-only">Filter by Inspected Date</label>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              try { dateInputRef.current?.showPicker() } catch (err) {}
-            }}
-            className="absolute left-3.5 top-3.5 text-slate-400 hover:text-brand-500 cursor-pointer z-10 transition-colors"
-            title="Open calendar picker"
-          >
-            <Calendar className="w-5 h-5" />
-          </button>
-          <input
-            ref={dateInputRef}
-            id="product-report-date"
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs text-sm text-slate-700 [&::-webkit-calendar-picker-indicator]:hidden"
+        <div className="min-w-45">
+          <DateRangeCalendar
+            from={dateFrom}
+            to={dateTo}
+            onChange={(from, to) => { setDateFrom(from); setDateTo(to) }}
+            placeholder="Filter by date"
           />
-          {dateFilter && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setDateFilter("") }}
-              aria-label="Clear date filter"
-              className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer z-10"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
         <div className="min-w-45">
           <Dropdown
@@ -245,6 +227,7 @@ export default function ProductReportsTab() {
             options={STATUS_OPTIONS}
             onChange={(v) => { setStatusFilter(v as string); setPage(1) }}
             placeholder="All results"
+            buttonClassName="py-3 rounded-xl"
           />
         </div>
         <div className="min-w-45">
@@ -253,6 +236,7 @@ export default function ProductReportsTab() {
             value={sort}
             options={SORT_OPTIONS}
             onChange={(v) => { setSort(v as string); setPage(1) }}
+            buttonClassName="py-3 rounded-xl"
           />
         </div>
       </div>

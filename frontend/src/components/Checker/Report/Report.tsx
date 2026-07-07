@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import {
   Eye, CheckCircle, XCircle, Download,
-  Factory, Package, Search, X, ChevronLeft, ChevronRight, RotateCw, Calendar,
+  Factory, Package, Search, X, ChevronLeft, ChevronRight, RotateCw,
 } from "lucide-react"
+import DateRangeCalendar, { fmtDate } from "@/components/Shared/DateRangeCalendar"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -56,15 +57,16 @@ export default function ReportsPage() {
   const initialSearch = searchParams.get("search") ?? ""
   const initialResult = searchParams.get("result") ?? ""
   const initialSort = searchParams.get("sort") ?? DEFAULT_SORT
-  const initialDate = searchParams.get("date") ?? ""
+  const initialFrom = searchParams.get("dateFrom") ?? ""
+  const initialTo = searchParams.get("dateTo") ?? ""
   const initialPage = Math.max(parseInt(searchParams.get("page") || "1", 10) || 1, 1)
 
   const [searchInput, setSearchInput] = useState(initialSearch)
   const [result, setResult] = useState(initialResult)
   const [sort, setSort] = useState(initialSort)
-  const [dateFilter, setDateFilter] = useState(initialDate)
+  const [dateFrom, setDateFrom] = useState(initialFrom)
+  const [dateTo, setDateTo] = useState(initialTo)
   const [page, setPage] = useState(initialPage)
-  const dateInputRef = useRef<HTMLInputElement>(null)
 
   const debouncedSearch = useDebounce(searchInput, 300)
 
@@ -81,7 +83,7 @@ export default function ReportsPage() {
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return }
     setPage(1)
-  }, [debouncedSearch, dateFilter])
+  }, [debouncedSearch, dateFrom, dateTo])
 
   const [sortBy, sortOrder] = useMemo(() => {
     const [by, ord] = sort.split(":")
@@ -95,11 +97,12 @@ export default function ReportsPage() {
     if (debouncedSearch) params.set("search", debouncedSearch)
     if (result) params.set("result", result)
     if (sort !== DEFAULT_SORT) params.set("sort", sort)
-    if (dateFilter) params.set("date", dateFilter)
+    if (dateFrom) params.set("dateFrom", dateFrom)
+    if (dateTo) params.set("dateTo", dateTo)
     if (page !== 1) params.set("page", String(page))
     const qs = params.toString()
     router.replace(qs ? `?${qs}` : "?", { scroll: false })
-  }, [activeTab, debouncedSearch, result, sort, dateFilter, page, router])
+  }, [activeTab, debouncedSearch, result, sort, dateFrom, dateTo, page, router])
 
   const loadReports = useCallback(async () => {
     const id = ++requestIdRef.current
@@ -139,26 +142,28 @@ export default function ReportsPage() {
     setSearchInput("")
     setResult("")
     setSort(DEFAULT_SORT)
-    setDateFilter("")
+    setDateFrom("")
+    setDateTo("")
     setPage(1)
   }
 
-  // Client-side date filter (matches the vendor/products module pattern) — filters within the current server page.
+  // Client-side date filter — filters within the current server page.
   const filteredInspections = useMemo(() => {
-    if (!dateFilter) return inspections
+    if (!dateFrom) return inspections
     return inspections.filter((insp) => {
       const src = insp.completedAt || insp.scheduledDate
       if (!src) return false
       const d = new Date(src)
       if (Number.isNaN(d.getTime())) return false
-      const raw = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-      return raw === dateFilter
+      const raw = fmtDate(d)
+      if (dateTo) return raw >= dateFrom && raw <= dateTo
+      return raw === dateFrom
     })
-  }, [inspections, dateFilter])
+  }, [inspections, dateFrom, dateTo])
 
-  const hasActiveFilters = Boolean(debouncedSearch || result || sort !== DEFAULT_SORT || dateFilter || page !== 1)
+  const hasActiveFilters = Boolean(debouncedSearch || result || sort !== DEFAULT_SORT || dateFrom || page !== 1)
   const rangeStart = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1
-  const rangeEnd = dateFilter
+  const rangeEnd = dateFrom
     ? rangeStart + filteredInspections.length - 1
     : Math.min(pagination.page * pagination.limit, pagination.total)
 
@@ -223,7 +228,7 @@ export default function ReportsPage() {
       {activeTab === "factory" && (
         <div className="space-y-4">
           {/* Filter bar */}
-          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] items-start">
+          <div className="grid gap-4 md:grid-cols-[1fr_auto_auto_auto] items-center">
             <div className="relative">
               <label htmlFor="report-search" className="sr-only">Search reports</label>
               <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 pointer-events-none" />
@@ -245,36 +250,13 @@ export default function ReportsPage() {
                 </button>
               )}
             </div>
-            <div className="relative min-w-45">
-              <label htmlFor="report-date-filter" className="sr-only">Filter by Completed Date</label>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  try { dateInputRef.current?.showPicker() } catch (err) {}
-                }}
-                className="absolute left-3.5 top-3.5 text-slate-400 hover:text-brand-500 cursor-pointer z-10 transition-colors"
-                title="Open calendar picker"
-              >
-                <Calendar className="w-5 h-5" />
-              </button>
-              <input
-                ref={dateInputRef}
-                id="report-date-filter"
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full pl-12 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all bg-white shadow-xs text-sm text-slate-700 [&::-webkit-calendar-picker-indicator]:hidden"
+            <div className="min-w-45">
+              <DateRangeCalendar
+                from={dateFrom}
+                to={dateTo}
+                onChange={(from, to) => { setDateFrom(from); setDateTo(to) }}
+                placeholder="Filter by date"
               />
-              {dateFilter && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setDateFilter("") }}
-                  aria-label="Clear date filter"
-                  className="absolute right-3 top-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer z-10"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
             </div>
             <div className="min-w-45">
               <Dropdown
@@ -283,6 +265,7 @@ export default function ReportsPage() {
                 options={RESULT_OPTIONS}
                 onChange={(v) => { setResult(v as string); setPage(1) }}
                 placeholder="All results"
+                buttonClassName="py-3 rounded-xl"
               />
             </div>
             <div className="min-w-45">
@@ -291,6 +274,7 @@ export default function ReportsPage() {
                 value={sort}
                 options={SORT_OPTIONS}
                 onChange={(v) => { setSort(v as string); setPage(1) }}
+                buttonClassName="py-3 rounded-xl"
               />
             </div>
           </div>
@@ -300,9 +284,9 @@ export default function ReportsPage() {
             <span>
               {loading
                 ? "Loading reports..."
-                : (dateFilter ? filteredInspections.length : pagination.total) === 0
+                : (dateFrom ? filteredInspections.length : pagination.total) === 0
                   ? "0 reports"
-                  : `Showing ${rangeStart}–${rangeEnd} of ${dateFilter ? filteredInspections.length : pagination.total} report${(dateFilter ? filteredInspections.length : pagination.total) === 1 ? "" : "s"}`}
+                  : `Showing ${rangeStart}–${rangeEnd} of ${dateFrom ? filteredInspections.length : pagination.total} report${(dateFrom ? filteredInspections.length : pagination.total) === 1 ? "" : "s"}`}
             </span>
             {hasActiveFilters && (
               <button
