@@ -43,7 +43,7 @@ const getStatusBadge = (status: string) => {
     case 'UNDER_REVIEW':
       return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-bold">Under Review</Badge>
     case 'SUSPENDED':
-      return <Badge className="bg-slate-100 text-slate-600 border border-slate-200 font-bold">Suspended</Badge>
+      return <Badge className="bg-orange-50 text-orange-700 border border-orange-200 font-bold">Suspended</Badge>
     case 'REJECTED':
       return <Badge className="bg-red-50 text-red-700 border border-red-200 font-bold">Rejected</Badge>
     case 'APPROVAL_PENDING':
@@ -79,13 +79,6 @@ const getInspectionBadge = (vendorStatus: string, latestInspection?: VendorProfi
   }
 }
 
-const getLocationString = (vendor: VendorProfile): string => {
-  const parts = [vendor.businessCity, vendor.businessState, vendor.businessCountry].filter(Boolean)
-  return parts.length > 0 ? parts.join(', ') : 'Not specified'
-}
-
-const hasRating = (vendor: VendorProfile): boolean =>
-  typeof vendor.rating === 'number' && (vendor.ratingCount ?? 0) > 0
 
 interface StatusCounts {
   total: number
@@ -483,17 +476,17 @@ export default function VendorsTable() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto scrollbar-none">
-              <Table>
+            <div>
+              <Table className="table-fixed">
                 <TableHeader className="!bg-brand-500/[0.06] !border-0 [&_tr]:border-b [&_tr]:border-brand-100/50">
                   <TableRow className="!bg-brand-500/[0.06] hover:!bg-brand-500/[0.06]">
-                    <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap">Vendor</TableHead>
-                    <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap">Location</TableHead>
-                    <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap">Status</TableHead>
-                    <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap">Completion</TableHead>
-                    <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap">Rating</TableHead>
-                    <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap">Join Date</TableHead>
-                    <TableHead className="font-bold !text-brand-500/60 h-11 py-3 px-5 text-[10px] uppercase tracking-wider whitespace-nowrap text-right">Actions</TableHead>
+                    <TableHead className="w-[20%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Vendor</TableHead>
+                    <TableHead className="w-[13%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact Person</TableHead>
+                    <TableHead className="w-[18%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider">Contact</TableHead>
+                    <TableHead className="w-[15%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center">Status</TableHead>
+                    <TableHead className="w-[10%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Completion</TableHead>
+                    <TableHead className="w-[9%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-center whitespace-nowrap">Join Date</TableHead>
+                    <TableHead className="w-[15%] font-bold !text-brand-500/60 h-11 py-3 px-3 text-[10px] uppercase tracking-wider text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -503,26 +496,40 @@ export default function VendorsTable() {
                       className="hover:bg-slate-50/60 transition-colors duration-150 border-b border-slate-100 last:border-0"
                     >
                       {/* Vendor */}
-                      <TableCell className="py-4 px-5">
-                        <div className="flex flex-col gap-0.5 min-w-[160px]">
-                          <div className="font-semibold text-slate-900 leading-snug">{vendor.companyName}</div>
-                          {(vendor as any).gstNumber ? (
-                            <div className="text-xs text-slate-500 font-mono">GST: {(vendor as any).gstNumber}</div>
+                      <TableCell className="py-3 px-3 align-top">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="font-semibold text-slate-900 leading-snug break-words">{vendor.companyName}</div>
+                          {vendor.gstNumber ? (
+                            <div className="text-xs text-slate-500 font-mono break-all">GST: {vendor.gstNumber}</div>
                           ) : (
                             <div className="text-xs text-slate-400 italic">Unregistered</div>
                           )}
-                          <div className="text-xs text-slate-400">{vendor.email}</div>
                         </div>
                       </TableCell>
 
-                      {/* Location */}
-                      <TableCell className="py-4 px-5 text-sm text-slate-600 whitespace-nowrap">
-                        {getLocationString(vendor)}
+                      {/* Contact Person */}
+                      <TableCell className="py-3 px-3 align-top">
+                        <div className="text-sm font-medium text-slate-700 break-words">{vendor.ownerName || '—'}</div>
+                      </TableCell>
+
+                      {/* Contact */}
+                      <TableCell className="py-3 px-3 align-top">
+                        <div className="flex flex-col gap-0.5">
+                          {vendor.businessPhone && (
+                            <div className="text-sm text-slate-700 whitespace-nowrap">{vendor.businessPhone}</div>
+                          )}
+                          {vendor.businessEmail && (
+                            <div className="text-xs text-slate-500 break-all">{vendor.businessEmail}</div>
+                          )}
+                          {!vendor.businessPhone && !vendor.businessEmail && (
+                            <span className="text-xs text-slate-400 italic">—</span>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Status */}
-                      <TableCell className="py-4 px-5">
-                        <div className="flex flex-col gap-1.5">
+                      <TableCell className="py-3 px-3 align-middle">
+                        <div className="flex flex-col items-center gap-1.5">
                           {getStatusBadge(vendor.status)}
                           {getInspectionBadge(vendor.status, vendor.latestInspection)}
                           {vendor.status === 'APPROVAL_PENDING' && vendor.approvalRequestedByName && (
@@ -535,7 +542,7 @@ export default function VendorsTable() {
                       </TableCell>
 
                       {/* Completion */}
-                      <TableCell className="py-4 px-5">
+                      <TableCell className="py-3 px-3 align-middle">
                         {(() => {
                           const pct = vendor.completionPercentage ?? 0
                           const gradient = pct === 100
@@ -545,7 +552,7 @@ export default function VendorsTable() {
                             ? 'text-emerald-600'
                             : pct >= 50 ? 'text-blue-600' : 'text-orange-500'
                           return (
-                            <div className="flex items-center gap-2.5 min-w-[90px]">
+                            <div className="flex items-center gap-1.5">
                               <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                 <div
                                   className={`h-full rounded-full bg-linear-to-r ${gradient} transition-[width] duration-500`}
@@ -558,30 +565,14 @@ export default function VendorsTable() {
                         })()}
                       </TableCell>
 
-                      {/* Rating */}
-                      <TableCell className="py-4 px-5">
-                        {hasRating(vendor) ? (
-                          <div
-                            className="flex items-center gap-1"
-                            title={`Based on ${vendor.ratingCount} admin review${(vendor.ratingCount ?? 0) === 1 ? '' : 's'}`}
-                          >
-                            <span className="text-yellow-400 text-sm">★</span>
-                            <span className="text-sm font-semibold text-slate-800">{vendor.rating?.toFixed(1)}</span>
-                            <span className="text-xs text-slate-400">({vendor.ratingCount})</span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-400 italic">No reviews yet</span>
-                        )}
-                      </TableCell>
-
                       {/* Join Date */}
-                      <TableCell className="py-4 px-5 text-sm text-slate-600 whitespace-nowrap">
+                      <TableCell className="py-3 px-3 text-sm text-slate-600 whitespace-nowrap align-middle text-center">
                         {formatDate(vendor.createdAt)}
                       </TableCell>
 
                       {/* Actions */}
-                      <TableCell className="py-4 px-5">
-                        <div className="flex items-center justify-end gap-1">
+                      <TableCell className="py-3 px-3 align-middle">
+                        <div className="flex items-center justify-end gap-0.5 whitespace-nowrap">
                           {hasPermission('view_vendors') && (
                             <Link href={`/admin/dashboard/vendors/view/${vendor.id}`}>
                               <button

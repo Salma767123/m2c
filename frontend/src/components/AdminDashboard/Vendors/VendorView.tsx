@@ -49,6 +49,18 @@ import { hasPermission } from '@/lib/auth'
 import { getLandlineDisplay, formatLocalLandline, formatIntlLandline } from '@/components/VendorHub/FormUI'
 import { buildFullName } from '@/lib/utils'
 import { downloadDoc, isDocImageUrl } from '@/lib/docDownload'
+import DocViewerModal from '@/components/UI/DocViewerModal'
+import { FACILITY_META, withUnit } from '@/components/Checker/Vendor/Steps/VI_Step5_Manufacturing'
+import { Country } from 'country-state-city'
+
+const COUNTRY_FLAG: Record<string, string> = {}
+Country.getAllCountries().forEach((c) => { if (c.flag) COUNTRY_FLAG[c.name] = c.flag })
+function withFlags(countries: string[]): string[] {
+  return countries.map((name) => {
+    const flag = COUNTRY_FLAG[name]
+    return flag ? `${flag} ${name}` : name
+  })
+}
 
 interface VendorViewProps {
   vendorId: string
@@ -618,15 +630,18 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     </div>
                   </div>
                 )}
-                {(vendor as any).intlLandline && (
-                  <div className="flex items-center space-x-3">
-                    <Phone className="h-4 w-4 text-slate-400" />
-                    <div>
-                      <p className="text-sm text-slate-500">International Landline</p>
-                      <p className="font-medium">{formatIntlLandline((vendor as any).intlLandline)}</p>
+                {(() => {
+                  const intlLL = formatIntlLandline((vendor as any).intlLandline);
+                  return intlLL ? (
+                    <div className="flex items-center space-x-3">
+                      <Phone className="h-4 w-4 text-slate-400" />
+                      <div>
+                        <p className="text-sm text-slate-500">International Landline</p>
+                        <p className="font-medium">{intlLL}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : null;
+                })()}
 
                 {vendor.phoneNumber2 && (
                   <div className="flex items-center space-x-3">
@@ -768,12 +783,15 @@ function OverviewTab({ vendor }: { vendor: VendorProfile }) {
                     <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: (vendor as any).ownerLocalLandlineStd, number: (vendor as any).ownerLandline })}</p>
                   </div>
                 )}
-                {(vendor as any).ownerIntlLandline && (
-                  <div>
-                    <p className="text-sm text-slate-500">International Landline</p>
-                    <p className="font-medium">{formatIntlLandline((vendor as any).ownerIntlLandline)}</p>
-                  </div>
-                )}
+                {(() => {
+                  const intlLL = formatIntlLandline((vendor as any).ownerIntlLandline);
+                  return intlLL ? (
+                    <div>
+                      <p className="text-sm text-slate-500">International Landline</p>
+                      <p className="font-medium">{intlLL}</p>
+                    </div>
+                  ) : null;
+                })()}
                 {(vendor as any).businessStartDate && (
                   <div>
                     <p className="text-sm text-slate-500">Business Start Date</p>
@@ -963,7 +981,7 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
       {/* Identification & Compliance — legal IDs collected on Step 1
           (CompanyDetails). Surfaced here so admins can verify against
           uploaded certificates during approval review. */}
-      {(v.companyIdNumber || v.panNumber || v.factoryOwnershipType || v.iecCode || v.aadhaarNumber || v.hasImportExport) && (
+      {(v.companyIdNumber || v.panNumber || v.iecCode || v.aadhaarNumber || v.hasImportExport) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -1003,36 +1021,10 @@ function DetailsTab({ vendor }: { vendor: VendorProfile }) {
                   <p className="font-medium">{v.aadhaarNumber}</p>
                 </div>
               )}
-              {v.factoryOwnershipType && (
-                <div>
-                  <p className="text-sm text-slate-500">Factory Ownership Type</p>
-                  <p className="font-medium capitalize">{v.factoryOwnershipType}</p>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Business Address</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-1">
-            <p>{vendor.businessAddress}</p>
-            {v.addressLine2 && <p>{v.addressLine2}</p>}
-            {v.addressLine3 && <p>{v.addressLine3}</p>}
-            {v.landmark && (
-              <p className="text-sm text-slate-500">
-                <span className="font-semibold">Landmark:</span> {v.landmark}
-              </p>
-            )}
-            <p>{vendor.businessCity}, {vendor.businessState} {vendor.businessZipCode}</p>
-            <p>{vendor.businessCountry}</p>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Legal Address & Factory Site */}
       {vendor.warehouseAddress && (
@@ -1290,6 +1282,7 @@ function ProductsTab({ vendor }: { vendor: VendorProfile }) {
 }
 
 function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
+  const [viewerDoc, setViewerDoc] = useState<{ url: string; name: string } | null>(null)
   return (
     <div className="space-y-6">
       {vendor.factoryAddress && (
@@ -1301,19 +1294,12 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-slate-500">Factory Address</p>
-                <p className="font-medium">{vendor.factoryAddress}</p>
-                <p className="font-medium">{vendor.factoryCity}, {vendor.factoryState}</p>
+            {vendor.qualityControl && (
+              <div className="mb-4">
+                <p className="text-sm text-slate-500">Quality Control Process</p>
+                <p className="font-medium">{vendor.qualityControl}</p>
               </div>
-              {vendor.qualityControl && (
-                <div>
-                  <p className="text-sm text-slate-500">Quality Control Process</p>
-                  <p className="font-medium">{vendor.qualityControl}</p>
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Enabled Facilities & Details */}
             {(() => {
@@ -1321,31 +1307,32 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
               const details = (vendor as any).facilityDetails;
               if (!enabled || typeof enabled !== 'object') return null;
 
-              const facilityLabels: Record<string, string> = {
-                spinning: 'Spinning', weaving: 'Weaving', dyeing: 'Dyeing',
-                printing: 'Printing', stitching: 'Stitching', finishing: 'Finishing'
-              };
-
               const activeFacilities = Object.entries(enabled).filter(([, v]) => v);
               if (activeFacilities.length === 0) return null;
 
               return (
-                <div className="mt-6 pt-6 border-t border-slate-200">
+                <div className={vendor.qualityControl ? 'mt-4 pt-4 border-t border-slate-200' : undefined}>
                   <h4 className="text-sm font-semibold text-slate-700 mb-3">Active Facility Stages</h4>
                   <div className="space-y-3">
                     {activeFacilities.map(([id]) => {
                       const fd = details?.[id];
+                      const meta = FACILITY_META[id];
+                      const label = meta?.label ?? (id.charAt(0).toUpperCase() + id.slice(1));
                       return (
                         <div key={id} className="p-3 bg-slate-50 rounded-lg">
-                          <p className="font-medium text-slate-900 mb-2">{facilityLabels[id] || id}</p>
-                          {fd && (
+                          <p className="font-medium text-slate-900 mb-2">{label}</p>
+                          {fd && meta && (
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                              {Object.entries(fd).filter(([, v]) => v).map(([key, val]) => (
-                                <div key={key}>
-                                  <p className="text-slate-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                                  <p className="font-medium">{String(val)}</p>
-                                </div>
-                              ))}
+                              {meta.detailFields.map(({ key, label: fieldLabel, unit }) => {
+                                const val = fd[key];
+                                if (val === null || val === undefined || val === '') return null;
+                                return (
+                                  <div key={key}>
+                                    <p className="text-slate-500">{fieldLabel}</p>
+                                    <p className="font-medium">{withUnit(val, unit)}</p>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -1389,10 +1376,16 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
                     </div>
                   </div>
                   {cert.documentUrl && (
-                    <Button variant="outline" size="sm" onClick={() => downloadDoc(cert.documentUrl!, cert.name || 'Certificate')}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setViewerDoc({ url: cert.documentUrl!, name: cert.name || 'Certificate' })}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => downloadDoc(cert.documentUrl!, cert.name || 'Certificate')}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -1441,6 +1434,13 @@ function FacilitiesTab({ vendor }: { vendor: VendorProfile }) {
             )}
           </CardContent>
         </Card>
+      )}
+      {viewerDoc && (
+        <DocViewerModal
+          url={viewerDoc.url}
+          name={viewerDoc.name}
+          onClose={() => setViewerDoc(null)}
+        />
       )}
     </div>
   )
@@ -1945,12 +1945,15 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                         <p className="font-medium">{formatLocalLandline({ countryCode: '+91', std: contact.localLandlineStd, number: contact.localLandline || contact.landline })}</p>
                       </div>
                     )}
-                    {contact.intlLandline && (
-                      <div>
-                        <p className="text-sm text-slate-500">International Landline Number</p>
-                        <p className="font-medium">{formatIntlLandline(contact.intlLandline)}</p>
-                      </div>
-                    )}
+                    {(() => {
+                      const intlLL = formatIntlLandline(contact.intlLandline);
+                      return intlLL ? (
+                        <div>
+                          <p className="text-sm text-slate-500">International Landline Number</p>
+                          <p className="font-medium">{intlLL}</p>
+                        </div>
+                      ) : null;
+                    })()}
                     <div>
                       <p className="text-sm text-slate-500">Department</p>
                       <p className="font-medium capitalize">{contact.department || 'N/A'}</p>
@@ -1991,7 +1994,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="mt-2">
                     <p className="text-xs text-slate-500 mb-1">Import Countries</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {(vendor as any).importCountries.map((c: string) => (
+                      {withFlags((vendor as any).importCountries).map((c: string) => (
                         <Badge key={c} className="bg-blue-50 text-blue-700 border border-blue-200">{c}</Badge>
                       ))}
                     </div>
@@ -2005,7 +2008,7 @@ function ContactTradeTab({ vendor }: { vendor: VendorProfile }) {
                   <div className="mt-2">
                     <p className="text-xs text-slate-500 mb-1">Export Countries</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {(vendor as any).exportCountries.map((c: string) => (
+                      {withFlags((vendor as any).exportCountries).map((c: string) => (
                         <Badge key={c} className="bg-emerald-50 text-emerald-700 border border-emerald-200">{c}</Badge>
                       ))}
                     </div>
@@ -2164,23 +2167,31 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('all')}
+          className="text-left rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-brand-300 transition-all"
+        >
+          <div className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <MessageSquare className="h-5 w-5 text-blue-600" />
+              <div className={`p-2 rounded-lg ${statusFilter === 'all' ? 'bg-brand-100' : 'bg-slate-100'}`}>
+                <MessageSquare className={`h-5 w-5 ${statusFilter === 'all' ? 'text-brand-600' : 'text-slate-500'}`} />
               </div>
               <div>
                 <p className="text-sm text-slate-500">Total Reviews</p>
-                <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
+                <p className={`text-2xl font-bold ${statusFilter === 'all' ? 'text-brand-600' : 'text-slate-900'}`}>{stats.total}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'approved' ? 'all' : 'approved')}
+          className="text-left rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-green-300 transition-all"
+        >
+          <div className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
+              <div className={`p-2 rounded-lg ${statusFilter === 'approved' ? 'bg-green-200' : 'bg-green-100'}`}>
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
@@ -2188,12 +2199,16 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                 <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'rejected' ? 'all' : 'rejected')}
+          className="text-left rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-red-300 transition-all"
+        >
+          <div className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
+              <div className={`p-2 rounded-lg ${statusFilter === 'rejected' ? 'bg-red-200' : 'bg-red-100'}`}>
                 <XCircle className="h-5 w-5 text-red-600" />
               </div>
               <div>
@@ -2201,8 +2216,8 @@ function ReviewsTab({ vendor }: { vendor: VendorProfile }) {
                 <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </button>
       </div>
 
       {/* Rating Distribution */}
